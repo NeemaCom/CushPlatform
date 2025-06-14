@@ -182,14 +182,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password } = loginSchema.parse(req.body);
       
-      const user = await storage.getUserByUsername(username);
+      // Support login with either username or email
+      let user = await storage.getUserByUsername(username);
+      if (!user) {
+        // Try to find user by email if username lookup failed
+        user = await storage.getUserByEmail(username);
+      }
+      
       if (!user) {
         await SecurityLogger.logAuthEvent(
           'login_attempt',
           null,
           false,
-          req.ip,
-          req.get('User-Agent'),
+          req.ip || '',
+          req.get('User-Agent') || '',
           { username, reason: 'user_not_found' }
         );
         return res.status(401).json({ error: "Invalid credentials" });
@@ -201,8 +207,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           'login_attempt',
           user.id,
           false,
-          req.ip,
-          req.get('User-Agent'),
+          req.ip || '',
+          req.get('User-Agent') || '',
           { username, reason: 'invalid_password' }
         );
         return res.status(401).json({ error: "Invalid credentials" });
@@ -221,8 +227,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         'login_success',
         user.id,
         true,
-        req.ip,
-        req.get('User-Agent'),
+        req.ip || '',
+        req.get('User-Agent') || '',
         { username }
       );
 
