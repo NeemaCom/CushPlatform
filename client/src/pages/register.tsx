@@ -101,8 +101,11 @@ export default function Register() {
         <div className="w-full max-w-md">
           <div className="mb-8">
             <div className="flex items-center mb-6">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Cush</span>
+              <img 
+                src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                alt="Cush Logo" 
+                className="h-8 w-auto"
+              />
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
             <p className="text-gray-600">Let's get you started with your financial journey</p>

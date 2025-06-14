@@ -46,8 +46,11 @@ export function Sidebar() {
     <div className="w-64 bg-white/95 backdrop-blur-sm shadow-sm h-screen fixed left-0 top-0 border-r border-blue-100">
       <div className="p-6">
         <div className="flex items-center">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
-          <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Cush</span>
+          <img 
+            src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+            alt="Cush Logo" 
+            className="h-8 w-auto"
+          />
         </div>
       </div>
       
