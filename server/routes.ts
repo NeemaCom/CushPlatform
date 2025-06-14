@@ -926,6 +926,267 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== COMMUNITY FEATURES API ROUTES =====
+
+  // Community Insights routes
+  app.get('/api/community/insights', async (req, res) => {
+    try {
+      const { limit = 20, category } = req.query;
+      const insights = await storage.getInsights(Number(limit), category as string);
+      res.json(insights);
+    } catch (error: any) {
+      console.error("Get insights error:", error);
+      res.status(500).json({ error: "Failed to fetch insights" });
+    }
+  });
+
+  app.get('/api/community/insights/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const insight = await storage.getInsightById(Number(id));
+      
+      if (!insight) {
+        return res.status(404).json({ error: "Insight not found" });
+      }
+      
+      res.json(insight);
+    } catch (error: any) {
+      console.error("Get insight error:", error);
+      res.status(500).json({ error: "Failed to fetch insight" });
+    }
+  });
+
+  app.post('/api/community/insights', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createInsightSchema.parse(req.body);
+      
+      const insight = await storage.createInsight({
+        ...validatedData,
+        authorId: userId,
+        status: 'published'
+      });
+      
+      res.status(201).json(insight);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid insight data", details: error.errors });
+      }
+      console.error("Create insight error:", error);
+      res.status(500).json({ error: "Failed to create insight" });
+    }
+  });
+
+  // Mentors routes
+  app.get('/api/community/mentors', async (req, res) => {
+    try {
+      const { specialty, isActive = 'true' } = req.query;
+      const mentors = await storage.getMentors(specialty as string, isActive === 'true');
+      res.json(mentors);
+    } catch (error: any) {
+      console.error("Get mentors error:", error);
+      res.status(500).json({ error: "Failed to fetch mentors" });
+    }
+  });
+
+  app.get('/api/community/mentors/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const mentor = await storage.getMentorById(Number(id));
+      
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+      
+      res.json(mentor);
+    } catch (error: any) {
+      console.error("Get mentor error:", error);
+      res.status(500).json({ error: "Failed to fetch mentor" });
+    }
+  });
+
+  app.post('/api/community/mentors', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createMentorSchema.parse(req.body);
+      
+      // Check if user already has a mentor profile
+      const existingMentor = await storage.getMentorByUserId(userId);
+      if (existingMentor) {
+        return res.status(400).json({ error: "User already has a mentor profile" });
+      }
+      
+      const mentor = await storage.createMentor({
+        ...validatedData,
+        userId,
+        isActive: true
+      });
+      
+      res.status(201).json(mentor);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid mentor data", details: error.errors });
+      }
+      console.error("Create mentor error:", error);
+      res.status(500).json({ error: "Failed to create mentor profile" });
+    }
+  });
+
+  // Community Events routes
+  app.get('/api/community/events', async (req, res) => {
+    try {
+      const { limit = 20, category } = req.query;
+      const events = await storage.getEvents(Number(limit), category as string);
+      res.json(events);
+    } catch (error: any) {
+      console.error("Get events error:", error);
+      res.status(500).json({ error: "Failed to fetch events" });
+    }
+  });
+
+  app.get('/api/community/events/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const event = await storage.getEventById(Number(id));
+      
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      res.json(event);
+    } catch (error: any) {
+      console.error("Get event error:", error);
+      res.status(500).json({ error: "Failed to fetch event" });
+    }
+  });
+
+  app.post('/api/community/events', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createEventSchema.parse(req.body);
+      
+      const event = await storage.createEvent({
+        ...validatedData,
+        organizerId: userId,
+        date: new Date(validatedData.date),
+        registrationDeadline: validatedData.registrationDeadline ? new Date(validatedData.registrationDeadline) : undefined
+      });
+      
+      res.status(201).json(event);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid event data", details: error.errors });
+      }
+      console.error("Create event error:", error);
+      res.status(500).json({ error: "Failed to create event" });
+    }
+  });
+
+  // Event registrations routes
+  app.get('/api/community/events/:eventId/registrations', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { eventId } = req.params;
+      const registrations = await storage.getEventRegistrations(Number(eventId));
+      res.json(registrations);
+    } catch (error: any) {
+      console.error("Get event registrations error:", error);
+      res.status(500).json({ error: "Failed to fetch event registrations" });
+    }
+  });
+
+  app.post('/api/community/events/:eventId/register', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { eventId } = req.params;
+      const { notes } = req.body;
+      
+      // Check if event exists
+      const event = await storage.getEventById(Number(eventId));
+      if (!event) {
+        return res.status(404).json({ error: "Event not found" });
+      }
+      
+      const registration = await storage.createEventRegistration({
+        eventId: Number(eventId),
+        userId,
+        status: 'registered',
+        notes: notes || null
+      });
+      
+      res.status(201).json(registration);
+    } catch (error: any) {
+      console.error("Register for event error:", error);
+      res.status(500).json({ error: "Failed to register for event" });
+    }
+  });
+
+  app.get('/api/community/my-registrations', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const registrations = await storage.getUserEventRegistrations(userId);
+      res.json(registrations);
+    } catch (error: any) {
+      console.error("Get user registrations error:", error);
+      res.status(500).json({ error: "Failed to fetch user registrations" });
+    }
+  });
+
+  // Mentor Sessions routes
+  app.post('/api/community/mentor-sessions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = bookMentorSessionSchema.parse(req.body);
+      
+      // Check if mentor exists
+      const mentor = await storage.getMentorById(validatedData.mentorId);
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+      
+      const session = await storage.createMentorSession({
+        mentorId: validatedData.mentorId,
+        menteeId: userId,
+        scheduledAt: new Date(validatedData.scheduledAt),
+        duration: validatedData.duration,
+        sessionType: validatedData.sessionType,
+        notes: validatedData.notes || null,
+        status: 'scheduled'
+      });
+      
+      res.status(201).json(session);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid session data", details: error.errors });
+      }
+      console.error("Book mentor session error:", error);
+      res.status(500).json({ error: "Failed to book mentor session" });
+    }
+  });
+
+  app.get('/api/community/my-sessions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { as } = req.query; // 'mentor' or 'mentee'
+      
+      let sessions;
+      if (as === 'mentor') {
+        // Get mentor profile first
+        const mentorProfile = await storage.getMentorByUserId(userId);
+        if (!mentorProfile) {
+          return res.status(404).json({ error: "Mentor profile not found" });
+        }
+        sessions = await storage.getMentorSessions(mentorProfile.id);
+      } else {
+        sessions = await storage.getMentorSessions(undefined, userId);
+      }
+      
+      res.json(sessions);
+    } catch (error: any) {
+      console.error("Get user sessions error:", error);
+      res.status(500).json({ error: "Failed to fetch user sessions" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -413,7 +413,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(eventRegistrations)
       .where(eq(eventRegistrations.userId, userId))
-      .orderBy(desc(eventRegistrations.createdAt));
+      .orderBy(desc(eventRegistrations.registeredAt));
   }
 
   async createEventRegistration(registration: InsertEventRegistration & { eventId: number; userId: number }): Promise<EventRegistration> {
@@ -427,7 +427,7 @@ export class DatabaseStorage implements IStorage {
   async updateEventRegistration(id: number, updates: Partial<EventRegistration>): Promise<EventRegistration> {
     const [updatedRegistration] = await db
       .update(eventRegistrations)
-      .set({ ...updates, updatedAt: new Date() })
+      .set(updates)
       .where(eq(eventRegistrations.id, id))
       .returning();
     return updatedRegistration;
