@@ -53,6 +53,13 @@ export function ImisiChatHead() {
     staleTime: 4 * 60 * 1000, // 4 minutes
   });
 
+  // Check subscription status
+  const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
+    queryKey: ['/api/subscription-status'],
+    retry: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
   React.useEffect(() => {
     if (proactiveSuggestion?.suggestion && !isOpen) {
       setHasNewSuggestion(true);
@@ -79,14 +86,10 @@ export function ImisiChatHead() {
             ${hasNewSuggestion ? 'animate-bounce' : ''}
           `}
         >
-          <Bot className="w-6 h-6 text-white" />
-          {hasNewSuggestion && (
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-          )}
+          <MessageCircle className="w-6 h-6" />
         </Button>
       </div>
 
-      {/* Chat Interface */}
       {isOpen && (
         <div className={`
           fixed bottom-24 right-6 z-40 w-96 transition-all duration-300
@@ -98,7 +101,7 @@ export function ImisiChatHead() {
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5" />
                   <CardTitle className="text-lg">Imisi 2.0</CardTitle>
-                  {subscriptionStatus?.hasActiveSubscription ? (
+                  {(subscriptionStatus as any)?.hasActiveSubscription ? (
                     <Badge variant="secondary" className="text-xs bg-yellow-500/90 text-yellow-900">
                       <Crown className="w-3 h-3 mr-1" />
                       Premium
@@ -153,13 +156,6 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
 
-  // Check subscription status
-  const { data: subscriptionStatus } = useQuery({
-    queryKey: ['/api/subscription-status'],
-    retry: false,
-    staleTime: 2 * 60 * 1000, // 2 minutes
-  });
-
   // Get chat history
   const { data: chatHistory } = useQuery<ChatHistoryResponse>({
     queryKey: ['/api/imisi/history'],
@@ -210,6 +206,7 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
       ]);
       setMessage('');
       queryClient.invalidateQueries({ queryKey: ['/api/imisi/history'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/subscription-status'] });
     },
     onError: (error: Error) => {
       toast({
