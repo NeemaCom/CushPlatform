@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
+import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 const sidebarItems = [
   { icon: Home, label: "Dashboard", href: "/dashboard" },
@@ -47,7 +48,7 @@ export function Sidebar() {
       <div className="p-6">
         <div className="flex items-center">
           <img 
-            src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+            src={cushLogo} 
             alt="Cush Logo" 
             className="h-8 w-auto"
           />
