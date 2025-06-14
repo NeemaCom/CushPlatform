@@ -74,7 +74,7 @@ export function ImisiChatHead() {
           onClick={toggleChat}
           className={`
             relative w-14 h-14 rounded-full shadow-xl transition-all duration-300 
-            blipping-colors hover:scale-110
+            pulsing-orb hover:scale-110
             ${hasNewSuggestion ? 'animate-bounce' : ''}
           `}
         >
