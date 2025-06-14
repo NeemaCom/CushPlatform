@@ -104,14 +104,41 @@
   .border-cush-blue-800 { border-color: var(--cush-blue-800); }
   .border-cush-blue-900 { border-color: var(--cush-blue-900); }
 
-  /* Rolling color animation for Imisi chat head */
-  @keyframes rolling-colors {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  /* Sophisticated blipping color animation for Imisi chat head */
+  @keyframes blipping-colors {
+    0% { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+    }
+    16.67% { 
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      box-shadow: 0 0 20px rgba(240, 147, 251, 0.6);
+    }
+    33.33% { 
+      background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+      box-shadow: 0 0 20px rgba(79, 172, 254, 0.6);
+    }
+    50% { 
+      background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+      box-shadow: 0 0 20px rgba(67, 233, 123, 0.6);
+    }
+    66.67% { 
+      background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+      box-shadow: 0 0 20px rgba(250, 112, 154, 0.6);
+    }
+    83.33% { 
+      background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+      box-shadow: 0 0 20px rgba(168, 237, 234, 0.6);
+    }
+    100% { 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+    }
   }
 
-  .rolling-colors {
-    background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, #ec4899, #f97316, #22c55e, #06b6d4, #3b82f6);
-    animation: rolling-colors 3s linear infinite;
+  .blipping-colors {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    animation: blipping-colors 4s ease-in-out infinite;
+    border: 2px solid rgba(255, 255, 255, 0.2);
   }
 }
