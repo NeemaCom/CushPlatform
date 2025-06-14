@@ -110,7 +110,7 @@ export function ImisiChatHead() {
                     <Button
                       variant="secondary"
                       size="sm"
-                      onClick={() => navigate('/subscribe')}
+                      onClick={() => setLocation('/subscribe')}
                       className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 h-6"
                     >
                       <Crown className="w-3 h-3 mr-1" />
@@ -160,7 +160,7 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
 
   // Get chat history
   const { data: chatHistory } = useQuery<ChatHistoryResponse>({
@@ -240,11 +240,11 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const handleActionClick = (action: any) => {
     if (action.type === 'navigate') {
       if (action.data === '/subscribe' || action.data?.route === '/subscribe') {
-        navigate('/subscribe');
+        setLocation('/subscribe');
       } else if (typeof action.data === 'string') {
-        navigate(action.data);
+        setLocation(action.data);
       } else if (action.data?.route) {
-        navigate(action.data.route);
+        setLocation(action.data.route);
       }
     }
   };
