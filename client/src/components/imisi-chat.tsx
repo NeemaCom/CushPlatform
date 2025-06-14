@@ -68,8 +68,8 @@ export function ImisiChatHead() {
           onClick={toggleChat}
           className={`
             relative w-14 h-14 rounded-full shadow-lg transition-all duration-300 
-            bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700
-            ${hasNewSuggestion ? 'animate-bounce' : 'hover:scale-110'}
+            rolling-colors hover:scale-110
+            ${hasNewSuggestion ? 'animate-bounce' : ''}
           `}
         >
           <Bot className="w-6 h-6 text-white" />
