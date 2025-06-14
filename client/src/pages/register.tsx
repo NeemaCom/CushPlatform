@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { registerSchema, type RegisterForm as RegisterFormType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, CheckCircle } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 import heroImage from "@assets/lady smiling_1749866663341.jpg";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
@@ -110,6 +111,28 @@ export default function Register() {
             </div>
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Create Account</h2>
             <p className="text-gray-600">Let's get you started with your financial journey</p>
+          </div>
+
+          {/* Gmail Sign Up Option */}
+          <div className="mb-6">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-12 border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 flex items-center justify-center gap-3"
+              onClick={() => {
+                // Handle Gmail OAuth
+                window.location.href = "/api/auth/google";
+              }}
+            >
+              <SiGoogle className="w-5 h-5 text-red-500" />
+              <span className="font-medium">Sign up with Gmail</span>
+            </Button>
+            
+            <div className="flex items-center my-6">
+              <div className="flex-1 border-t border-gray-300"></div>
+              <span className="px-4 text-sm text-gray-500 bg-white">or continue with email</span>
+              <div className="flex-1 border-t border-gray-300"></div>
+            </div>
           </div>
 
           <Form {...form}>
