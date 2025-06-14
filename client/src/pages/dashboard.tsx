@@ -115,21 +115,6 @@ export default function Dashboard() {
                 <p className="text-gray-600">Welcome back, {dashboardData?.user.name || 'User'}!</p>
               </div>
               <div className="flex items-center space-x-4">
-                {subscriptionStatus && !subscriptionStatus.hasActiveSubscription && (
-                  <Button 
-                    onClick={() => navigate("/subscribe")}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2"
-                  >
-                    <Crown className="w-4 h-4 mr-2" />
-                    Upgrade to Premium
-                  </Button>
-                )}
-                {subscriptionStatus && subscriptionStatus.hasActiveSubscription && (
-                  <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Premium
-                  </Badge>
-                )}
                 <Button variant="ghost" size="icon">
                   <Bell className="h-5 w-5 text-gray-400" />
                 </Button>
