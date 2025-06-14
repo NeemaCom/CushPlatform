@@ -6,6 +6,11 @@ import {
   userAuditLogs,
   chatMessages,
   aiAssistantContext,
+  insights,
+  mentors,
+  communityEvents,
+  eventRegistrations,
+  mentorSessions,
   type User, 
   type SafeUser,
   type InsertUser,
@@ -18,7 +23,17 @@ import {
   type ChatMessage,
   type InsertChatMessage,
   type AIAssistantContext,
-  type InsertAIAssistantContext
+  type InsertAIAssistantContext,
+  type Insight,
+  type InsertInsight,
+  type Mentor,
+  type InsertMentor,
+  type CommunityEvent,
+  type InsertCommunityEvent,
+  type EventRegistration,
+  type InsertEventRegistration,
+  type MentorSession,
+  type InsertMentorSession
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -55,6 +70,38 @@ export interface IStorage {
   getAIAssistantContext(userId: number, contextType?: string): Promise<AIAssistantContext[]>;
   createAIAssistantContext(context: Omit<InsertAIAssistantContext, 'id' | 'createdAt' | 'updatedAt'> & { userId: number }): Promise<AIAssistantContext>;
   updateAIAssistantContext(id: number, updates: Partial<AIAssistantContext>): Promise<AIAssistantContext>;
+
+  // Community Insights methods
+  getInsights(limit?: number, category?: string): Promise<Insight[]>;
+  getInsightById(id: number): Promise<Insight | undefined>;
+  createInsight(insight: InsertInsight & { authorId: number }): Promise<Insight>;
+  updateInsight(id: number, updates: Partial<Insight>): Promise<Insight>;
+  deleteInsight(id: number): Promise<void>;
+
+  // Mentor methods
+  getMentors(specialty?: string, isActive?: boolean): Promise<Mentor[]>;
+  getMentorById(id: number): Promise<Mentor | undefined>;
+  getMentorByUserId(userId: number): Promise<Mentor | undefined>;
+  createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor>;
+  updateMentor(id: number, updates: Partial<Mentor>): Promise<Mentor>;
+
+  // Community Events methods
+  getEvents(limit?: number, category?: string): Promise<CommunityEvent[]>;
+  getEventById(id: number): Promise<CommunityEvent | undefined>;
+  createEvent(event: InsertCommunityEvent & { organizerId: number }): Promise<CommunityEvent>;
+  updateEvent(id: number, updates: Partial<CommunityEvent>): Promise<CommunityEvent>;
+  deleteEvent(id: number): Promise<void>;
+
+  // Event Registrations methods
+  getEventRegistrations(eventId: number): Promise<EventRegistration[]>;
+  getUserEventRegistrations(userId: number): Promise<EventRegistration[]>;
+  createEventRegistration(registration: InsertEventRegistration & { eventId: number; userId: number }): Promise<EventRegistration>;
+  updateEventRegistration(id: number, updates: Partial<EventRegistration>): Promise<EventRegistration>;
+
+  // Mentor Sessions methods
+  getMentorSessions(mentorId?: number, menteeId?: number): Promise<MentorSession[]>;
+  createMentorSession(session: InsertMentorSession & { mentorId: number; menteeId: number }): Promise<MentorSession>;
+  updateMentorSession(id: number, updates: Partial<MentorSession>): Promise<MentorSession>;
 }
 
 export class DatabaseStorage implements IStorage {

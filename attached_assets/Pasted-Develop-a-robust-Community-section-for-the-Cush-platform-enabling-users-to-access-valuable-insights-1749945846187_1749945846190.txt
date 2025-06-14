@@ -1,0 +1,61 @@
+Develop a robust Community section for the Cush platform, enabling users to access valuable insights, connect with mentors, and discover community events.
+
+Core Requirements:
+Community Insights Module:
+
+Data Model: Define a Insight database schema (e.g., id, title, content, authorId, category, createdAt, updatedAt).
+
+Backend APIs:
+
+GET /api/community/insights: Retrieve a list of insights (with optional filters/pagination).
+
+GET /api/community/insights/:id: Retrieve a single insight.
+
+(Admin only) POST /api/admin/insights, PUT /api/admin/insights/:id, DELETE /api/admin/insights/:id: CRUD operations for insights.
+
+Frontend Interface: Dedicated section to display articles, guides, and informative content relevant to migrants and underserved communities.
+
+Mentor Connection Module:
+
+Data Model: Define a Mentor database schema (e.g., id, userId (FK to User), specialty, bio, availability (JSONB), rating, createdAt, updatedAt).
+
+Backend APIs:
+
+GET /api/community/mentors: Discover available mentors (with filters by specialty, availability).
+
+GET /api/community/mentors/:id: View detailed mentor profiles.
+
+POST /api/community/mentors/request-connection: Allow users to send connection requests or book introductory sessions with mentors (integrate with calendar/scheduling, potentially using a similar flow to doctor appointments).
+
+(Admin only) POST /api/admin/mentors, PUT /api/admin/mentors/:id, DELETE /api/admin/mentors/:id: CRUD for mentor profiles.
+
+Frontend Interface: User-friendly interface to browse mentors, view profiles, and initiate connection/booking.
+
+Community Events Access:
+
+Data Model: Define a CommunityEvent database schema (e.g., id, title, description, date, time, location, isOnline (boolean), link (if online), organizerId (FK to User/Admin), createdAt, updatedAt).
+
+Backend APIs:
+
+GET /api/community/events: Discover upcoming community events (with filters by date, location, type).
+
+GET /api/community/events/:id: View event details.
+
+(Admin/Organizer) POST /api/admin/events, PUT /api/admin/events/:id, DELETE /api/admin/events/:id: CRUD for events.
+
+Frontend Interface: Display a calendar or list of events, with details and RSVP/registration options.
+
+Expected Deliverables:
+backend/src/db/schema.ts: Updated Drizzle schemas for Insight, Mentor, and CommunityEvent models.
+
+backend/src/types/index.ts: Definitive TypeScript interfaces for Insight, Mentor, and CommunityEvent.
+
+backend/src/routes.ts: (Or new dedicated community routes file) APIs for insights, mentor discovery, and events.
+
+Frontend (Conceptual): Notes on React components for:
+
+Insights listing and detail pages.
+
+Mentor browsing and profile pages.
+
+Community events calendar/list.
