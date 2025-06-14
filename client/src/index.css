@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom Gmail button animations */
+@keyframes shimmer {
+  0% { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(200%) skewX(-12deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-3px); }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(239, 68, 68, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.4), 0 0 30px rgba(239, 68, 68, 0.1); }
+}
+
+@keyframes rainbow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gmail-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.gmail-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.gmail-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.gmail-rainbow {
+  background: linear-gradient(-45deg, #ea4335, #fbbc04, #34a853, #4285f4);
+  background-size: 400% 400%;
+  animation: rainbow 3s ease infinite;
+}
+
 :root {
   --background: hsl(0, 0%, 100%);
   --foreground: hsl(20, 14.3%, 4.1%);

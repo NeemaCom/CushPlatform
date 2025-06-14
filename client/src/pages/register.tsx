@@ -117,45 +117,77 @@ export default function Register() {
 
           {/* Gmail Sign Up Option */}
           <div className="mb-6">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isGoogleLoading}
-              className="w-full h-14 border-2 border-gray-200 hover:border-red-400 hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-300 ease-in-out flex items-center justify-center gap-3 group shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
-              onClick={() => {
-                setIsGoogleLoading(true);
-                // Handle Gmail OAuth
-                window.location.href = "/api/auth/google";
-              }}
-            >
-              <div className="relative">
-                {isGoogleLoading ? (
-                  <Loader2 className="w-6 h-6 text-red-500 animate-spin" />
-                ) : (
-                  <>
-                    <SiGoogle className="w-6 h-6 text-red-500 group-hover:scale-110 transition-transform duration-200" />
-                    <div className="absolute inset-0 w-6 h-6 bg-red-500 rounded-full opacity-0 group-hover:opacity-20 animate-ping"></div>
-                  </>
-                )}
-              </div>
-              <span className="font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-200">
-                {isGoogleLoading ? "Connecting to Google..." : "Continue with Gmail"}
-              </span>
-              {!isGoogleLoading && (
-                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
+            <div className="relative group gmail-float">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isGoogleLoading}
+                className="w-full h-16 border-2 border-gray-200 hover:border-transparent bg-white hover:bg-gradient-to-r hover:from-white hover:via-red-50 hover:to-blue-50 transition-all duration-500 ease-out flex items-center justify-center gap-4 shadow-lg hover:shadow-xl gmail-glow transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none overflow-hidden relative"
+                onClick={() => {
+                  setIsGoogleLoading(true);
+                  window.location.href = "/api/auth/google";
+                }}
+              >
+                {/* Animated rainbow background */}
+                <div className="absolute inset-0 gmail-rainbow opacity-0 group-hover:opacity-10 transition-opacity duration-500"></div>
+                
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 gmail-shimmer bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100"></div>
+                
+                <div className="relative flex items-center gap-4 z-10">
+                  <div className="relative">
+                    {isGoogleLoading ? (
+                      <div className="relative">
+                        <Loader2 className="w-7 h-7 text-red-500 animate-spin" />
+                        <div className="absolute inset-0 w-7 h-7 bg-red-500 rounded-full opacity-20 animate-pulse"></div>
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <SiGoogle className="w-7 h-7 text-red-500 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300" />
+                        <div className="absolute inset-0 w-7 h-7 bg-red-500 rounded-full opacity-0 group-hover:opacity-20 animate-ping"></div>
+                        <div className="absolute inset-0 w-7 h-7 bg-gradient-to-r from-red-500 to-orange-500 rounded-full opacity-0 group-hover:opacity-10 animate-pulse"></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-col items-start">
+                    <span className="font-bold text-lg text-gray-800 group-hover:text-gray-900 transition-colors duration-200">
+                      {isGoogleLoading ? "Connecting..." : "Continue with Google"}
+                    </span>
+                    <span className="text-xs text-gray-500 group-hover:text-gray-600 transition-colors duration-200">
+                      Quick & secure sign up
+                    </span>
+                  </div>
+                  
+                  {!isGoogleLoading && (
+                    <div className="ml-auto opacity-0 group-hover:opacity-100 transition-all duration-300 transform group-hover:translate-x-1">
+                      <div className="relative">
+                        <svg className="w-5 h-5 text-gray-400 group-hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                        <div className="absolute -inset-1 bg-gradient-to-r from-red-500 to-blue-500 rounded-full opacity-0 group-hover:opacity-20 animate-pulse"></div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </Button>
+              </Button>
+              
+              {/* Enhanced floating particles effect */}
+              <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                <div className="absolute top-2 left-4 w-1.5 h-1.5 bg-red-400 rounded-full animate-bounce delay-75 shadow-sm"></div>
+                <div className="absolute top-4 right-8 w-1 h-1 bg-blue-400 rounded-full animate-bounce delay-150 shadow-sm"></div>
+                <div className="absolute bottom-3 left-8 w-1 h-1 bg-green-400 rounded-full animate-bounce delay-300 shadow-sm"></div>
+                <div className="absolute top-6 right-4 w-0.5 h-0.5 bg-yellow-400 rounded-full animate-pulse delay-500"></div>
+              </div>
+            </div>
             
             <div className="flex items-center my-8">
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-              <div className="px-6 text-sm text-gray-500 bg-white relative">
-                <span className="bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm">
-                  or continue with email
-                </span>
+              <div className="relative px-6">
+                <div className="relative bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+                  <span className="text-sm text-gray-500 font-medium">or continue with email</span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-red-50 to-blue-50 rounded-full opacity-0 hover:opacity-50 transition-opacity duration-300"></div>
+                </div>
               </div>
               <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
             </div>
