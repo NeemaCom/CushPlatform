@@ -14,7 +14,7 @@ export default function Homepage() {
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
                 <img 
-                  src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                  src={cushLogo} 
                   alt="Cush Logo" 
                   className="h-8 w-auto mr-3"
                 />
@@ -373,7 +373,7 @@ export default function Homepage() {
             <div className="md:col-span-1">
               <div className="flex items-center mb-4">
                 <img 
-                  src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                  src={cushLogo} 
                   alt="Cush Logo" 
                   className="h-8 w-auto"
                 />

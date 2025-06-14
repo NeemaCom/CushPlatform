@@ -10,6 +10,7 @@ import { registerSchema, type RegisterForm as RegisterFormType } from "@shared/s
 import { apiRequest } from "@/lib/queryClient";
 import { Shield, CheckCircle } from "lucide-react";
 import heroImage from "@assets/lady smiling_1749866663341.jpg";
+import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function Register() {
   const [, navigate] = useLocation();
@@ -102,7 +103,7 @@ export default function Register() {
           <div className="mb-8">
             <div className="flex items-center mb-6">
               <img 
-                src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                src={cushLogo} 
                 alt="Cush Logo" 
                 className="h-8 w-auto"
               />

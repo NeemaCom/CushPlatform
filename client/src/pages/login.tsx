@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginForm as LoginFormType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import heroImage from "@assets/guy smiling2_1749866663339.jpg";
+import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -80,7 +81,7 @@ export default function Login() {
           <div className="mb-8">
             <div className="flex items-center mb-6">
               <img 
-                src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                src={cushLogo} 
                 alt="Cush Logo" 
                 className="h-8 w-auto"
               />
