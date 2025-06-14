@@ -28,7 +28,7 @@ export interface ChatResponse {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   async generateResponse(userMessage: string, context: UserContext): Promise<ChatResponse> {
     const systemPrompt = this.buildSystemPrompt(context);
@@ -40,46 +40,33 @@ export class GeminiService {
       const text = response.text();
 
       return this.parseResponse(text);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Gemini API error:', error);
+      
+      // Handle rate limit errors with helpful fallback
+      if (error.status === 429) {
+        const { user, currentBalance } = context;
+        return {
+          message: `Hello ${user.firstName}! I'm Imisi 2.0, your AI assistant for Cush. I can help you with financial management, budgeting advice, and immigration guidance. With your current balance of $${currentBalance.toFixed(2)}, I can provide personalized recommendations. How can I assist you today?`,
+          suggestions: ['Check my budget', 'Immigration help', 'Financial advice', 'Platform features']
+        };
+      }
+      
       throw new Error('Unable to generate AI response');
     }
   }
 
+
+
   private buildSystemPrompt(context: UserContext): string {
     const { user, accounts, recentTransactions, balanceHistory, currentBalance, monthlyIncome, monthlyExpenses } = context;
     
-    return `You are Imisi 2.0, a friendly and intelligent AI assistant for Cush, a financial platform. You help users with:
-- Financial management and budgeting advice
-- Immigration-related guidance and documentation
-- Platform navigation and feature explanations
-- Personalized recommendations based on their financial data
+    return `You are Imisi 2.0, AI assistant for Cush financial platform.
 
-User Profile:
-- Name: ${user.firstName} ${user.lastName}
-- Email: ${user.email}
-- Nationality: ${user.nationality || 'Not specified'}
-- Account Type: ${user.role}
+User: ${user.firstName} ${user.lastName} (${user.nationality || 'N/A'})
+Balance: $${currentBalance.toFixed(2)} | Monthly: +$${monthlyIncome.toFixed(2)} -$${monthlyExpenses.toFixed(2)}
 
-Financial Overview:
-- Current Total Balance: $${currentBalance.toFixed(2)}
-- Monthly Income: $${monthlyIncome.toFixed(2)}
-- Monthly Expenses: $${monthlyExpenses.toFixed(2)}
-- Accounts: ${accounts.map(acc => `${acc.name} (${acc.type}): $${acc.balance}`).join(', ')}
-
-Recent Activity:
-${recentTransactions.slice(0, 5).map(t => `- ${t.description}: ${t.type === 'expense' ? '-' : '+'}$${t.amount} (${t.category})`).join('\n')}
-
-Guidelines:
-- Be conversational, helpful, and encouraging
-- Provide specific, actionable advice based on their financial data
-- Offer to help with immigration documentation and processes
-- Suggest relevant platform features when appropriate
-- Keep responses concise but comprehensive
-- Include practical next steps or suggestions when relevant
-- For immigration topics, provide helpful guidance but always recommend consulting official sources
-
-Response format: Provide a clear, helpful response. If suggesting actions, include them naturally in your response.`;
+Help with finances, budgeting, immigration guidance. Be concise and actionable.`;
   }
 
   private parseResponse(text: string): ChatResponse {
