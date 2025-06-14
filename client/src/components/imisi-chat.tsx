@@ -278,19 +278,21 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
           )}
           
           {messages.map((msg, index) => (
-            <div key={index} className={`flex gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div key={index} className={`flex gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'} ${
+              msg.type === 'ai' ? 'chat-message-ai' : 'chat-message-user'
+            }`} style={{ animationDelay: `${index * 0.1}s` }}>
               {msg.type === 'ai' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 chat-bot-thinking">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
               )}
               
               <div className={`max-w-[80%] ${msg.type === 'user' ? 'order-1' : ''}`}>
                 <div className={`
-                  rounded-lg px-4 py-2 text-sm
+                  rounded-lg px-4 py-2 text-sm transition-all duration-200 hover:shadow-md
                   ${msg.type === 'user' 
-                    ? 'bg-blue-500 text-white ml-auto' 
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-blue-500 text-white ml-auto hover:bg-blue-600' 
+                    : 'bg-gray-100 text-gray-900 hover:bg-gray-50'
                   }
                 `}>
                   {msg.content}
@@ -305,9 +307,10 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
                         variant="outline"
                         size="sm"
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="text-xs h-auto py-1 px-2 block w-full text-left"
+                        className="text-xs h-auto py-1 px-2 block w-full text-left chat-button-hover hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
+                        style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
                       >
-                        <Sparkles className="w-3 h-3 mr-1 inline" />
+                        <Sparkles className="w-3 h-3 mr-1 inline animate-pulse" />
                         {suggestion}
                       </Button>
                     ))}
@@ -323,7 +326,8 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
                         variant="default"
                         size="sm"
                         onClick={() => handleActionClick(action)}
-                        className="text-xs h-auto py-1 px-2 mr-1"
+                        className="text-xs h-auto py-1 px-2 mr-1 chat-button-hover hover:scale-105 transition-all duration-200"
+                        style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
                       >
                         {action.label}
                       </Button>
@@ -333,12 +337,12 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
 
                 {/* Premium Upgrade Button - Show for non-premium users after AI responses */}
                 {msg.type === 'ai' && !subscriptionStatus?.hasActiveSubscription && (
-                  <div className="mt-3 pt-2 border-t border-gray-200">
+                  <div className="mt-3 pt-2 border-t border-gray-200 chat-message-enter" style={{ animationDelay: `${(index + 1) * 0.1 + 0.3}s` }}>
                     <Button
                       onClick={() => setLocation('/subscribe')}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs py-2 px-3 rounded-md shadow-sm transition-all duration-200"
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs py-2 px-3 rounded-md shadow-sm transition-all duration-200 upgrade-button-glow hover:scale-[1.02] hover:shadow-lg"
                     >
-                      <Crown className="w-3 h-3 mr-2" />
+                      <Crown className="w-3 h-3 mr-2 animate-pulse" />
                       Upgrade to Premium
                     </Button>
                   </div>
@@ -354,15 +358,15 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
           ))}
           
           {sendMessageMutation.isPending && (
-            <div className="flex gap-3 justify-start">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
+            <div className="flex gap-3 justify-start chat-message-ai">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center chat-bot-thinking">
                 <Bot className="w-4 h-4 text-white" />
               </div>
-              <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+              <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm message-shimmer">
+                <div className="typing-indicator">
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
+                  <div className="typing-dot"></div>
                 </div>
               </div>
             </div>
@@ -380,14 +384,18 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ask Imisi anything..."
             disabled={sendMessageMutation.isPending}
-            className="flex-1"
+            className="flex-1 chat-input-focus transition-all duration-200 hover:border-blue-300 focus:border-blue-500"
           />
           <Button 
             type="submit" 
             disabled={!message.trim() || sendMessageMutation.isPending}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 chat-button-hover hover:scale-105 transition-all duration-200"
           >
-            <Send className="w-4 h-4" />
+            {sendMessageMutation.isPending ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-4 h-4" />
+            )}
           </Button>
         </form>
       </div>
