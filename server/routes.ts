@@ -37,9 +37,7 @@ import rateLimit from "express-rate-limit";
 if (!process.env.STRIPE_SECRET_KEY) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2023-10-16",
-});
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Apply global rate limiting
@@ -784,6 +782,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Save AI context error:", error);
       res.status(500).json({ error: "Failed to save AI context" });
+    }
+  });
+
+  // Stripe subscription endpoints for Imisi Premium
+  app.post('/api/create-subscription', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (!user.email) {
+        return res.status(400).json({ error: "User email is required for subscription" });
+      }
+
+      // Check if user already has a subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        
+        if (subscription.status === 'active') {
+          return res.json({
+            subscriptionId: subscription.id,
+            status: subscription.status,
+            clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+          });
+        }
+      }
+
+      // Create or retrieve Stripe customer
+      let customerId = user.stripeCustomerId;
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: user.name || user.username,
+          metadata: {
+            userId: userId.toString()
+          }
+        });
+        customerId = customer.id;
+        
+        // Update user with Stripe customer ID
+        await storage.updateUser(userId, { stripeCustomerId: customerId });
+      }
+
+      // Create subscription for Imisi Premium
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Imisi Premium AI Concierge',
+              description: 'Unlimited AI assistant responses with advanced financial guidance'
+            },
+            unit_amount: 999, // $9.99/month
+            recurring: {
+              interval: 'month'
+            }
+          }
+        }],
+        payment_behavior: 'default_incomplete',
+        payment_settings: {
+          save_default_payment_method: 'on_subscription'
+        },
+        expand: ['latest_invoice.payment_intent'],
+      });
+
+      // Update user with subscription ID
+      await storage.updateUser(userId, { stripeSubscriptionId: subscription.id });
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret: subscription.latest_invoice?.payment_intent?.client_secret,
+        status: subscription.status
+      });
+
+    } catch (error: any) {
+      console.error("Create subscription error:", error);
+      res.status(500).json({ error: "Failed to create subscription: " + error.message });
+    }
+  });
+
+  // Get subscription status
+  app.get('/api/subscription-status', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.stripeSubscriptionId) {
+        return res.json({ 
+          hasActiveSubscription: false,
+          status: 'inactive'
+        });
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+      
+      res.json({
+        hasActiveSubscription: subscription.status === 'active',
+        status: subscription.status,
+        currentPeriodEnd: subscription.current_period_end,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end
+      });
+
+    } catch (error: any) {
+      console.error("Get subscription status error:", error);
+      res.status(500).json({ error: "Failed to get subscription status" });
+    }
+  });
+
+  // Cancel subscription
+  app.post('/api/cancel-subscription', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user || !user.stripeSubscriptionId) {
+        return res.status(404).json({ error: "No active subscription found" });
+      }
+
+      const subscription = await stripe.subscriptions.update(user.stripeSubscriptionId, {
+        cancel_at_period_end: true
+      });
+
+      res.json({
+        success: true,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        currentPeriodEnd: subscription.current_period_end
+      });
+
+    } catch (error: any) {
+      console.error("Cancel subscription error:", error);
+      res.status(500).json({ error: "Failed to cancel subscription" });
     }
   });
 
