@@ -151,7 +151,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set session
       req.session.userId = user.id;
-      req.session.role = user.role;
+      req.session.role = user.role || 'customer';
       req.session.lastActivity = Date.now();
 
       const safeUser = createSafeUser(user);
@@ -645,12 +645,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const aiResponse = await geminiService.generateResponse(message, context);
 
       // Store chat message in database
+      const finalSessionId = sessionId || Math.random().toString(36).substring(2, 15);
       const chatMessage = await storage.createChatMessage({
         userId,
         message,
         response: aiResponse.message,
-        context: { sessionId, userBalance: currentBalance },
-        sessionId: sessionId || Math.random().toString(36).substring(2, 15)
+        context: JSON.stringify({ sessionId: finalSessionId, userBalance: currentBalance }),
+        sessionId: finalSessionId
       });
 
       res.json({

@@ -80,7 +80,6 @@ export const authRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true,
   skipSuccessfulRequests: false,
   skipFailedRequests: false,
   handler: (req, res) => {
@@ -107,7 +106,6 @@ export const generalRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true,
   skipSuccessfulRequests: true,
 });
 
