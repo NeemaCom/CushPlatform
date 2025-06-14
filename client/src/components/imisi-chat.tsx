@@ -44,6 +44,7 @@ export function ImisiChatHead() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasNewSuggestion, setHasNewSuggestion] = useState(false);
+  const [, setLocation] = useLocation();
 
   // Get proactive suggestions
   const { data: proactiveSuggestion } = useQuery<ProactiveSuggestion>({
@@ -101,7 +102,7 @@ export function ImisiChatHead() {
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5" />
                   <CardTitle className="text-lg">Imisi 2.0</CardTitle>
-                  {subscriptionStatus && subscriptionStatus.hasActiveSubscription ? (
+                  {subscriptionStatus?.hasActiveSubscription ? (
                     <Badge variant="secondary" className="text-xs bg-yellow-500/90 text-yellow-900">
                       <Crown className="w-3 h-3 mr-1" />
                       Premium
