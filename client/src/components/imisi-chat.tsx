@@ -98,9 +98,16 @@ export function ImisiChatHead() {
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5" />
                   <CardTitle className="text-lg">Imisi 2.0</CardTitle>
-                  <Badge variant="secondary" className="text-xs bg-white/20">
-                    AI Assistant
-                  </Badge>
+                  {subscriptionStatus?.hasActiveSubscription ? (
+                    <Badge variant="secondary" className="text-xs bg-yellow-500/90 text-yellow-900">
+                      <Crown className="w-3 h-3 mr-1" />
+                      Premium
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-xs bg-white/20">
+                      Free
+                    </Badge>
+                  )}
                 </div>
                 <div className="flex gap-1">
                   <Button
