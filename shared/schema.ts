@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -95,6 +95,99 @@ export const userAuditLogs = pgTable("user_audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Community Insights table
+export const insights = pgTable("insights", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  excerpt: text("excerpt"), // Short description for listings
+  authorId: integer("author_id").notNull().references(() => users.id),
+  category: text("category").notNull(), // migration, finance, legal, housing, employment
+  tags: text("tags").array(), // Additional categorization
+  status: text("status").default("published"), // draft, published, archived
+  viewCount: integer("view_count").default(0),
+  featuredImage: text("featured_image"), // URL to image
+  readTime: integer("read_time"), // Estimated read time in minutes
+  isPublic: boolean("is_public").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Mentors table
+export const mentors = pgTable("mentors", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  specialty: text("specialty").notNull(), // finance, legal, career, housing, immigration
+  bio: text("bio").notNull(),
+  experience: text("experience"), // Years of experience or background
+  availability: json("availability").$type<{
+    timezone: string;
+    weekdays: { day: string; startTime: string; endTime: string; }[];
+    isActive: boolean;
+  }>(),
+  hourlyRate: decimal("hourly_rate", { precision: 8, scale: 2 }), // Optional pricing
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0.00"), // Average rating
+  totalSessions: integer("total_sessions").default(0),
+  languages: text("languages").array(), // Languages spoken
+  certifications: text("certifications").array(), // Professional certifications
+  linkedinUrl: text("linkedin_url"),
+  isVerified: boolean("is_verified").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Community Events table
+export const communityEvents = pgTable("community_events", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // workshop, webinar, networking, support_group
+  date: timestamp("date").notNull(),
+  duration: integer("duration"), // Duration in minutes
+  location: text("location"), // Physical location or "Online"
+  isOnline: boolean("is_online").default(false),
+  meetingLink: text("meeting_link"), // For online events
+  organizerId: integer("organizer_id").notNull().references(() => users.id),
+  maxAttendees: integer("max_attendees"),
+  currentAttendees: integer("current_attendees").default(0),
+  registrationRequired: boolean("registration_required").default(true),
+  registrationDeadline: timestamp("registration_deadline"),
+  tags: text("tags").array(),
+  featuredImage: text("featured_image"),
+  isPublic: boolean("is_public").default(true),
+  status: text("status").default("upcoming"), // upcoming, ongoing, completed, cancelled
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Event Registrations table (many-to-many relationship)
+export const eventRegistrations = pgTable("event_registrations", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull().references(() => communityEvents.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").default("registered"), // registered, attended, cancelled
+  registeredAt: timestamp("registered_at").defaultNow(),
+  notes: text("notes"), // Special requirements or notes
+});
+
+// Mentor Sessions table (for booking and tracking sessions)
+export const mentorSessions = pgTable("mentor_sessions", {
+  id: serial("id").primaryKey(),
+  mentorId: integer("mentor_id").notNull().references(() => mentors.id),
+  menteeId: integer("mentee_id").notNull().references(() => users.id),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  duration: integer("duration").default(60), // Duration in minutes
+  status: text("status").default("scheduled"), // scheduled, completed, cancelled, no_show
+  sessionType: text("session_type").default("consultation"), // consultation, follow_up, workshop
+  notes: text("notes"), // Session notes
+  menteeRating: integer("mentee_rating"), // 1-5 rating from mentee
+  menteeReview: text("mentee_review"),
+  mentorNotes: text("mentor_notes"), // Private notes for mentor
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -102,6 +195,11 @@ export const usersRelations = relations(users, ({ many }) => ({
   balanceHistory: many(balanceHistory),
   chatMessages: many(chatMessages),
   aiAssistantContext: many(aiAssistantContext),
+  insights: many(insights),
+  mentorProfile: many(mentors),
+  organizedEvents: many(communityEvents),
+  eventRegistrations: many(eventRegistrations),
+  mentorSessions: many(mentorSessions),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -140,6 +238,51 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
 export const aiAssistantContextRelations = relations(aiAssistantContext, ({ one }) => ({
   user: one(users, {
     fields: [aiAssistantContext.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insightsRelations = relations(insights, ({ one }) => ({
+  author: one(users, {
+    fields: [insights.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const mentorsRelations = relations(mentors, ({ one, many }) => ({
+  user: one(users, {
+    fields: [mentors.userId],
+    references: [users.id],
+  }),
+  sessions: many(mentorSessions),
+}));
+
+export const communityEventsRelations = relations(communityEvents, ({ one, many }) => ({
+  organizer: one(users, {
+    fields: [communityEvents.organizerId],
+    references: [users.id],
+  }),
+  registrations: many(eventRegistrations),
+}));
+
+export const eventRegistrationsRelations = relations(eventRegistrations, ({ one }) => ({
+  event: one(communityEvents, {
+    fields: [eventRegistrations.eventId],
+    references: [communityEvents.id],
+  }),
+  user: one(users, {
+    fields: [eventRegistrations.userId],
+    references: [users.id],
+  }),
+}));
+
+export const mentorSessionsRelations = relations(mentorSessions, ({ one }) => ({
+  mentor: one(mentors, {
+    fields: [mentorSessions.mentorId],
+    references: [mentors.id],
+  }),
+  mentee: one(users, {
+    fields: [mentorSessions.menteeId],
     references: [users.id],
   }),
 }));
@@ -228,6 +371,121 @@ export const insertAIAssistantContextSchema = createInsertSchema(aiAssistantCont
   isActive: true,
 });
 
+// Community schemas
+export const insertInsightSchema = createInsertSchema(insights).pick({
+  title: true,
+  content: true,
+  excerpt: true,
+  category: true,
+  tags: true,
+  status: true,
+  featuredImage: true,
+  readTime: true,
+  isPublic: true,
+});
+
+export const insertMentorSchema = createInsertSchema(mentors).pick({
+  specialty: true,
+  bio: true,
+  experience: true,
+  availability: true,
+  hourlyRate: true,
+  languages: true,
+  certifications: true,
+  linkedinUrl: true,
+  isActive: true,
+});
+
+export const insertCommunityEventSchema = createInsertSchema(communityEvents).pick({
+  title: true,
+  description: true,
+  category: true,
+  date: true,
+  duration: true,
+  location: true,
+  isOnline: true,
+  meetingLink: true,
+  maxAttendees: true,
+  registrationRequired: true,
+  registrationDeadline: true,
+  tags: true,
+  featuredImage: true,
+  isPublic: true,
+});
+
+export const insertEventRegistrationSchema = createInsertSchema(eventRegistrations).pick({
+  status: true,
+  notes: true,
+});
+
+export const insertMentorSessionSchema = createInsertSchema(mentorSessions).pick({
+  scheduledAt: true,
+  duration: true,
+  sessionType: true,
+  notes: true,
+});
+
+// Validation schemas for API endpoints
+export const createInsightSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  content: z.string().min(1, "Content is required"),
+  excerpt: z.string().max(500, "Excerpt too long").optional(),
+  category: z.enum(["migration", "finance", "legal", "housing", "employment"]),
+  tags: z.array(z.string()).optional(),
+  featuredImage: z.string().url().optional(),
+  readTime: z.number().min(1).optional(),
+  isPublic: z.boolean().default(true),
+});
+
+export const createMentorSchema = z.object({
+  specialty: z.enum(["finance", "legal", "career", "housing", "immigration"]),
+  bio: z.string().min(50, "Bio must be at least 50 characters").max(1000, "Bio too long"),
+  experience: z.string().max(500, "Experience description too long").optional(),
+  availability: z.object({
+    timezone: z.string(),
+    weekdays: z.array(z.object({
+      day: z.string(),
+      startTime: z.string(),
+      endTime: z.string(),
+    })),
+    isActive: z.boolean(),
+  }).optional(),
+  hourlyRate: z.number().min(0).optional(),
+  languages: z.array(z.string()).optional(),
+  certifications: z.array(z.string()).optional(),
+  linkedinUrl: z.string().url().optional(),
+});
+
+export const createEventSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title too long"),
+  description: z.string().min(1, "Description is required"),
+  category: z.enum(["workshop", "webinar", "networking", "support_group"]),
+  date: z.string().datetime("Invalid date format"),
+  duration: z.number().min(15, "Duration must be at least 15 minutes").optional(),
+  location: z.string().optional(),
+  isOnline: z.boolean().default(false),
+  meetingLink: z.string().url().optional(),
+  maxAttendees: z.number().min(1).optional(),
+  registrationRequired: z.boolean().default(true),
+  registrationDeadline: z.string().datetime().optional(),
+  tags: z.array(z.string()).optional(),
+  featuredImage: z.string().url().optional(),
+  isPublic: z.boolean().default(true),
+});
+
+export const bookMentorSessionSchema = z.object({
+  mentorId: z.number().min(1, "Mentor ID is required"),
+  scheduledAt: z.string().datetime("Invalid date format"),
+  duration: z.number().min(30, "Session must be at least 30 minutes").max(180, "Session cannot exceed 3 hours"),
+  sessionType: z.enum(["consultation", "follow_up", "workshop"]).default("consultation"),
+  notes: z.string().max(500, "Notes too long").optional(),
+});
+
+export const registerEventSchema = z.object({
+  eventId: z.number().min(1, "Event ID is required"),
+  notes: z.string().max(500, "Notes too long").optional(),
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type SafeUser = Omit<User, 'passwordHash' | 'passwordResetToken' | 'passwordResetExpires' | 'mfaBackupCodes'>;
@@ -245,3 +503,20 @@ export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
 export type AIAssistantContext = typeof aiAssistantContext.$inferSelect;
 export type InsertAIAssistantContext = z.infer<typeof insertAIAssistantContextSchema>;
+
+// Community types
+export type Insight = typeof insights.$inferSelect;
+export type InsertInsight = z.infer<typeof insertInsightSchema>;
+export type CreateInsight = z.infer<typeof createInsightSchema>;
+export type Mentor = typeof mentors.$inferSelect;
+export type InsertMentor = z.infer<typeof insertMentorSchema>;
+export type CreateMentor = z.infer<typeof createMentorSchema>;
+export type CommunityEvent = typeof communityEvents.$inferSelect;
+export type InsertCommunityEvent = z.infer<typeof insertCommunityEventSchema>;
+export type CreateEvent = z.infer<typeof createEventSchema>;
+export type EventRegistration = typeof eventRegistrations.$inferSelect;
+export type InsertEventRegistration = z.infer<typeof insertEventRegistrationSchema>;
+export type RegisterEvent = z.infer<typeof registerEventSchema>;
+export type MentorSession = typeof mentorSessions.$inferSelect;
+export type InsertMentorSession = z.infer<typeof insertMentorSessionSchema>;
+export type BookMentorSession = z.infer<typeof bookMentorSessionSchema>;
