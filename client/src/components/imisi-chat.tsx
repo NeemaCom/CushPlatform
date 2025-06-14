@@ -35,22 +35,28 @@ interface ProactiveSuggestion {
   timestamp: string;
 }
 
+interface ChatHistoryResponse {
+  messages: ChatMessage[];
+}
+
 export function ImisiChatHead() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasNewSuggestion, setHasNewSuggestion] = useState(false);
 
   // Get proactive suggestions
-  const { data: proactiveSuggestion } = useQuery({
+  const { data: proactiveSuggestion } = useQuery<ProactiveSuggestion>({
     queryKey: ['/api/imisi/suggestions'],
     refetchInterval: 5 * 60 * 1000, // Check every 5 minutes
+    retry: false,
+    staleTime: 4 * 60 * 1000, // 4 minutes
   });
 
   React.useEffect(() => {
     if (proactiveSuggestion?.suggestion && !isOpen) {
       setHasNewSuggestion(true);
     }
-  }, [proactiveSuggestion, isOpen]);
+  }, [proactiveSuggestion?.suggestion, isOpen]);
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
@@ -139,27 +145,43 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const queryClient = useQueryClient();
 
   // Get chat history
-  const { data: chatHistory } = useQuery<{ messages: ChatMessage[] }>({
+  const { data: chatHistory } = useQuery<ChatHistoryResponse>({
     queryKey: ['/api/imisi/history'],
-    onSuccess: (data) => {
-      if (data.messages.length > 0) {
-        const formattedMessages = data.messages.reverse().flatMap(msg => [
-          { type: 'user' as const, content: msg.message },
-          { type: 'ai' as const, content: msg.response }
-        ]);
-        setMessages(formattedMessages);
-      }
-    }
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
+
+  // Handle chat history data
+  React.useEffect(() => {
+    if (chatHistory?.messages && Array.isArray(chatHistory.messages) && chatHistory.messages.length > 0) {
+      const formattedMessages = [...chatHistory.messages].reverse().flatMap((msg: ChatMessage) => [
+        { type: 'user' as const, content: msg.message },
+        { type: 'ai' as const, content: msg.response }
+      ]);
+      setMessages(formattedMessages);
+    }
+  }, [chatHistory]);
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (data: { message: string; sessionId: string }) =>
-      apiRequest<AIResponse>('/api/imisi/chat', {
+    mutationFn: async (data: { message: string; sessionId: string }) => {
+      const response = await fetch('/api/imisi/chat', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify(data),
-      }),
-    onSuccess: (response) => {
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to send message');
+      }
+      
+      return response.json() as Promise<AIResponse>;
+    },
+    onSuccess: (response: AIResponse) => {
       setMessages(prev => [
         ...prev,
         { type: 'user', content: message },
@@ -173,7 +195,7 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
       setMessage('');
       queryClient.invalidateQueries({ queryKey: ['/api/imisi/history'] });
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Chat Error",
         description: error.message || "Failed to send message",
