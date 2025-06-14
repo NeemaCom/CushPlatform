@@ -11,9 +11,19 @@ import {
   updateProfileSchema,
   passwordRecoverySchema,
   resetPasswordSchema,
+  createInsightSchema,
+  createMentorSchema,
+  createEventSchema,
+  bookMentorSessionSchema,
+  registerEventSchema,
   type RegisterForm,
   type LoginForm,
-  type UpdateProfileForm
+  type UpdateProfileForm,
+  type CreateInsight,
+  type CreateMentor,
+  type CreateEvent,
+  type BookMentorSession,
+  type RegisterEvent
 } from "@shared/schema";
 import { 
   EncryptionService, 
