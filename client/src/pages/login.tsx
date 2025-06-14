@@ -58,16 +58,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white flex items-center justify-center">
       <div className="max-w-md w-full mx-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-cush-blue-600 mb-2">Cush</h1>
+          <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mx-auto mb-4"></div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">Cush</h1>
           <p className="text-gray-600">Financial management platform</p>
         </div>
 
-        <Card>
+        <Card className="border-blue-100 shadow-xl">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-gray-900">Sign In to Cush</CardTitle>
+            <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Sign In to Cush</CardTitle>
             <p className="text-gray-600 mt-2">Welcome back! Please sign in to your account.</p>
           </CardHeader>
           <CardContent>

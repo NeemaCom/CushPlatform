@@ -37,10 +37,11 @@ export function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-white shadow-sm h-screen fixed left-0 top-0 border-r border-gray-200">
+    <div className="w-64 bg-white/95 backdrop-blur-sm shadow-sm h-screen fixed left-0 top-0 border-r border-blue-100">
       <div className="p-6">
         <div className="flex items-center">
-          <span className="text-2xl font-bold text-cush-blue-600">Cush</span>
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
+          <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Cush</span>
         </div>
       </div>
       
