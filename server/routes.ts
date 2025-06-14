@@ -63,6 +63,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
+  // Setup Google OAuth routes
+  setupGoogleAuth(app);
+
   // Enhanced registration endpoint
   app.post("/api/auth/signup", authRateLimit, async (req: AuthenticatedRequest, res) => {
     try {

@@ -1,65 +1,81 @@
-import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { storage } from "./storage";
 import type { Express } from "express";
-
-// Configure Google OAuth strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID!,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-  callbackURL: "/api/auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // Check if user already exists with this Google ID or email
-    const existingUser = await storage.getUserByEmail(profile.emails![0].value);
-    
-    if (existingUser) {
-      // User exists, log them in
-      return done(null, existingUser);
-    }
-    
-    // Create new user from Google profile
-    const newUser = await storage.createUser({
-      firstName: profile.name?.givenName || "",
-      lastName: profile.name?.familyName || "",
-      username: profile.emails![0].value.split('@')[0] + Date.now(), // Generate unique username
-      email: profile.emails![0].value,
-      passwordHash: "", // No password for OAuth users
-      role: "customer",
-      profileImage: profile.photos?.[0]?.value || null,
-      isEmailVerified: true, // Gmail accounts are already verified
-      acceptTerms: true,
-      acceptPrivacy: true,
-      marketingConsent: false
-    });
-    
-    return done(null, newUser);
-  } catch (error) {
-    return done(error, null);
-  }
-}));
+import { storage } from "./storage";
 
 export function setupGoogleAuth(app: Express) {
   // Google OAuth initiate
-  app.get("/api/auth/google", 
-    passport.authenticate("google", { scope: ["profile", "email"] })
-  );
+  app.get("/api/auth/google", async (req, res) => {
+    const googleAuthUrl = `https://accounts.google.com/oauth/authorize?` +
+      `client_id=${process.env.GOOGLE_CLIENT_ID}&` +
+      `redirect_uri=${encodeURIComponent(`${req.protocol}://${req.get('host')}/api/auth/google/callback`)}&` +
+      `scope=profile email&` +
+      `response_type=code&` +
+      `access_type=offline&` +
+      `prompt=consent`;
+    
+    res.redirect(googleAuthUrl);
+  });
 
   // Google OAuth callback
-  app.get("/api/auth/google/callback", 
-    passport.authenticate("google", { failureRedirect: "/register?error=oauth_failed" }),
-    async (req, res) => {
-      // Successful authentication, redirect to dashboard
-      if (req.user) {
-        // Set session
-        req.session.userId = (req.user as any).id;
-        req.session.role = (req.user as any).role;
-        req.session.lastActivity = Date.now();
-        
-        res.redirect("/dashboard");
-      } else {
-        res.redirect("/register?error=oauth_failed");
+  app.get("/api/auth/google/callback", async (req, res) => {
+    try {
+      const { code } = req.query;
+      
+      if (!code) {
+        return res.redirect("/register?error=oauth_failed");
       }
+
+      // Exchange code for access token
+      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_CLIENT_ID!,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+          code: code as string,
+          grant_type: "authorization_code",
+          redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+        }),
+      });
+
+      const tokenData = await tokenResponse.json();
+      
+      if (!tokenData.access_token) {
+        return res.redirect("/register?error=oauth_failed");
+      }
+
+      // Get user profile
+      const profileResponse = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      });
+
+      const profile = await profileResponse.json();
+
+      // Check if user already exists
+      let user = await storage.getUserByEmail(profile.email);
+      
+      if (!user) {
+        // Create new user
+        user = await storage.createUser({
+          firstName: profile.given_name || "",
+          lastName: profile.family_name || "",
+          username: profile.email.split('@')[0] + Date.now(),
+          email: profile.email,
+          passwordHash: "", // No password for OAuth users
+          acceptTerms: true,
+          acceptPrivacy: true,
+          marketingConsent: false
+        });
+      }
+
+      // Set session
+      req.session.userId = user.id;
+      req.session.role = user.role ?? "customer";
+      req.session.lastActivity = Date.now();
+      
+      res.redirect("/dashboard");
+    } catch (error) {
+      console.error("Google OAuth error:", error);
+      res.redirect("/register?error=oauth_failed");
     }
-  );
+  });
 }
