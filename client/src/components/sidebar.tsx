@@ -57,8 +57,8 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center py-3 px-4 rounded-lg mb-2 transition-colors cursor-pointer",
                     isActive
-                      ? "bg-cush-blue-50 text-cush-blue-600"
-                      : "text-gray-600 hover:bg-gray-50"
+                      ? "bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 border-r-2 border-blue-600"
+                      : "text-gray-600 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50"
                   )}
                 >
                   <Icon className="w-5 h-5" />
