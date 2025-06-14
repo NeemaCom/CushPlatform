@@ -339,7 +339,7 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
                       className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs py-2 px-3 rounded-md shadow-sm transition-all duration-200"
                     >
                       <Crown className="w-3 h-3 mr-2" />
-                      Upgrade to Imisi Premium for unlimited responses and advanced financial guidance! Only $9.99/month.
+                      Upgrade to Premium
                     </Button>
                   </div>
                 )}
