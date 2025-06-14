@@ -24,6 +24,11 @@ const sidebarItems = [
 export function Sidebar() {
   const [location, navigate] = useLocation();
 
+  const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
+    queryKey: ["/api/subscription-status"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       return await apiRequest("POST", "/api/auth/logout");
@@ -71,7 +76,16 @@ export function Sidebar() {
         </div>
       </nav>
       
-      <div className="absolute bottom-6 left-6 right-6">
+      <div className="absolute bottom-6 left-6 right-6 space-y-3">
+        {subscriptionStatus && !subscriptionStatus.hasActiveSubscription && (
+          <Button
+            onClick={() => navigate("/subscribe")}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white justify-start"
+          >
+            <Crown className="w-5 h-5" />
+            <span className="ml-3">Upgrade to Premium</span>
+          </Button>
+        )}
         <Button
           variant="ghost"
           className="w-full justify-start text-gray-600 hover:bg-gray-50"
