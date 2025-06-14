@@ -15,6 +15,7 @@ export interface UserContext {
   currentBalance: number;
   monthlyIncome: number;
   monthlyExpenses: number;
+  hasActiveSubscription?: boolean;
 }
 
 export interface ChatResponse {
@@ -31,28 +32,56 @@ export class GeminiService {
   private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
   async generateResponse(userMessage: string, context: UserContext): Promise<ChatResponse> {
-    const systemPrompt = this.buildSystemPrompt(context);
+    const isPremium = context.hasActiveSubscription || false;
+    const systemPrompt = this.buildSystemPrompt(context, isPremium);
     const fullPrompt = `${systemPrompt}\n\nUser: ${userMessage}`;
 
     try {
       const result = await this.model.generateContent(fullPrompt);
       const response = await result.response;
-      const text = response.text();
+      let text = response.text();
 
-      return this.parseResponse(text);
+      // Apply word limit for free users
+      if (!isPremium) {
+        const words = text.split(/\s+/).filter(word => word.length > 0);
+        if (words.length > 50) {
+          text = words.slice(0, 50).join(' ') + '...';
+        }
+        text += '\n\n💎 Upgrade to Imisi Premium for unlimited responses and advanced financial guidance! Only $9.99/month.';
+      }
+
+      const parsedResponse = this.parseResponse(text);
+      
+      // Add premium upgrade action for free users
+      if (!isPremium) {
+        parsedResponse.actions = [
+          {
+            type: 'navigate',
+            label: '💎 Upgrade to Premium',
+            data: '/subscribe'
+          },
+          ...(parsedResponse.actions || [])
+        ];
+      }
+
+      return parsedResponse;
     } catch (error: any) {
       console.error('Gemini API error:', error);
       
       // Handle rate limit errors with helpful fallback
       if (error.status === 429) {
         const { user, currentBalance } = context;
+        const fallbackMessage = isPremium 
+          ? `Hi ${user.firstName}! I'm experiencing high demand. Balance: $${currentBalance.toFixed(2)}. Please try again in a moment.`
+          : `Hi ${user.firstName}! Balance: $${currentBalance.toFixed(2)}. Upgrade to Premium for priority access and unlimited responses!`;
+        
         return {
-          message: `Hi ${user.firstName}! I'm Imisi 2.0. I can help with finances and immigration basics. Balance: $${currentBalance.toFixed(2)}. For detailed analysis and personalized strategies, upgrade to Imisi Premium.`,
-          suggestions: ['Upgrade to Premium', 'Basic budgeting', 'Immigration info'],
-          actions: [{
+          message: fallbackMessage,
+          suggestions: isPremium ? ['Try again', 'Check balance', 'View transactions'] : ['Upgrade to Premium', 'Basic budgeting', 'Immigration info'],
+          actions: isPremium ? [] : [{
             type: 'navigate',
             label: 'Upgrade to Premium',
-            data: { route: '/subscribe' }
+            data: '/subscribe'
           }]
         };
       }
@@ -63,14 +92,25 @@ export class GeminiService {
 
 
 
-  private buildSystemPrompt(context: UserContext): string {
+  private buildSystemPrompt(context: UserContext, isPremium: boolean = false): string {
     const { user, accounts, recentTransactions, balanceHistory, currentBalance, monthlyIncome, monthlyExpenses } = context;
     
-    return `You are Imisi 2.0, AI assistant for Cush. Keep responses under 50 words.
+    const wordLimit = isPremium ? '' : 'Keep responses under 50 words.';
+    const premiumPrompt = isPremium ? 'Provide detailed, comprehensive responses.' : 'After each response, suggest upgrading to Imisi Premium.';
+    
+    return `You are Imisi 2.0, AI assistant for Cush financial platform. ${wordLimit}
 
-User: ${user.firstName} (${user.nationality || 'N/A'}) | Balance: $${currentBalance.toFixed(2)}
+User: ${user.firstName} ${user.lastName} (${isPremium ? 'Premium' : 'Free'})
+Balance: $${currentBalance.toFixed(2)}
+Monthly Income: $${monthlyIncome.toFixed(2)}
+Monthly Expenses: $${monthlyExpenses.toFixed(2)}
 
-After each response, suggest upgrading to Imisi Premium for detailed personalized guidance. Be concise, helpful, then promote premium.`;
+Recent Transactions:
+${recentTransactions.slice(0, 3).map(t => `${t.type}: $${t.amount} - ${t.description}`).join('\n')}
+
+You help with financial analysis, budgeting, and immigration guidance for Nigerians moving to Canada.
+
+${premiumPrompt} Be helpful and personalized.`;
   }
 
   private parseResponse(text: string): ChatResponse {
