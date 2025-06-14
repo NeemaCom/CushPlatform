@@ -7,31 +7,32 @@ export default function Homepage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
-      <nav className="bg-white shadow-sm border-b border-gray-200">
+      <nav className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-blue-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <span className="text-2xl font-bold text-cush-blue-600">Cush</span>
+              <div className="flex-shrink-0 flex items-center">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Cush</span>
               </div>
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">
-                  <a href="#features" className="text-gray-900 hover:text-cush-blue-600 px-3 py-2 text-sm font-medium">Features</a>
-                  <a href="#stats" className="text-gray-500 hover:text-cush-blue-600 px-3 py-2 text-sm font-medium">Pricing</a>
-                  <a href="#" className="text-gray-500 hover:text-cush-blue-600 px-3 py-2 text-sm font-medium">About</a>
-                  <a href="#" className="text-gray-500 hover:text-cush-blue-600 px-3 py-2 text-sm font-medium">Contact</a>
+                  <a href="#features" className="text-gray-900 hover:text-blue-600 px-3 py-2 text-sm font-medium">Services</a>
+                  <a href="#stats" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">About</a>
+                  <a href="#" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">Success Stories</a>
+                  <a href="#" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">Contact</a>
                 </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <Link href="/login">
-                <Button variant="ghost" className="text-cush-blue-600 hover:text-cush-blue-700 font-medium">
+                <Button variant="ghost" className="text-blue-600 hover:text-blue-700 font-medium">
                   Sign In
                 </Button>
               </Link>
               <Link href="/register">
-                <Button className="bg-cush-blue-600 hover:bg-cush-blue-700 text-white font-medium">
-                  Get Started
+                <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-medium">
+                  Start Your Journey
                 </Button>
               </Link>
             </div>
@@ -40,25 +41,24 @@ export default function Homepage() {
       </nav>
 
       {/* Hero Section */}
-      <div className="bg-gradient-to-br from-cush-blue-50 to-white">
+      <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h1 className="text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
-                Simplify Your{" "}
-                <span className="text-cush-blue-600">Financial</span>
-                {" "}Management
+                Financial Solutions for{" "}
+                <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Expatriates & Digital Nomads</span>
               </h1>
               <p className="mt-6 text-xl text-gray-600 leading-relaxed">
-                Take control of your finances with our comprehensive platform. Track expenses, manage investments, and grow your wealth with intelligent insights.
+                Seamlessly manage your finances across borders with multi-currency wallets, virtual cards, and expert financial guidance designed for location-independent professionals.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row gap-4">
-                <Link href="/dashboard">
-                  <Button className="bg-cush-blue-600 hover:bg-cush-blue-700 text-white px-8 py-3 text-lg">
-                    Start Free Trial
+                <Link href="/register">
+                  <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-8 py-3 text-lg">
+                    Get Started Free
                   </Button>
                 </Link>
-                <Button variant="outline" className="border-gray-300 hover:border-cush-blue-300 text-gray-700 px-8 py-3 text-lg">
+                <Button variant="outline" className="border-blue-300 hover:border-blue-400 text-blue-600 px-8 py-3 text-lg">
                   Watch Demo
                 </Button>
               </div>
