@@ -103,4 +103,15 @@
   .border-cush-blue-700 { border-color: var(--cush-blue-700); }
   .border-cush-blue-800 { border-color: var(--cush-blue-800); }
   .border-cush-blue-900 { border-color: var(--cush-blue-900); }
+
+  /* Rolling color animation for Imisi chat head */
+  @keyframes rolling-colors {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .rolling-colors {
+    background: conic-gradient(from 0deg, #3b82f6, #8b5cf6, #ec4899, #f97316, #22c55e, #06b6d4, #3b82f6);
+    animation: rolling-colors 3s linear infinite;
+  }
 }
