@@ -7,10 +7,11 @@ import {
   ArrowLeftRight, 
   Wallet, 
   Settings, 
-  LogOut 
+  LogOut,
+  Crown
 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 
 const sidebarItems = [
   { icon: Home, label: "Dashboard", href: "/dashboard" },
