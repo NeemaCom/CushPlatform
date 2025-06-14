@@ -638,6 +638,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
+      const hasActiveSubscription = user.stripeSubscriptionId === 'premium_active';
+
       const context: UserContext = {
         user: createSafeUser(user),
         accounts,
@@ -645,7 +647,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         balanceHistory,
         currentBalance,
         monthlyIncome,
-        monthlyExpenses
+        monthlyExpenses,
+        hasActiveSubscription
       };
 
       // Generate AI response using Gemini
@@ -731,6 +734,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(t => t.type === 'expense')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
+      const hasActiveSubscription = user.stripeSubscriptionId === 'premium_active';
+
       const context: UserContext = {
         user: createSafeUser(user),
         accounts,
@@ -738,7 +743,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         balanceHistory,
         currentBalance,
         monthlyIncome,
-        monthlyExpenses
+        monthlyExpenses,
+        hasActiveSubscription
       };
 
       const proactivePrompt = await geminiService.generateProactivePrompt(context);
