@@ -219,7 +219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Set session
       req.session.userId = user.id;
-      req.session.role = user.role;
+      req.session.role = user.role || 'customer';
       req.session.lastActivity = Date.now();
 
       // Log successful login
@@ -650,8 +650,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         message,
         response: aiResponse.message,
-        context: JSON.stringify({ sessionId: finalSessionId, userBalance: currentBalance }),
-        sessionId: finalSessionId
+        context: { sessionId: finalSessionId, userBalance: currentBalance.toString() },
+        sessionId: finalSessionId || undefined
       });
 
       res.json({
