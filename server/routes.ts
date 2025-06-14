@@ -650,7 +650,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId,
         message,
         response: aiResponse.message,
-        context: { sessionId: finalSessionId, userBalance: currentBalance.toString() },
+        context: null,
         sessionId: finalSessionId || undefined
       });
 
