@@ -2,7 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import session from "express-session";
+import passport from "passport";
 import { storage } from "./storage";
+import { setupGoogleAuth } from "./google-auth";
 import { 
   registerSchema, 
   loginSchema, 
