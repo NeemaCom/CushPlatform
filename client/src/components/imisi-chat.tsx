@@ -101,15 +101,21 @@ export function ImisiChatHead() {
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5" />
                   <CardTitle className="text-lg">Imisi 2.0</CardTitle>
-                  {(subscriptionStatus as any)?.hasActiveSubscription ? (
+                  {subscriptionStatus && subscriptionStatus.hasActiveSubscription ? (
                     <Badge variant="secondary" className="text-xs bg-yellow-500/90 text-yellow-900">
                       <Crown className="w-3 h-3 mr-1" />
                       Premium
                     </Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-xs bg-white/20">
-                      Free
-                    </Badge>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => navigate('/subscribe')}
+                      className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 h-6"
+                    >
+                      <Crown className="w-3 h-3 mr-1" />
+                      Upgrade
+                    </Button>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -154,11 +160,18 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
 
   // Get chat history
   const { data: chatHistory } = useQuery<ChatHistoryResponse>({
     queryKey: ['/api/imisi/history'],
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Get subscription status
+  const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
+    queryKey: ['/api/subscription-status'],
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -227,11 +240,11 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const handleActionClick = (action: any) => {
     if (action.type === 'navigate') {
       if (action.data === '/subscribe' || action.data?.route === '/subscribe') {
-        setLocation('/subscribe');
+        navigate('/subscribe');
       } else if (typeof action.data === 'string') {
-        setLocation(action.data);
+        navigate(action.data);
       } else if (action.data?.route) {
-        setLocation(action.data.route);
+        navigate(action.data.route);
       }
     }
   };
