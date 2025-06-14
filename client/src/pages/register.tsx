@@ -23,7 +23,9 @@ export default function Register() {
       username: "",
       email: "",
       password: "",
-      confirmPassword: "",
+      acceptTerms: false,
+      acceptPrivacy: false,
+      marketingConsent: false,
     },
   });
 
@@ -202,24 +204,7 @@ export default function Register() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="Confirm your password"
-                        className="h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+
 
               <Button
                 type="submit"
