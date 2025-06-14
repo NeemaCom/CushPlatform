@@ -4,10 +4,16 @@ import { storage } from "./storage";
 export function setupGoogleAuth(app: Express) {
   // Google OAuth initiate
   app.get("/api/auth/google", async (req, res) => {
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `https://${req.get('host')}`
+      : `http://${req.get('host')}`;
+    
+    const redirectUri = `${baseUrl}/api/auth/google/callback`;
+    
     const googleAuthUrl = `https://accounts.google.com/oauth/authorize?` +
       `client_id=${process.env.GOOGLE_CLIENT_ID}&` +
-      `redirect_uri=${encodeURIComponent(`${req.protocol}://${req.get('host')}/api/auth/google/callback`)}&` +
-      `scope=profile email&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+      `scope=${encodeURIComponent('profile email')}&` +
       `response_type=code&` +
       `access_type=offline&` +
       `prompt=consent`;
@@ -25,6 +31,12 @@ export function setupGoogleAuth(app: Express) {
       }
 
       // Exchange code for access token
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? `https://${req.get('host')}`
+        : `http://${req.get('host')}`;
+      
+      const redirectUri = `${baseUrl}/api/auth/google/callback`;
+      
       const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -33,7 +45,7 @@ export function setupGoogleAuth(app: Express) {
           client_secret: process.env.GOOGLE_CLIENT_SECRET!,
           code: code as string,
           grant_type: "authorization_code",
-          redirect_uri: `${req.protocol}://${req.get('host')}/api/auth/google/callback`,
+          redirect_uri: redirectUri,
         }),
       });
 
