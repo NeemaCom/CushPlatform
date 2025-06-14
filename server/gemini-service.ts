@@ -28,7 +28,7 @@ export interface ChatResponse {
 }
 
 export class GeminiService {
-  private model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
 
   async generateResponse(userMessage: string, context: UserContext): Promise<ChatResponse> {
     const systemPrompt = this.buildSystemPrompt(context);
