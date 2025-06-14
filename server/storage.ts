@@ -269,6 +269,205 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedContext;
   }
+
+  // Community Insights methods
+  async getInsights(limit: number = 50, category?: string): Promise<Insight[]> {
+    const conditions = [];
+    conditions.push(eq(insights.isPublic, true));
+    conditions.push(eq(insights.status, 'published'));
+    
+    if (category) {
+      conditions.push(eq(insights.category, category));
+    }
+
+    return await db
+      .select()
+      .from(insights)
+      .where(and(...conditions))
+      .orderBy(desc(insights.createdAt))
+      .limit(limit);
+  }
+
+  async getInsightById(id: number): Promise<Insight | undefined> {
+    const [insight] = await db.select().from(insights).where(eq(insights.id, id));
+    return insight || undefined;
+  }
+
+  async createInsight(insight: InsertInsight & { authorId: number }): Promise<Insight> {
+    const [newInsight] = await db
+      .insert(insights)
+      .values(insight)
+      .returning();
+    return newInsight;
+  }
+
+  async updateInsight(id: number, updates: Partial<Insight>): Promise<Insight> {
+    const [updatedInsight] = await db
+      .update(insights)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(insights.id, id))
+      .returning();
+    return updatedInsight;
+  }
+
+  async deleteInsight(id: number): Promise<void> {
+    await db.delete(insights).where(eq(insights.id, id));
+  }
+
+  // Mentor methods
+  async getMentors(specialty?: string, isActive: boolean = true): Promise<Mentor[]> {
+    const conditions = [];
+    conditions.push(eq(mentors.isActive, isActive));
+    
+    if (specialty) {
+      conditions.push(eq(mentors.specialty, specialty));
+    }
+
+    return await db
+      .select()
+      .from(mentors)
+      .where(and(...conditions))
+      .orderBy(desc(mentors.createdAt));
+  }
+
+  async getMentorById(id: number): Promise<Mentor | undefined> {
+    const [mentor] = await db.select().from(mentors).where(eq(mentors.id, id));
+    return mentor || undefined;
+  }
+
+  async getMentorByUserId(userId: number): Promise<Mentor | undefined> {
+    const [mentor] = await db.select().from(mentors).where(eq(mentors.userId, userId));
+    return mentor || undefined;
+  }
+
+  async createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor> {
+    const [newMentor] = await db
+      .insert(mentors)
+      .values(mentor)
+      .returning();
+    return newMentor;
+  }
+
+  async updateMentor(id: number, updates: Partial<Mentor>): Promise<Mentor> {
+    const [updatedMentor] = await db
+      .update(mentors)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(mentors.id, id))
+      .returning();
+    return updatedMentor;
+  }
+
+  // Community Events methods
+  async getEvents(limit: number = 50, category?: string): Promise<CommunityEvent[]> {
+    const conditions = [];
+    conditions.push(eq(communityEvents.isPublic, true));
+    
+    if (category) {
+      conditions.push(eq(communityEvents.category, category));
+    }
+
+    return await db
+      .select()
+      .from(communityEvents)
+      .where(and(...conditions))
+      .orderBy(desc(communityEvents.date))
+      .limit(limit);
+  }
+
+  async getEventById(id: number): Promise<CommunityEvent | undefined> {
+    const [event] = await db.select().from(communityEvents).where(eq(communityEvents.id, id));
+    return event || undefined;
+  }
+
+  async createEvent(event: InsertCommunityEvent & { organizerId: number }): Promise<CommunityEvent> {
+    const [newEvent] = await db
+      .insert(communityEvents)
+      .values(event)
+      .returning();
+    return newEvent;
+  }
+
+  async updateEvent(id: number, updates: Partial<CommunityEvent>): Promise<CommunityEvent> {
+    const [updatedEvent] = await db
+      .update(communityEvents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(communityEvents.id, id))
+      .returning();
+    return updatedEvent;
+  }
+
+  async deleteEvent(id: number): Promise<void> {
+    await db.delete(communityEvents).where(eq(communityEvents.id, id));
+  }
+
+  // Event Registrations methods
+  async getEventRegistrations(eventId: number): Promise<EventRegistration[]> {
+    return await db
+      .select()
+      .from(eventRegistrations)
+      .where(eq(eventRegistrations.eventId, eventId));
+  }
+
+  async getUserEventRegistrations(userId: number): Promise<EventRegistration[]> {
+    return await db
+      .select()
+      .from(eventRegistrations)
+      .where(eq(eventRegistrations.userId, userId))
+      .orderBy(desc(eventRegistrations.createdAt));
+  }
+
+  async createEventRegistration(registration: InsertEventRegistration & { eventId: number; userId: number }): Promise<EventRegistration> {
+    const [newRegistration] = await db
+      .insert(eventRegistrations)
+      .values(registration)
+      .returning();
+    return newRegistration;
+  }
+
+  async updateEventRegistration(id: number, updates: Partial<EventRegistration>): Promise<EventRegistration> {
+    const [updatedRegistration] = await db
+      .update(eventRegistrations)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(eventRegistrations.id, id))
+      .returning();
+    return updatedRegistration;
+  }
+
+  // Mentor Sessions methods
+  async getMentorSessions(mentorId?: number, menteeId?: number): Promise<MentorSession[]> {
+    const conditions = [];
+    
+    if (mentorId) {
+      conditions.push(eq(mentorSessions.mentorId, mentorId));
+    }
+    
+    if (menteeId) {
+      conditions.push(eq(mentorSessions.menteeId, menteeId));
+    }
+
+    return await db
+      .select()
+      .from(mentorSessions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(mentorSessions.scheduledAt));
+  }
+
+  async createMentorSession(session: InsertMentorSession & { mentorId: number; menteeId: number }): Promise<MentorSession> {
+    const [newSession] = await db
+      .insert(mentorSessions)
+      .values(session)
+      .returning();
+    return newSession;
+  }
+
+  async updateMentorSession(id: number, updates: Partial<MentorSession>): Promise<MentorSession> {
+    const [updatedSession] = await db
+      .update(mentorSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(mentorSessions.id, id))
+      .returning();
+    return updatedSession;
+  }
 }
 
 export const storage = new DatabaseStorage();
