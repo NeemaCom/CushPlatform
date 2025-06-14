@@ -96,17 +96,17 @@ export default function Dashboard() {
   const categories = dashboardData?.spendingCategories || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
       <div className="flex">
         <Sidebar />
         
         {/* Main Content */}
         <div className="flex-1 ml-64">
           {/* Top Bar */}
-          <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+          <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-blue-100 px-6 py-4">
             <div className="flex justify-between items-center">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+                <h1 className="text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Dashboard</h1>
                 <p className="text-gray-600">Welcome back, {dashboardData?.user.name || 'User'}!</p>
               </div>
               <div className="flex items-center space-x-4">
@@ -114,7 +114,7 @@ export default function Dashboard() {
                   <Bell className="h-5 w-5 text-gray-400" />
                 </Button>
                 <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-cush-blue-600 rounded-full flex items-center justify-center">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm font-medium">
                       {dashboardData?.user.initials || 'U'}
                     </span>

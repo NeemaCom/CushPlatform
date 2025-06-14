@@ -202,11 +202,11 @@ export default function Subscribe() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white py-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <Badge className="mb-4 bg-gradient-to-r from-purple-600 to-blue-600">
+          <Badge className="mb-4 bg-gradient-to-r from-blue-500 to-purple-600">
             <Sparkles className="w-3 h-3 mr-1" />
             Upgrade to Premium
           </Badge>
