@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { BarChart3, Shield, Smartphone, ChevronRight } from "lucide-react";
+import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function Homepage() {
   return (
@@ -12,8 +13,11 @@ export default function Homepage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <div className="flex-shrink-0 flex items-center">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Cush</span>
+                <img 
+                  src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                  alt="Cush Logo" 
+                  className="h-8 w-auto mr-3"
+                />
               </div>
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">
@@ -368,8 +372,11 @@ export default function Homepage() {
             {/* Brand Column */}
             <div className="md:col-span-1">
               <div className="flex items-center mb-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg mr-3"></div>
-                <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Cush</span>
+                <img 
+                  src="/attached_assets/Logo + Typeface_PNG (4)_1749870664804.png" 
+                  alt="Cush Logo" 
+                  className="h-8 w-auto"
+                />
               </div>
               <p className="text-gray-400 mb-4">
                 Migration-focused financial technology platform helping individuals navigate cross-border relocation.
