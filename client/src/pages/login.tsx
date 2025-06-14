@@ -122,8 +122,11 @@ export default function Login() {
                     ) : (
                       <div className="relative">
                         <SiGoogle className="w-7 h-7 text-red-500 group-hover:scale-110 group-hover:rotate-12 transition-all duration-300" />
-                        <div className="absolute inset-0 w-7 h-7 bg-red-500 rounded-full opacity-0 group-hover:opacity-20 animate-ping"></div>
-                        <div className="absolute inset-0 w-7 h-7 bg-gradient-to-r from-red-500 to-orange-500 rounded-full opacity-0 group-hover:opacity-10 animate-pulse"></div>
+                        <div className="absolute inset-0 w-7 h-7 bg-red-500 opacity-0 group-hover:opacity-15" style={{
+                          clipPath: 'polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%)',
+                          animation: 'bubble-pulse 2s ease-in-out infinite'
+                        }}></div>
+                        <div className="absolute -inset-1 w-9 h-9 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 opacity-0 group-hover:opacity-8 animate-pulse rounded-lg blur-sm"></div>
                       </div>
                     )}
                   </div>
