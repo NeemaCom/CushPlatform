@@ -47,8 +47,13 @@ export class GeminiService {
       if (error.status === 429) {
         const { user, currentBalance } = context;
         return {
-          message: `Hello ${user.firstName}! I'm Imisi 2.0, your AI assistant for Cush. I can help you with financial management, budgeting advice, and immigration guidance. With your current balance of $${currentBalance.toFixed(2)}, I can provide personalized recommendations. How can I assist you today?`,
-          suggestions: ['Check my budget', 'Immigration help', 'Financial advice', 'Platform features']
+          message: `Hi ${user.firstName}! I'm Imisi 2.0. I can help with finances and immigration basics. Balance: $${currentBalance.toFixed(2)}. For detailed analysis and personalized strategies, upgrade to Imisi Premium.`,
+          suggestions: ['Upgrade to Premium', 'Basic budgeting', 'Immigration info'],
+          actions: [{
+            type: 'navigate',
+            label: 'Upgrade to Premium',
+            data: { route: '/subscribe' }
+          }]
         };
       }
       
@@ -61,12 +66,11 @@ export class GeminiService {
   private buildSystemPrompt(context: UserContext): string {
     const { user, accounts, recentTransactions, balanceHistory, currentBalance, monthlyIncome, monthlyExpenses } = context;
     
-    return `You are Imisi 2.0, AI assistant for Cush financial platform.
+    return `You are Imisi 2.0, AI assistant for Cush. Keep responses under 50 words.
 
-User: ${user.firstName} ${user.lastName} (${user.nationality || 'N/A'})
-Balance: $${currentBalance.toFixed(2)} | Monthly: +$${monthlyIncome.toFixed(2)} -$${monthlyExpenses.toFixed(2)}
+User: ${user.firstName} (${user.nationality || 'N/A'}) | Balance: $${currentBalance.toFixed(2)}
 
-Help with finances, budgeting, immigration guidance. Be concise and actionable.`;
+After each response, suggest upgrading to Imisi Premium for detailed personalized guidance. Be concise, helpful, then promote premium.`;
   }
 
   private parseResponse(text: string): ChatResponse {
@@ -107,10 +111,23 @@ Help with finances, budgeting, immigration guidance. Be concise and actionable.`
       }
     });
 
+    // Ensure response includes premium upgrade prompt
+    let finalMessage = text;
+    if (!text.includes('Premium') && !text.includes('upgrade')) {
+      finalMessage += '\n\n💎 Upgrade to Imisi Premium for detailed analysis and unlimited assistance.';
+    }
+
+    // Always include premium upgrade action
+    actions.unshift({
+      type: 'navigate',
+      label: 'Upgrade to Premium',
+      data: { route: '/subscribe' }
+    });
+
     return {
-      message: text,
-      suggestions: suggestions.length > 0 ? suggestions.slice(0, 3) : undefined,
-      actions: actions.length > 0 ? actions : undefined
+      message: finalMessage,
+      suggestions: ['Upgrade to Premium', 'Ask another question', 'Immigration help'],
+      actions: actions
     };
   }
 
