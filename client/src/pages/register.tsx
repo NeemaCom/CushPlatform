@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -8,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { registerSchema, type RegisterForm as RegisterFormType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Shield, CheckCircle } from "lucide-react";
+import { Shield, CheckCircle, Loader2 } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import heroImage from "@assets/lady smiling_1749866663341.jpg";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
@@ -16,6 +17,7 @@ import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const form = useForm<RegisterFormType>({
     resolver: zodResolver(registerSchema),
@@ -118,20 +120,44 @@ export default function Register() {
             <Button
               type="button"
               variant="outline"
-              className="w-full h-12 border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 transition-all duration-200 flex items-center justify-center gap-3"
+              disabled={isGoogleLoading}
+              className="w-full h-14 border-2 border-gray-200 hover:border-red-400 hover:bg-gradient-to-r hover:from-red-50 hover:to-orange-50 transition-all duration-300 ease-in-out flex items-center justify-center gap-3 group shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
               onClick={() => {
+                setIsGoogleLoading(true);
                 // Handle Gmail OAuth
                 window.location.href = "/api/auth/google";
               }}
             >
-              <SiGoogle className="w-5 h-5 text-red-500" />
-              <span className="font-medium">Sign up with Gmail</span>
+              <div className="relative">
+                {isGoogleLoading ? (
+                  <Loader2 className="w-6 h-6 text-red-500 animate-spin" />
+                ) : (
+                  <>
+                    <SiGoogle className="w-6 h-6 text-red-500 group-hover:scale-110 transition-transform duration-200" />
+                    <div className="absolute inset-0 w-6 h-6 bg-red-500 rounded-full opacity-0 group-hover:opacity-20 animate-ping"></div>
+                  </>
+                )}
+              </div>
+              <span className="font-semibold text-gray-700 group-hover:text-gray-900 transition-colors duration-200">
+                {isGoogleLoading ? "Connecting to Google..." : "Continue with Gmail"}
+              </span>
+              {!isGoogleLoading && (
+                <div className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              )}
             </Button>
             
-            <div className="flex items-center my-6">
-              <div className="flex-1 border-t border-gray-300"></div>
-              <span className="px-4 text-sm text-gray-500 bg-white">or continue with email</span>
-              <div className="flex-1 border-t border-gray-300"></div>
+            <div className="flex items-center my-8">
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
+              <div className="px-6 text-sm text-gray-500 bg-white relative">
+                <span className="bg-white px-2 py-1 rounded-full border border-gray-200 shadow-sm">
+                  or continue with email
+                </span>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
             </div>
           </div>
 
