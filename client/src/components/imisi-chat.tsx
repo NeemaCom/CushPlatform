@@ -144,6 +144,14 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
+
+  // Check subscription status
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['/api/subscription-status'],
+    retry: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 
   // Get chat history
   const { data: chatHistory } = useQuery<ChatHistoryResponse>({
@@ -212,16 +220,20 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
     sendMessageMutation.mutate({ message: message.trim(), sessionId });
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    setMessage(suggestion);
-  };
-
   const handleActionClick = (action: any) => {
     if (action.type === 'navigate') {
-      window.location.href = action.data.route;
-    } else if (action.type === 'external') {
-      window.open(action.data.url, '_blank');
+      if (action.data === '/subscribe' || action.data?.route === '/subscribe') {
+        setLocation('/subscribe');
+      } else if (typeof action.data === 'string') {
+        setLocation(action.data);
+      } else if (action.data?.route) {
+        setLocation(action.data.route);
+      }
     }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setMessage(suggestion);
   };
 
   useEffect(() => {
