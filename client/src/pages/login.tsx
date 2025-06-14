@@ -27,7 +27,7 @@ export default function Login() {
   });
 
   const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
+    mutationFn: async (data: LoginFormType) => {
       const response = await apiRequest("POST", "/api/auth/signin", data);
       if (!response.ok) {
         const error = await response.json();
@@ -51,7 +51,7 @@ export default function Login() {
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
+  const onSubmit = (data: LoginFormType) => {
     loginMutation.mutate(data);
   };
 
