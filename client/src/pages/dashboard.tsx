@@ -54,14 +54,14 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
         <div className="flex">
           <Sidebar />
           <div className="flex-1 ml-64">
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 {[...Array(4)].map((_, i) => (
-                  <Card key={i}>
+                  <Card key={i} className="border-blue-100">
                     <CardContent className="p-6">
                       <Skeleton className="h-4 w-20 mb-2" />
                       <Skeleton className="h-8 w-24 mb-4" />
