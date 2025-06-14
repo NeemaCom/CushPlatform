@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import Stripe from "stripe";
 import session from "express-session";
 import { storage } from "./storage";
 import { 
@@ -31,6 +32,14 @@ import {
 import { z } from "zod";
 import { geminiService, type UserContext } from "./gemini-service";
 import rateLimit from "express-rate-limit";
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+  apiVersion: "2023-10-16",
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Apply global rate limiting
