@@ -8,9 +8,17 @@ interface BeforeInstallPromptEvent extends Event {
 class PWAManager {
   private deferredPrompt: BeforeInstallPromptEvent | null = null;
   private swRegistration: ServiceWorkerRegistration | null = null;
+  private initialized: boolean = false;
 
   constructor() {
-    this.initializeServiceWorker();
+    // Don't auto-initialize in constructor to avoid double registration
+  }
+
+  // Initialize PWA features
+  init() {
+    if (this.initialized) return;
+    
+    this.initialized = true;
     this.setupInstallPrompt();
     this.setupPushNotifications();
   }
