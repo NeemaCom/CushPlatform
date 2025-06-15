@@ -43,9 +43,9 @@ export default function Register() {
     if (/\d/.test(password)) score += 1;
     else feedback.push("number");
     
-    // Special character check
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score += 1;
-    else feedback.push("special character");
+    // Special character check (match backend schema)
+    if (/[@$!%*?&]/.test(password)) score += 1;
+    else feedback.push("special character (@$!%*?&)");
     
     const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];

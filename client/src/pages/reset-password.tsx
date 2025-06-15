@@ -57,8 +57,8 @@ export default function ResetPassword() {
     if (/\d/.test(password)) score += 1;
     else feedback.push("number");
     
-    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score += 1;
-    else feedback.push("special character");
+    if (/[@$!%*?&]/.test(password)) score += 1;
+    else feedback.push("special character (@$!%*?&)");
     
     const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];

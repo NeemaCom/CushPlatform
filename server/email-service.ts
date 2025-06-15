@@ -23,9 +23,17 @@ export async function sendEmail(params: EmailParams): Promise<boolean> {
       text: params.text,
       html: params.html,
     });
+    console.log(`Password reset email sent successfully to ${params.to}`);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('SendGrid email error:', error);
+    
+    if (error.code === 403) {
+      console.error('SendGrid API key permissions error. Please ensure your API key has "Mail Send" permissions and verify sender authentication.');
+    } else if (error.code === 401) {
+      console.error('SendGrid API key authentication failed. Please verify your API key is correct.');
+    }
+    
     return false;
   }
 }
