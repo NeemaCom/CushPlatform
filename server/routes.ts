@@ -202,16 +202,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced login endpoint
   app.post("/api/auth/signin", authRateLimit, async (req: AuthenticatedRequest, res) => {
     try {
+      console.log('Login attempt - Request body:', JSON.stringify(req.body, null, 2));
+      
       const { username, password } = loginSchema.parse(req.body);
+      console.log('Parsed credentials - Username:', username, 'Password length:', password?.length);
       
       // Support login with either username or email
       let user = await storage.getUserByUsername(username);
+      console.log('User by username lookup:', user ? 'Found' : 'Not found');
+      
       if (!user) {
         // Try to find user by email if username lookup failed
         user = await storage.getUserByEmail(username);
+        console.log('User by email lookup:', user ? 'Found' : 'Not found');
       }
       
       if (!user) {
+        console.log('No user found for credentials:', username);
         await SecurityLogger.logAuthEvent(
           'login_attempt',
           null,
@@ -223,8 +230,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 
+      console.log('User found - ID:', user.id, 'Username:', user.username, 'Email:', user.email);
+      console.log('Password hash exists:', !!user.passwordHash);
+      console.log('Password hash length:', user.passwordHash?.length);
+
       const isValid = await EncryptionService.verifyPassword(password, user.passwordHash);
+      console.log('Password verification result:', isValid);
+      
       if (!isValid) {
+        console.log('Password verification failed for user:', user.username);
         await SecurityLogger.logAuthEvent(
           'login_attempt',
           user.id,
