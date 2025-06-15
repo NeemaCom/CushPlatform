@@ -17,6 +17,7 @@ import Community from "@/pages/community";
 import InsightDetail from "@/pages/insight-detail";
 import MentorProfile from "@/pages/mentor-profile";
 import CreateInsight from "@/pages/create-insight";
+import PWASettings from "@/pages/pwa-settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/community/insights/:id" component={InsightDetail} />
       <Route path="/community/mentors/:id" component={MentorProfile} />
       <Route path="/community/create-insight" component={CreateInsight} />
+      <Route path="/settings/pwa" component={PWASettings} />
       <Route component={NotFound} />
     </Switch>
   );
