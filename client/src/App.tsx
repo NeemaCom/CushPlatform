@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Homepage from "@/pages/homepage";
 import Dashboard from "@/pages/dashboard";
+import Analytics from "@/pages/analytics";
 import Imisi from "@/pages/imisi";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
@@ -20,6 +21,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Homepage} />
       <Route path="/dashboard" component={Dashboard} />
+      <Route path="/analytics" component={Analytics} />
       <Route path="/imisi" component={Imisi} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
