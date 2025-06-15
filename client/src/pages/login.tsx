@@ -11,7 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { loginSchema, type LoginForm as LoginFormType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Loader2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Eye, EyeOff, CheckCircle, Sparkles } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import heroImage from "@assets/guy smiling2_1749866663339.jpg";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
@@ -22,6 +22,7 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const form = useForm<LoginFormType>({
     resolver: zodResolver(loginSchema),
@@ -40,12 +41,35 @@ export default function Login() {
       }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (userData) => {
+      setShowSuccess(true);
+      
+      // Enhanced success toast with user details
       toast({
-        title: "Welcome back!",
-        description: "You have successfully signed in.",
+        title: (
+          <div className="flex items-center space-x-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <span>Welcome back, {userData.username}!</span>
+          </div>
+        ),
+        description: (
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2 text-sm">
+              <Sparkles className="h-4 w-4 text-yellow-500" />
+              <span>Successfully signed in to your account</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Redirecting to your dashboard...
+            </div>
+          </div>
+        ),
+        duration: 3000,
       });
-      navigate("/dashboard");
+
+      // Add a slight delay for better UX before navigation
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 1500);
     },
     onError: (error: Error) => {
       toast({
@@ -61,7 +85,25 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {/* Success Overlay */}
+      {showSuccess && (
+        <div className="fixed inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 backdrop-blur-sm z-10 flex items-center justify-center pointer-events-none">
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-8 shadow-2xl border border-green-200/50 animate-in fade-in-0 zoom-in-95 duration-500">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative">
+                <CheckCircle className="h-16 w-16 text-green-600 animate-pulse" />
+                <div className="absolute inset-0 h-16 w-16 bg-green-400/20 rounded-full animate-ping"></div>
+              </div>
+              <div className="text-center">
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome Back!</h3>
+                <p className="text-gray-600">Taking you to your dashboard...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Left side - Hero Image */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 to-purple-600 relative overflow-hidden">
         <div className="absolute inset-0 bg-black/20"></div>
@@ -80,18 +122,18 @@ export default function Login() {
       </div>
 
       {/* Right side - Form */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-white">
+      <div className="flex-1 flex items-center justify-center p-8 bg-white relative">
         <div className="w-full max-w-md">
           <div className="mb-8">
             <div className="flex items-center mb-6">
               <img 
                 src={cushLogo} 
                 alt="Cush Logo" 
-                className="h-8 w-auto"
+                className="h-8 w-auto transition-transform hover:scale-105"
               />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
-            <p className="text-gray-600">Welcome back! Please enter your details.</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2 animate-in fade-in-50 slide-in-from-bottom-4 duration-500">Sign In</h2>
+            <p className="text-gray-600 animate-in fade-in-50 slide-in-from-bottom-4 duration-700 delay-100">Welcome back! Please enter your details.</p>
           </div>
 
           {/* Gmail Sign In Option */}
@@ -253,10 +295,28 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-3 h-12"
-                disabled={loginMutation.isPending}
+                className={`w-full font-medium py-3 h-12 transition-all duration-300 ${
+                  showSuccess 
+                    ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700" 
+                    : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                } text-white transform hover:scale-[1.02] active:scale-[0.98]`}
+                disabled={loginMutation.isPending || showSuccess}
               >
-                {loginMutation.isPending ? "Signing In..." : "Sign In"}
+                <div className="flex items-center justify-center space-x-2">
+                  {loginMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Signing In...</span>
+                    </>
+                  ) : showSuccess ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 animate-pulse" />
+                      <span>Success! Redirecting...</span>
+                    </>
+                  ) : (
+                    <span>Sign In</span>
+                  )}
+                </div>
               </Button>
             </form>
           </Form>
