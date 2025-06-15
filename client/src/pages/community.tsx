@@ -98,10 +98,12 @@ export default function CommunityPage() {
   });
 
   // Filter insights based on search
-  const filteredInsights = insights.filter((insight: Insight) =>
-    insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    insight.excerpt?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredInsights = insights.filter((insight: Insight) => {
+    const matchesSearch = insight.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      insight.excerpt?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || selectedCategory === "all" || insight.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   // Filter mentors based on search
   const filteredMentors = mentors.filter((mentor: Mentor) =>
@@ -191,7 +193,7 @@ export default function CommunityPage() {
                   <SelectValue placeholder="Filter by category" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Categories</SelectItem>
+                  <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="migration">Migration</SelectItem>
                   <SelectItem value="finance">Finance</SelectItem>
                   <SelectItem value="legal">Legal</SelectItem>
