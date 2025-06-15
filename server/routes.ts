@@ -1365,6 +1365,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== LOAN REFERRAL SYSTEM ENDPOINTS =====
+
+  // Submit loan pre-qualification
+  app.post('/api/loans/pre-qualify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = loanPreQualificationSchema.parse(req.body);
+      
+      // Create pre-qualification record
+      const preQualification = await storage.createLoanPreQualification({
+        ...validatedData,
+        userId
+      });
+
+      // Process matching in background and create referrals
+      const result = await loanService.processPreQualification(preQualification.id);
+
+      res.status(201).json({
+        preQualification,
+        matches: result.matches.length,
+        referralsCreated: result.referralsCreated,
+        message: result.referralsCreated > 0 
+          ? `Found ${result.referralsCreated} matching partners` 
+          : "No matching partners found at this time"
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid pre-qualification data", details: error.errors });
+      }
+      console.error('Pre-qualification error:', error);
+      res.status(500).json({ error: "Failed to process pre-qualification" });
+    }
+  });
+
+  // Get user's pre-qualification history
+  app.get('/api/loans/my-pre-qualifications', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const preQualifications = await storage.getLoanPreQualifications(userId);
+      res.json(preQualifications);
+    } catch (error: any) {
+      console.error('Error fetching pre-qualifications:', error);
+      res.status(500).json({ error: "Failed to fetch pre-qualifications" });
+    }
+  });
+
+  // Get user's loan referrals
+  app.get('/api/loans/my-referrals', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const referrals = await storage.getLoanReferrals(undefined, userId);
+      
+      // Enhance with partner information
+      const enhancedReferrals = await Promise.all(
+        referrals.map(async (referral) => {
+          const partner = await storage.getLoanPartner(referral.partnerId);
+          const preQual = await storage.getLoanPreQualification(referral.preQualificationId);
+          return {
+            ...referral,
+            partner: partner ? {
+              name: partner.name,
+              description: partner.description,
+              logoUrl: partner.logoUrl,
+              website: partner.website,
+              processingTimeRange: partner.processingTimeRange
+            } : null,
+            preQualification: preQual ? {
+              loanPurpose: preQual.loanPurpose,
+              amountRequested: preQual.amountRequested,
+              currency: preQual.currency
+            } : null
+          };
+        })
+      );
+
+      res.json(enhancedReferrals);
+    } catch (error: any) {
+      console.error('Error fetching referrals:', error);
+      res.status(500).json({ error: "Failed to fetch referrals" });
+    }
+  });
+
+  // Track referral clicks and redirect
+  app.get('/api/loans/referral/:trackingId', async (req, res) => {
+    try {
+      const { trackingId } = req.params;
+      const { pq, p } = req.query;
+
+      if (!pq || !p) {
+        return res.status(400).json({ error: "Invalid referral link" });
+      }
+
+      const preQualId = parseInt(pq as string);
+      const partnerId = parseInt(p as string);
+
+      const redirectUrl = await loanService.trackReferralClick(trackingId, preQualId, partnerId);
+
+      if (!redirectUrl) {
+        return res.status(404).json({ error: "Referral not found or partner unavailable" });
+      }
+
+      // Redirect to partner website
+      res.redirect(redirectUrl);
+    } catch (error: any) {
+      console.error('Error tracking referral:', error);
+      res.status(500).json({ error: "Failed to process referral" });
+    }
+  });
+
+  // Partner webhook endpoint for status updates
+  app.post('/api/loans/webhook/:referralCode', async (req, res) => {
+    try {
+      const { referralCode } = req.params;
+      const { status, applicationId, approvedAmount, approvedRate, rejectionReason } = req.body;
+
+      const success = await loanService.updateReferralStatus(referralCode, status, {
+        applicationId,
+        approvedAmount,
+        approvedRate,
+        rejectionReason,
+        webhookData: req.body
+      });
+
+      if (!success) {
+        return res.status(404).json({ error: "Referral not found" });
+      }
+
+      res.json({ success: true, message: "Status updated successfully" });
+    } catch (error: any) {
+      console.error('Webhook error:', error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // ===== ADMIN LOAN MANAGEMENT ENDPOINTS =====
+
+  // Get all loan partners (admin only)
+  app.get('/api/admin/loans/partners', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const partners = await storage.getLoanPartners();
+      res.json(partners);
+    } catch (error: any) {
+      console.error('Error fetching partners:', error);
+      res.status(500).json({ error: "Failed to fetch partners" });
+    }
+  });
+
+  // Create new loan partner (admin only)
+  app.post('/api/admin/loans/partners', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const partner = await storage.createLoanPartner(req.body);
+      res.status(201).json(partner);
+    } catch (error: any) {
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: "Failed to create partner" });
+    }
+  });
+
+  // Update loan partner (admin only)
+  app.put('/api/admin/loans/partners/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const partnerId = parseInt(req.params.id);
+      const partner = await storage.updateLoanPartner(partnerId, req.body);
+      res.json(partner);
+    } catch (error: any) {
+      console.error('Error updating partner:', error);
+      res.status(500).json({ error: "Failed to update partner" });
+    }
+  });
+
+  // Get all pre-qualifications for admin review
+  app.get('/api/admin/loans/pre-qualifications', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const preQualifications = await storage.getLoanPreQualifications();
+      res.json(preQualifications);
+    } catch (error: any) {
+      console.error('Error fetching pre-qualifications:', error);
+      res.status(500).json({ error: "Failed to fetch pre-qualifications" });
+    }
+  });
+
+  // Get loan referral revenue metrics (admin only)
+  app.get('/api/admin/financial/loan-referral-revenue', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const revenue = await loanService.getLoanReferralRevenue(start, end);
+      res.json(revenue);
+    } catch (error: any) {
+      console.error('Error fetching loan revenue:', error);
+      res.status(500).json({ error: "Failed to fetch loan revenue data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
