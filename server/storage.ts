@@ -14,6 +14,8 @@ import {
   loanPartners,
   loanPreQualifications,
   loanReferrals,
+  financialGoals,
+  goalProgress,
   type User, 
   type SafeUser,
   type InsertUser,
@@ -42,7 +44,11 @@ import {
   type LoanPreQualification,
   type InsertLoanPreQualification,
   type LoanReferral,
-  type InsertLoanReferral
+  type InsertLoanReferral,
+  type FinancialGoal,
+  type InsertFinancialGoal,
+  type GoalProgress,
+  type InsertGoalProgress
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
