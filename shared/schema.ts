@@ -188,6 +188,72 @@ export const mentorSessions = pgTable("mentor_sessions", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Loan Partner table - represents lending institutions/partners
+export const loanPartners = pgTable("loan_partners", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  eligibilityCriteria: json("eligibility_criteria"), // JSONB for flexible criteria
+  referralCommissionRate: decimal("referral_commission_rate", { precision: 5, scale: 4 }), // e.g., 0.0250 for 2.5%
+  isActive: boolean("is_active").default(true),
+  apiEndpoint: text("api_endpoint"), // For direct API integration
+  contactEmail: text("contact_email"),
+  website: text("website"),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  supportedCountries: text("supported_countries").array(),
+  minLoanAmount: decimal("min_loan_amount", { precision: 12, scale: 2 }),
+  maxLoanAmount: decimal("max_loan_amount", { precision: 12, scale: 2 }),
+  supportedCurrencies: text("supported_currencies").array().default(["USD"]),
+  processingTimeRange: text("processing_time_range"), // e.g., "3-7 business days"
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loan Pre-Qualification table - user loan application requests
+export const loanPreQualifications = pgTable("loan_pre_qualifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  loanPurpose: text("loan_purpose").notNull(), // personal, business, home, auto, etc.
+  amountRequested: decimal("amount_requested", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").default("USD"),
+  creditScore: integer("credit_score"), // Optional credit score
+  employmentStatus: text("employment_status").notNull(), // employed, self_employed, unemployed, retired
+  monthlyIncome: decimal("monthly_income", { precision: 10, scale: 2 }),
+  existingDebt: decimal("existing_debt", { precision: 10, scale: 2 }),
+  collateralValue: decimal("collateral_value", { precision: 12, scale: 2 }),
+  loanTerm: integer("loan_term"), // In months
+  country: text("country"),
+  state: text("state"),
+  city: text("city"),
+  additionalInfo: json("additional_info"), // Flexible field for extra data
+  status: text("status").default("submitted"), // submitted, processing, matched, no_match, expired
+  adminNotes: text("admin_notes"), // For admin review
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loan Referral table - tracks referrals to partners
+export const loanReferrals = pgTable("loan_referrals", {
+  id: serial("id").primaryKey(),
+  preQualificationId: integer("pre_qualification_id").notNull().references(() => loanPreQualifications.id),
+  partnerId: integer("partner_id").notNull().references(() => loanPartners.id),
+  referralLink: text("referral_link").notNull().unique(), // Unique trackable link
+  referralCode: text("referral_code").notNull().unique(), // Short tracking code
+  referralStatus: text("referral_status").default("referred"), // referred, applied, approved, rejected, withdrawn
+  applicationId: text("application_id"), // Partner's application ID
+  approvedAmount: decimal("approved_amount", { precision: 12, scale: 2 }),
+  approvedRate: decimal("approved_rate", { precision: 5, scale: 4 }), // Interest rate
+  commissionEarned: decimal("commission_earned", { precision: 10, scale: 2 }),
+  commissionPaid: boolean("commission_paid").default(false),
+  partnerResponse: json("partner_response"), // Store partner webhook data
+  referredAt: timestamp("referred_at").defaultNow(),
+  appliedAt: timestamp("applied_at"),
+  approvedAt: timestamp("approved_at"),
+  rejectedAt: timestamp("rejected_at"),
+  lastStatusUpdate: timestamp("last_status_update").defaultNow(),
+  notes: text("notes"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -200,6 +266,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   organizedEvents: many(communityEvents),
   eventRegistrations: many(eventRegistrations),
   mentorSessions: many(mentorSessions),
+  loanPreQualifications: many(loanPreQualifications),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -284,6 +351,29 @@ export const mentorSessionsRelations = relations(mentorSessions, ({ one }) => ({
   mentee: one(users, {
     fields: [mentorSessions.menteeId],
     references: [users.id],
+  }),
+}));
+
+export const loanPartnersRelations = relations(loanPartners, ({ many }) => ({
+  referrals: many(loanReferrals),
+}));
+
+export const loanPreQualificationsRelations = relations(loanPreQualifications, ({ one, many }) => ({
+  user: one(users, {
+    fields: [loanPreQualifications.userId],
+    references: [users.id],
+  }),
+  referrals: many(loanReferrals),
+}));
+
+export const loanReferralsRelations = relations(loanReferrals, ({ one }) => ({
+  preQualification: one(loanPreQualifications, {
+    fields: [loanReferrals.preQualificationId],
+    references: [loanPreQualifications.id],
+  }),
+  partner: one(loanPartners, {
+    fields: [loanReferrals.partnerId],
+    references: [loanPartners.id],
   }),
 }));
 
@@ -424,6 +514,78 @@ export const insertMentorSessionSchema = createInsertSchema(mentorSessions).pick
   sessionType: true,
   notes: true,
 });
+
+// Loan system schemas
+export const loanPreQualificationSchema = z.object({
+  loanPurpose: z.string().min(1, "Loan purpose is required"),
+  amountRequested: z.string().min(1, "Loan amount is required"),
+  currency: z.string().default("USD"),
+  creditScore: z.number().min(300).max(850).optional(),
+  employmentStatus: z.enum(["employed", "self_employed", "unemployed", "retired"]),
+  monthlyIncome: z.string().optional(),
+  existingDebt: z.string().optional(),
+  collateralValue: z.string().optional(),
+  loanTerm: z.number().min(1).max(360).optional(), // 1-360 months
+  country: z.string().optional(),
+  state: z.string().optional(),
+  city: z.string().optional(),
+  additionalInfo: z.any().optional(),
+});
+
+export const insertLoanPartnerSchema = createInsertSchema(loanPartners).pick({
+  name: true,
+  eligibilityCriteria: true,
+  referralCommissionRate: true,
+  isActive: true,
+  apiEndpoint: true,
+  contactEmail: true,
+  website: true,
+  description: true,
+  logoUrl: true,
+  supportedCountries: true,
+  minLoanAmount: true,
+  maxLoanAmount: true,
+  supportedCurrencies: true,
+  processingTimeRange: true,
+});
+
+export const insertLoanPreQualificationSchema = createInsertSchema(loanPreQualifications).pick({
+  loanPurpose: true,
+  amountRequested: true,
+  currency: true,
+  creditScore: true,
+  employmentStatus: true,
+  monthlyIncome: true,
+  existingDebt: true,
+  collateralValue: true,
+  loanTerm: true,
+  country: true,
+  state: true,
+  city: true,
+  additionalInfo: true,
+});
+
+export const insertLoanReferralSchema = createInsertSchema(loanReferrals).pick({
+  referralLink: true,
+  referralCode: true,
+  referralStatus: true,
+  applicationId: true,
+  approvedAmount: true,
+  approvedRate: true,
+  commissionEarned: true,
+  commissionPaid: true,
+  partnerResponse: true,
+  notes: true,
+});
+
+// Loan system type exports
+export type LoanPartner = typeof loanPartners.$inferSelect;
+export type LoanPreQualification = typeof loanPreQualifications.$inferSelect;
+export type LoanReferral = typeof loanReferrals.$inferSelect;
+export type InsertLoanPartner = z.infer<typeof insertLoanPartnerSchema>;
+export type InsertLoanPreQualification = z.infer<typeof insertLoanPreQualificationSchema>;
+export type InsertLoanReferral = z.infer<typeof insertLoanReferralSchema>;
+export type LoanPreQualificationForm = z.infer<typeof loanPreQualificationSchema>;
 
 // Validation schemas for API endpoints
 export const createInsightSchema = z.object({
