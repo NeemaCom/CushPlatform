@@ -618,6 +618,63 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updatedReferral;
   }
+
+  // ===== FINANCIAL GOALS METHODS =====
+
+  async getFinancialGoals(userId?: number): Promise<FinancialGoal[]> {
+    const query = db.select().from(financialGoals);
+    if (userId) {
+      return query.where(eq(financialGoals.userId, userId));
+    }
+    return query;
+  }
+
+  async getFinancialGoal(id: number): Promise<FinancialGoal | undefined> {
+    const [goal] = await db
+      .select()
+      .from(financialGoals)
+      .where(eq(financialGoals.id, id));
+    return goal;
+  }
+
+  async createFinancialGoal(goal: InsertFinancialGoal & { userId: number }): Promise<FinancialGoal> {
+    const [newGoal] = await db
+      .insert(financialGoals)
+      .values(goal)
+      .returning();
+    return newGoal;
+  }
+
+  async updateFinancialGoal(id: number, updates: Partial<FinancialGoal>): Promise<FinancialGoal> {
+    const [updatedGoal] = await db
+      .update(financialGoals)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(financialGoals.id, id))
+      .returning();
+    return updatedGoal;
+  }
+
+  async deleteFinancialGoal(id: number): Promise<void> {
+    await db
+      .delete(financialGoals)
+      .where(eq(financialGoals.id, id));
+  }
+
+  async getGoalProgress(goalId: number): Promise<GoalProgress[]> {
+    return db
+      .select()
+      .from(goalProgress)
+      .where(eq(goalProgress.goalId, goalId))
+      .orderBy(desc(goalProgress.recordedAt));
+  }
+
+  async addGoalProgress(progress: InsertGoalProgress & { goalId: number }): Promise<GoalProgress> {
+    const [newProgress] = await db
+      .insert(goalProgress)
+      .values(progress)
+      .returning();
+    return newProgress;
+  }
 }
 
 export const storage = new DatabaseStorage();

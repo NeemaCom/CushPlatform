@@ -8,6 +8,7 @@ import { Sidebar } from "@/components/sidebar";
 import { BalanceChart } from "@/components/balance-chart";
 import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
+import { FinancialGoalsWidget } from "@/components/FinancialGoalsWidget";
 import { Bell, Wallet, TrendingUp, TrendingDown, PiggyBank, Crown, Sparkles } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
 

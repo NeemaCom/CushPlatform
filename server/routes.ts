@@ -1562,6 +1562,138 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== FINANCIAL GOALS ENDPOINTS =====
+
+  // Get user's financial goals
+  app.get('/api/financial-goals', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const goals = await storage.getFinancialGoals(userId);
+      res.json(goals);
+    } catch (error: any) {
+      console.error('Error fetching financial goals:', error);
+      res.status(500).json({ error: "Failed to fetch financial goals" });
+    }
+  });
+
+  // Create a new financial goal
+  app.post('/api/financial-goals', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createFinancialGoalSchema.parse(req.body);
+      
+      const goal = await storage.createFinancialGoal({
+        ...validatedData,
+        userId,
+        targetAmount: validatedData.targetAmount,
+        currentAmount: "0.00",
+        targetDate: validatedData.targetDate ? new Date(validatedData.targetDate) : null,
+        monthlyContribution: validatedData.monthlyContribution || null,
+      });
+
+      res.status(201).json(goal);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid goal data", details: error.errors });
+      }
+      console.error('Error creating financial goal:', error);
+      res.status(500).json({ error: "Failed to create financial goal" });
+    }
+  });
+
+  // Update a financial goal
+  app.put('/api/financial-goals/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const goalId = parseInt(req.params.id);
+      const validatedData = updateFinancialGoalSchema.parse(req.body);
+      
+      // Verify ownership
+      const existingGoal = await storage.getFinancialGoal(goalId);
+      if (!existingGoal || existingGoal.userId !== userId) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+
+      const updatedGoal = await storage.updateFinancialGoal(goalId, {
+        ...validatedData,
+        targetDate: validatedData.targetDate ? new Date(validatedData.targetDate) : existingGoal.targetDate,
+        updatedAt: new Date(),
+      });
+
+      res.json(updatedGoal);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid goal data", details: error.errors });
+      }
+      console.error('Error updating financial goal:', error);
+      res.status(500).json({ error: "Failed to update financial goal" });
+    }
+  });
+
+  // Add progress to a financial goal
+  app.post('/api/financial-goals/:id/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const goalId = parseInt(req.params.id);
+      const validatedData = addGoalProgressSchema.parse(req.body);
+      
+      // Verify ownership
+      const goal = await storage.getFinancialGoal(goalId);
+      if (!goal || goal.userId !== userId) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+
+      const amount = parseFloat(validatedData.amount);
+      const newCurrentAmount = parseFloat(goal.currentAmount || '0') + amount;
+      const progressPercentage = (newCurrentAmount / parseFloat(goal.targetAmount)) * 100;
+
+      // Add progress record
+      const progress = await storage.addGoalProgress({
+        goalId,
+        amount: validatedData.amount,
+        progressPercentage: progressPercentage.toFixed(2),
+        entryType: validatedData.entryType,
+        notes: validatedData.notes,
+      });
+
+      // Update goal current amount
+      const updatedGoal = await storage.updateFinancialGoal(goalId, {
+        currentAmount: newCurrentAmount.toFixed(2),
+        isCompleted: progressPercentage >= 100,
+        completedAt: progressPercentage >= 100 ? new Date() : null,
+        updatedAt: new Date(),
+      });
+
+      res.status(201).json({ progress, updatedGoal });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid progress data", details: error.errors });
+      }
+      console.error('Error adding goal progress:', error);
+      res.status(500).json({ error: "Failed to add goal progress" });
+    }
+  });
+
+  // Delete a financial goal
+  app.delete('/api/financial-goals/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const goalId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const goal = await storage.getFinancialGoal(goalId);
+      if (!goal || goal.userId !== userId) {
+        return res.status(404).json({ error: "Goal not found" });
+      }
+
+      await storage.deleteFinancialGoal(goalId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Error deleting financial goal:', error);
+      res.status(500).json({ error: "Failed to delete financial goal" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

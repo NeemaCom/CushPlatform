@@ -649,6 +649,71 @@ export type InsertLoanPreQualification = z.infer<typeof insertLoanPreQualificati
 export type InsertLoanReferral = z.infer<typeof insertLoanReferralSchema>;
 export type LoanPreQualificationForm = z.infer<typeof loanPreQualificationSchema>;
 
+// ===== FINANCIAL GOALS SYSTEM =====
+
+// Financial Goals schemas
+export const createFinancialGoalSchema = z.object({
+  title: z.string().min(1, "Goal title is required").max(100),
+  description: z.string().optional(),
+  goalType: z.enum(["savings", "debt_payoff", "investment", "emergency_fund", "vacation", "home", "car", "education", "retirement"]),
+  targetAmount: z.string().min(1, "Target amount is required"),
+  currency: z.string().default("USD"),
+  targetDate: z.string().optional(),
+  priority: z.enum(["high", "medium", "low"]).default("medium"),
+  category: z.string().optional(),
+  monthlyContribution: z.string().optional(),
+  autoTransferEnabled: z.boolean().default(false),
+  linkedAccountId: z.number().optional(),
+  reminderEnabled: z.boolean().default(true),
+  reminderFrequency: z.enum(["daily", "weekly", "monthly"]).default("weekly"),
+  notes: z.string().optional(),
+});
+
+export const updateFinancialGoalSchema = createFinancialGoalSchema.partial();
+
+export const insertFinancialGoalSchema = createInsertSchema(financialGoals).pick({
+  title: true,
+  description: true,
+  goalType: true,
+  targetAmount: true,
+  currentAmount: true,
+  currency: true,
+  targetDate: true,
+  priority: true,
+  category: true,
+  isActive: true,
+  monthlyContribution: true,
+  autoTransferEnabled: true,
+  linkedAccountId: true,
+  reminderEnabled: true,
+  reminderFrequency: true,
+  notes: true,
+});
+
+export const insertGoalProgressSchema = createInsertSchema(goalProgress).pick({
+  amount: true,
+  progressPercentage: true,
+  transactionId: true,
+  entryType: true,
+  notes: true,
+});
+
+export const addGoalProgressSchema = z.object({
+  goalId: z.number(),
+  amount: z.string().min(1, "Amount is required"),
+  entryType: z.enum(["manual", "automatic", "transaction_linked"]).default("manual"),
+  notes: z.string().optional(),
+});
+
+// Financial Goals type exports
+export type FinancialGoal = typeof financialGoals.$inferSelect;
+export type GoalProgress = typeof goalProgress.$inferSelect;
+export type InsertFinancialGoal = z.infer<typeof insertFinancialGoalSchema>;
+export type InsertGoalProgress = z.infer<typeof insertGoalProgressSchema>;
+export type CreateFinancialGoal = z.infer<typeof createFinancialGoalSchema>;
+export type UpdateFinancialGoal = z.infer<typeof updateFinancialGoalSchema>;
+export type AddGoalProgress = z.infer<typeof addGoalProgressSchema>;
+
 // Validation schemas for API endpoints
 export const createInsightSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
