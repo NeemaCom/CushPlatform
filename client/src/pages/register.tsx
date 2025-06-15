@@ -67,15 +67,27 @@ export default function Register() {
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
     
     // Debug logging for testing
-    if (password && process.env.NODE_ENV === 'development') {
-      console.log(`Password strength check for "${password}":`, {
+    if (password) {
+      console.log(`Password strength debug for "${password}":`, {
         length: password.length >= 8,
+        lengthScore: password.length >= 8 ? 1 : 0,
         uppercase: /[A-Z]/.test(password),
+        uppercaseScore: /[A-Z]/.test(password) ? 1 : 0,
         lowercase: /[a-z]/.test(password),
+        lowercaseScore: /[a-z]/.test(password) ? 1 : 0,
         number: /\d/.test(password),
+        numberScore: /\d/.test(password) ? 1 : 0,
         special: specialCharRegex.test(password),
-        score,
-        label: labels[score] || "Very Weak"
+        specialScore: specialCharRegex.test(password) ? 1 : 0,
+        totalScore: score,
+        expectedScore: 
+          (password.length >= 8 ? 1 : 0) +
+          (/[A-Z]/.test(password) ? 1 : 0) +
+          (/[a-z]/.test(password) ? 1 : 0) +
+          (/\d/.test(password) ? 1 : 0) +
+          (specialCharRegex.test(password) ? 1 : 0),
+        label: labels[score] || "Very Weak",
+        feedback: feedback
       });
     }
     
