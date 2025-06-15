@@ -1,0 +1,61 @@
+Establish a comprehensive Loan Referral & Management System within Cush, building upon existing financial capabilities to connect users with loan providers and manage the referral lifecycle.
+
+Core Requirements:
+Loan Pre-Qualification & Referral Engine:
+
+Data Models:
+
+LoanPreQualification: id, userId (FK), loanPurpose, amountRequested, currency, creditScore (optional), employmentStatus, status ('submitted' | 'processing' | 'matched' | 'no_match'), createdAt.
+
+LoanReferral: id, preQualificationId (FK), partnerId (FK to LoanPartner), referralLink (unique, trackable), referralStatus ('referred' | 'applied' | 'approved' | 'rejected'), createdAt.
+
+LoanPartner: id, name, eligibilityCriteria (JSONB, e.g., 'country', 'min_credit'), referralCommissionRate, isActive (boolean), apiEndpoint (if direct API integration).
+
+Backend APIs:
+
+POST /api/loans/pre-qualify: Allow users to submit pre-qualification forms.
+
+GET /api/loans/my-pre-qualifications: View user's pre-qualification statuses.
+
+GET /api/loans/my-referrals: View user's loan referrals and their statuses.
+
+Matching Logic: Implement backend logic to match pre-qualification data with LoanPartner criteria.
+
+Referral Generation: Generate unique, trackable referralLink for the matched partner.
+
+(Admin only) GET /api/admin/loans/partners, POST /api/admin/loans/partners: Manage loan partners.
+
+(Admin only) GET /api/admin/loans/pre-qualifications: View all pre-qualifications for review.
+
+Affiliate & Revenue Tracking:
+
+Implement robust mechanisms to track successful referrals through the generated links.
+
+Integrate data (or receive webhooks) from loan partners to update LoanReferral status (e.g., from 'referred' to 'approved').
+
+Backend API: GET /api/admin/financial/loan-referral-revenue: Provide aggregated reporting on revenue generated from loan referrals.
+
+User Experience:
+
+Clear and intuitive pre-qualification form.
+
+Dashboard for users to track their pre-qualification and referral status.
+
+Transparent disclosure about Cush's role as a referrer, not a direct lender.
+
+Expected Deliverables:
+backend/src/db/schema.ts: Updated Drizzle schemas for LoanPreQualification, LoanReferral, and LoanPartner models.
+
+backend/src/types/index.ts: Definitive TypeScript interfaces for LoanPreQualification, LoanReferral, and LoanPartner.
+
+backend/src/routes.ts: (Or new dedicated loan routes file) APIs for loan pre-qualification and referral management.
+
+backend/src/loan-service.ts (new file): Encapsulates loan partner matching logic and referral generation.
+
+Frontend (Conceptual): Notes on React components for:
+
+Loan pre-qualification form.
+
+User dashboard for tracking loan application status.
+
+Admin panel for managing loan partners and viewing referral data.
