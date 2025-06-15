@@ -1,0 +1,75 @@
+Objective: Transform the Cush web application into a Progressive Web App (PWA), enabling a native-like experience on mobile devices without requiring traditional app store distribution. Prioritize installability, offline capability, and enhanced performance.
+
+Core Requirements:
+PWA Foundational Setup:
+
+Web App Manifest (manifest.json):
+
+Create or update frontend/public/manifest.json with essential metadata: name, short_name, start_url, display (standalone or fullscreen), background_color, theme_color, icons (multiple sizes for various devices), and orientation.
+
+Ensure the manifest is correctly linked in the index.html file (<link rel="manifest" href="/manifest.json">).
+
+Service Worker Registration:
+
+Implement a Service Worker in frontend/src/service-worker.js (or similar file).
+
+Register the service worker in the main application entry point (e.g., main.tsx).
+
+Ensure the service worker scope (scope) covers the entire application.
+
+Offline Capabilities & Caching Strategy:
+
+Cache Assets: Use the service worker to cache static assets (HTML, CSS, JavaScript bundles, images, fonts) on installation (install event).
+
+Runtime Caching: Implement strategies for caching API responses and dynamic content during runtime (fetch event):
+
+Cache-First: For static or infrequently changing content.
+
+Network-First (with Cache Fallback): For data that needs to be fresh but should still be available offline if the network fails.
+
+Stale-While-Revalidate: For content that can be served quickly from cache while a fresh version is fetched in the background.
+
+Offline Fallback Page: Provide a user-friendly offline.html page that is served by the service worker when the user is completely offline.
+
+Installability & App Shell:
+
+Ensure the PWA meets all Web App Manifest criteria and Service Worker registration requirements to trigger the "Add to Home Screen" prompt on supported browsers/devices.
+
+Design an App Shell architecture where the core UI (layout, navigation) is cached and loads instantly, providing a snappy perceived performance.
+
+Push Notifications:
+
+Integrate Web Push Notifications (using service worker APIs and a backend Push service).
+
+Allow users to opt-in for push notifications for critical alerts (e.g., appointment reminders, transaction updates).
+
+Implement backend endpoints to send push notifications to registered service worker subscriptions.
+
+Performance Optimization for PWA:
+
+Lazy Loading: Implement lazy loading for images and components not immediately visible.
+
+Code Splitting: Ensure optimal JavaScript bundle splitting for faster initial load.
+
+Minimize Network Requests: Optimize API calls and resource loading.
+
+Accessibility & User Experience:
+
+Ensure the PWA is fully responsive and provides a seamless user experience across various screen sizes and orientations.
+
+Adhere to WCAG guidelines for accessibility.
+
+Expected Deliverables:
+frontend/public/manifest.json: Complete and validated Web App Manifest.
+
+frontend/src/service-worker.js: Fully implemented Service Worker with caching strategies and push notification registration logic.
+
+frontend/public/offline.html: A basic, branded offline fallback page.
+
+frontend/src/index.tsx (or main.tsx): Updated to register the Service Worker.
+
+Backend Push Notification Service: Example code in backend/src/notifications/push.ts for handling web push subscriptions and sending notifications.
+
+README.md updates: Instructions on how to "install" the PWA on various mobile browsers.
+
+Frontend (Conceptual): Notes on UI elements for requesting push notification permission and managing offline status.
