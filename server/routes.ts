@@ -1218,8 +1218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Generate AI-powered analytics
+      const safeUser = createSafeUser(user);
       const aiAnalytics = await aiAnalyticsService.analyzeUserFinances(
-        user as any, // Convert to SafeUser type
+        safeUser,
         transactions,
         accounts
       );

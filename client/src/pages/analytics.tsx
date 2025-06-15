@@ -310,11 +310,12 @@ export default function Analytics() {
 
           {/* Charts Section */}
           <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="spending">Spending</TabsTrigger>
               <TabsTrigger value="income">Income</TabsTrigger>
               <TabsTrigger value="budgets">Budgets</TabsTrigger>
+              <TabsTrigger value="insights">AI Insights</TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
@@ -451,6 +452,246 @@ export default function Analytics() {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="insights" className="space-y-6">
+              {/* Financial Health Score */}
+              {analytics?.aiInsights?.financialHealth && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-blue-600" />
+                      Financial Health Score
+                    </CardTitle>
+                    <CardDescription>AI-powered assessment of your financial wellbeing</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="text-3xl font-bold text-blue-600">
+                        {analytics.aiInsights.financialHealth.score}/100
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        analytics.aiInsights.financialHealth.score >= 80 ? 'bg-green-100 text-green-800' :
+                        analytics.aiInsights.financialHealth.score >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {analytics.aiInsights.financialHealth.score >= 80 ? 'Excellent' :
+                         analytics.aiInsights.financialHealth.score >= 60 ? 'Good' : 'Needs Improvement'}
+                      </div>
+                    </div>
+                    <Progress value={analytics.aiInsights.financialHealth.score} className="mb-4" />
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Key Factors:</h4>
+                      <ul className="space-y-1">
+                        {analytics.aiInsights.financialHealth.factors.map((factor, index) => (
+                          <li key={index} className="flex items-center gap-2 text-sm">
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            {factor}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Spending Patterns */}
+              {analytics?.patterns && analytics.patterns.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-purple-600" />
+                      Detected Spending Patterns
+                    </CardTitle>
+                    <CardDescription>AI analysis of your financial behavior</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {analytics.patterns.map((pattern) => (
+                        <div key={pattern.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {pattern.type === 'spending_spike' && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                              {pattern.type === 'recurring_expense' && <Clock className="h-4 w-4 text-blue-500" />}
+                              {pattern.type === 'savings_opportunity' && <PiggyBank className="h-4 w-4 text-green-500" />}
+                              {pattern.type === 'income_drop' && <TrendingDown className="h-4 w-4 text-orange-500" />}
+                              {pattern.type === 'budget_overrun' && <Target className="h-4 w-4 text-red-500" />}
+                              <span className="font-medium capitalize">{pattern.type.replace('_', ' ')}</span>
+                            </div>
+                            <Badge className={
+                              pattern.impact === 'high' ? 'bg-red-100 text-red-800' :
+                              pattern.impact === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-blue-100 text-blue-800'
+                            }>
+                              {pattern.impact} impact
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">{pattern.description}</p>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-500">{pattern.category} • {pattern.frequency}</span>
+                            <span className="font-medium">{formatCurrency(pattern.amount)}</span>
+                          </div>
+                          {pattern.suggestions.length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <div className="text-sm font-medium mb-1">Suggestions:</div>
+                              <ul className="text-sm text-gray-600 space-y-1">
+                                {pattern.suggestions.map((suggestion, index) => (
+                                  <li key={index} className="flex items-start gap-2">
+                                    <Lightbulb className="h-3 w-3 text-yellow-500 mt-0.5 flex-shrink-0" />
+                                    {suggestion}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Personalized Recommendations */}
+              {analytics?.recommendations && analytics.recommendations.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Zap className="h-5 w-5 text-green-600" />
+                      Personalized Recommendations
+                    </CardTitle>
+                    <CardDescription>AI-powered suggestions to improve your finances</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      {analytics.recommendations.map((rec) => (
+                        <div key={rec.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {rec.type === 'save_money' && <PiggyBank className="h-4 w-4 text-green-500" />}
+                              {rec.type === 'optimize_spending' && <TrendingDown className="h-4 w-4 text-blue-500" />}
+                              {rec.type === 'increase_income' && <TrendingUp className="h-4 w-4 text-green-500" />}
+                              {rec.type === 'budget_adjustment' && <Target className="h-4 w-4 text-purple-500" />}
+                              {rec.type === 'investment_opportunity' && <TrendingUpIcon className="h-4 w-4 text-emerald-500" />}
+                              <span className="font-medium">{rec.title}</span>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={
+                                rec.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-blue-100 text-blue-800'
+                              }>
+                                {rec.priority} priority
+                              </Badge>
+                              <div className="text-sm text-gray-500 mt-1">{rec.timeframe}</div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-3">{rec.description}</p>
+                          {rec.potentialSavings > 0 && (
+                            <div className="bg-green-50 p-3 rounded-lg mb-3">
+                              <div className="text-sm font-medium text-green-800">
+                                Potential Savings: {formatCurrency(rec.potentialSavings)}
+                              </div>
+                            </div>
+                          )}
+                          <div className="space-y-2">
+                            <div className="text-sm font-medium">Action Steps:</div>
+                            <ol className="text-sm text-gray-600 space-y-1">
+                              {rec.actionSteps.map((step, index) => (
+                                <li key={index} className="flex items-start gap-2">
+                                  <span className="bg-blue-100 text-blue-800 text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                    {index + 1}
+                                  </span>
+                                  {step}
+                                </li>
+                              ))}
+                            </ol>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* AI Insights Summary */}
+              {analytics?.aiInsights && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Brain className="h-5 w-5 text-indigo-600" />
+                      AI Financial Insights
+                    </CardTitle>
+                    <CardDescription>Comprehensive analysis of your financial behavior</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">Spending Habits</h4>
+                      <ul className="space-y-1">
+                        {analytics.aiInsights.spendingHabits.map((habit, index) => (
+                          <li key={index} className="text-sm text-gray-600 flex items-start gap-2">
+                            <span className="text-blue-500">•</span>
+                            {habit}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Income Stability</h4>
+                      <p className="text-sm text-gray-600">{analytics.aiInsights.incomeStability}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Savings Progress</h4>
+                      <p className="text-sm text-gray-600">{analytics.aiInsights.savingsProgress}</p>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Budget Performance</h4>
+                      <p className="text-sm text-gray-600">{analytics.aiInsights.budgetPerformance}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Predictions */}
+              {analytics?.predictions && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <TrendingUpIcon className="h-5 w-5 text-emerald-600" />
+                      Financial Predictions
+                    </CardTitle>
+                    <CardDescription>AI-powered forecasts for your financial future</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="text-sm text-blue-600 font-medium">Next Month Spending</div>
+                        <div className="text-2xl font-bold text-blue-800">
+                          {formatCurrency(analytics.predictions.nextMonthSpending)}
+                        </div>
+                      </div>
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="text-sm text-green-600 font-medium">Savings Goal Progress</div>
+                        <div className="text-lg font-semibold text-green-800">
+                          {analytics.predictions.savingsGoalProgress}
+                        </div>
+                      </div>
+                    </div>
+                    {analytics.predictions.budgetRisks.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-2 text-orange-700">Budget Risks</h4>
+                        <ul className="space-y-1">
+                          {analytics.predictions.budgetRisks.map((risk, index) => (
+                            <li key={index} className="text-sm text-orange-600 flex items-start gap-2">
+                              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                              {risk}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
         </div>
