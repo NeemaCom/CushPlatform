@@ -9,6 +9,8 @@ import Analytics from "@/pages/analytics";
 import Imisi from "@/pages/imisi";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
+import ForgotPassword from "@/pages/forgot-password";
+import ResetPassword from "@/pages/reset-password";
 import Subscribe from "@/pages/subscribe";
 import Community from "@/pages/community";
 import InsightDetail from "@/pages/insight-detail";
@@ -25,6 +27,8 @@ function Router() {
       <Route path="/imisi" component={Imisi} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/subscribe" component={Subscribe} />
       <Route path="/community" component={Community} />
       <Route path="/community/insights/:id" component={InsightDetail} />
