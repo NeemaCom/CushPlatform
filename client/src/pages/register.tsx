@@ -66,35 +66,12 @@ export default function Register() {
     const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
     
-    // Debug logging for testing
-    if (password) {
-      console.log(`Password strength debug for "${password}":`, {
-        length: password.length >= 8,
-        lengthScore: password.length >= 8 ? 1 : 0,
-        uppercase: /[A-Z]/.test(password),
-        uppercaseScore: /[A-Z]/.test(password) ? 1 : 0,
-        lowercase: /[a-z]/.test(password),
-        lowercaseScore: /[a-z]/.test(password) ? 1 : 0,
-        number: /\d/.test(password),
-        numberScore: /\d/.test(password) ? 1 : 0,
-        special: specialCharRegex.test(password),
-        specialScore: specialCharRegex.test(password) ? 1 : 0,
-        totalScore: score,
-        expectedScore: 
-          (password.length >= 8 ? 1 : 0) +
-          (/[A-Z]/.test(password) ? 1 : 0) +
-          (/[a-z]/.test(password) ? 1 : 0) +
-          (/\d/.test(password) ? 1 : 0) +
-          (specialCharRegex.test(password) ? 1 : 0),
-        label: labels[score] || "Very Weak",
-        feedback: feedback
-      });
-    }
+
     
     return {
       score,
-      label: labels[score] || "Very Weak",
-      color: colors[score] || "bg-red-500",
+      label: labels[Math.min(score, labels.length - 1)] || "Very Weak",
+      color: colors[Math.min(score, colors.length - 1)] || "bg-red-500",
       feedback: feedback.length > 0 ? `Missing: ${feedback.join(", ")}` : "Password meets all requirements"
     };
   };

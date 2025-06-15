@@ -65,8 +65,8 @@ export default function ResetPassword() {
     
     return {
       score,
-      label: labels[score] || "Very Weak",
-      color: colors[score] || "bg-red-500",
+      label: labels[Math.min(score, labels.length - 1)] || "Very Weak",
+      color: colors[Math.min(score, colors.length - 1)] || "bg-red-500",
       feedback: feedback.length > 0 ? `Missing: ${feedback.join(", ")}` : "Password meets all requirements"
     };
   };
