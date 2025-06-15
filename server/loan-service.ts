@@ -413,29 +413,27 @@ export class LoanService {
    */
   async getLoanReferralRevenue(startDate?: Date, endDate?: Date) {
     try {
-      let query = db
-        .select({
-          partnerId: loanReferrals.partnerId,
-          partnerName: loanPartners.name,
-          totalReferrals: 'COUNT(*)',
-          approvedReferrals: 'COUNT(CASE WHEN referral_status = \'approved\' THEN 1 END)',
-          totalCommissionEarned: 'SUM(commission_earned)',
-          totalCommissionPaid: 'SUM(CASE WHEN commission_paid = true THEN commission_earned ELSE 0 END)',
-          averageApprovedAmount: 'AVG(approved_amount)',
-        })
-        .from(loanReferrals)
-        .leftJoin(loanPartners, eq(loanReferrals.partnerId, loanPartners.id))
-        .groupBy(loanReferrals.partnerId, loanPartners.name);
+      // Build the base query with raw SQL for aggregations
+      const query = `
+        SELECT 
+          lr.partner_id,
+          lp.name as partner_name,
+          COUNT(*) as total_referrals,
+          COUNT(CASE WHEN lr.referral_status = 'approved' THEN 1 END) as approved_referrals,
+          COALESCE(SUM(lr.commission_earned), 0) as total_commission_earned,
+          COALESCE(SUM(CASE WHEN lr.commission_paid = true THEN lr.commission_earned ELSE 0 END), 0) as total_commission_paid,
+          COALESCE(AVG(lr.approved_amount), 0) as average_approved_amount
+        FROM loan_referrals lr
+        LEFT JOIN loan_partners lp ON lr.partner_id = lp.id
+        WHERE 1=1
+        ${startDate ? `AND lr.referred_at >= '${startDate.toISOString()}'` : ''}
+        ${endDate ? `AND lr.referred_at <= '${endDate.toISOString()}'` : ''}
+        GROUP BY lr.partner_id, lp.name
+        ORDER BY total_commission_earned DESC
+      `;
 
-      // Add date filters if provided
-      if (startDate) {
-        query = query.where(gte(loanReferrals.referredAt, startDate));
-      }
-      if (endDate) {
-        query = query.where(lte(loanReferrals.referredAt, endDate));
-      }
-
-      return await query;
+      const result = await db.execute(query);
+      return result.rows;
 
     } catch (error) {
       console.error("Error getting loan referral revenue:", error);

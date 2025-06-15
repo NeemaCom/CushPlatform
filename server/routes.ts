@@ -6,6 +6,8 @@ import passport from "passport";
 import { storage } from "./storage";
 import { setupGoogleAuth } from "./google-auth";
 import { aiAnalyticsService } from "./ai-analytics-service";
+import { loanService } from "./loan-service";
+import { loanPreQualificationSchema, type LoanPreQualificationForm } from "../shared/schema";
 import { 
   registerSchema, 
   loginSchema, 
