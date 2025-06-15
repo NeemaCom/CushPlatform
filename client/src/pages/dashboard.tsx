@@ -230,6 +230,11 @@ export default function Dashboard() {
               <TransactionList />
             </div>
 
+            {/* Financial Goals Widget */}
+            <div className="mt-6">
+              <FinancialGoalsWidget />
+            </div>
+
             {/* Additional Dashboard Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
               {/* Spending Categories */}
