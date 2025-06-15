@@ -22,8 +22,8 @@ export default function Homepage() {
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">
                   <a href="#features" className="text-gray-900 hover:text-blue-600 px-3 py-2 text-sm font-medium">Services</a>
-                  <Link href="/community">
-                    <a className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">Community</a>
+                  <Link href="/community" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">
+                    Community
                   </Link>
                   <a href="#stats" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">About</a>
                   <a href="#" className="text-gray-500 hover:text-blue-600 px-3 py-2 text-sm font-medium">Success Stories</a>
