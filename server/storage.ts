@@ -11,6 +11,9 @@ import {
   communityEvents,
   eventRegistrations,
   mentorSessions,
+  loanPartners,
+  loanPreQualifications,
+  loanReferrals,
   type User, 
   type SafeUser,
   type InsertUser,
@@ -33,7 +36,13 @@ import {
   type EventRegistration,
   type InsertEventRegistration,
   type MentorSession,
-  type InsertMentorSession
+  type InsertMentorSession,
+  type LoanPartner,
+  type InsertLoanPartner,
+  type LoanPreQualification,
+  type InsertLoanPreQualification,
+  type LoanReferral,
+  type InsertLoanReferral
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -102,6 +111,25 @@ export interface IStorage {
   getMentorSessions(mentorId?: number, menteeId?: number): Promise<MentorSession[]>;
   createMentorSession(session: InsertMentorSession & { mentorId: number; menteeId: number }): Promise<MentorSession>;
   updateMentorSession(id: number, updates: Partial<MentorSession>): Promise<MentorSession>;
+
+  // Loan Partners methods
+  getLoanPartners(): Promise<LoanPartner[]>;
+  getLoanPartner(id: number): Promise<LoanPartner | undefined>;
+  createLoanPartner(partner: InsertLoanPartner): Promise<LoanPartner>;
+  updateLoanPartner(id: number, updates: Partial<LoanPartner>): Promise<LoanPartner>;
+
+  // Loan Pre-Qualifications methods
+  getLoanPreQualifications(userId?: number): Promise<LoanPreQualification[]>;
+  getLoanPreQualification(id: number): Promise<LoanPreQualification | undefined>;
+  createLoanPreQualification(preQual: InsertLoanPreQualification & { userId: number }): Promise<LoanPreQualification>;
+  updateLoanPreQualification(id: number, updates: Partial<LoanPreQualification>): Promise<LoanPreQualification>;
+
+  // Loan Referrals methods
+  getLoanReferrals(preQualificationId?: number, userId?: number): Promise<LoanReferral[]>;
+  getLoanReferral(id: number): Promise<LoanReferral | undefined>;
+  getLoanReferralByCode(referralCode: string): Promise<LoanReferral | undefined>;
+  createLoanReferral(referral: InsertLoanReferral & { preQualificationId: number; partnerId: number }): Promise<LoanReferral>;
+  updateLoanReferral(id: number, updates: Partial<LoanReferral>): Promise<LoanReferral>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -467,6 +495,128 @@ export class DatabaseStorage implements IStorage {
       .where(eq(mentorSessions.id, id))
       .returning();
     return updatedSession;
+  }
+
+  // Loan Partners methods
+  async getLoanPartners(): Promise<LoanPartner[]> {
+    return await db
+      .select()
+      .from(loanPartners)
+      .orderBy(desc(loanPartners.createdAt));
+  }
+
+  async getLoanPartner(id: number): Promise<LoanPartner | undefined> {
+    const [partner] = await db
+      .select()
+      .from(loanPartners)
+      .where(eq(loanPartners.id, id));
+    return partner || undefined;
+  }
+
+  async createLoanPartner(partner: InsertLoanPartner): Promise<LoanPartner> {
+    const [newPartner] = await db
+      .insert(loanPartners)
+      .values(partner)
+      .returning();
+    return newPartner;
+  }
+
+  async updateLoanPartner(id: number, updates: Partial<LoanPartner>): Promise<LoanPartner> {
+    const [updatedPartner] = await db
+      .update(loanPartners)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(loanPartners.id, id))
+      .returning();
+    return updatedPartner;
+  }
+
+  // Loan Pre-Qualifications methods
+  async getLoanPreQualifications(userId?: number): Promise<LoanPreQualification[]> {
+    const query = db.select().from(loanPreQualifications);
+    
+    if (userId) {
+      return await query
+        .where(eq(loanPreQualifications.userId, userId))
+        .orderBy(desc(loanPreQualifications.createdAt));
+    }
+    
+    return await query.orderBy(desc(loanPreQualifications.createdAt));
+  }
+
+  async getLoanPreQualification(id: number): Promise<LoanPreQualification | undefined> {
+    const [preQual] = await db
+      .select()
+      .from(loanPreQualifications)
+      .where(eq(loanPreQualifications.id, id));
+    return preQual || undefined;
+  }
+
+  async createLoanPreQualification(preQual: InsertLoanPreQualification & { userId: number }): Promise<LoanPreQualification> {
+    const [newPreQual] = await db
+      .insert(loanPreQualifications)
+      .values(preQual)
+      .returning();
+    return newPreQual;
+  }
+
+  async updateLoanPreQualification(id: number, updates: Partial<LoanPreQualification>): Promise<LoanPreQualification> {
+    const [updatedPreQual] = await db
+      .update(loanPreQualifications)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(loanPreQualifications.id, id))
+      .returning();
+    return updatedPreQual;
+  }
+
+  // Loan Referrals methods
+  async getLoanReferrals(preQualificationId?: number, userId?: number): Promise<LoanReferral[]> {
+    let query = db.select().from(loanReferrals);
+    
+    if (preQualificationId) {
+      query = query.where(eq(loanReferrals.preQualificationId, preQualificationId));
+    } else if (userId) {
+      // Join with pre-qualifications to filter by user
+      query = db
+        .select()
+        .from(loanReferrals)
+        .innerJoin(loanPreQualifications, eq(loanReferrals.preQualificationId, loanPreQualifications.id))
+        .where(eq(loanPreQualifications.userId, userId)) as any;
+    }
+    
+    return await query.orderBy(desc(loanReferrals.referredAt));
+  }
+
+  async getLoanReferral(id: number): Promise<LoanReferral | undefined> {
+    const [referral] = await db
+      .select()
+      .from(loanReferrals)
+      .where(eq(loanReferrals.id, id));
+    return referral || undefined;
+  }
+
+  async getLoanReferralByCode(referralCode: string): Promise<LoanReferral | undefined> {
+    const [referral] = await db
+      .select()
+      .from(loanReferrals)
+      .where(eq(loanReferrals.referralCode, referralCode));
+    return referral || undefined;
+  }
+
+  async createLoanReferral(referral: InsertLoanReferral & { preQualificationId: number; partnerId: number }): Promise<LoanReferral> {
+    const [newReferral] = await db
+      .insert(loanReferrals)
+      .values(referral)
+      .returning();
+    return newReferral;
+  }
+
+  async updateLoanReferral(id: number, updates: Partial<LoanReferral>): Promise<LoanReferral> {
+    const [updatedReferral] = await db
+      .update(loanReferrals)
+      .set({ ...updates, lastStatusUpdate: new Date() })
+      .where(eq(loanReferrals.id, id))
+      .returning();
+    return updatedReferral;
   }
 }
 
