@@ -461,6 +461,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Change password endpoint
+  app.post("/api/auth/change-password", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const userId = req.userId!;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+      
+      // Get user to verify current password
+      const user = await storage.getUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Verify current password
+      const isCurrentPasswordValid = await EncryptionService.verifyPassword(currentPassword, user.passwordHash);
+      if (!isCurrentPasswordValid) {
+        await SecurityLogger.logAuthEvent(
+          'password_change_failed',
+          userId,
+          false,
+          req.ip,
+          req.get('User-Agent'),
+          { reason: 'invalid_current_password' }
+        );
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+      
+      // Check new password strength
+      const passwordCheck = validatePasswordStrength(newPassword);
+      if (!passwordCheck.isValid) {
+        return res.status(400).json({ 
+          error: "New password does not meet security requirements",
+          details: passwordCheck.errors 
+        });
+      }
+      
+      // Hash new password and update
+      const hashedNewPassword = await EncryptionService.hashPassword(newPassword);
+      await storage.updateUser(userId, {
+        passwordHash: hashedNewPassword,
+      });
+      
+      await SecurityLogger.logAuthEvent(
+        'password_change_success',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Change password error:", error);
+      res.status(500).json({ error: "Failed to change password" });
+    }
+  });
+
   // MFA endpoints
   app.post("/api/mfa/enable", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
@@ -592,7 +652,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/transactions/recent", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const transactions = await storage.getRecentTransactions(userId, 10);
+      const transactions = await storage.getRecentTransactions(userId, 5);
       res.json(transactions);
     } catch (error) {
       console.error("Recent transactions error:", error);
