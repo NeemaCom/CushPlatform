@@ -40,7 +40,7 @@ export default function CreateInsightPage() {
       title: "",
       content: "",
       excerpt: "",
-      category: "",
+      category: undefined,
       tags: [],
       featuredImage: "",
       readTime: undefined,
