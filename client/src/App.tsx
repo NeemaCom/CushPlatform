@@ -8,6 +8,10 @@ import Dashboard from "@/pages/dashboard";
 import Login from "@/pages/login";
 import Register from "@/pages/register";
 import Subscribe from "@/pages/subscribe";
+import Community from "@/pages/community";
+import InsightDetail from "@/pages/insight-detail";
+import MentorProfile from "@/pages/mentor-profile";
+import CreateInsight from "@/pages/create-insight";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +22,10 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/subscribe" component={Subscribe} />
+      <Route path="/community" component={Community} />
+      <Route path="/community/insights/:id" component={InsightDetail} />
+      <Route path="/community/mentors/:id" component={MentorProfile} />
+      <Route path="/community/create-insight" component={CreateInsight} />
       <Route component={NotFound} />
     </Switch>
   );
