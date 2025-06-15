@@ -32,8 +32,40 @@ import {
   Target,
   Calendar,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Brain,
+  AlertTriangle,
+  Lightbulb,
+  TrendingUpIcon,
+  Activity,
+  Zap,
+  CheckCircle,
+  Clock
 } from "lucide-react";
+
+interface FinancialPattern {
+  id: string;
+  type: 'spending_spike' | 'recurring_expense' | 'income_drop' | 'savings_opportunity' | 'budget_overrun';
+  category: string;
+  description: string;
+  impact: 'high' | 'medium' | 'low';
+  amount: number;
+  frequency: string;
+  detectedAt: string;
+  suggestions: string[];
+}
+
+interface PersonalizedRecommendation {
+  id: string;
+  type: 'save_money' | 'optimize_spending' | 'increase_income' | 'budget_adjustment' | 'investment_opportunity';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  potentialSavings: number;
+  actionSteps: string[];
+  category: string;
+  timeframe: string;
+}
 
 interface AnalyticsData {
   spending: {
@@ -74,6 +106,23 @@ interface AnalyticsData {
       expenses: number;
       net: number;
     }>;
+  };
+  aiInsights?: {
+    spendingHabits: string[];
+    incomeStability: string;
+    savingsProgress: string;
+    budgetPerformance: string;
+    financialHealth: {
+      score: number;
+      factors: string[];
+    };
+  };
+  patterns?: FinancialPattern[];
+  recommendations?: PersonalizedRecommendation[];
+  predictions?: {
+    nextMonthSpending: number;
+    savingsGoalProgress: string;
+    budgetRisks: string[];
   };
 }
 

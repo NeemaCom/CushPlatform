@@ -5,6 +5,7 @@ import session from "express-session";
 import passport from "passport";
 import { storage } from "./storage";
 import { setupGoogleAuth } from "./google-auth";
+import { aiAnalyticsService } from "./ai-analytics-service";
 import { 
   registerSchema, 
   loginSchema, 
@@ -1199,19 +1200,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Analytics endpoint
+  // Enhanced Analytics endpoint with AI insights
   app.get('/api/analytics', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
       const { timeRange = '6months', category } = req.query;
       
-      // Get user's transactions and accounts for analytics
-      const [accounts, transactions] = await Promise.all([
+      // Get user data for AI analysis
+      const [user, accounts, transactions] = await Promise.all([
+        storage.getUser(userId),
         storage.getAccountsByUserId(userId),
         storage.getRecentTransactions(userId, 1000) // Get more transactions for analytics
       ]);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Generate AI-powered analytics
+      const aiAnalytics = await aiAnalyticsService.analyzeUserFinances(
+        user as any, // Convert to SafeUser type
+        transactions,
+        accounts
+      );
       
-      // Calculate total balance
+      // Calculate traditional analytics data
       const totalBalance = accounts.reduce((sum, account) => 
         sum + parseFloat(account.balance), 0
       );
@@ -1334,7 +1347,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         budgets,
         transactions: {
           monthly: monthlyData
-        }
+        },
+        // Add AI-powered insights
+        aiInsights: aiAnalytics.insights,
+        patterns: aiAnalytics.patterns,
+        recommendations: aiAnalytics.recommendations,
+        predictions: aiAnalytics.predictions
       };
       
       res.json(analyticsData);
