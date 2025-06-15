@@ -28,27 +28,56 @@ export default function Register() {
     let feedback = [];
     
     // Length check
-    if (password.length >= 8) score += 1;
-    else feedback.push("8+ characters");
+    if (password.length >= 8) {
+      score += 1;
+    } else {
+      feedback.push("8+ characters");
+    }
     
     // Uppercase check
-    if (/[A-Z]/.test(password)) score += 1;
-    else feedback.push("uppercase letter");
+    if (/[A-Z]/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("uppercase letter");
+    }
     
     // Lowercase check
-    if (/[a-z]/.test(password)) score += 1;
-    else feedback.push("lowercase letter");
+    if (/[a-z]/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("lowercase letter");
+    }
     
     // Number check
-    if (/\d/.test(password)) score += 1;
-    else feedback.push("number");
+    if (/\d/.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("number");
+    }
     
-    // Special character check (match backend schema)
-    if (/[@$!%*?&]/.test(password)) score += 1;
-    else feedback.push("special character (@$!%*?&)");
+    // Special character check - must contain at least one of: @ $ ! % * ? &
+    const specialCharRegex = /[@$!%*?&]/;
+    if (specialCharRegex.test(password)) {
+      score += 1;
+    } else {
+      feedback.push("special character (@$!%*?&)");
+    }
     
     const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
     const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
+    
+    // Debug logging for testing
+    if (password && process.env.NODE_ENV === 'development') {
+      console.log(`Password strength check for "${password}":`, {
+        length: password.length >= 8,
+        uppercase: /[A-Z]/.test(password),
+        lowercase: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        special: specialCharRegex.test(password),
+        score,
+        label: labels[score] || "Very Weak"
+      });
+    }
     
     return {
       score,
