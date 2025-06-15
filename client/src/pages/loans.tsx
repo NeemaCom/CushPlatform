@@ -18,15 +18,19 @@ import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
 const preQualificationSchema = z.object({
-  loanAmount: z.number().min(1000).max(500000),
-  loanPurpose: z.string().min(1),
-  annualIncome: z.number().min(1),
-  creditScore: z.number().min(300).max(850),
-  employmentStatus: z.string().min(1),
-  debtToIncomeRatio: z.number().min(0).max(100),
-  collateralValue: z.number().optional(),
-  businessRevenue: z.number().optional(),
-  yearsInBusiness: z.number().optional(),
+  loanPurpose: z.string().min(1, "Loan purpose is required"),
+  amountRequested: z.string().min(1, "Loan amount is required"),
+  currency: z.string().default("USD"),
+  creditScore: z.number().min(300).max(850).optional(),
+  employmentStatus: z.enum(["employed", "self_employed", "unemployed", "retired", "student"]),
+  monthlyIncome: z.string().optional(),
+  existingDebt: z.string().optional(),
+  collateralValue: z.string().optional(),
+  loanTerm: z.number().min(1).max(360).optional(),
+  country: z.string().optional(),
+  state: z.string().optional(),
+  city: z.string().optional(),
+  additionalInfo: z.any().optional(),
 });
 
 type PreQualificationForm = z.infer<typeof preQualificationSchema>;
@@ -46,15 +50,18 @@ export default function LoansPage() {
   const form = useForm<PreQualificationForm>({
     resolver: zodResolver(preQualificationSchema),
     defaultValues: {
-      loanAmount: 10000,
       loanPurpose: '',
-      annualIncome: 50000,
+      amountRequested: '10000',
+      currency: 'USD',
       creditScore: 650,
-      employmentStatus: '',
-      debtToIncomeRatio: 30,
-      collateralValue: 0,
-      businessRevenue: 0,
-      yearsInBusiness: 0,
+      employmentStatus: 'employed',
+      monthlyIncome: '4000',
+      existingDebt: '0',
+      collateralValue: '0',
+      loanTerm: 60,
+      country: 'US',
+      state: '',
+      city: '',
     },
   });
 
@@ -143,16 +150,15 @@ export default function LoansPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="loanAmount"
+                    name="amountRequested"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Loan Amount ($)</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
+                            type="text"
                             placeholder="10000"
                             {...field}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -190,16 +196,15 @@ export default function LoansPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="annualIncome"
+                    name="monthlyIncome"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Annual Income ($)</FormLabel>
+                        <FormLabel>Monthly Income ($)</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            placeholder="50000"
+                            type="text"
+                            placeholder="4000"
                             {...field}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -255,18 +260,15 @@ export default function LoansPage() {
                   />
                   <FormField
                     control={form.control}
-                    name="debtToIncomeRatio"
+                    name="existingDebt"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Debt-to-Income Ratio (%)</FormLabel>
+                        <FormLabel>Existing Debt ($)</FormLabel>
                         <FormControl>
                           <Input
-                            type="number"
-                            placeholder="30"
-                            min="0"
-                            max="100"
+                            type="text"
+                            placeholder="0"
                             {...field}
-                            onChange={(e) => field.onChange(Number(e.target.value))}
                           />
                         </FormControl>
                         <FormMessage />
@@ -275,46 +277,45 @@ export default function LoansPage() {
                   />
                 </div>
 
-                {form.watch('loanPurpose') === 'business' && (
-                  <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
-                    <FormField
-                      control={form.control}
-                      name="businessRevenue"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Annual Business Revenue ($)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="100000"
-                              {...field}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="yearsInBusiness"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Years in Business</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              placeholder="2"
-                              {...field}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                )}
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="loanTerm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Loan Term (months)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="60"
+                            min="1"
+                            max="360"
+                            {...field}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="text"
+                            placeholder="US"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
@@ -324,10 +325,9 @@ export default function LoansPage() {
                       <FormLabel>Collateral Value (Optional) ($)</FormLabel>
                       <FormControl>
                         <Input
-                          type="number"
+                          type="text"
                           placeholder="0"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
                         />
                       </FormControl>
                       <FormMessage />
