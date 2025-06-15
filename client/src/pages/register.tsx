@@ -120,6 +120,8 @@ export default function Register() {
   });
 
   const onSubmit = (data: RegisterFormType) => {
+    console.log("Form submission data:", data);
+    console.log("Form errors:", form.formState.errors);
     registerMutation.mutate(data);
   };
 
