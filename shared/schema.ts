@@ -254,6 +254,44 @@ export const loanReferrals = pgTable("loan_referrals", {
   notes: text("notes"),
 });
 
+// Financial Goals table - user-defined savings and financial targets
+export const financialGoals = pgTable("financial_goals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  goalType: text("goal_type").notNull(), // savings, debt_payoff, investment, emergency_fund, vacation, home, car
+  targetAmount: decimal("target_amount", { precision: 12, scale: 2 }).notNull(),
+  currentAmount: decimal("current_amount", { precision: 12, scale: 2 }).default("0.00"),
+  currency: text("currency").default("USD"),
+  targetDate: timestamp("target_date"),
+  priority: text("priority").default("medium"), // high, medium, low
+  category: text("category"), // housing, travel, education, retirement, etc.
+  isActive: boolean("is_active").default(true),
+  isCompleted: boolean("is_completed").default(false),
+  completedAt: timestamp("completed_at"),
+  monthlyContribution: decimal("monthly_contribution", { precision: 10, scale: 2 }),
+  autoTransferEnabled: boolean("auto_transfer_enabled").default(false),
+  linkedAccountId: integer("linked_account_id").references(() => accounts.id),
+  reminderEnabled: boolean("reminder_enabled").default(true),
+  reminderFrequency: text("reminder_frequency").default("weekly"), // daily, weekly, monthly
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Goal Progress Tracking table - historical progress data
+export const goalProgress = pgTable("goal_progress", {
+  id: serial("id").primaryKey(),
+  goalId: integer("goal_id").notNull().references(() => financialGoals.id, { onDelete: "cascade" }),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  progressPercentage: decimal("progress_percentage", { precision: 5, scale: 2 }),
+  transactionId: integer("transaction_id").references(() => transactions.id),
+  entryType: text("entry_type").default("manual"), // manual, automatic, transaction_linked
+  notes: text("notes"),
+  recordedAt: timestamp("recorded_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -267,6 +305,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   eventRegistrations: many(eventRegistrations),
   mentorSessions: many(mentorSessions),
   loanPreQualifications: many(loanPreQualifications),
+  financialGoals: many(financialGoals),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -374,6 +413,29 @@ export const loanReferralsRelations = relations(loanReferrals, ({ one }) => ({
   partner: one(loanPartners, {
     fields: [loanReferrals.partnerId],
     references: [loanPartners.id],
+  }),
+}));
+
+export const financialGoalsRelations = relations(financialGoals, ({ one, many }) => ({
+  user: one(users, {
+    fields: [financialGoals.userId],
+    references: [users.id],
+  }),
+  linkedAccount: one(accounts, {
+    fields: [financialGoals.linkedAccountId],
+    references: [accounts.id],
+  }),
+  progress: many(goalProgress),
+}));
+
+export const goalProgressRelations = relations(goalProgress, ({ one }) => ({
+  goal: one(financialGoals, {
+    fields: [goalProgress.goalId],
+    references: [financialGoals.id],
+  }),
+  transaction: one(transactions, {
+    fields: [goalProgress.transactionId],
+    references: [transactions.id],
   }),
 }));
 
