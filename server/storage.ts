@@ -377,7 +377,7 @@ export class DatabaseStorage implements IStorage {
   async createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor> {
     const [newMentor] = await db
       .insert(mentors)
-      .values(mentor)
+      .values([mentor])
       .returning();
     return newMentor;
   }

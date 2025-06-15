@@ -55,10 +55,19 @@ export function FinancialGoalsWidget({ className = "" }: FinancialGoalsWidgetPro
   });
 
   const createGoalMutation = useMutation({
-    mutationFn: (data: CreateFinancialGoal) => apiRequest('/api/financial-goals', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    mutationFn: async (data: CreateFinancialGoal) => {
+      const response = await fetch('/api/financial-goals', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to create goal');
+      }
+      return response.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/financial-goals'] });
       setIsDialogOpen(false);
