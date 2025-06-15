@@ -50,7 +50,7 @@ export function Sidebar() {
   };
 
   return (
-    <div className="w-64 bg-white/95 backdrop-blur-sm shadow-sm h-screen fixed left-0 top-0 border-r border-blue-100">
+    <div className="w-64 h-screen fixed left-0 top-0 sidebar-gradient backdrop-blur-sm shadow-xl border-r border-white/20">
       <div className="p-6">
         <div className="flex items-center">
           <img 
@@ -71,10 +71,10 @@ export function Sidebar() {
               <Link key={item.href} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center py-3 px-4 rounded-lg mb-2 transition-colors cursor-pointer",
+                    "flex items-center py-3 px-4 rounded-lg mb-2 transition-all duration-300 cursor-pointer backdrop-blur-sm",
                     isActive
-                      ? "bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 border-r-2 border-blue-600"
-                      : "text-gray-600 hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-purple-50/50"
+                      ? "bg-white/20 text-white border-r-4 border-white/60 shadow-lg transform scale-105"
+                      : "text-white/80 hover:bg-white/10 hover:text-white hover:shadow-md hover:transform hover:scale-102"
                   )}
                 >
                   <Icon className="w-5 h-5" />
@@ -89,7 +89,7 @@ export function Sidebar() {
       <div className="absolute bottom-6 left-6 right-6">
         <Button
           variant="ghost"
-          className="w-full justify-start text-gray-600 hover:bg-gray-50"
+          className="w-full justify-start text-white/80 hover:bg-white/10 hover:text-white transition-all duration-300 backdrop-blur-sm"
           onClick={handleLogout}
           disabled={logoutMutation.isPending}
         >

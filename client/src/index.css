@@ -35,6 +35,27 @@
   100% { background-position: 0% 50%; }
 }
 
+@keyframes sidebar-gradient {
+  0% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes sidebar-glow {
+  0%, 100% { 
+    box-shadow: 
+      inset 0 0 60px rgba(255, 255, 255, 0.1),
+      0 0 30px rgba(59, 130, 246, 0.15);
+  }
+  50% { 
+    box-shadow: 
+      inset 0 0 80px rgba(255, 255, 255, 0.15),
+      0 0 40px rgba(147, 51, 234, 0.2);
+  }
+}
+
 .gmail-shimmer {
   animation: shimmer 2s ease-in-out infinite;
 }
@@ -51,6 +72,44 @@
   background: linear-gradient(-45deg, #ea4335, #fbbc04, #34a853, #4285f4);
   background-size: 400% 400%;
   animation: rainbow 3s ease infinite;
+}
+
+.sidebar-gradient {
+  background: linear-gradient(
+    135deg,
+    hsl(217, 91%, 60%) 0%,
+    hsl(224, 76%, 48%) 15%,
+    hsl(267, 84%, 64%) 35%,
+    hsl(224, 64%, 33%) 60%,
+    hsl(217, 91%, 60%) 85%,
+    hsl(221, 83%, 53%) 100%
+  );
+  background-size: 400% 400%;
+  animation: sidebar-gradient 15s ease infinite, sidebar-glow 8s ease-in-out infinite;
+  position: relative;
+}
+
+.sidebar-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 25%,
+    transparent 75%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  z-index: 0;
+  pointer-events: none;
+}
+
+.sidebar-gradient > * {
+  position: relative;
+  z-index: 1;
 }
 
 :root {
