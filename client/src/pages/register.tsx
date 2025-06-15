@@ -5,6 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { registerSchema, type RegisterForm as RegisterFormType } from "@shared/schema";
@@ -120,8 +121,6 @@ export default function Register() {
   });
 
   const onSubmit = (data: RegisterFormType) => {
-    console.log("Form submission data:", data);
-    console.log("Form errors:", form.formState.errors);
     registerMutation.mutate(data);
   };
 
@@ -403,6 +402,78 @@ export default function Register() {
               />
 
 
+
+              {/* Terms and Privacy Checkboxes */}
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="acceptTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="text-sm font-normal">
+                          I agree to the{" "}
+                          <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">
+                            Terms of Service
+                          </a>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="acceptPrivacy"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="text-sm font-normal">
+                          I agree to the{" "}
+                          <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+                            Privacy Policy
+                          </a>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="marketingConsent"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="text-sm font-normal text-gray-600">
+                          I would like to receive marketing communications and updates (optional)
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <Button
                 type="submit"
