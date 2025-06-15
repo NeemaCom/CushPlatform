@@ -14,6 +14,7 @@ import ForgotPassword from "@/pages/forgot-password";
 import ResetPassword from "@/pages/reset-password";
 import Subscribe from "@/pages/subscribe";
 import Community from "@/pages/community";
+import Loans from "@/pages/loans";
 import InsightDetail from "@/pages/insight-detail";
 import MentorProfile from "@/pages/mentor-profile";
 import CreateInsight from "@/pages/create-insight";
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/imisi" component={Imisi} />
+      <Route path="/loans" component={Loans} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
