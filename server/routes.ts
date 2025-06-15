@@ -1187,6 +1187,151 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Analytics endpoint
+  app.get('/api/analytics', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { timeRange = '6months', category } = req.query;
+      
+      // Get user's transactions and accounts for analytics
+      const [accounts, transactions] = await Promise.all([
+        storage.getAccountsByUserId(userId),
+        storage.getRecentTransactions(userId, 1000) // Get more transactions for analytics
+      ]);
+      
+      // Calculate total balance
+      const totalBalance = accounts.reduce((sum, account) => 
+        sum + parseFloat(account.balance), 0
+      );
+      
+      // Generate analytics data based on time range
+      const now = new Date();
+      const monthsBack = timeRange === '1month' ? 1 : 
+                        timeRange === '3months' ? 3 : 
+                        timeRange === '6months' ? 6 : 12;
+      
+      const startDate = new Date(now.getFullYear(), now.getMonth() - monthsBack, 1);
+      
+      // Filter transactions by date range
+      const filteredTransactions = transactions.filter(t => 
+        new Date(t.createdAt) >= startDate
+      );
+      
+      // Calculate spending by category
+      const expenseTransactions = filteredTransactions.filter(t => 
+        parseFloat(t.amount) < 0
+      );
+      
+      const categorySpending = expenseTransactions.reduce((acc, t) => {
+        const category = t.category || 'Other';
+        acc[category] = (acc[category] || 0) + Math.abs(parseFloat(t.amount));
+        return acc;
+      }, {} as Record<string, number>);
+      
+      const totalSpending = Object.values(categorySpending).reduce((sum, amount) => sum + amount, 0);
+      
+      const spendingCategories = Object.entries(categorySpending).map(([name, amount], index) => ({
+        name: name.charAt(0).toUpperCase() + name.slice(1),
+        amount,
+        percentage: totalSpending > 0 ? Math.round((amount / totalSpending) * 100) : 0,
+        color: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'][index % 6]
+      }));
+      
+      // Calculate income
+      const incomeTransactions = filteredTransactions.filter(t => 
+        parseFloat(t.amount) > 0
+      );
+      
+      const totalIncome = incomeTransactions.reduce((sum, t) => 
+        sum + parseFloat(t.amount), 0
+      );
+      
+      // Generate monthly data
+      const monthlyData = [];
+      for (let i = monthsBack - 1; i >= 0; i--) {
+        const monthDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const monthName = monthDate.toLocaleDateString('en-US', { month: 'short' });
+        
+        const monthTransactions = filteredTransactions.filter(t => {
+          const tDate = new Date(t.createdAt);
+          return tDate.getMonth() === monthDate.getMonth() && 
+                 tDate.getFullYear() === monthDate.getFullYear();
+        });
+        
+        const monthIncome = monthTransactions
+          .filter(t => parseFloat(t.amount) > 0)
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          
+        const monthExpenses = Math.abs(monthTransactions
+          .filter(t => parseFloat(t.amount) < 0)
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0));
+        
+        monthlyData.push({
+          month: monthName,
+          amount: monthIncome,
+          income: monthIncome,
+          expenses: monthExpenses,
+          net: monthIncome - monthExpenses
+        });
+      }
+      
+      // Calculate savings
+      const monthlyIncome = totalIncome / monthsBack;
+      const monthlyExpenses = totalSpending / monthsBack;
+      const monthlySavings = monthlyIncome - monthlyExpenses;
+      const savingsRate = monthlyIncome > 0 ? (monthlySavings / monthlyIncome) * 100 : 0;
+      const savingsGoal = monthlyIncome * 0.2; // 20% savings goal
+      
+      // Generate budget data (mock for now since we don't have budgets table)
+      const budgetCategories = ['housing', 'food', 'transportation', 'entertainment'];
+      const budgets = budgetCategories.map(category => {
+        const spent = categorySpending[category] || 0;
+        const budget = spent * 1.2; // Set budget 20% higher than spent for demo
+        const percentage = budget > 0 ? (spent / budget) * 100 : 0;
+        
+        let status: 'on-track' | 'warning' | 'over-budget' = 'on-track';
+        if (percentage > 100) status = 'over-budget';
+        else if (percentage > 80) status = 'warning';
+        
+        return {
+          category,
+          spent,
+          budget,
+          percentage: Math.round(percentage),
+          status
+        };
+      });
+      
+      const analyticsData = {
+        spending: {
+          total: totalSpending,
+          categories: spendingCategories,
+          trend: Math.random() * 20 - 10 // Mock trend for now
+        },
+        income: {
+          total: monthlyIncome,
+          monthly: monthlyData,
+          trend: Math.random() * 20 - 10 // Mock trend for now
+        },
+        savings: {
+          total: totalBalance,
+          goal: savingsGoal,
+          rate: Math.max(0, savingsRate),
+          trend: Math.random() * 20 - 10 // Mock trend for now
+        },
+        budgets,
+        transactions: {
+          monthly: monthlyData
+        }
+      };
+      
+      res.json(analyticsData);
+    } catch (error: any) {
+      console.error("Get analytics error:", error);
+      res.status(500).json({ error: "Failed to fetch analytics data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
