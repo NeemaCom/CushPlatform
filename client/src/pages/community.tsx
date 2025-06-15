@@ -106,10 +106,12 @@ export default function CommunityPage() {
   });
 
   // Filter mentors based on search
-  const filteredMentors = mentors.filter((mentor: Mentor) =>
-    mentor.bio.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    mentor.specialty.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredMentors = mentors.filter((mentor: Mentor) => {
+    const matchesSearch = mentor.bio.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      mentor.specialty.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSpecialty = !selectedSpecialty || selectedSpecialty === "all" || mentor.specialty === selectedSpecialty;
+    return matchesSearch && matchesSpecialty;
+  });
 
   // Filter events based on search
   const filteredEvents = events.filter((event: CommunityEvent) =>
@@ -263,7 +265,7 @@ export default function CommunityPage() {
                   <SelectValue placeholder="Filter by specialty" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Specialties</SelectItem>
+                  <SelectItem value="all">All Specialties</SelectItem>
                   <SelectItem value="finance">Finance</SelectItem>
                   <SelectItem value="legal">Legal</SelectItem>
                   <SelectItem value="career">Career</SelectItem>
