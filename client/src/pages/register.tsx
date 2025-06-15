@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { registerSchema, type RegisterForm as RegisterFormType } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
-import { Shield, CheckCircle, Loader2 } from "lucide-react";
+import { Shield, CheckCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import heroImage from "@assets/lady smiling_1749866663341.jpg";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
@@ -18,6 +18,45 @@ export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Password strength checker
+  const getPasswordStrength = (password: string) => {
+    if (!password) return { score: 0, label: "", color: "" };
+    
+    let score = 0;
+    let feedback = [];
+    
+    // Length check
+    if (password.length >= 8) score += 1;
+    else feedback.push("8+ characters");
+    
+    // Uppercase check
+    if (/[A-Z]/.test(password)) score += 1;
+    else feedback.push("uppercase letter");
+    
+    // Lowercase check
+    if (/[a-z]/.test(password)) score += 1;
+    else feedback.push("lowercase letter");
+    
+    // Number check
+    if (/\d/.test(password)) score += 1;
+    else feedback.push("number");
+    
+    // Special character check
+    if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score += 1;
+    else feedback.push("special character");
+    
+    const labels = ["Very Weak", "Weak", "Fair", "Good", "Strong"];
+    const colors = ["bg-red-500", "bg-orange-500", "bg-yellow-500", "bg-blue-500", "bg-green-500"];
+    
+    return {
+      score,
+      label: labels[score] || "Very Weak",
+      color: colors[score] || "bg-red-500",
+      feedback: feedback.length > 0 ? `Missing: ${feedback.join(", ")}` : "Password meets all requirements"
+    };
+  };
 
   const form = useForm<RegisterFormType>({
     resolver: zodResolver(registerSchema),
@@ -276,20 +315,71 @@ export default function Register() {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        {...field}
-                        type="password"
-                        placeholder="Create a strong password"
-                        className="h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
+                render={({ field }) => {
+                  const passwordStrength = getPasswordStrength(field.value || "");
+                  return (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            {...field}
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Create a strong password"
+                            className="h-12 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 pr-12"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPassword(!showPassword)}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4 text-gray-400" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        </div>
+                      </FormControl>
+                      
+                      {/* Password Strength Indicator */}
+                      {field.value && (
+                        <div className="mt-2 space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-gray-600">Password strength:</span>
+                            <span className={`font-medium ${
+                              passwordStrength.score >= 4 ? 'text-green-600' :
+                              passwordStrength.score >= 3 ? 'text-blue-600' :
+                              passwordStrength.score >= 2 ? 'text-yellow-600' :
+                              'text-red-600'
+                            }`}>
+                              {passwordStrength.label}
+                            </span>
+                          </div>
+                          <div className="flex space-x-1">
+                            {Array.from({ length: 5 }).map((_, index) => (
+                              <div
+                                key={index}
+                                className={`h-2 flex-1 rounded-full transition-colors duration-200 ${
+                                  index < passwordStrength.score
+                                    ? passwordStrength.color
+                                    : 'bg-gray-200'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {passwordStrength.feedback}
+                          </p>
+                        </div>
+                      )}
+                      
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
               />
 
 
