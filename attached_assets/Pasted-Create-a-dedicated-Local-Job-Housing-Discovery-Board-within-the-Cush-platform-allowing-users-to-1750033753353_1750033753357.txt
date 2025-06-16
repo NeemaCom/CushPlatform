@@ -1,0 +1,47 @@
+Create a dedicated "Local Job & Housing Discovery Board" within the Cush platform, allowing users to find relevant job opportunities and housing options in their target regions.
+
+Core Requirements:
+Job Discovery Board:
+
+Data Model: Define a JobListing database schema (e.g., id, title, company, location, description, jobType ('full-time' | 'part-time'), applicationLink, postedDate, expirationDate).
+
+Backend APIs:
+
+GET /api/jobs: Search and filter job listings by keywords, location, job type.
+
+GET /api/jobs/:id: View detailed job descriptions.
+
+(Admin/Employer role - Future consideration) POST /api/admin/jobs, PUT /api/admin/jobs/:id, DELETE /api/admin/jobs/:id: CRUD operations for job listings.
+
+Frontend Interface: A searchable and filterable interface for job listings, with clear calls to action for applying.
+
+Housing Discovery Board:
+
+Data Model: Define a HousingListing database schema (similar to the Property model proposed earlier, but focusing on user/landlord-posted options: id, address, city, country, rentAmount, currency, propertyType ('room' | 'apartment' | 'house'), bedrooms, bathrooms, availabilityDate, description, contactInfo (securely managed), photos (string[] of URLs)).
+
+Backend APIs:
+
+GET /api/housing: Search and filter housing listings by location, price, property type, availability.
+
+GET /api/housing/:id: View detailed housing listings.
+
+POST /api/housing/listings: Allow authenticated users/landlords to post their own housing listings.
+
+PUT /api/housing/listings/:id, DELETE /api/housing/listings/:id: Allow owners to manage their listings.
+
+Frontend Interface: A searchable and filterable interface for housing listings, with photo galleries and contact options (integrating with secure in-app messaging).
+
+Expected Deliverables:
+backend/src/db/schema.ts: Updated Drizzle schemas for JobListing and HousingListing models.
+
+backend/src/types/index.ts: Definitive TypeScript interfaces for JobListing and HousingListing.
+
+backend/src/routes.ts: (Or new dedicated job/housing routes file) APIs for searching and managing job and housing listings.
+
+Frontend (Conceptual): Notes on React components for:
+
+Job search and listing pages.
+
+Housing search and listing pages.
+
+Forms for users/landlords to submit new housing listings.

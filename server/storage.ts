@@ -213,7 +213,7 @@ export class DatabaseStorage implements IStorage {
     return await db
       .select()
       .from(transactions)
-      .where(eq(transactions.user_id, userId))
+      .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt))
       .limit(limit);
   }
