@@ -2,6 +2,5 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist/public",
   "framework": null,
-  "installCommand": "npm ci",
-  "nodeVersion": "20.x"
+  "installCommand": "npm ci"
 }
