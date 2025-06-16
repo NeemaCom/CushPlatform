@@ -1846,6 +1846,204 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ADMIN USER MANAGEMENT ENDPOINTS =====
+
+  // Get all users (admin only)
+  app.get('/api/admin/users', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const search = req.query.search as string;
+
+      let users;
+      if (search) {
+        users = await storage.searchUsers(search);
+      } else {
+        users = await storage.getAllUsers(limit, offset);
+      }
+
+      // Create safe user objects (exclude sensitive data)
+      const safeUsers = users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phoneNumber: user.phoneNumber,
+        nationality: user.nationality,
+        isEmailVerified: user.isEmailVerified,
+        isPhoneVerified: user.isPhoneVerified,
+        mfaEnabled: user.mfaEnabled,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      }));
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_users_viewed',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { count: safeUsers.length, search: search || null }
+      );
+
+      res.json(safeUsers);
+    } catch (error: any) {
+      console.error('Admin users fetch error:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get user count (admin only)
+  app.get('/api/admin/users/count', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const count = await storage.getUsersCount();
+      res.json({ count });
+    } catch (error: any) {
+      console.error('Admin user count error:', error);
+      res.status(500).json({ error: "Failed to get user count" });
+    }
+  });
+
+  // Update user role (admin only)
+  app.put('/api/admin/users/:id/role', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { role } = req.body;
+
+      if (!['admin', 'customer'].includes(role)) {
+        return res.status(400).json({ error: "Invalid role" });
+      }
+
+      const user = await storage.updateUser(userId, { role });
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_user_role_updated',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { targetUserId: userId, newRole: role }
+      );
+
+      res.json({ 
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        updatedAt: user.updatedAt
+      });
+    } catch (error: any) {
+      console.error('Admin user role update error:', error);
+      res.status(500).json({ error: "Failed to update user role" });
+    }
+  });
+
+  // Activate/Deactivate user account (admin only)
+  app.put('/api/admin/users/:id/status', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { isActive } = req.body;
+
+      if (typeof isActive !== 'boolean') {
+        return res.status(400).json({ error: "Invalid status value" });
+      }
+
+      const user = await storage.updateUser(userId, { isActive });
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_user_status_updated',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { targetUserId: userId, newStatus: isActive ? 'active' : 'inactive' }
+      );
+
+      res.json({ 
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        isActive: user.isActive,
+        updatedAt: user.updatedAt
+      });
+    } catch (error: any) {
+      console.error('Admin user status update error:', error);
+      res.status(500).json({ error: "Failed to update user status" });
+    }
+  });
+
+  // ===== ADMIN TRANSACTION OVERSIGHT ENDPOINTS =====
+
+  // Get all transactions (admin only, read-only)
+  app.get('/api/admin/transactions', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const userId = req.query.userId ? parseInt(req.query.userId as string) : undefined;
+
+      let transactions;
+      if (userId) {
+        transactions = await storage.getTransactionsByUserId(userId);
+      } else {
+        transactions = await storage.getAllTransactions(limit, offset);
+      }
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_transactions_viewed',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { count: transactions.length, filteredByUserId: userId || null }
+      );
+
+      res.json(transactions);
+    } catch (error: any) {
+      console.error('Admin transactions fetch error:', error);
+      res.status(500).json({ error: "Failed to fetch transactions" });
+    }
+  });
+
+  // Get transaction count (admin only)
+  app.get('/api/admin/transactions/count', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const count = await storage.getTransactionsCount();
+      res.json({ count });
+    } catch (error: any) {
+      console.error('Admin transaction count error:', error);
+      res.status(500).json({ error: "Failed to get transaction count" });
+    }
+  });
+
+  // ===== ADMIN AUDIT LOG ENDPOINTS =====
+
+  // Get audit logs (admin only)
+  app.get('/api/admin/audit-logs', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const auditLogs = await storage.getAuditLogs(limit, offset);
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_audit_logs_viewed',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { count: auditLogs.length }
+      );
+
+      res.json(auditLogs);
+    } catch (error: any) {
+      console.error('Admin audit logs fetch error:', error);
+      res.status(500).json({ error: "Failed to fetch audit logs" });
+    }
+  });
+
   // Housing search endpoint
   app.get('/api/housing/search', async (req, res) => {
     try {
