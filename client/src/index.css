@@ -77,39 +77,14 @@
 .sidebar-gradient {
   background: linear-gradient(
     135deg,
-    hsl(217, 91%, 60%) 0%,
-    hsl(224, 76%, 48%) 15%,
-    hsl(267, 84%, 64%) 35%,
-    hsl(224, 64%, 33%) 60%,
-    hsl(217, 91%, 60%) 85%,
-    hsl(221, 83%, 53%) 100%
+    #3b82f6 0%,
+    #2563eb 25%,
+    #8b5cf6 50%,
+    #1e40af 75%,
+    #3730a3 100%
   );
-  background-size: 400% 400%;
-  animation: sidebar-gradient 15s ease infinite, sidebar-glow 8s ease-in-out infinite;
-  position: relative;
-}
-
-.sidebar-gradient::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    45deg,
-    rgba(255, 255, 255, 0.1) 0%,
-    transparent 25%,
-    transparent 75%,
-    rgba(255, 255, 255, 0.05) 100%
-  );
-  z-index: 0;
-  pointer-events: none;
-}
-
-.sidebar-gradient > * {
-  position: relative;
-  z-index: 1;
+  background-size: 300% 300%;
+  animation: sidebar-gradient 12s ease infinite;
 }
 
 :root {
