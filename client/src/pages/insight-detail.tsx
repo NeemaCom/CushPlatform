@@ -1,3 +1,4 @@
+import React from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,7 +158,7 @@ export default function InsightDetailPage() {
                     Tags
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {insight.tags.map((tag, index) => (
+                    {insight.tags.map((tag: string, index: number) => (
                       <Badge key={index} variant="outline">
                         {tag}
                       </Badge>
