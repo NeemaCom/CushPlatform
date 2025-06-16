@@ -1,0 +1,57 @@
+The Netlify deploy errored, with the following guidance provided:
+
+**Diagnosis:**
+- The build failed with a non-zero exit code during the building site stage.
+- The error message indicates that a Netlify Function failed to require one of its dependencies because it couldn't find the module '../../dist/index.js' from the 'netlify/functions' directory.
+
+**Solution:**
+1. Verify that the required module '../../dist/index.js' is present in the site's top-level "package.json" or has been committed to the repository.
+2. If the module is missing, ensure it is added to the site's "package.json" or commit the 'dist' folder containing the 'index.js' file to the repository.
+
+By following these steps, the Netlify Function should be able to require its dependencies successfully.
+
+The relevant error logs are:
+
+Line 91: [32m✓ built in 6.71s[39m
+Line 92: ​
+Line 93: [90m(build.command completed in 7.1s)[39m
+Line 94: [96m[1m​[22m[39m
+Line 95: [96m[1mFunctions bundling                                            [22m[39m
+Line 96: [96m[1m────────────────────────────────────────────────────────────────[22m[39m
+Line 97: ​
+Line 98: Packaging Functions from [36mnetlify/functions[39m directory:
+Line 99:  - server.js
+Line 100: ​
+Line 101: Failed during stage 'building site': Build script returned non-zero exit code: 2
+Line 102: [91m[1m​[22m[39m
+Line 103: [91m[1mDependencies installation error                               [22m[39m
+Line 104: [91m[1m────────────────────────────────────────────────────────────────[22m[39m
+Line 105: ​
+Line 106:   [31m[1mError message[22m[39m
+Line 107:   A Netlify Function failed to require one of its dependencies.
+Line 108:   Please make sure it is present in the site's top-level "package.json".
+​
+Line 109:   In file "/opt/build/repo/netlify/functions/server.js"
+Line 110:   Cannot find module '../../dist/index.js' from '/opt/build/repo/netlify/functions'
+Line 111: ​
+Line 112:   [31m[1mResolved config[22m[39m
+Line 113:   build:
+Line 114:     command: vite build
+Line 115:     commandOrigin: config
+Line 116:     environment:
+Line 117:       - DATABASE_URL
+Line 118:       - NETLIFY_DATABASE_URL
+Line 119:       - NETLIFY_DATABASE_URL_UNPOOLED
+Line 120:       - undefined
+Line 121:       - NODE_VERSION
+Line 122:     publish: /opt/build/repo/dist/public
+Line 123:     publishOrigin: config
+Line 124:   functionsDirectory: /opt/build/repo/netlify/functions
+Line 125:   redirects:
+Line 126:     - from: /*
+      status: 200
+      to: /index.html
+  redirectsOrigin: config
+Line 127: Build failed due to a user error: Build script returned non-zero exit code: 2
+Line 128: Failing build: Failed to build site
+Line 129: Finished processing build request in 1m18.165s
