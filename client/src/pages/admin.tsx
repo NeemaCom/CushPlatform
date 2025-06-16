@@ -71,37 +71,37 @@ export default function AdminDashboard() {
   // Fetch users
   const { data: users = [], isLoading: loadingUsers } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users', searchTerm],
-    queryFn: () => apiRequest(`/api/admin/users${searchTerm ? `?search=${encodeURIComponent(searchTerm)}` : ''}`),
+    queryFn: getQueryFn(),
   });
 
   // Fetch user count
   const { data: userCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/users/count'],
+    queryFn: getQueryFn(),
   });
 
   // Fetch transactions
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<AdminTransaction[]>({
     queryKey: ['/api/admin/transactions', selectedUserId],
-    queryFn: () => apiRequest(`/api/admin/transactions${selectedUserId ? `?userId=${selectedUserId}` : ''}`),
+    queryFn: getQueryFn(),
   });
 
   // Fetch transaction count
   const { data: transactionCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/transactions/count'],
+    queryFn: getQueryFn(),
   });
 
   // Fetch audit logs
   const { data: auditLogs = [], isLoading: loadingAudit } = useQuery<AuditLog[]>({
     queryKey: ['/api/admin/audit-logs'],
+    queryFn: getQueryFn(),
   });
 
   // Update user role mutation
   const updateRoleMutation = useMutation({
     mutationFn: ({ userId, role }: { userId: number; role: string }) =>
-      apiRequest(`/api/admin/users/${userId}/role`, {
-        method: 'PUT',
-        body: { role },
-      }),
+      apiRequest('PUT', `/api/admin/users/${userId}/role`, { role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       toast({ title: "User role updated successfully" });
@@ -114,10 +114,7 @@ export default function AdminDashboard() {
   // Update user status mutation
   const updateStatusMutation = useMutation({
     mutationFn: ({ userId, isActive }: { userId: number; isActive: boolean }) =>
-      apiRequest(`/api/admin/users/${userId}/status`, {
-        method: 'PUT',
-        body: { isActive },
-      }),
+      apiRequest('PUT', `/api/admin/users/${userId}/status`, { isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       toast({ title: "User status updated successfully" });

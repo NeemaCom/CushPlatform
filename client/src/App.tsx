@@ -18,6 +18,7 @@ import Loans from "@/pages/loans";
 import Jobs from "@/pages/jobs";
 import Housing from "@/pages/housing";
 import Settings from "@/pages/settings";
+import Admin from "@/pages/admin";
 import InsightDetail from "@/pages/insight-detail";
 import MentorProfile from "@/pages/mentor-profile";
 import CreateInsight from "@/pages/create-insight";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/jobs" component={Jobs} />
       <Route path="/housing" component={Housing} />
       <Route path="/settings" component={Settings} />
+      <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />

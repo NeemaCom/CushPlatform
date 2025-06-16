@@ -14,7 +14,8 @@ import {
   CreditCard,
   Briefcase,
   Building,
-  CreditCard as VirtualWallet
+  CreditCard as VirtualWallet,
+  Shield
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -39,6 +40,12 @@ export function Sidebar() {
 
   const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
     queryKey: ["/api/subscription-status"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
+  // Fetch current user to check if they're an admin
+  const { data: currentUser } = useQuery<{ id: number; role: string; email: string }>({
+    queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
@@ -112,6 +119,23 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {/* Admin Link - Only show for admin users */}
+          {currentUser?.role === 'admin' && (
+            <Link href="/admin">
+              <div
+                className={cn(
+                  "flex items-center py-3 px-4 rounded-lg mb-2 transition-all duration-300 cursor-pointer backdrop-blur-sm",
+                  location === "/admin"
+                    ? "bg-white/20 text-white border-r-4 border-white/60 shadow-lg transform scale-105"
+                    : "text-white/80 hover:bg-white/10 hover:text-white hover:shadow-md hover:transform hover:scale-102"
+                )}
+              >
+                <Shield className="w-5 h-5" />
+                <span className="ml-3 font-medium">Admin</span>
+              </div>
+            </Link>
+          )}
         </div>
       </nav>
       
