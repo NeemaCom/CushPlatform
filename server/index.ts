@@ -51,23 +51,20 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // For Vercel deployment, don't setup Vite or static serving
-  if (process.env.NODE_ENV !== 'production') {
-    // importantly only setup vite in development and after
-    // setting up all the other routes so the catch-all route
-    // doesn't interfere with the other routes
-    if (app.get("env") === "development") {
-      await setupVite(app, server);
-    } else {
-      serveStatic(app);
-    }
+  // Setup Vite in development, static serving in production and staging
+  if (process.env.NODE_ENV === 'development') {
+    await setupVite(app, server);
+  } else {
+    // Serve static files in production and staging
+    serveStatic(app);
+  }
 
-    // ALWAYS serve the app on port 5000
-    // this serves both the API and the client.
-    // It is the only port that is not firewalled.
-    const port = 5000;
+  // Always serve the app on port 5000 (except for serverless platforms like Vercel)
+  // This serves both the API and the client
+  if (!process.env.VERCEL) {
+    const port = process.env.PORT || 5000;
     server.listen({
-      port,
+      port: Number(port),
       host: "0.0.0.0",
       reusePort: true,
     }, () => {
@@ -75,10 +72,10 @@ export async function createServer() {
     });
   }
 
-  return app;
+  return server;
 }
 
-// Start server only in development/local mode
-if (process.env.NODE_ENV !== 'production') {
+// Start server in all environments except serverless platforms
+if (!process.env.VERCEL) {
   createServer();
 }
