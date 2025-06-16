@@ -1,0 +1,59 @@
+Implement a bare-bones, functional administrative interface for the Cush platform. This interface will provide immediate, essential operational control over critical user and data elements, serving as a stop-gap until the full "Robust Admin Backend" (Phase 6) is developed. Prioritize rapid implementation and foundational security.
+
+Core Requirements:
+Admin Authentication & Authorization (Minimal):
+
+Reuse existing admin user authentication if User.role = 'admin' is already functional.
+
+If admin authentication is not yet fully robust (Phase 2 not complete): Implement a very simple, development-only login mechanism (e.g., hardcoded admin credentials in environment variables) that MUST be removed or replaced before production deployment.
+
+Implement a basic authorization middleware (isAdmin or similar) to protect all admin UI routes and their corresponding APIs, ensuring only users with the admin role can access this interface.
+
+User Management (Essential):
+
+Dashboard/List View: A simple page displaying a list of all Users (ID, Email, Role, basic status).
+
+Search/Filter: Basic ability to search users by email or ID.
+
+Actions:
+
+View user details (excluding sensitive data like password hash).
+
+Update user role (e.g., set Customer to Admin, or vice versa).
+
+Activate/Deactivate user accounts.
+
+Audit Logging Integration: Ensure all admin actions (e.g., role change, account activation) are logged via the existing securityLogger.logSecurityEvent or a new auditService.createAuditLog (if available from other phases).
+
+Financial Oversight (Basic):
+
+Transaction List: A simple table displaying recent Transactions (ID, User, Type, Amount, Status).
+
+Search/Filter (Optional): Basic filters by user or transaction status.
+
+Read-Only: All financial views should be strictly read-only in this bare-bones phase.
+
+Content Management (Conceptual):
+
+Placeholder: A simple conceptual placeholder section for "Content Management" to acknowledge its future need, but no active functionality is required at this stage.
+
+Technical Implementation:
+
+Frontend: Implement the admin UI as part of the existing React/Next.js frontend, ideally under a protected route like /admin.
+
+Backend APIs: Create new or extend existing backend API endpoints specifically for admin operations (e.g., GET /api/admin/users, PUT /api/admin/users/:id/role). These APIs must enforce strict server-side authorization.
+
+Expected Deliverables:
+backend/src/routes/admin.ts (new file): Dedicated API routes for the bare-bones admin functionalities (user listing, role updates, transaction listing).
+
+backend/src/middleware/isAdmin.ts (new file): A simple middleware to check for the 'admin' role.
+
+Frontend (Conceptual): Notes on React components for:
+
+A simple /admin login page (if separate auth is needed).
+
+An admin dashboard/navigation.
+
+User listing table with basic controls.
+
+Transaction listing table.

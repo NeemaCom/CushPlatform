@@ -60,7 +60,7 @@ import {
   type UpdateHousingListing
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, or, ilike, gte, lte } from "drizzle-orm";
+import { eq, desc, and, or, ilike, gte, lte, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -159,6 +159,15 @@ export interface IStorage {
   createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing>;
   updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing>;
   deleteHousingListing(id: number): Promise<void>;
+
+  // Admin-specific methods
+  getAllUsers(limit?: number, offset?: number): Promise<User[]>;
+  searchUsers(query: string): Promise<User[]>;
+  getAllTransactions(limit?: number, offset?: number): Promise<Transaction[]>;
+  getTransactionsByUserId(userId: number): Promise<Transaction[]>;
+  getUsersCount(): Promise<number>;
+  getTransactionsCount(): Promise<number>;
+  getAuditLogs(limit?: number, offset?: number): Promise<UserAuditLog[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -887,6 +896,72 @@ export class DatabaseStorage implements IStorage {
 
   async deleteHousingListing(id: number): Promise<void> {
     await db.delete(housingListings).where(eq(housingListings.id, id));
+  }
+
+  // Admin-specific methods implementation
+  async getAllUsers(limit: number = 50, offset: number = 0): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .where(
+        or(
+          ilike(users.email, `%${query}%`),
+          ilike(users.username, `%${query}%`),
+          ilike(users.firstName, `%${query}%`),
+          ilike(users.lastName, `%${query}%`)
+        )
+      )
+      .orderBy(desc(users.createdAt))
+      .limit(20);
+  }
+
+  async getAllTransactions(limit: number = 50, offset: number = 0): Promise<Transaction[]> {
+    return await db
+      .select()
+      .from(transactions)
+      .orderBy(desc(transactions.date))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getTransactionsByUserId(userId: number): Promise<Transaction[]> {
+    return await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.userId, userId))
+      .orderBy(desc(transactions.date));
+  }
+
+  async getUsersCount(): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users);
+    return result[0]?.count || 0;
+  }
+
+  async getTransactionsCount(): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(transactions);
+    return result[0]?.count || 0;
+  }
+
+  async getAuditLogs(limit: number = 50, offset: number = 0): Promise<UserAuditLog[]> {
+    return await db
+      .select()
+      .from(userAuditLogs)
+      .orderBy(desc(userAuditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
   }
 }
 
