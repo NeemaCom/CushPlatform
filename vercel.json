@@ -1,6 +1,6 @@
 {
-  "buildCommand": "node build.js",
+  "buildCommand": "./node_modules/.bin/vite build && ./node_modules/.bin/esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
   "outputDirectory": "dist/public",
   "framework": null,
-  "installCommand": "npm ci"
+  "installCommand": "npm install"
 }
