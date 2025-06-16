@@ -11,7 +11,9 @@ import {
   Crown,
   MessageCircle,
   Users,
-  CreditCard
+  CreditCard,
+  Briefcase,
+  Building
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -22,6 +24,8 @@ const sidebarItems = [
   { icon: MessageCircle, label: "Imisi 2.0", href: "/imisi" },
   { icon: Users, label: "Community", href: "/community" },
   { icon: CreditCard, label: "Loans", href: "/loans" },
+  { icon: Briefcase, label: "Jobs", href: "/jobs" },
+  { icon: Building, label: "Housing", href: "/housing" },
   { icon: BarChart3, label: "Analytics", href: "/analytics" },
   { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
   { icon: Wallet, label: "Accounts", href: "/accounts" },
