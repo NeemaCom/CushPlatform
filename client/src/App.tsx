@@ -27,6 +27,7 @@ import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 import TestPage from "@/pages/test-page";
 import SimpleTest from "@/pages/simple-test";
+import LegalTest from "@/pages/legal-test";
 import NotFound from "@/pages/not-found";
 
 function Router() {
