@@ -54,8 +54,8 @@ export async function createServer() {
   // Setup Vite in development, static serving in production and staging
   if (process.env.NODE_ENV === 'development') {
     await setupVite(app, server);
-  } else {
-    // Serve static files in production and staging
+  } else if (!process.env.VERCEL) {
+    // Serve static files in production (but not on Vercel serverless)
     serveStatic(app);
   }
 
