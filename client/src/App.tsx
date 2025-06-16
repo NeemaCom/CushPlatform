@@ -23,9 +23,10 @@ import InsightDetail from "@/pages/insight-detail";
 import MentorProfile from "@/pages/mentor-profile";
 import CreateInsight from "@/pages/create-insight";
 import PWASettings from "@/pages/pwa-settings";
-import PrivacyPolicy from "@/pages/privacy-policy";
-import TermsOfService from "@/pages/terms-of-service";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 import TestPage from "@/pages/test-page";
+import SimpleTest from "@/pages/simple-test";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -50,9 +51,10 @@ function Router() {
       <Route path="/community/mentors/:id" component={MentorProfile} />
       <Route path="/community/create-insight" component={CreateInsight} />
       <Route path="/settings/pwa" component={PWASettings} />
+      <Route path="/simple-test" component={SimpleTest} />
       <Route path="/test-page" component={TestPage} />
-      <Route path="/privacy-policy" component={PrivacyPolicy} />
-      <Route path="/terms-of-service" component={TermsOfService} />
+      <Route path="/privacy-policy" component={Privacy} />
+      <Route path="/terms-of-service" component={Terms} />
       <Route component={NotFound} />
     </Switch>
   );
