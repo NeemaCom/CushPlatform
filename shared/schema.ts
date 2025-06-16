@@ -292,6 +292,64 @@ export const goalProgress = pgTable("goal_progress", {
   recordedAt: timestamp("recorded_at").defaultNow(),
 });
 
+// Job Listings table - job opportunities
+export const jobListings = pgTable("job_listings", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  location: text("location").notNull(),
+  country: text("country").notNull(),
+  city: text("city").notNull(),
+  description: text("description").notNull(),
+  jobType: text("job_type").notNull(), // full-time, part-time, contract, freelance
+  salaryMin: decimal("salary_min", { precision: 10, scale: 2 }),
+  salaryMax: decimal("salary_max", { precision: 10, scale: 2 }),
+  currency: text("currency").default("USD"),
+  applicationLink: text("application_link").notNull(),
+  requirements: text("requirements").array(),
+  benefits: text("benefits").array(),
+  remote: boolean("remote").default(false),
+  experience: text("experience"), // entry, mid, senior
+  industry: text("industry"),
+  companySize: text("company_size"), // startup, small, medium, large
+  postedDate: timestamp("posted_date").defaultNow(),
+  expirationDate: timestamp("expiration_date"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Housing Listings table - accommodation options
+export const housingListings = pgTable("housing_listings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id), // landlord/poster
+  title: text("title").notNull(),
+  address: text("address").notNull(),
+  city: text("city").notNull(),
+  country: text("country").notNull(),
+  postalCode: text("postal_code"),
+  rentAmount: decimal("rent_amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").default("USD"),
+  propertyType: text("property_type").notNull(), // room, apartment, house, studio
+  bedrooms: integer("bedrooms").notNull(),
+  bathrooms: decimal("bathrooms", { precision: 3, scale: 1 }).notNull(),
+  furnished: boolean("furnished").default(false),
+  utilitiesIncluded: boolean("utilities_included").default(false),
+  petsAllowed: boolean("pets_allowed").default(false),
+  availabilityDate: timestamp("availability_date").notNull(),
+  description: text("description").notNull(),
+  amenities: text("amenities").array(),
+  photos: text("photos").array(), // URLs to images
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  area: decimal("area", { precision: 8, scale: 2 }), // square meters/feet
+  deposit: decimal("deposit", { precision: 10, scale: 2 }),
+  minimumStay: integer("minimum_stay"), // months
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -306,6 +364,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   mentorSessions: many(mentorSessions),
   loanPreQualifications: many(loanPreQualifications),
   financialGoals: many(financialGoals),
+  housingListings: many(housingListings),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -436,6 +495,13 @@ export const goalProgressRelations = relations(goalProgress, ({ one }) => ({
   transaction: one(transactions, {
     fields: [goalProgress.transactionId],
     references: [transactions.id],
+  }),
+}));
+
+export const housingListingsRelations = relations(housingListings, ({ one }) => ({
+  user: one(users, {
+    fields: [housingListings.userId],
+    references: [users.id],
   }),
 }));
 
@@ -713,6 +779,123 @@ export type InsertGoalProgress = z.infer<typeof insertGoalProgressSchema>;
 export type CreateFinancialGoal = z.infer<typeof createFinancialGoalSchema>;
 export type UpdateFinancialGoal = z.infer<typeof updateFinancialGoalSchema>;
 export type AddGoalProgress = z.infer<typeof addGoalProgressSchema>;
+
+// ===== JOB & HOUSING DISCOVERY SYSTEM =====
+
+// Job Listing schemas
+export const insertJobListingSchema = createInsertSchema(jobListings).pick({
+  title: true,
+  company: true,
+  location: true,
+  country: true,
+  city: true,
+  description: true,
+  jobType: true,
+  salaryMin: true,
+  salaryMax: true,
+  currency: true,
+  applicationLink: true,
+  requirements: true,
+  benefits: true,
+  remote: true,
+  experience: true,
+  industry: true,
+  companySize: true,
+  expirationDate: true,
+});
+
+export const searchJobsSchema = z.object({
+  keywords: z.string().optional(),
+  location: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  jobType: z.enum(["full-time", "part-time", "contract", "freelance"]).optional(),
+  remote: z.boolean().optional(),
+  experience: z.enum(["entry", "mid", "senior"]).optional(),
+  industry: z.string().optional(),
+  salaryMin: z.string().optional(),
+  salaryMax: z.string().optional(),
+  limit: z.number().min(1).max(50).default(20),
+  offset: z.number().min(0).default(0),
+});
+
+// Housing Listing schemas
+export const insertHousingListingSchema = createInsertSchema(housingListings).pick({
+  title: true,
+  address: true,
+  city: true,
+  country: true,
+  postalCode: true,
+  rentAmount: true,
+  currency: true,
+  propertyType: true,
+  bedrooms: true,
+  bathrooms: true,
+  furnished: true,
+  utilitiesIncluded: true,
+  petsAllowed: true,
+  availabilityDate: true,
+  description: true,
+  amenities: true,
+  photos: true,
+  contactEmail: true,
+  contactPhone: true,
+  area: true,
+  deposit: true,
+  minimumStay: true,
+});
+
+export const searchHousingSchema = z.object({
+  location: z.string().optional(),
+  country: z.string().optional(),
+  city: z.string().optional(),
+  propertyType: z.enum(["room", "apartment", "house", "studio"]).optional(),
+  minRent: z.string().optional(),
+  maxRent: z.string().optional(),
+  bedrooms: z.number().min(0).optional(),
+  bathrooms: z.number().min(0).optional(),
+  furnished: z.boolean().optional(),
+  petsAllowed: z.boolean().optional(),
+  utilitiesIncluded: z.boolean().optional(),
+  availableFrom: z.string().optional(),
+  limit: z.number().min(1).max(50).default(20),
+  offset: z.number().min(0).default(0),
+});
+
+export const updateHousingListingSchema = createInsertSchema(housingListings).pick({
+  title: true,
+  address: true,
+  city: true,
+  country: true,
+  postalCode: true,
+  rentAmount: true,
+  currency: true,
+  propertyType: true,
+  bedrooms: true,
+  bathrooms: true,
+  furnished: true,
+  utilitiesIncluded: true,
+  petsAllowed: true,
+  availabilityDate: true,
+  description: true,
+  amenities: true,
+  photos: true,
+  contactEmail: true,
+  contactPhone: true,
+  area: true,
+  deposit: true,
+  minimumStay: true,
+  isActive: true,
+}).partial();
+
+// Job & Housing type exports
+export type JobListing = typeof jobListings.$inferSelect;
+export type HousingListing = typeof housingListings.$inferSelect;
+export type InsertJobListing = z.infer<typeof insertJobListingSchema>;
+export type InsertHousingListing = z.infer<typeof insertHousingListingSchema>;
+export type SearchJobsQuery = z.infer<typeof searchJobsSchema>;
+export type SearchHousingQuery = z.infer<typeof searchHousingSchema>;
+export type UpdateHousingListing = z.infer<typeof updateHousingListingSchema>;
 
 // Validation schemas for API endpoints
 export const createInsightSchema = z.object({
