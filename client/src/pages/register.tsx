@@ -183,7 +183,12 @@ export default function Register() {
                 className="w-full h-16 border-2 border-gray-200 hover:border-transparent bg-white hover:bg-gradient-to-r hover:from-white hover:via-red-50 hover:to-blue-50 transition-all duration-500 ease-out flex items-center justify-center gap-4 shadow-lg hover:shadow-xl gmail-glow transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none overflow-hidden relative"
                 onClick={() => {
                   setIsGoogleLoading(true);
-                  window.location.href = "/api/auth/google";
+                  toast({
+                    title: "Google OAuth Setup Required",
+                    description: "Google signup is temporarily unavailable. Please use email registration below.",
+                    variant: "destructive",
+                  });
+                  setIsGoogleLoading(false);
                 }}
               >
                 {/* Animated rainbow background */}
