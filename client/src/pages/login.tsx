@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -46,23 +46,8 @@ export default function Login() {
       
       // Enhanced success toast with user details
       toast({
-        title: (
-          <div className="flex items-center space-x-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <span>Welcome back, {userData.username}!</span>
-          </div>
-        ),
-        description: (
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <Sparkles className="h-4 w-4 text-yellow-500" />
-              <span>Successfully signed in to your account</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Redirecting to your dashboard...
-            </div>
-          </div>
-        ),
+        title: `Welcome back, ${userData.username}!`,
+        description: "Successfully signed in to your account. Redirecting to your dashboard...",
         duration: 3000,
       });
 
