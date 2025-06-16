@@ -1,3 +1,5 @@
+import React from "react";
+
 function SimpleTest() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
