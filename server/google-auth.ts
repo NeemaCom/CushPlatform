@@ -10,23 +10,37 @@ export function setupGoogleAuth(app: Express) {
     
     const redirectUri = `${baseUrl}/api/auth/google/callback`;
     
+    // Log OAuth configuration for debugging
+    console.log("Google OAuth Config:", {
+      clientId: process.env.GOOGLE_CLIENT_ID ? "present" : "missing",
+      redirectUri,
+      baseUrl
+    });
+    
     const googleAuthUrl = `https://accounts.google.com/oauth/authorize?` +
       `client_id=${process.env.GOOGLE_CLIENT_ID}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-      `scope=${encodeURIComponent('profile email')}&` +
+      `scope=${encodeURIComponent('openid profile email')}&` +
       `response_type=code&` +
       `access_type=offline&` +
       `prompt=consent`;
     
+    console.log("Redirecting to Google OAuth URL:", googleAuthUrl);
     res.redirect(googleAuthUrl);
   });
 
   // Google OAuth callback
   app.get("/api/auth/google/callback", async (req, res) => {
     try {
-      const { code } = req.query;
+      const { code, error } = req.query;
+      
+      if (error) {
+        console.error("Google OAuth error:", error);
+        return res.redirect(`/register?error=oauth_failed&details=${error}`);
+      }
       
       if (!code) {
+        console.error("No authorization code received");
         return res.redirect("/register?error=oauth_failed");
       }
 
