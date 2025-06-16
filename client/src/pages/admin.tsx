@@ -71,31 +71,31 @@ export default function AdminDashboard() {
   // Fetch users
   const { data: users = [], isLoading: loadingUsers } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users', searchTerm],
-    queryFn: getQueryFn({}),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   // Fetch user count
   const { data: userCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/users/count'],
-    queryFn: getQueryFn({}),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   // Fetch transactions
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<AdminTransaction[]>({
     queryKey: ['/api/admin/transactions', selectedUserId],
-    queryFn: getQueryFn({}),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   // Fetch transaction count
   const { data: transactionCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/transactions/count'],
-    queryFn: getQueryFn({}),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   // Fetch audit logs
   const { data: auditLogs = [], isLoading: loadingAudit } = useQuery<AuditLog[]>({
     queryKey: ['/api/admin/audit-logs'],
-    queryFn: getQueryFn({}),
+    queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   // Update user role mutation
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {auditLogs.map((log) => (
+                  {Array.isArray(auditLogs) && auditLogs.map((log: any) => (
                     <TableRow key={log.id}>
                       <TableCell className="font-medium">{log.id}</TableCell>
                       <TableCell>{log.userId || 'N/A'}</TableCell>
