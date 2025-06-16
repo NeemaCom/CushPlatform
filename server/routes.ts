@@ -26,7 +26,17 @@ import {
   type CreateMentor,
   type CreateEvent,
   type BookMentorSession,
-  type RegisterEvent
+  type RegisterEvent,
+  searchJobsSchema,
+  searchHousingSchema,
+  insertJobListingSchema,
+  insertHousingListingSchema,
+  updateHousingListingSchema,
+  type SearchJobsQuery,
+  type SearchHousingQuery,
+  type InsertJobListing,
+  type InsertHousingListing,
+  type UpdateHousingListing
 } from "@shared/schema";
 import { 
   EncryptionService, 
