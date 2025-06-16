@@ -24,8 +24,8 @@ import InsightDetail from "@/pages/insight-detail";
 import MentorProfile from "@/pages/mentor-profile";
 import CreateInsight from "@/pages/create-insight";
 import PWASettings from "@/pages/pwa-settings";
-import WorkingPrivacy from "@/pages/working-privacy";
-import WorkingTerms from "@/pages/working-terms";
+import PrivacyPolicy from "@/pages/privacy-policy";
+import TermsOfService from "@/pages/terms-of-service";
 import TestPage from "@/pages/test-page";
 import SimpleTest from "@/pages/simple-test";
 import LegalTest from "@/pages/legal-test";
@@ -56,8 +56,8 @@ function Router() {
       <Route path="/legal-test" component={LegalTest} />
       <Route path="/simple-test" component={SimpleTest} />
       <Route path="/test-page" component={TestPage} />
-      <Route path="/privacy-policy" component={WorkingPrivacy} />
-      <Route path="/terms-of-service" component={WorkingTerms} />
+      <Route path="/privacy-policy" component={PrivacyPolicy} />
+      <Route path="/terms-of-service" component={TermsOfService} />
       <Route component={NotFound} />
     </Switch>
   );
