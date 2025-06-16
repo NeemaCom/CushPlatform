@@ -1,7 +1,6 @@
 import { Shield, Eye, Lock, Globe, FileText, Mail } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function PrivacyPolicy() {
   const lastUpdated = "December 16, 2024";
@@ -12,10 +11,9 @@ export default function PrivacyPolicy() {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
-            <img src={cushLogo} alt="Cush Logo" className="h-8 w-auto" />
             <div className="flex items-center gap-2 text-gray-600">
               <Shield className="w-5 h-5" />
-              <span className="font-semibold">Privacy Policy</span>
+              <span className="font-semibold">Cush - Privacy Policy</span>
             </div>
           </div>
         </div>

@@ -2,7 +2,6 @@ import { Scale, Users, CreditCard, AlertTriangle, Globe, FileText, Mail } from "
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function TermsOfService() {
   const lastUpdated = "December 16, 2024";
@@ -13,10 +12,9 @@ export default function TermsOfService() {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-4xl mx-auto px-6 py-4">
           <div className="flex items-center gap-3">
-            <img src={cushLogo} alt="Cush Logo" className="h-8 w-auto" />
             <div className="flex items-center gap-2 text-gray-600">
               <Scale className="w-5 h-5" />
-              <span className="font-semibold">Terms of Service</span>
+              <span className="font-semibold">Cush - Terms of Service</span>
             </div>
           </div>
         </div>
