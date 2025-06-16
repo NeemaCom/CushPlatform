@@ -791,10 +791,10 @@ export class DatabaseStorage implements IStorage {
 
   // Housing Listings methods
   async searchHousing(query: SearchHousingQuery): Promise<HousingListing[]> {
-    let dbQuery = db.select().from(housingListings).where(eq(housingListings.isActive, true));
+    const conditions = [eq(housingListings.isActive, true)];
     
     if (query.location) {
-      dbQuery = dbQuery.where(
+      conditions.push(
         or(
           ilike(housingListings.address, `%${query.location}%`),
           ilike(housingListings.city, `%${query.location}%`)
@@ -803,50 +803,53 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (query.country) {
-      dbQuery = dbQuery.where(eq(housingListings.country, query.country));
+      conditions.push(eq(housingListings.country, query.country));
     }
     
     if (query.city) {
-      dbQuery = dbQuery.where(eq(housingListings.city, query.city));
+      conditions.push(eq(housingListings.city, query.city));
     }
     
     if (query.propertyType) {
-      dbQuery = dbQuery.where(eq(housingListings.propertyType, query.propertyType));
+      conditions.push(eq(housingListings.propertyType, query.propertyType));
     }
     
     if (query.minRent) {
-      dbQuery = dbQuery.where(gte(housingListings.rentAmount, query.minRent));
+      conditions.push(gte(housingListings.rentAmount, query.minRent));
     }
     
     if (query.maxRent) {
-      dbQuery = dbQuery.where(lte(housingListings.rentAmount, query.maxRent));
+      conditions.push(lte(housingListings.rentAmount, query.maxRent));
     }
     
     if (query.bedrooms !== undefined) {
-      dbQuery = dbQuery.where(eq(housingListings.bedrooms, query.bedrooms));
+      conditions.push(eq(housingListings.bedrooms, query.bedrooms));
     }
     
     if (query.bathrooms !== undefined) {
-      dbQuery = dbQuery.where(gte(housingListings.bathrooms, query.bathrooms.toString()));
+      conditions.push(gte(housingListings.bathrooms, query.bathrooms.toString()));
     }
     
     if (query.furnished !== undefined) {
-      dbQuery = dbQuery.where(eq(housingListings.furnished, query.furnished));
+      conditions.push(eq(housingListings.furnished, query.furnished));
     }
     
     if (query.petsAllowed !== undefined) {
-      dbQuery = dbQuery.where(eq(housingListings.petsAllowed, query.petsAllowed));
+      conditions.push(eq(housingListings.petsAllowed, query.petsAllowed));
     }
     
     if (query.utilitiesIncluded !== undefined) {
-      dbQuery = dbQuery.where(eq(housingListings.utilitiesIncluded, query.utilitiesIncluded));
+      conditions.push(eq(housingListings.utilitiesIncluded, query.utilitiesIncluded));
     }
     
     if (query.availableFrom) {
-      dbQuery = dbQuery.where(gte(housingListings.availabilityDate, new Date(query.availableFrom)));
+      conditions.push(gte(housingListings.availabilityDate, new Date(query.availableFrom)));
     }
     
-    return await dbQuery
+    return await db
+      .select()
+      .from(housingListings)
+      .where(and(...conditions))
       .orderBy(desc(housingListings.createdAt))
       .limit(query.limit || 20)
       .offset(query.offset || 0);
