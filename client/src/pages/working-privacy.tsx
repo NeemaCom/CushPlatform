@@ -57,10 +57,10 @@ const WorkingPrivacy: React.FC = () => {
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">How We Use Your Information</h2>
               
-              <div className="grid md:grid-cols-2 gap-6">
+              <div className="grid md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <h3 className="font-medium text-gray-800 mb-3">Core Services</h3>
-                  <ul className="list-disc ml-6 space-y-1">
+                  <ul className="list-disc ml-6 space-y-2">
                     <li>Create and maintain user accounts</li>
                     <li>Provide immigration assistance and guidance</li>
                     <li>Process remittance transactions</li>
@@ -71,7 +71,7 @@ const WorkingPrivacy: React.FC = () => {
                 
                 <div>
                   <h3 className="font-medium text-gray-800 mb-3">Platform Enhancement</h3>
-                  <ul className="list-disc ml-6 space-y-1">
+                  <ul className="list-disc ml-6 space-y-2">
                     <li>Personalize AI assistant responses</li>
                     <li>Improve service recommendations</li>
                     <li>Conduct security and fraud prevention</li>
@@ -85,87 +85,91 @@ const WorkingPrivacy: React.FC = () => {
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data Security</h2>
               
-              <div className="bg-green-50 border-l-4 border-green-400 p-6">
-                <h3 className="font-medium text-green-800 mb-3">Our Security Measures</h3>
-                <div className="grid md:grid-cols-2 gap-4 text-sm text-green-700">
-                  <ul className="list-disc ml-6 space-y-2">
-                    <li>End-to-end encryption for data transmission</li>
-                    <li>Advanced encryption for data storage</li>
-                    <li>Multi-factor authentication options</li>
-                    <li>Regular security audits and assessments</li>
-                  </ul>
-                  <ul className="list-disc ml-6 space-y-2">
-                    <li>Access controls and employee training</li>
-                    <li>Intrusion detection and monitoring</li>
-                    <li>Secure development practices</li>
-                    <li>Incident response procedures</li>
-                  </ul>
-                </div>
+              <div className="space-y-4">
+                <p>
+                  We implement industry-standard security measures to protect your personal information from unauthorized 
+                  access, use, or disclosure. Our security practices include:
+                </p>
+                
+                <ul className="list-disc ml-6 space-y-2">
+                  <li><strong>Encryption:</strong> All data transmission is encrypted using SSL/TLS protocols</li>
+                  <li><strong>Access Controls:</strong> Limited access to personal data on a need-to-know basis</li>
+                  <li><strong>Regular Audits:</strong> Security assessments and vulnerability testing</li>
+                  <li><strong>Secure Storage:</strong> Data stored in secure, access-controlled environments</li>
+                  <li><strong>Staff Training:</strong> Regular privacy and security training for all personnel</li>
+                </ul>
               </div>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your Privacy Rights</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your Rights</h2>
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="font-medium text-gray-800 mb-3">Data Subject Rights</h3>
+                  <h3 className="font-medium text-gray-800 mb-3">Data Access & Control</h3>
                   <ul className="list-disc ml-6 space-y-2">
-                    <li><strong>Access:</strong> Request copies of your personal data</li>
-                    <li><strong>Rectification:</strong> Correct inaccurate information</li>
-                    <li><strong>Erasure:</strong> Request deletion of your data</li>
-                    <li><strong>Portability:</strong> Export your data in a usable format</li>
+                    <li>Request access to your personal data</li>
+                    <li>Correct inaccurate information</li>
+                    <li>Delete your account and data</li>
+                    <li>Export your data in portable format</li>
                   </ul>
                 </div>
                 
                 <div>
-                  <h3 className="font-medium text-gray-800 mb-3">How to Exercise Rights</h3>
-                  <p className="text-sm">
-                    Contact us at <strong>privacy@cush.com</strong> or use the privacy controls 
-                    in your account settings. We will respond to requests within 30 days.
-                  </p>
+                  <h3 className="font-medium text-gray-800 mb-3">Communication Preferences</h3>
+                  <ul className="list-disc ml-6 space-y-2">
+                    <li>Opt-out of marketing communications</li>
+                    <li>Manage notification preferences</li>
+                    <li>Control cookie and tracking settings</li>
+                    <li>Withdraw consent for data processing</li>
+                  </ul>
                 </div>
               </div>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Regulatory Compliance</h2>
-              <p className="mb-4">
-                We are committed to complying with applicable data protection laws and regulations worldwide, including:
-              </p>
-              <div className="grid md:grid-cols-2 gap-4">
-                <ul className="list-disc ml-6 space-y-1">
-                  <li><strong>GDPR</strong> (European Union)</li>
-                  <li><strong>CCPA</strong> (California, USA)</li>
-                  <li><strong>PIPEDA</strong> (Canada)</li>
-                </ul>
-                <ul className="list-disc ml-6 space-y-1">
-                  <li><strong>UK GDPR</strong> (United Kingdom)</li>
-                  <li><strong>NDPR</strong> (Nigeria)</li>
-                  <li>Other applicable regional laws</li>
-                </ul>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Third-Party Services</h2>
+              
+              <div className="space-y-4">
+                <p>
+                  We work with trusted third-party service providers to deliver our services. These partners may 
+                  have access to your information as necessary to perform their functions, but they are contractually 
+                  obligated to maintain confidentiality and security.
+                </p>
+                
+                <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+                  <h4 className="font-medium text-blue-900 mb-2">Key Partners Include:</h4>
+                  <ul className="text-blue-800 space-y-1 text-sm">
+                    <li>• Payment processors (Stripe) for secure financial transactions</li>
+                    <li>• Email service providers for communications</li>
+                    <li>• Cloud hosting providers for data storage and processing</li>
+                    <li>• Analytics services for platform improvement</li>
+                  </ul>
+                </div>
               </div>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Information</h2>
               
-              <div className="bg-blue-50 border-l-4 border-blue-400 p-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <p className="mb-4">
-                  If you have questions about this Privacy Policy or our data practices, please contact us:
+                  If you have questions about this Privacy Policy or how we handle your personal information, 
+                  please contact us:
                 </p>
-                <div className="space-y-2">
+                
+                <div className="space-y-2 text-sm">
                   <p><strong>Email:</strong> privacy@cush.com</p>
                   <p><strong>Data Protection Officer:</strong> dpo@cush.com</p>
-                  <p><strong>Support:</strong> Available through your account dashboard</p>
+                  <p><strong>Address:</strong> Cush Privacy Team, [Company Address]</p>
                 </div>
               </div>
             </section>
 
             <footer className="text-center pt-8 border-t border-gray-200">
-              <p className="text-xs text-gray-500">
-                This Privacy Policy was last updated on December 16, 2024. We may update this policy periodically. 
-                Material changes will be communicated to users via email or platform notifications.
+              <p className="text-gray-600 text-sm">
+                This Privacy Policy is effective as of December 16, 2024 and may be updated periodically. 
+                We will notify you of any material changes.
               </p>
             </footer>
           </div>
