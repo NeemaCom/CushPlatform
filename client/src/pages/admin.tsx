@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import { 
   Users, 
   CreditCard, 
@@ -71,31 +71,31 @@ export default function AdminDashboard() {
   // Fetch users
   const { data: users = [], isLoading: loadingUsers } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users', searchTerm],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({}),
   });
 
   // Fetch user count
   const { data: userCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/users/count'],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({}),
   });
 
   // Fetch transactions
   const { data: transactions = [], isLoading: loadingTransactions } = useQuery<AdminTransaction[]>({
     queryKey: ['/api/admin/transactions', selectedUserId],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({}),
   });
 
   // Fetch transaction count
   const { data: transactionCount } = useQuery<{ count: number }>({
     queryKey: ['/api/admin/transactions/count'],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({}),
   });
 
   // Fetch audit logs
   const { data: auditLogs = [], isLoading: loadingAudit } = useQuery<AuditLog[]>({
     queryKey: ['/api/admin/audit-logs'],
-    queryFn: getQueryFn(),
+    queryFn: getQueryFn({}),
   });
 
   // Update user role mutation
@@ -248,7 +248,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {Array.isArray(users) && users.map((user: any) => (
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.id}</TableCell>
                       <TableCell>{user.email}</TableCell>
@@ -316,7 +316,7 @@ export default function AdminDashboard() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">All Users</SelectItem>
-                    {users.map((user) => (
+                    {Array.isArray(users) && users.map((user: any) => (
                       <SelectItem key={user.id} value={user.id.toString()}>
                         {user.email}
                       </SelectItem>
@@ -343,7 +343,7 @@ export default function AdminDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {transactions.map((transaction) => (
+                  {Array.isArray(transactions) && transactions.map((transaction: any) => (
                     <TableRow key={transaction.id}>
                       <TableCell className="font-medium">{transaction.id}</TableCell>
                       <TableCell>{transaction.userId}</TableCell>
