@@ -51,11 +51,11 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Setup Vite in development, static serving in production and staging
+  // Setup Vite in development, static serving in production
   if (process.env.NODE_ENV === 'development') {
     await setupVite(app, server);
-  } else if (!process.env.VERCEL) {
-    // Serve static files in production (but not on Vercel serverless)
+  } else {
+    // Serve static files in production
     serveStatic(app);
   }
 
