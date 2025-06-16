@@ -14,6 +14,7 @@ import { Shield, CheckCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { SiGoogle } from "react-icons/si";
 import heroImage from "@assets/lady smiling_1749866663341.jpg";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
+import LegalLinks from "@/components/LegalLinks";
 
 export default function Register() {
   const [, navigate] = useLocation();
@@ -424,7 +425,7 @@ export default function Register() {
                       <div className="space-y-1 leading-none">
                         <FormLabel className="text-sm font-normal">
                           I agree to the{" "}
-                          <a href="/terms" className="text-blue-600 hover:text-blue-700 underline">
+                          <a href="/terms-of-service" className="text-blue-600 hover:text-blue-700 underline">
                             Terms of Service
                           </a>
                         </FormLabel>
@@ -448,7 +449,7 @@ export default function Register() {
                       <div className="space-y-1 leading-none">
                         <FormLabel className="text-sm font-normal">
                           I agree to the{" "}
-                          <a href="/privacy" className="text-blue-600 hover:text-blue-700 underline">
+                          <a href="/privacy-policy" className="text-blue-600 hover:text-blue-700 underline">
                             Privacy Policy
                           </a>
                         </FormLabel>
