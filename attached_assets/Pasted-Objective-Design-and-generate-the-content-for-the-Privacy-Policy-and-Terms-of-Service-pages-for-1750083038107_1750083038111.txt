@@ -1,0 +1,221 @@
+Objective: Design and generate the content for the "Privacy Policy" and "Terms of Service" pages for the Cush platform. These pages must be clear, comprehensive, legally compliant, and user-friendly, reflecting Cush's specific services, data handling practices, and user responsibilities.
+
+Core Requirements:
+Clear Language & Accessibility:
+
+Content should be written in clear, concise, and easy-to-understand language. Avoid excessive legal jargon where plain language suffices.
+
+Ensure the pages are accessible and easily navigable for all users.
+
+Compliance Focus:
+
+Explicitly mention adherence to relevant global data protection regulations (e.g., GDPR for EU, CCPA for California, NDPR for Nigeria, PIPEDA for Canada, UK GDPR, and general principles for other jurisdictions).
+
+Address compliance for financial services data and medical data (if ConnectCare/VitalLink is integrated in the future, currently placeholder/mention of general data types).
+
+Dynamic Content Integration:
+
+Design the content to be hosted on dedicated web pages (e.g., /privacy-policy, /terms-of-service) within the Cush frontend.
+
+Structure the content in Markdown for easy rendering on the frontend.
+
+Privacy Policy Page: Important Sections
+This section needs to detail how Cush collects, uses, stores, shares, and protects user data.
+
+Introduction:
+
+State Cush's commitment to user privacy.
+
+Briefly explain what Cush is (global immigration services, remittances, loans, etc.).
+
+Information We Collect:
+
+Personal Identifiable Information (PII):
+
+User-provided: Name, email, phone number, address, date of birth, nationality, immigration status, financial details (bank accounts, card info - note: handled by Stripe), medical history (if health features are present), educational background.
+
+Automatically collected: IP address, device information, browser type, usage data (pages visited, features used), session data, cookies.
+
+Sensitive Data: Explicitly mention handling of sensitive data such as immigration status, nationality, and financial details.
+
+Financial Data: Clarify that actual payment card details are handled by Stripe, and Cush does not store them directly.
+
+Health Data (Conditional): If health features are enabled, explain the collection and special protection for health-related information (e.g., symptoms, diagnoses, medical records).
+
+How We Use Your Information:
+
+To provide and maintain services (user accounts, immigration assistance, remittances, loans).
+
+For authentication and security (MFA, fraud prevention).
+
+For personalization (AI assistant, tailored advice).
+
+For communication (service updates, support, marketing with consent).
+
+For legal and regulatory compliance.
+
+For research and analytics (on aggregated, de-identified data for market insights, value-based care).
+
+How We Share Your Information:
+
+With Service Providers: Third-party vendors (Stripe, Twilio, Google/Gemini API, Drizzle ORM/PostgreSQL, cloud providers, KYC/AML providers, remittance partners, loan partners). Specify that they are bound by confidentiality.
+
+With Your Consent: For example, sharing specific data with mentors or housing providers if explicitly authorized by the user.
+
+For Legal Reasons: To comply with laws, respond to subpoenas, protect rights.
+
+Business Transfers: In case of mergers or acquisitions.
+
+Aggregated/De-identified Data: For research, analytics, and improving services without identifying individual users.
+
+Data Security:
+
+Detail measures taken: Encryption (at rest and in transit), access controls, regular security audits, employee training.
+
+Reiterate that no method of transmission over the internet is 100% secure.
+
+Data Retention:
+
+Explain how long data is kept and the criteria for retention (legal obligations, service provision).
+
+Your Rights (Data Subject Rights):
+
+Right to access personal data.
+
+Right to rectification (correct inaccurate data).
+
+Right to erasure ("right to be forgotten" - within legal limits).
+
+Right to restrict processing.
+
+Right to data portability.
+
+Right to object to processing.
+
+How to exercise these rights (contact information, in-app controls).
+
+Cookies and Tracking Technologies:
+
+Explain the use of cookies and similar technologies.
+
+How users can manage cookie preferences.
+
+International Data Transfers:
+
+Address data transfers across borders, especially for global services (e.g., using Standard Contractual Clauses).
+
+Children's Privacy:
+
+State age restrictions and policies for minors.
+
+Changes to This Privacy Policy:
+
+Explain how users will be notified of changes.
+
+Contact Us:
+
+Provide clear contact information for privacy-related inquiries.
+
+Terms of Service Page: Important Sections
+This section outlines the rules and agreements between Cush and its users, setting expectations and responsibilities.
+
+Introduction:
+
+Welcome message, agreement to terms.
+
+Defines parties involved (Cush, User).
+
+Acceptance of Terms:
+
+Explicit statement that by using the service, the user agrees to the terms.
+
+Services Provided:
+
+Detailed description of Cush's services (immigration assistance, mentorship, remittances, loans, AI chatbot, housing/jobs board, community features).
+
+Clarify Cush's role (e.g., platform provider, referral agent, not a direct lender/employer/landlord for all services).
+
+User Accounts:
+
+Account creation, eligibility requirements (age, legal capacity).
+
+Account security (user responsibility for password, MFA).
+
+Account suspension/termination policy.
+
+User Responsibilities:
+
+Prohibited conduct (illegal activities, fraud, harassment, unauthorized access).
+
+Accuracy of information provided by the user.
+
+Compliance with applicable laws.
+
+Use of AI chatbot (e.g., not for medical emergencies, AI limitations).
+
+Intellectual Property Rights:
+
+Ownership of Cush platform content, trademarks, and user-generated content.
+
+User's license to Cush for submitted content.
+
+Payments and Fees:
+
+Pricing structure for services.
+
+Refund policy.
+
+Responsibilities for taxes.
+
+Clarification of third-party payment processing (Stripe).
+
+Disclaimers and Limitation of Liability:
+
+Crucial for mitigating risk.
+
+"As Is" Basis: Services provided without warranties.
+
+No Medical/Legal/Financial Advice: Explicitly state that Cush (and its AI) does not provide medical, legal, immigration, or financial advice. It's a platform for information and connection. Users must seek professional advice.
+
+Third-Party Services: Disclaim liability for services provided by third-party partners (loan providers, remittance agents, doctors, landlords, employers).
+
+Limitation of Liability: Capping Cush's liability for damages.
+
+Indemnification:
+
+Users agree to protect Cush from claims arising from their misuse of the platform.
+
+Dispute Resolution:
+
+Governing law (e.g., jurisdiction where Cush is registered).
+
+Arbitration clause (if preferred over litigation).
+
+Class action waiver.
+
+Links to Third-Party Websites:
+
+Disclaim responsibility for external sites.
+
+Changes to the Terms of Service:
+
+How and when terms may be updated.
+
+Termination:
+
+Conditions under which either party can terminate the agreement.
+
+Miscellaneous:
+
+Severability, entire agreement, waiver.
+
+Contact Information:
+
+How to contact Cush for terms-related inquiries.
+
+Expected Deliverables:
+frontend/src/pages/privacy-policy.md: Markdown content for the Privacy Policy page.
+
+frontend/src/pages/terms-of-service.md: Markdown content for the Terms of Service page.
+
+frontend/src/components/LegalLinks.tsx (Conceptual): A simple React component to display links to these pages in the footer or navigation.
