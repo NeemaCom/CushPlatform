@@ -1764,6 +1764,203 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== JOB & HOUSING DISCOVERY ROUTES =====
+
+  // Job search endpoint
+  app.get('/api/jobs/search', async (req, res) => {
+    try {
+      const validatedQuery = searchJobsSchema.parse(req.query);
+      const jobs = await storage.searchJobs(validatedQuery);
+      res.json(jobs);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid search parameters", details: error.errors });
+      }
+      console.error('Job search error:', error);
+      res.status(500).json({ error: "Failed to search jobs" });
+    }
+  });
+
+  // Get single job listing
+  app.get('/api/jobs/:id', async (req, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const job = await storage.getJobListing(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      res.json(job);
+    } catch (error: any) {
+      console.error('Get job error:', error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
+  // Create job listing (admin only)
+  app.post('/api/admin/jobs', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = insertJobListingSchema.parse(req.body);
+      const job = await storage.createJobListing({
+        ...validatedData,
+        expirationDate: validatedData.expirationDate ? new Date(validatedData.expirationDate) : null
+      });
+      res.status(201).json(job);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid job data", details: error.errors });
+      }
+      console.error('Create job error:', error);
+      res.status(500).json({ error: "Failed to create job listing" });
+    }
+  });
+
+  // Update job listing (admin only)
+  app.put('/api/admin/jobs/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      if (updates.expirationDate) {
+        updates.expirationDate = new Date(updates.expirationDate);
+      }
+      
+      const job = await storage.updateJobListing(jobId, updates);
+      res.json(job);
+    } catch (error: any) {
+      console.error('Update job error:', error);
+      res.status(500).json({ error: "Failed to update job listing" });
+    }
+  });
+
+  // Delete job listing (admin only)
+  app.delete('/api/admin/jobs/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      await storage.deleteJobListing(jobId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete job error:', error);
+      res.status(500).json({ error: "Failed to delete job listing" });
+    }
+  });
+
+  // Housing search endpoint
+  app.get('/api/housing/search', async (req, res) => {
+    try {
+      const validatedQuery = searchHousingSchema.parse(req.query);
+      const housing = await storage.searchHousing(validatedQuery);
+      res.json(housing);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid search parameters", details: error.errors });
+      }
+      console.error('Housing search error:', error);
+      res.status(500).json({ error: "Failed to search housing" });
+    }
+  });
+
+  // Get single housing listing
+  app.get('/api/housing/:id', async (req, res) => {
+    try {
+      const housingId = parseInt(req.params.id);
+      const housing = await storage.getHousingListing(housingId);
+      
+      if (!housing) {
+        return res.status(404).json({ error: "Housing not found" });
+      }
+      
+      res.json(housing);
+    } catch (error: any) {
+      console.error('Get housing error:', error);
+      res.status(500).json({ error: "Failed to fetch housing" });
+    }
+  });
+
+  // Get user's housing listings
+  app.get('/api/housing/my-listings', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const listings = await storage.getUserHousingListings(userId);
+      res.json(listings);
+    } catch (error: any) {
+      console.error('Get user housing error:', error);
+      res.status(500).json({ error: "Failed to fetch user housing listings" });
+    }
+  });
+
+  // Create housing listing
+  app.post('/api/housing', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = insertHousingListingSchema.parse(req.body);
+      
+      const housing = await storage.createHousingListing({
+        ...validatedData,
+        userId,
+        availabilityDate: new Date(validatedData.availabilityDate)
+      });
+      
+      res.status(201).json(housing);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid housing data", details: error.errors });
+      }
+      console.error('Create housing error:', error);
+      res.status(500).json({ error: "Failed to create housing listing" });
+    }
+  });
+
+  // Update housing listing
+  app.put('/api/housing/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const housingId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const existingListing = await storage.getHousingListing(housingId);
+      if (!existingListing || existingListing.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to update this listing" });
+      }
+      
+      const validatedData = updateHousingListingSchema.parse(req.body);
+      
+      if (validatedData.availabilityDate) {
+        validatedData.availabilityDate = new Date(validatedData.availabilityDate);
+      }
+      
+      const housing = await storage.updateHousingListing(housingId, validatedData);
+      res.json(housing);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid housing data", details: error.errors });
+      }
+      console.error('Update housing error:', error);
+      res.status(500).json({ error: "Failed to update housing listing" });
+    }
+  });
+
+  // Delete housing listing
+  app.delete('/api/housing/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const housingId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const existingListing = await storage.getHousingListing(housingId);
+      if (!existingListing || existingListing.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to delete this listing" });
+      }
+      
+      await storage.deleteHousingListing(housingId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete housing error:', error);
+      res.status(500).json({ error: "Failed to delete housing listing" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -400,7 +400,10 @@ export class DatabaseStorage implements IStorage {
   async createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor> {
     const [newMentor] = await db
       .insert(mentors)
-      .values([mentor])
+      .values({
+        ...mentor,
+        weekdays: mentor.weekdays as { day: string; startTime: string; endTime: string; }[]
+      })
       .returning();
     return newMentor;
   }
