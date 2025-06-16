@@ -61,31 +61,33 @@ const WorkingTerms: React.FC = () => {
             <section>
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">User Responsibilities</h2>
               
-              <div className="mb-6">
-                <h3 className="font-medium text-gray-800 mb-3">Prohibited Conduct</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <ul className="list-disc ml-6 space-y-2">
-                    <li>Illegal activities or fraud</li>
-                    <li>Harassment or abusive behavior</li>
-                    <li>Unauthorized access to systems</li>
-                    <li>Impersonation of others</li>
-                  </ul>
-                  <ul className="list-disc ml-6 space-y-2">
-                    <li>Spam or unsolicited communications</li>
-                    <li>Malware or harmful code distribution</li>
-                    <li>Violation of intellectual property rights</li>
-                    <li>Circumventing security measures</li>
-                  </ul>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Prohibited Conduct</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <ul className="list-disc ml-6 space-y-2 text-sm">
+                      <li>Illegal activities or fraud</li>
+                      <li>Harassment or abusive behavior</li>
+                      <li>Unauthorized access to systems</li>
+                      <li>Impersonation of others</li>
+                    </ul>
+                    <ul className="list-disc ml-6 space-y-2 text-sm">
+                      <li>Spam or unsolicited communications</li>
+                      <li>Malware or harmful code distribution</li>
+                      <li>Violation of intellectual property rights</li>
+                      <li>Circumventing security measures</li>
+                    </ul>
+                  </div>
                 </div>
-              </div>
 
-              <div>
-                <h3 className="font-medium text-gray-800 mb-3">Information Accuracy</h3>
-                <p>
-                  You are responsible for providing accurate, current, and complete information. 
-                  False or misleading information may result in account suspension and may affect 
-                  your ability to access services from our partners.
-                </p>
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Information Accuracy</h3>
+                  <p className="text-sm leading-relaxed">
+                    You are responsible for providing accurate, current, and complete information. 
+                    False or misleading information may result in account suspension and may affect 
+                    your ability to access services from our partners.
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -99,151 +101,172 @@ const WorkingTerms: React.FC = () => {
                 </p>
               </div>
 
-              <div>
-                <h3 className="font-medium text-gray-800 mb-3">Guidelines for AI Use</h3>
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Acceptable Use</h3>
+                  <ul className="list-disc ml-6 space-y-2 text-sm">
+                    <li>Use for general financial guidance and platform navigation</li>
+                    <li>Ask questions about immigration processes and requirements</li>
+                    <li>Request information about our services and features</li>
+                    <li>Seek guidance on using platform tools and resources</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Prohibited AI Usage</h3>
+                  <ul className="list-disc ml-6 space-y-2 text-sm">
+                    <li>Requesting specific legal advice or representation</li>
+                    <li>Seeking medical diagnoses or treatment recommendations</li>
+                    <li>Attempting to generate harmful or inappropriate content</li>
+                    <li>Using AI responses as official documentation</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Financial Services</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Loan Referral Service</h3>
+                  <p className="text-sm leading-relaxed mb-3">
+                    Cush provides loan referral services by connecting users with third-party lenders. 
+                    We are not a direct lender and do not make credit decisions.
+                  </p>
+                  
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <h4 className="font-medium text-blue-900 mb-2">Important Disclosures:</h4>
+                    <ul className="text-blue-800 space-y-1 text-sm">
+                      <li>• Loan terms and conditions are determined by individual lenders</li>
+                      <li>• Interest rates and fees vary by lender and creditworthiness</li>
+                      <li>• We may receive compensation from lenders for successful referrals</li>
+                      <li>• Credit checks may be performed by lenders</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Remittance Services</h3>
+                  <p className="text-sm leading-relaxed">
+                    International money transfer services are provided through licensed third-party partners. 
+                    Exchange rates, fees, and transfer times are determined by our partners and may vary 
+                    based on destination country and transfer method.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Community Guidelines</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Respectful Interaction</h3>
+                  <ul className="list-disc ml-6 space-y-2 text-sm">
+                    <li>Treat all community members with respect and dignity</li>
+                    <li>Maintain professional and constructive communication</li>
+                    <li>Respect diverse backgrounds, cultures, and experiences</li>
+                    <li>Report inappropriate behavior to our moderation team</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="font-medium text-gray-800 mb-3">Content Standards</h3>
+                  <ul className="list-disc ml-6 space-y-2 text-sm">
+                    <li>Share accurate and helpful information</li>
+                    <li>Avoid posting personal or sensitive information</li>
+                    <li>Respect intellectual property and cite sources when appropriate</li>
+                    <li>Keep discussions relevant to immigration and financial topics</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Liability and Disclaimers</h2>
+              
+              <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-4">
+                <p className="text-sm text-red-800">
+                  <strong>No Warranty:</strong> Services are provided "as is" without warranties of any kind. 
+                  We do not guarantee the accuracy, completeness, or timeliness of information provided.
+                </p>
+              </div>
+
+              <div className="space-y-4 text-sm">
+                <p>
+                  <strong>Limitation of Liability:</strong> Cush's liability is limited to the maximum extent 
+                  permitted by law. We are not liable for indirect, incidental, or consequential damages 
+                  arising from your use of our services.
+                </p>
+
+                <p>
+                  <strong>Third-Party Services:</strong> We are not responsible for the actions, products, 
+                  content, or services of third-party providers. Your interactions with third parties are 
+                  solely between you and such parties.
+                </p>
+
+                <p>
+                  <strong>Immigration Outcomes:</strong> We do not guarantee successful immigration outcomes. 
+                  Immigration processes are complex and subject to government policies and individual circumstances.
+                </p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Account Termination</h2>
+              
+              <div className="space-y-4 text-sm">
+                <p>
+                  We reserve the right to suspend or terminate accounts that violate these Terms or engage 
+                  in activities that may harm our platform or other users. Account termination may result in:
+                </p>
+
                 <ul className="list-disc ml-6 space-y-2">
-                  <li>Use for informational purposes and general guidance</li>
-                  <li>Do not rely on AI responses for medical emergencies</li>
-                  <li>Consult qualified professionals for legal or medical advice</li>
-                  <li>Understand that AI responses may not always be accurate</li>
-                  <li>Do not share sensitive personal information in AI chats</li>
+                  <li>Loss of access to all platform features and services</li>
+                  <li>Forfeiture of any unused credits or balances</li>
+                  <li>Deletion of user-generated content and data</li>
+                  <li>Prohibition from creating new accounts</li>
                 </ul>
-              </div>
-            </section>
 
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Payments and Fees</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Service Fees</h3>
-                  <ul className="list-disc ml-6 space-y-1">
-                    <li>Basic platform access is free</li>
-                    <li>Premium features require subscription</li>
-                    <li>Transaction fees apply to remittance services</li>
-                    <li>Third-party services may have separate fees</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Payment Processing</h3>
-                  <p>
-                    Payments are processed securely through Stripe. We do not store your complete 
-                    payment card information on our servers. All transactions are subject to 
-                    verification and fraud prevention measures.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Refund Policy</h3>
-                  <p>
-                    Refunds are available for subscription services within 30 days of purchase, 
-                    subject to usage limits. Transaction fees for completed remittances are non-refundable. 
-                    Contact our support team for refund requests.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Disclaimers and Limitation of Liability</h2>
-              
-              <div className="space-y-4">
-                <div className="bg-orange-50 border-l-4 border-orange-400 p-4">
-                  <p className="text-sm text-orange-800">
-                    <strong>Services Provided "As Is":</strong> Our platform and services are provided on an "as is" 
-                    and "as available" basis without warranties of any kind, either express or implied.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-3">No Professional Advice</h3>
-                  <p className="mb-3">Cush and its AI assistant do not provide:</p>
-                  <ul className="list-disc ml-6 space-y-1 mb-3">
-                    <li>Medical advice or diagnosis</li>
-                    <li>Legal advice or representation</li>
-                    <li>Immigration legal counsel</li>
-                    <li>Professional financial advisory services</li>
-                  </ul>
-                  <p>
-                    We are an information and connection platform. Always consult qualified professionals 
-                    for advice specific to your situation.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-3">Limitation of Liability</h3>
-                  <p>
-                    To the maximum extent permitted by law, Cush's total liability for any claims related to 
-                    our services shall not exceed the amount you have paid to Cush in the 12 months preceding 
-                    the claim, or $100, whichever is greater.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Dispute Resolution</h2>
-              
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Governing Law</h3>
-                  <p>
-                    These Terms shall be governed by and construed in accordance with the laws of the 
-                    jurisdiction where Cush is registered, without regard to conflict of law principles.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className="font-medium text-gray-800 mb-2">Dispute Resolution Process</h3>
-                  <p className="mb-2">Before pursuing formal legal action, we encourage users to:</p>
-                  <ul className="list-disc ml-6 space-y-1">
-                    <li>Contact our support team to resolve the issue</li>
-                    <li>Participate in good faith negotiations</li>
-                    <li>Consider mediation if direct resolution fails</li>
-                  </ul>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Changes to Terms of Service</h2>
-              <div className="space-y-3">
                 <p>
-                  We may update these Terms periodically to reflect changes in our services, legal requirements, 
-                  or business practices. Material changes will be communicated to users via:
-                </p>
-                <ul className="list-disc ml-6 space-y-1">
-                  <li>Email notification to registered users</li>
-                  <li>Prominent notice on our platform</li>
-                  <li>In-app notifications</li>
-                </ul>
-                <p>
-                  Continued use of our services after notification constitutes acceptance of the updated Terms.
+                  Users may terminate their accounts at any time through account settings. Upon termination, 
+                  we will process data deletion in accordance with our Privacy Policy.
                 </p>
               </div>
             </section>
 
             <section>
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Changes to Terms</h2>
               
-              <div className="bg-green-50 border-l-4 border-green-400 p-6">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <p className="text-sm">
+                  We may update these Terms periodically to reflect changes in our services or applicable law. 
+                  Material changes will be communicated through email or platform notifications. Continued use 
+                  of our services after changes become effective constitutes acceptance of the updated Terms.
+                </p>
+              </div>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Information</h2>
+              
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
                 <p className="mb-4">
-                  If you have questions about these Terms of Service, please contact us:
+                  For questions about these Terms of Service or our platform, please contact us:
                 </p>
-                <div className="space-y-2">
+                
+                <div className="space-y-2 text-sm">
                   <p><strong>Email:</strong> legal@cush.com</p>
                   <p><strong>Support:</strong> support@cush.com</p>
-                  <p><strong>Business Inquiries:</strong> business@cush.com</p>
-                  <p><strong>In-Platform:</strong> Use the support chat in your account dashboard</p>
+                  <p><strong>Address:</strong> Cush Legal Team, [Company Address]</p>
                 </div>
               </div>
             </section>
 
             <footer className="text-center pt-8 border-t border-gray-200">
-              <p className="text-xs text-gray-500">
-                These Terms of Service were last updated on December 16, 2024. By continuing to use Cush 
-                after any modifications, you agree to the updated Terms.
+              <p className="text-gray-600 text-sm">
+                These Terms of Service are effective as of December 16, 2024 and govern your use of the Cush platform.
               </p>
             </footer>
           </div>
