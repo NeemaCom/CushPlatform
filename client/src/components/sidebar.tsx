@@ -50,7 +50,14 @@ export function Sidebar() {
   };
 
   return (
-    <div className="w-64 h-screen fixed left-0 top-0 sidebar-gradient backdrop-blur-sm shadow-xl border-r border-white/20">
+    <div 
+      className="w-64 h-screen fixed left-0 top-0 backdrop-blur-sm shadow-xl border-r border-white/20"
+      style={{
+        background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 25%, #8b5cf6 50%, #1e40af 75%, #3730a3 100%)',
+        backgroundSize: '300% 300%',
+        animation: 'sidebar-gradient 12s ease infinite'
+      }}
+    >
       <div className="p-6">
         <div className="flex items-center">
           <img 
