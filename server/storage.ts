@@ -16,6 +16,8 @@ import {
   loanReferrals,
   financialGoals,
   goalProgress,
+  jobListings,
+  housingListings,
   type User, 
   type SafeUser,
   type InsertUser,
@@ -48,10 +50,17 @@ import {
   type FinancialGoal,
   type InsertFinancialGoal,
   type GoalProgress,
-  type InsertGoalProgress
+  type InsertGoalProgress,
+  type JobListing,
+  type HousingListing,
+  type InsertJobListing,
+  type InsertHousingListing,
+  type SearchJobsQuery,
+  type SearchHousingQuery,
+  type UpdateHousingListing
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, or, ilike, gte, lte } from "drizzle-orm";
 
 export interface IStorage {
   // User management
@@ -136,6 +145,20 @@ export interface IStorage {
   getLoanReferralByCode(referralCode: string): Promise<LoanReferral | undefined>;
   createLoanReferral(referral: InsertLoanReferral & { preQualificationId: number; partnerId: number }): Promise<LoanReferral>;
   updateLoanReferral(id: number, updates: Partial<LoanReferral>): Promise<LoanReferral>;
+
+  // Job & Housing Discovery methods
+  searchJobs(query: SearchJobsQuery): Promise<JobListing[]>;
+  getJobListing(id: number): Promise<JobListing | undefined>;
+  createJobListing(job: InsertJobListing): Promise<JobListing>;
+  updateJobListing(id: number, updates: Partial<JobListing>): Promise<JobListing>;
+  deleteJobListing(id: number): Promise<void>;
+
+  searchHousing(query: SearchHousingQuery): Promise<HousingListing[]>;
+  getHousingListing(id: number): Promise<HousingListing | undefined>;
+  getUserHousingListings(userId: number): Promise<HousingListing[]>;
+  createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing>;
+  updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing>;
+  deleteHousingListing(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -680,6 +703,184 @@ export class DatabaseStorage implements IStorage {
       .values(progress)
       .returning();
     return newProgress;
+  }
+
+  // ===== JOB & HOUSING DISCOVERY METHODS =====
+
+  // Job Listings methods
+  async searchJobs(query: SearchJobsQuery): Promise<JobListing[]> {
+    const conditions = [eq(jobListings.isActive, true)];
+    
+    if (query.keywords) {
+      conditions.push(
+        or(
+          ilike(jobListings.title, `%${query.keywords}%`),
+          ilike(jobListings.company, `%${query.keywords}%`),
+          ilike(jobListings.description, `%${query.keywords}%`)
+        )
+      );
+    }
+    
+    if (query.location) {
+      conditions.push(ilike(jobListings.location, `%${query.location}%`));
+    }
+    
+    if (query.country) {
+      conditions.push(eq(jobListings.country, query.country));
+    }
+    
+    if (query.city) {
+      conditions.push(eq(jobListings.city, query.city));
+    }
+    
+    if (query.jobType) {
+      conditions.push(eq(jobListings.jobType, query.jobType));
+    }
+    
+    if (query.remote !== undefined) {
+      conditions.push(eq(jobListings.remote, query.remote));
+    }
+    
+    if (query.experience) {
+      conditions.push(eq(jobListings.experience, query.experience));
+    }
+    
+    if (query.industry) {
+      conditions.push(eq(jobListings.industry, query.industry));
+    }
+    
+    if (query.salaryMin) {
+      conditions.push(gte(jobListings.salaryMin, query.salaryMin));
+    }
+    
+    if (query.salaryMax) {
+      conditions.push(lte(jobListings.salaryMax, query.salaryMax));
+    }
+    
+    return await db
+      .select()
+      .from(jobListings)
+      .where(and(...conditions))
+      .orderBy(desc(jobListings.postedDate))
+      .limit(query.limit || 20)
+      .offset(query.offset || 0);
+  }
+
+  async getJobListing(id: number): Promise<JobListing | undefined> {
+    const [job] = await db.select().from(jobListings).where(eq(jobListings.id, id));
+    return job || undefined;
+  }
+
+  async createJobListing(job: InsertJobListing): Promise<JobListing> {
+    const [newJob] = await db.insert(jobListings).values(job).returning();
+    return newJob;
+  }
+
+  async updateJobListing(id: number, updates: Partial<JobListing>): Promise<JobListing> {
+    const [updatedJob] = await db
+      .update(jobListings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(jobListings.id, id))
+      .returning();
+    return updatedJob;
+  }
+
+  async deleteJobListing(id: number): Promise<void> {
+    await db.delete(jobListings).where(eq(jobListings.id, id));
+  }
+
+  // Housing Listings methods
+  async searchHousing(query: SearchHousingQuery): Promise<HousingListing[]> {
+    let dbQuery = db.select().from(housingListings).where(eq(housingListings.isActive, true));
+    
+    if (query.location) {
+      dbQuery = dbQuery.where(
+        or(
+          ilike(housingListings.address, `%${query.location}%`),
+          ilike(housingListings.city, `%${query.location}%`)
+        )
+      );
+    }
+    
+    if (query.country) {
+      dbQuery = dbQuery.where(eq(housingListings.country, query.country));
+    }
+    
+    if (query.city) {
+      dbQuery = dbQuery.where(eq(housingListings.city, query.city));
+    }
+    
+    if (query.propertyType) {
+      dbQuery = dbQuery.where(eq(housingListings.propertyType, query.propertyType));
+    }
+    
+    if (query.minRent) {
+      dbQuery = dbQuery.where(gte(housingListings.rentAmount, query.minRent));
+    }
+    
+    if (query.maxRent) {
+      dbQuery = dbQuery.where(lte(housingListings.rentAmount, query.maxRent));
+    }
+    
+    if (query.bedrooms !== undefined) {
+      dbQuery = dbQuery.where(eq(housingListings.bedrooms, query.bedrooms));
+    }
+    
+    if (query.bathrooms !== undefined) {
+      dbQuery = dbQuery.where(gte(housingListings.bathrooms, query.bathrooms.toString()));
+    }
+    
+    if (query.furnished !== undefined) {
+      dbQuery = dbQuery.where(eq(housingListings.furnished, query.furnished));
+    }
+    
+    if (query.petsAllowed !== undefined) {
+      dbQuery = dbQuery.where(eq(housingListings.petsAllowed, query.petsAllowed));
+    }
+    
+    if (query.utilitiesIncluded !== undefined) {
+      dbQuery = dbQuery.where(eq(housingListings.utilitiesIncluded, query.utilitiesIncluded));
+    }
+    
+    if (query.availableFrom) {
+      dbQuery = dbQuery.where(gte(housingListings.availabilityDate, new Date(query.availableFrom)));
+    }
+    
+    return await dbQuery
+      .orderBy(desc(housingListings.createdAt))
+      .limit(query.limit || 20)
+      .offset(query.offset || 0);
+  }
+
+  async getHousingListing(id: number): Promise<HousingListing | undefined> {
+    const [housing] = await db.select().from(housingListings).where(eq(housingListings.id, id));
+    return housing || undefined;
+  }
+
+  async getUserHousingListings(userId: number): Promise<HousingListing[]> {
+    return await db
+      .select()
+      .from(housingListings)
+      .where(eq(housingListings.userId, userId))
+      .orderBy(desc(housingListings.createdAt));
+  }
+
+  async createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing> {
+    const [newHousing] = await db.insert(housingListings).values(housing).returning();
+    return newHousing;
+  }
+
+  async updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing> {
+    const [updatedHousing] = await db
+      .update(housingListings)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(housingListings.id, id))
+      .returning();
+    return updatedHousing;
+  }
+
+  async deleteHousingListing(id: number): Promise<void> {
+    await db.delete(housingListings).where(eq(housingListings.id, id));
   }
 }
 
