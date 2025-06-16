@@ -65,16 +65,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Health check endpoint for deployment
-  app.get('/', (req, res) => {
-    res.status(200).json({ 
-      status: 'ok', 
-      message: 'Cush Financial Platform API',
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  app.get('/health', (req, res) => {
+  // Health check endpoint for deployment (only for API paths)
+  app.get('/api/health', (req, res) => {
     res.status(200).json({ 
       status: 'healthy', 
       uptime: process.uptime(),
