@@ -52,6 +52,7 @@ export function setupGoogleAuth(app: Express) {
       const tokenData = await tokenResponse.json();
       
       if (!tokenData.access_token) {
+        console.error("Google OAuth token exchange failed:", tokenData);
         return res.redirect("/register?error=oauth_failed");
       }
 
