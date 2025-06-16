@@ -13,13 +13,15 @@ import {
   Users,
   CreditCard,
   Briefcase,
-  Building
+  Building,
+  CreditCard as VirtualWallet
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 const sidebarItems = [
+  { icon: VirtualWallet, label: "Virtual Wallet", href: "#", disabled: true },
   { icon: Home, label: "Dashboard", href: "/dashboard" },
   { icon: MessageCircle, label: "Imisi 2.0", href: "/imisi" },
   { icon: Users, label: "Community", href: "/community" },
@@ -77,6 +79,22 @@ export function Sidebar() {
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = location === item.href;
+            
+            if (item.disabled) {
+              return (
+                <div
+                  key={item.href}
+                  className={cn(
+                    "flex items-center py-3 px-4 rounded-lg mb-2 transition-all duration-300 backdrop-blur-sm",
+                    "text-white/50 cursor-default opacity-60"
+                  )}
+                  onClick={(e) => e.preventDefault()}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="ml-3 font-medium">{item.label}</span>
+                </div>
+              );
+            }
             
             return (
               <Link key={item.href} href={item.href}>
