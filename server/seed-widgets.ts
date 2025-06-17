@@ -258,6 +258,11 @@ export async function seedWidgets() {
   }
 }
 
-if (require.main === module) {
-  seedWidgets().then(() => process.exit(0));
-}
+// Run seeder if called directly
+seedWidgets().then(() => {
+  console.log('Widget seeding completed');
+  process.exit(0);
+}).catch((error) => {
+  console.error('Widget seeding failed:', error);
+  process.exit(1);
+});
