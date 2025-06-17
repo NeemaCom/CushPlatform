@@ -14,18 +14,14 @@ import {
   CreditCard,
   Briefcase,
   Building,
-  CreditCard as VirtualWallet,
-  Shield,
   Package,
   Menu,
   X,
   ChevronDown,
   ChevronRight,
-  Zap,
   DollarSign,
-  TrendingUp,
   User,
-  HelpCircle
+  Shield
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -59,7 +55,7 @@ const navigationGroups: NavGroup[] = [
     label: "Financial Services",
     icon: DollarSign,
     items: [
-      { icon: VirtualWallet, label: "Virtual Wallet", href: "#", disabled: true, badge: "Coming Soon" },
+      { icon: CreditCard, label: "Virtual Wallet", href: "#", disabled: true, badge: "Coming Soon" },
       { icon: Wallet, label: "Accounts", href: "/accounts" },
       { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
       { icon: CreditCard, label: "Loans", href: "/loans" },

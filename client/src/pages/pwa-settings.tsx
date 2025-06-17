@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 import { useLocation } from 'wouter';
-import { SimpleSidebar } from '@/components/simple-sidebar';
+import { EnhancedSidebar } from '@/components/enhanced-sidebar';
 
 export default function PWASettings() {
   const [, setLocation] = useLocation();

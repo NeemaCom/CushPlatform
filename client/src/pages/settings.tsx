@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { SimpleSidebar } from "@/components/simple-sidebar";
+import { EnhancedSidebar } from "@/components/enhanced-sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -161,8 +161,8 @@ export default function Settings() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
       <div className="flex">
-        <SimpleSidebar />
-        <div className="flex-1 ml-64">
+        <EnhancedSidebar />
+        <div className="flex-1 lg:ml-64">
           <div className="p-6">
             <div className="max-w-4xl mx-auto">
               <div className="flex items-center justify-between mb-8">
