@@ -147,17 +147,36 @@ export interface IStorage {
   updateLoanReferral(id: number, updates: Partial<LoanReferral>): Promise<LoanReferral>;
 
   // Job & Housing Discovery methods
-  searchJobs(query: SearchJobsQuery): Promise<JobListing[]>;
-  getJobListing(id: number): Promise<JobListing | undefined>;
+  getJobListings(filters: {
+    search?: string;
+    location?: string;
+    jobType?: string;
+    experience?: string;
+    industry?: string;
+    remote?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<JobListing[]>;
+  getJobListingById(id: number): Promise<JobListing | undefined>;
   createJobListing(job: InsertJobListing): Promise<JobListing>;
   updateJobListing(id: number, updates: Partial<JobListing>): Promise<JobListing>;
   deleteJobListing(id: number): Promise<void>;
 
-  searchHousing(query: SearchHousingQuery): Promise<HousingListing[]>;
-  getHousingListing(id: number): Promise<HousingListing | undefined>;
-  getUserHousingListings(userId: number): Promise<HousingListing[]>;
+  getHousingListings(filters: {
+    search?: string;
+    location?: string;
+    propertyType?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    bedrooms?: number;
+    furnished?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<HousingListing[]>;
+  getHousingListingById(id: number): Promise<HousingListing | undefined>;
+  getHousingListingsByUserId(userId: number): Promise<HousingListing[]>;
   createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing>;
-  updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing>;
+  updateHousingListing(id: number, updates: Partial<HousingListing>): Promise<HousingListing>;
   deleteHousingListing(id: number): Promise<void>;
 
   // Admin-specific methods
