@@ -15,8 +15,7 @@ import {
   Briefcase,
   Building,
   CreditCard as VirtualWallet,
-  Shield,
-  MapPin
+  Shield
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
