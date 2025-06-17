@@ -26,7 +26,7 @@ import {
   Coffee,
   Waves
 } from 'lucide-react';
-import { SimpleSidebar } from '@/components/simple-sidebar';
+import { EnhancedSidebar } from '@/components/enhanced-sidebar';
 
 interface HousingListing {
   id: number;
@@ -122,7 +122,7 @@ export default function Housing() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <SimpleSidebar />
+      <EnhancedSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-auto">
           <div className="p-6 max-w-7xl mx-auto">
