@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { 
   Home, 
   BarChart3, 
@@ -15,29 +16,88 @@ import {
   Building,
   CreditCard as VirtualWallet,
   Shield,
-  Package
+  Package,
+  Menu,
+  X,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  DollarSign,
+  TrendingUp,
+  User,
+  HelpCircle
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
-const sidebarItems = [
-  { icon: VirtualWallet, label: "Virtual Wallet", href: "#", disabled: true },
-  { icon: Home, label: "Dashboard", href: "/dashboard" },
-  { icon: MessageCircle, label: "Imisi 2.0", href: "/imisi" },
-  { icon: Users, label: "Community", href: "/community" },
-  { icon: CreditCard, label: "Loans", href: "/loans" },
-  { icon: Briefcase, label: "Jobs", href: "/jobs" },
-  { icon: Building, label: "Housing", href: "/housing" },
-  { icon: Package, label: "Widget Store", href: "/widget-marketplace" },
-  { icon: BarChart3, label: "Analytics", href: "/analytics" },
-  { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
-  { icon: Wallet, label: "Accounts", href: "/accounts" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+interface NavGroup {
+  id: string;
+  label: string;
+  icon: any;
+  items: Array<{
+    icon: any;
+    label: string;
+    href: string;
+    disabled?: boolean;
+    badge?: string;
+  }>;
+}
+
+const navigationGroups: NavGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: Home,
+    items: [
+      { icon: Home, label: "Dashboard", href: "/dashboard" },
+      { icon: BarChart3, label: "Analytics", href: "/analytics" },
+    ]
+  },
+  {
+    id: "financial",
+    label: "Financial Services",
+    icon: DollarSign,
+    items: [
+      { icon: VirtualWallet, label: "Virtual Wallet", href: "#", disabled: true, badge: "Coming Soon" },
+      { icon: Wallet, label: "Accounts", href: "/accounts" },
+      { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
+      { icon: CreditCard, label: "Loans", href: "/loans" },
+    ]
+  },
+  {
+    id: "services",
+    label: "Immigration Services",
+    icon: Briefcase,
+    items: [
+      { icon: Briefcase, label: "Jobs", href: "/jobs" },
+      { icon: Building, label: "Housing", href: "/housing" },
+      { icon: MessageCircle, label: "Imisi 2.0 AI", href: "/imisi", badge: "AI" },
+    ]
+  },
+  {
+    id: "community",
+    label: "Community & Tools",
+    icon: Users,
+    items: [
+      { icon: Users, label: "Community", href: "/community" },
+      { icon: Package, label: "Widget Store", href: "/widget-marketplace", badge: "New" },
+    ]
+  },
+  {
+    id: "account",
+    label: "Account & Support",
+    icon: User,
+    items: [
+      { icon: Settings, label: "Settings", href: "/settings" },
+    ]
+  }
 ];
 
 export function SimpleSidebar() {
   const [location, navigate] = useLocation();
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(["overview", "financial", "services", "community"]);
 
   const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
     queryKey: ["/api/subscription-status"],
