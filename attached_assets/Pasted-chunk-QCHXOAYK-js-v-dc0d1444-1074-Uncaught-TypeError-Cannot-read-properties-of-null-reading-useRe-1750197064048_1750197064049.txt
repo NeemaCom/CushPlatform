@@ -1,0 +1,50 @@
+chunk-QCHXOAYK.js?v=dc0d1444:1074 Uncaught TypeError: Cannot read properties of null (reading 'useRef')
+    at Object.useRef (chunk-QCHXOAYK.js?v=dc0d1444:1074:29)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=dc0d1444:67:34)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=504c7fdc:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=504c7fdc:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=504c7fdc:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-RPCDYKBN.js?v=504c7fdc:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-RPCDYKBN.js?v=504c7fdc:3699:24)
+    at invokeGuardedCallback (chunk-RPCDYKBN.js?v=504c7fdc:3733:39)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=504c7fdc:19765:15)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=504c7fdc:19198:20)Understand this error
+2chunk-QCHXOAYK.js?v=dc0d1444:136 Warning: Invalid hook call. Hooks can only be called inside of the body of a function component. This could happen for one of the following reasons:
+1. You might have mismatching versions of React and the renderer (such as React DOM)
+2. You might be breaking the Rules of Hooks
+3. You might have more than one copy of React in the same app
+See https://reactjs.org/link/invalid-hook-call for tips about how to debug and fix this problem.
+printWarning @ chunk-QCHXOAYK.js?v=dc0d1444:136Understand this error
+chunk-QCHXOAYK.js?v=dc0d1444:1074 Uncaught TypeError: Cannot read properties of null (reading 'useRef')
+    at Object.useRef (chunk-QCHXOAYK.js?v=dc0d1444:1074:29)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=dc0d1444:67:34)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=504c7fdc:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=504c7fdc:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=504c7fdc:15914:22)
+    at HTMLUnknownElement.callCallback2 (chunk-RPCDYKBN.js?v=504c7fdc:3674:22)
+    at Object.invokeGuardedCallbackDev (chunk-RPCDYKBN.js?v=504c7fdc:3699:24)
+    at invokeGuardedCallback (chunk-RPCDYKBN.js?v=504c7fdc:3733:39)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=504c7fdc:19765:15)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=504c7fdc:19198:20)Understand this error
+chunk-RPCDYKBN.js?v=504c7fdc:14032 The above error occurred in the <TooltipProvider> component:
+
+    at TooltipProvider (https://d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=dc0d1444:61:5)
+    at QueryClientProvider (https://d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/@fs/home/runner/workspace/node_modules/.vite/deps/@tanstack_react-query.js?v=504c7fdc:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+logCapturedError @ chunk-RPCDYKBN.js?v=504c7fdc:14032Understand this error
+chunk-RPCDYKBN.js?v=504c7fdc:19413 Uncaught TypeError: Cannot read properties of null (reading 'useRef')
+    at Object.useRef (chunk-QCHXOAYK.js?v=dc0d1444:1074:29)
+    at TooltipProvider (@radix-ui_react-tooltip.js?v=dc0d1444:67:34)
+    at renderWithHooks (chunk-RPCDYKBN.js?v=504c7fdc:11548:26)
+    at mountIndeterminateComponent (chunk-RPCDYKBN.js?v=504c7fdc:14926:21)
+    at beginWork (chunk-RPCDYKBN.js?v=504c7fdc:15914:22)
+    at beginWork$1 (chunk-RPCDYKBN.js?v=504c7fdc:19753:22)
+    at performUnitOfWork (chunk-RPCDYKBN.js?v=504c7fdc:19198:20)
+    at workLoopSync (chunk-RPCDYKBN.js?v=504c7fdc:19137:13)
+    at renderRootSync (chunk-RPCDYKBN.js?v=504c7fdc:19116:15)
+    at recoverFromConcurrentError (chunk-RPCDYKBN.js?v=504c7fdc:18736:28)Understand this error
+d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/:1 <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes">Understand this warning
+d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/:1 Error while trying to use the following icon from the Manifest: https://d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/icons/icon-144x144.png (Download error or resource isn't a valid image)Understand this error
