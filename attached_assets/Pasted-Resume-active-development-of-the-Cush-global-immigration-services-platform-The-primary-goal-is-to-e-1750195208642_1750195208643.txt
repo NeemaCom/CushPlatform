@@ -1,0 +1,39 @@
+Resume active development of the Cush global immigration services platform. The primary goal is to ensure seamless continuity with all previously defined project phases, architectural considerations, and feature requirements.
+
+Project Context Recap:
+Cush is designed to be the leading digital platform for global immigration services, encompassing mentorship, advisory, remittances, and loans. We have established a multi-phase development plan, emphasizing enterprise-grade security, robust data integrity, mobile-first design, and an intuitive user experience with AI integration (Imisi 2.0).
+
+Instructions for Continuity:
+Comprehensive Project Review:
+
+Action: Conduct a thorough review of all previously provided prompts and generated code/artifact content for the Cush project. This includes:
+
+The initial "Website Builder Prompt: Cush - Global Immigration Services Platform" (the master brief).
+
+All detailed phase breakdowns (Phase 1, 2, 3, 4, 5, 6).
+
+Additional feature prompts (Community, Local Job & Housing, Loan Referral Setup).
+
+Special prompts (Bare-Bones Admin Interface, PWA Implementation).
+
+All troubleshooting and code correction interactions, ensuring the latest, corrected versions of files (server/routes.ts, server/types.ts, server/database.ts, server/security.ts, tsconfig.json, package.json, etc.) are implicitly referenced.
+
+Goal: Fully grasp the current state of implementation, the overall architectural vision, and any pending fixes or unaddressed issues from the last active development point.
+
+Current Status Assessment & Next Phase Proposal:
+
+Action: Based on your comprehensive review, articulate the following:
+
+Last Successfully Addressed Component/Phase: Clearly state what was the most recently completed or addressed functional area or architectural component.
+
+Outstanding Issues/Gaps: Identify any remaining errors, incomplete features, or logical gaps from the previous work (e.g., if a previous compilation error fix wasn't fully verified, or if a feature was prompted but not yet started).
+
+Proposed Next Development Phase: Suggest the most logical and critical next phase or feature to work on from the overall project plan. Justify your selection based on dependencies, strategic importance, and the current project status.
+
+Confirmation: Confirm your readiness to proceed with the proposed next phase.
+
+Reinforce Core Principles:
+
+Throughout this process and subsequent development, maintain unwavering adherence to Cush's core principles: Security First, Scalability, Reliability, Performance, Compliance (especially GDPR, CCPA, NDPR), Mobile-First User Experience, and Observability.
+
+AI Agent Task: Begin by performing the "Current Status Assessment & Next Phase Proposal" as outlined above. Provide a concise summary of your findings and your recommendation for the next step in Cush's development.

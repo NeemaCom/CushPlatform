@@ -1,229 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cush - Offline</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #333;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .offline-container {
-      background: white;
-      border-radius: 16px;
-      padding: 40px;
-      text-align: center;
-      max-width: 500px;
-      width: 100%;
-      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    .logo {
-      width: 80px;
-      height: 80px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      border-radius: 50%;
-      margin: 0 auto 24px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-size: 32px;
-      font-weight: bold;
-    }
-
-    h1 {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 16px;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .subtitle {
-      font-size: 18px;
-      color: #666;
-      margin-bottom: 32px;
-      line-height: 1.5;
-    }
-
-    .offline-icon {
-      width: 120px;
-      height: 120px;
-      margin: 0 auto 24px;
-      opacity: 0.6;
-    }
-
-    .features {
-      text-align: left;
-      margin: 32px 0;
-      background: #f8fafc;
-      border-radius: 12px;
-      padding: 24px;
-    }
-
-    .features h3 {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 16px;
-      color: #374151;
-    }
-
-    .features ul {
-      list-style: none;
-    }
-
-    .features li {
-      padding: 8px 0;
-      padding-left: 24px;
-      position: relative;
-      color: #6b7280;
-    }
-
-    .features li::before {
-      content: "✓";
-      position: absolute;
-      left: 0;
-      color: #10b981;
-      font-weight: bold;
-    }
-
-    .retry-btn {
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
-      color: white;
-      border: none;
-      padding: 12px 32px;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-      margin-top: 24px;
-    }
-
-    .retry-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 16px rgba(59, 130, 246, 0.3);
-    }
-
-    .connection-status {
-      margin-top: 24px;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-
-    .connection-status.offline {
-      background: #fef2f2;
-      color: #dc2626;
-      border: 1px solid #fecaca;
-    }
-
-    .connection-status.online {
-      background: #f0fdf4;
-      color: #16a34a;
-      border: 1px solid #bbf7d0;
-    }
-
-    @media (max-width: 480px) {
-      .offline-container {
-        padding: 24px;
-      }
-
-      h1 {
-        font-size: 24px;
-      }
-
-      .subtitle {
-        font-size: 16px;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cush - Offline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        
+        .container {
+            max-width: 400px;
+            padding: 2rem;
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 1.5rem;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        
+        h1 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        p {
+            margin-bottom: 1.5rem;
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+        
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.75rem 2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+        
+        .retry-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .features {
+            margin-top: 2rem;
+            text-align: left;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+        
+        .feature::before {
+            content: "✓";
+            margin-right: 0.5rem;
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-  <div class="offline-container">
-    <div class="logo">C</div>
-    <h1>You're Offline</h1>
-    <p class="subtitle">
-      Don't worry! Cush works offline too. Some features are available even without an internet connection.
-    </p>
-
-    <svg class="offline-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8z" fill="#e5e7eb"/>
-      <path d="M8 12l2 2 4-4" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>
-
-    <div class="features">
-      <h3>Available Offline:</h3>
-      <ul>
-        <li>View cached financial data</li>
-        <li>Browse transaction history</li>
-        <li>Access account summaries</li>
-        <li>Review analytics insights</li>
-      </ul>
+    <div class="container">
+        <div class="icon">🌐</div>
+        <h1>You're Offline</h1>
+        <p>Cush works offline too! Some features are still available while you're disconnected.</p>
+        
+        <button class="retry-btn" onclick="window.location.reload()">
+            Try Again
+        </button>
+        
+        <div class="features">
+            <div class="feature">View cached dashboard data</div>
+            <div class="feature">Access recent transactions</div>
+            <div class="feature">Browse community insights</div>
+            <div class="feature">Use basic calculator tools</div>
+        </div>
     </div>
 
-    <div class="connection-status offline" id="connectionStatus">
-      🔴 No internet connection
-    </div>
-
-    <button class="retry-btn" onclick="retryConnection()">
-      Try Again
-    </button>
-  </div>
-
-  <script>
-    function updateConnectionStatus() {
-      const status = document.getElementById('connectionStatus');
-      if (navigator.onLine) {
-        status.className = 'connection-status online';
-        status.innerHTML = '🟢 Connected - Reloading...';
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
-      } else {
-        status.className = 'connection-status offline';
-        status.innerHTML = '🔴 No internet connection';
-      }
-    }
-
-    function retryConnection() {
-      updateConnectionStatus();
-      if (navigator.onLine) {
-        window.location.reload();
-      }
-    }
-
-    // Listen for online/offline events
-    window.addEventListener('online', updateConnectionStatus);
-    window.addEventListener('offline', updateConnectionStatus);
-
-    // Check connection status on load
-    updateConnectionStatus();
-
-    // Periodically check connection
-    setInterval(() => {
-      if (navigator.onLine) {
-        updateConnectionStatus();
-      }
-    }, 5000);
-  </script>
+    <script>
+        // Check for connection periodically
+        function checkConnection() {
+            if (navigator.onLine) {
+                window.location.href = '/';
+            }
+        }
+        
+        // Listen for online event
+        window.addEventListener('online', () => {
+            window.location.href = '/';
+        });
+        
+        // Check every 5 seconds
+        setInterval(checkConnection, 5000);
+    </script>
 </body>
 </html>
