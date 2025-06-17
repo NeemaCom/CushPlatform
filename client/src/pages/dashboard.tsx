@@ -105,28 +105,28 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
       <div className="flex">
-        <SimpleSidebar />
+        <EnhancedSidebar />
         
         {/* Main Content */}
-        <div className="flex-1 ml-64">
+        <div className="flex-1 lg:ml-64">
           {/* Top Bar */}
-          <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-blue-100 px-6 py-4">
+          <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-blue-100 px-4 lg:px-6 py-4">
             <div className="flex justify-between items-center">
-              <div>
-                <h1 className="text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">Dashboard</h1>
-                <p className="text-gray-600">Welcome back, {dashboardData?.user.name || 'User'}!</p>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl lg:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">Dashboard</h1>
+                <p className="text-gray-600 text-sm lg:text-base truncate">Welcome back, {dashboardData?.user.name || 'User'}!</p>
               </div>
-              <div className="flex items-center space-x-4">
-                <Button variant="ghost" size="icon">
+              <div className="flex items-center space-x-2 lg:space-x-4">
+                <Button variant="ghost" size="icon" className="hidden sm:flex">
                   <Bell className="h-5 w-5 text-gray-400" />
                 </Button>
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 lg:space-x-3">
                   <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                     <span className="text-white text-sm font-medium">
                       {dashboardData?.user.initials || 'U'}
                     </span>
                   </div>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-gray-900 hidden sm:block">
                     {dashboardData?.user.name || 'User'}
                   </span>
                 </div>
@@ -135,9 +135,28 @@ export default function Dashboard() {
           </div>
 
           {/* Dashboard Content */}
-          <div className="p-6">
+          <div className="p-4 lg:p-6 space-y-6">
+            {/* Welcome Section with Onboarding Progress */}
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-6 text-white">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center">
+                <div className="mb-4 lg:mb-0">
+                  <h2 className="text-2xl font-bold mb-2">Welcome to Cush!</h2>
+                  <p className="text-blue-100">Your global immigration financial companion</p>
+                </div>
+                <div className="bg-white/20 backdrop-blur-sm rounded-lg p-4 min-w-0 lg:min-w-[200px]">
+                  <div className="text-sm text-blue-100 mb-1">Profile Setup</div>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 bg-white/20 rounded-full h-2">
+                      <div className="bg-white rounded-full h-2 w-3/4"></div>
+                    </div>
+                    <span className="text-sm font-medium">75%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Balance Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -236,62 +255,113 @@ export default function Dashboard() {
               <FinancialGoalsWidget />
             </div>
 
+            {/* Quick Actions Section */}
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <button className="flex flex-col items-center p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors group">
+                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <ArrowLeftRight className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">Transfer</span>
+                </button>
+                
+                <button className="flex flex-col items-center p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group">
+                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <PiggyBank className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">Save</span>
+                </button>
+                
+                <button className="flex flex-col items-center p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors group">
+                  <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <BarChart3 className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">Analytics</span>
+                </button>
+                
+                <button className="flex flex-col items-center p-4 rounded-xl bg-orange-50 hover:bg-orange-100 transition-colors group">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                    <Sparkles className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">AI Insights</span>
+                </button>
+              </div>
+            </div>
+
             {/* Additional Dashboard Sections */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Spending Categories */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Spending Categories</CardTitle>
+              <Card className="shadow-sm border-gray-100">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg text-gray-900">Spending Categories</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
                     {categories.length > 0 ? (
                       categories.map((category, index) => (
-                        <div key={index} className="flex items-center justify-between">
+                        <div key={index} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50">
                           <div className="flex items-center space-x-3">
                             <div 
                               className="w-3 h-3 rounded-full" 
                               style={{ backgroundColor: category.color }}
                             />
-                            <span className="text-gray-600">{category.name}</span>
+                            <span className="text-gray-700 font-medium">{category.name}</span>
                           </div>
-                          <span className="font-medium">
+                          <span className="font-semibold text-gray-900">
                             £{category.amount.toLocaleString('en-GB')}
                           </span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-gray-500 text-center py-4">No spending data available</p>
+                      <div className="text-center py-8">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                          <BarChart3 className="w-8 h-8 text-gray-400" />
+                        </div>
+                        <p className="text-gray-500">No spending data yet</p>
+                        <p className="text-sm text-gray-400">Start tracking your expenses</p>
+                      </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
+              {/* Immigration Services */}
+              <Card className="shadow-sm border-gray-100">
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg text-gray-900">Immigration Services</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    <Button variant="outline" className="w-full justify-start">
-                      <div className="bg-cush-blue-100 p-2 rounded-full mr-3">
-                        <span className="text-cush-blue-600 text-sm">+</span>
+                    <button className="w-full p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Briefcase className="w-5 h-5 text-blue-600" />
+                          <span className="font-medium text-gray-700">Find Jobs</span>
+                        </div>
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">Active</span>
                       </div>
-                      Add Transaction
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <div className="bg-green-100 p-2 rounded-full mr-3">
-                        <span className="text-green-600 text-sm">→</span>
+                    </button>
+                    
+                    <button className="w-full p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Building className="w-5 h-5 text-blue-600" />
+                          <span className="font-medium text-gray-700">Housing</span>
+                        </div>
+                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">New</span>
                       </div>
-                      Transfer Money
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start">
-                      <div className="bg-yellow-100 p-2 rounded-full mr-3">
-                        <span className="text-yellow-600 text-sm">📄</span>
+                    </button>
+                    
+                    <button className="w-full p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-left">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <MessageCircle className="w-5 h-5 text-purple-600" />
+                          <span className="font-medium text-gray-700">AI Assistant</span>
+                        </div>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">AI</span>
                       </div>
-                      Generate Report
-                    </Button>
+                    </button>
                   </div>
                 </CardContent>
               </Card>
