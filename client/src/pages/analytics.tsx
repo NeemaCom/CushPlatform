@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Sidebar } from "@/components/sidebar";
+import { SimpleSidebar } from "@/components/simple-sidebar";
 import {
   LineChart,
   Line,
@@ -181,7 +181,7 @@ export default function Analytics() {
   if (isLoading) {
     return (
       <div className="flex">
-        <Sidebar />
+        <SimpleSidebar />
         <div className="flex-1 ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
           <div className="container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
@@ -200,7 +200,7 @@ export default function Analytics() {
 
   return (
     <div className="flex">
-      <Sidebar />
+      <SimpleSidebar />
       <div className="flex-1 ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}

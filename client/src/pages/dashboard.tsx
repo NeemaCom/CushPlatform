@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sidebar } from "@/components/sidebar";
+import { SimpleSidebar } from "@/components/simple-sidebar";
 import { BalanceChart } from "@/components/balance-chart";
 import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
@@ -63,7 +63,7 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
         <div className="flex">
-          <Sidebar />
+          <SimpleSidebar />
           <div className="flex-1 ml-64">
             <div className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -105,7 +105,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
       <div className="flex">
-        <Sidebar />
+        <SimpleSidebar />
         
         {/* Main Content */}
         <div className="flex-1 ml-64">

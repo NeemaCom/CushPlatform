@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sidebar } from "@/components/sidebar";
+import { SimpleSidebar } from "@/components/simple-sidebar";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -145,7 +145,7 @@ export default function Imisi() {
   if (isLoading) {
     return (
       <div className="flex">
-        <Sidebar />
+        <SimpleSidebar />
         <div className="flex-1 ml-64 p-8">
           <div className="flex items-center justify-center h-96">
             <div className="text-center">
@@ -166,7 +166,7 @@ export default function Imisi() {
 
   return (
     <div className="flex">
-      <Sidebar />
+      <SimpleSidebar />
       <div className="flex-1 ml-64 p-8 bg-gray-50">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
