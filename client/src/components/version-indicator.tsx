@@ -29,8 +29,8 @@ export function VersionIndicator() {
   if (!version) return null;
 
   return (
-    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 hidden sm:inline-flex">
-      {version.version}
+    <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+      v{version.version}
     </Badge>
   );
 }
