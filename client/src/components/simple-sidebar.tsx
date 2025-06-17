@@ -14,7 +14,8 @@ import {
   Briefcase,
   Building,
   CreditCard as VirtualWallet,
-  Shield
+  Shield,
+  Package
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -28,6 +29,7 @@ const sidebarItems = [
   { icon: CreditCard, label: "Loans", href: "/loans" },
   { icon: Briefcase, label: "Jobs", href: "/jobs" },
   { icon: Building, label: "Housing", href: "/housing" },
+  { icon: Package, label: "Widget Store", href: "/widget-marketplace" },
   { icon: BarChart3, label: "Analytics", href: "/analytics" },
   { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
   { icon: Wallet, label: "Accounts", href: "/accounts" },

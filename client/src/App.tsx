@@ -24,6 +24,7 @@ import CreateInsight from "@/pages/create-insight";
 import PWASettings from "@/pages/pwa-settings";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsOfService from "@/pages/terms-of-service";
+import WidgetMarketplace from "@/pages/widget-marketplace";
 import TestPage from "@/pages/test-page";
 import SimpleTest from "@/pages/simple-test";
 import LegalTest from "@/pages/legal-test";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/loans" component={Loans} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/housing" component={Housing} />
+      <Route path="/widget-marketplace" component={WidgetMarketplace} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />

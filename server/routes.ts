@@ -2337,6 +2337,253 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Widget Marketplace API Routes
+  
+  // Get all widget types
+  app.get('/api/widgets', async (req, res) => {
+    try {
+      const { category, search } = req.query;
+      
+      let widgets;
+      if (search) {
+        widgets = await storage.searchWidgets(search as string);
+      } else if (category) {
+        widgets = await storage.getWidgetTypesByCategory(category as string);
+      } else {
+        widgets = await storage.getAllWidgetTypes();
+      }
+      
+      res.json(widgets);
+    } catch (error: any) {
+      console.error('Get widgets error:', error);
+      res.status(500).json({ error: "Failed to fetch widgets" });
+    }
+  });
+
+  // Get widget type by ID
+  app.get('/api/widgets/:id', async (req, res) => {
+    try {
+      const widgetId = parseInt(req.params.id);
+      const widget = await storage.getWidgetTypeById(widgetId);
+      
+      if (!widget) {
+        return res.status(404).json({ error: "Widget not found" });
+      }
+      
+      res.json(widget);
+    } catch (error: any) {
+      console.error('Get widget error:', error);
+      res.status(500).json({ error: "Failed to fetch widget" });
+    }
+  });
+
+  // Get widget ratings
+  app.get('/api/widgets/:id/ratings', async (req, res) => {
+    try {
+      const widgetId = parseInt(req.params.id);
+      const ratings = await storage.getWidgetRatings(widgetId);
+      res.json(ratings);
+    } catch (error: any) {
+      console.error('Get widget ratings error:', error);
+      res.status(500).json({ error: "Failed to fetch widget ratings" });
+    }
+  });
+
+  // Add user widget (install widget)
+  app.post('/api/user-widgets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { widgetTypeId, position, config, title } = req.body;
+      
+      const userWidget = await storage.addUserWidget({
+        userId,
+        widgetTypeId,
+        position,
+        config: config || {},
+        title
+      });
+      
+      res.json(userWidget);
+    } catch (error: any) {
+      console.error('Add user widget error:', error);
+      res.status(500).json({ error: "Failed to add widget" });
+    }
+  });
+
+  // Get user widgets
+  app.get('/api/user-widgets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const widgets = await storage.getUserWidgets(userId);
+      res.json(widgets);
+    } catch (error: any) {
+      console.error('Get user widgets error:', error);
+      res.status(500).json({ error: "Failed to fetch user widgets" });
+    }
+  });
+
+  // Update user widget
+  app.put('/api/user-widgets/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const widgetId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      // Verify ownership
+      const userWidgets = await storage.getUserWidgets(userId);
+      const widget = userWidgets.find(w => w.id === widgetId);
+      
+      if (!widget) {
+        return res.status(403).json({ error: "Widget not found or not authorized" });
+      }
+      
+      const updatedWidget = await storage.updateUserWidget(widgetId, updates);
+      res.json(updatedWidget);
+    } catch (error: any) {
+      console.error('Update user widget error:', error);
+      res.status(500).json({ error: "Failed to update widget" });
+    }
+  });
+
+  // Remove user widget
+  app.delete('/api/user-widgets/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const widgetId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const userWidgets = await storage.getUserWidgets(userId);
+      const widget = userWidgets.find(w => w.id === widgetId);
+      
+      if (!widget) {
+        return res.status(403).json({ error: "Widget not found or not authorized" });
+      }
+      
+      await storage.removeUserWidget(widgetId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Remove user widget error:', error);
+      res.status(500).json({ error: "Failed to remove widget" });
+    }
+  });
+
+  // Rate widget
+  app.post('/api/widgets/:id/rate', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const widgetTypeId = parseInt(req.params.id);
+      const { rating, review } = req.body;
+      
+      if (rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      // Check if user already rated this widget
+      const existingRating = await storage.getUserWidgetRating(userId, widgetTypeId);
+      if (existingRating) {
+        return res.status(400).json({ error: "You have already rated this widget" });
+      }
+      
+      const widgetRating = await storage.addWidgetRating({
+        userId,
+        widgetTypeId,
+        rating,
+        review
+      });
+      
+      res.json(widgetRating);
+    } catch (error: any) {
+      console.error('Rate widget error:', error);
+      res.status(500).json({ error: "Failed to rate widget" });
+    }
+  });
+
+  // Dashboard layouts
+  app.get('/api/dashboard-layouts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const layouts = await storage.getUserDashboardLayouts(userId);
+      res.json(layouts);
+    } catch (error: any) {
+      console.error('Get dashboard layouts error:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard layouts" });
+    }
+  });
+
+  app.post('/api/dashboard-layouts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { name, layout, isDefault, isPublic } = req.body;
+      
+      const dashboardLayout = await storage.createDashboardLayout({
+        userId,
+        name,
+        layout,
+        isDefault: isDefault || false,
+        isPublic: isPublic || false
+      });
+      
+      res.json(dashboardLayout);
+    } catch (error: any) {
+      console.error('Create dashboard layout error:', error);
+      res.status(500).json({ error: "Failed to create dashboard layout" });
+    }
+  });
+
+  app.put('/api/dashboard-layouts/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const layoutId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      // Verify ownership
+      const layouts = await storage.getUserDashboardLayouts(userId);
+      const layout = layouts.find(l => l.id === layoutId);
+      
+      if (!layout) {
+        return res.status(403).json({ error: "Layout not found or not authorized" });
+      }
+      
+      const updatedLayout = await storage.updateDashboardLayout(layoutId, updates);
+      res.json(updatedLayout);
+    } catch (error: any) {
+      console.error('Update dashboard layout error:', error);
+      res.status(500).json({ error: "Failed to update dashboard layout" });
+    }
+  });
+
+  app.delete('/api/dashboard-layouts/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const layoutId = parseInt(req.params.id);
+      
+      // Verify ownership
+      const layouts = await storage.getUserDashboardLayouts(userId);
+      const layout = layouts.find(l => l.id === layoutId);
+      
+      if (!layout) {
+        return res.status(403).json({ error: "Layout not found or not authorized" });
+      }
+      
+      await storage.deleteDashboardLayout(layoutId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Delete dashboard layout error:', error);
+      res.status(500).json({ error: "Failed to delete dashboard layout" });
+    }
+  });
+
+  // Get public dashboard layouts
+  app.get('/api/public-layouts', async (req, res) => {
+    try {
+      const layouts = await storage.getPublicDashboardLayouts();
+      res.json(layouts);
+    } catch (error: any) {
+      console.error('Get public layouts error:', error);
+      res.status(500).json({ error: "Failed to fetch public layouts" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
