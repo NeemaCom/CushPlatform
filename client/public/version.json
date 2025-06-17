@@ -1,0 +1,6 @@
+{
+  "version": "2.1.0-enhanced-sidebar",
+  "build": "2025-01-17-23:20",
+  "features": ["enhanced-sidebar", "mobile-responsive", "grouped-navigation"],
+  "timestamp": 1737156000000
+}

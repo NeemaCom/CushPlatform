@@ -113,7 +113,12 @@ export default function Dashboard() {
           <div className="bg-white/90 backdrop-blur-sm shadow-sm border-b border-blue-100 px-4 lg:px-6 py-4">
             <div className="flex justify-between items-center">
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl lg:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">Dashboard</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-xl lg:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">Dashboard</h1>
+                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 hidden sm:inline-flex">
+                    v2.1.0-enhanced-sidebar
+                  </Badge>
+                </div>
                 <p className="text-gray-600 text-sm lg:text-base truncate">Welcome back, {dashboardData?.user.name || 'User'}!</p>
               </div>
               <div className="flex items-center space-x-2 lg:space-x-4">
