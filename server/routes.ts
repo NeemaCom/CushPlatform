@@ -1641,6 +1641,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== JOBS DISCOVERY BOARD API ROUTES =====
+
+  // Get all job listings with filtering
+  app.get('/api/jobs', async (req: AuthenticatedRequest, res) => {
+    try {
+      // Return sample job data for demonstration
+      const sampleJobs = [
+        {
+          id: 1,
+          title: "Software Engineer",
+          company: "TechCorp Global",
+          location: "Toronto, ON",
+          country: "Canada",
+          city: "Toronto",
+          description: "Join our dynamic team building next-generation applications. We're looking for passionate developers to help us scale our platform.",
+          jobType: "full-time",
+          salaryMin: 75000,
+          salaryMax: 95000,
+          currency: "CAD",
+          applicationLink: "https://techcorp.com/careers/software-engineer",
+          requirements: ["JavaScript", "React", "Node.js", "PostgreSQL"],
+          benefits: ["Health Insurance", "Remote Work", "Professional Development"],
+          remote: true,
+          experience: "mid",
+          industry: "Technology",
+          companySize: "medium",
+          postedDate: new Date().toISOString()
+        },
+        {
+          id: 2,
+          title: "Financial Analyst",
+          company: "Finance Plus",
+          location: "New York, NY",
+          country: "United States",
+          city: "New York",
+          description: "Seeking experienced financial analyst to join our investment team. Excellent opportunity for career growth in finance sector.",
+          jobType: "full-time",
+          salaryMin: 65000,
+          salaryMax: 80000,
+          currency: "USD",
+          applicationLink: "https://financeplus.com/careers",
+          requirements: ["Excel", "Financial Modeling", "CFA", "Python"],
+          benefits: ["401k Match", "Health Insurance", "Bonus Structure"],
+          remote: false,
+          experience: "mid",
+          industry: "Finance",
+          companySize: "large",
+          postedDate: new Date(Date.now() - 86400000).toISOString()
+        },
+        {
+          id: 3,
+          title: "Marketing Coordinator",
+          company: "Creative Solutions",
+          location: "London, UK",
+          country: "United Kingdom",
+          city: "London",
+          description: "Entry-level marketing position perfect for recent graduates. Learn digital marketing in a supportive environment.",
+          jobType: "full-time",
+          salaryMin: 28000,
+          salaryMax: 35000,
+          currency: "GBP",
+          applicationLink: "https://creativesolutions.co.uk/jobs",
+          requirements: ["Marketing Degree", "Social Media", "Content Creation"],
+          benefits: ["Training Program", "Flexible Hours", "Career Development"],
+          remote: false,
+          experience: "entry",
+          industry: "Marketing",
+          companySize: "small",
+          postedDate: new Date(Date.now() - 172800000).toISOString()
+        }
+      ];
+
+      res.json(sampleJobs);
+    } catch (error: any) {
+      console.error('Error fetching job listings:', error);
+      res.status(500).json({ error: "Failed to fetch job listings" });
+    }
+  });
+
+  // ===== HOUSING DISCOVERY BOARD API ROUTES =====
+
+  // Get all housing listings with filtering
+  app.get('/api/housing', async (req: AuthenticatedRequest, res) => {
+    try {
+      // Return sample housing data for demonstration
+      const sampleListings = [
+        {
+          id: 1,
+          title: "Modern 2BR Apartment in Downtown",
+          address: "123 Main Street",
+          city: "Toronto",
+          country: "Canada",
+          rentAmount: 2200,
+          currency: "CAD",
+          propertyType: "apartment",
+          bedrooms: 2,
+          bathrooms: 1.5,
+          furnished: true,
+          utilitiesIncluded: true,
+          petsAllowed: false,
+          availabilityDate: new Date().toISOString(),
+          description: "Beautiful modern apartment in the heart of downtown Toronto. Walking distance to subway, shops, and restaurants.",
+          amenities: ["WiFi", "Gym", "Laundry", "Parking"],
+          photos: [],
+          contactEmail: "landlord@example.com",
+          contactPhone: "+1-416-555-0123",
+          area: 85,
+          deposit: 2200,
+          minimumStay: 12,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 2,
+          title: "Cozy Studio Near University",
+          address: "456 University Ave",
+          city: "Vancouver",
+          country: "Canada",
+          rentAmount: 1400,
+          currency: "CAD",
+          propertyType: "studio",
+          bedrooms: 0,
+          bathrooms: 1,
+          furnished: true,
+          utilitiesIncluded: false,
+          petsAllowed: true,
+          availabilityDate: new Date(Date.now() + 604800000).toISOString(),
+          description: "Perfect studio apartment for students. Close to UBC campus with easy transit access.",
+          amenities: ["WiFi", "Study Area", "Pet-Friendly"],
+          photos: [],
+          contactEmail: "student.housing@example.com",
+          area: 35,
+          deposit: 700,
+          minimumStay: 8,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 3,
+          title: "Family House with Garden",
+          address: "789 Oak Street",
+          city: "Calgary",
+          country: "Canada",
+          rentAmount: 2800,
+          currency: "CAD",
+          propertyType: "house",
+          bedrooms: 3,
+          bathrooms: 2,
+          furnished: false,
+          utilitiesIncluded: false,
+          petsAllowed: true,
+          availabilityDate: new Date(Date.now() + 1209600000).toISOString(),
+          description: "Spacious family home with large backyard. Great neighborhood with schools nearby.",
+          amenities: ["Garden", "Garage", "Pet-Friendly", "Near Schools"],
+          photos: [],
+          contactEmail: "family.home@example.com",
+          contactPhone: "+1-403-555-0456",
+          area: 150,
+          deposit: 2800,
+          minimumStay: 12,
+          createdAt: new Date().toISOString()
+        }
+      ];
+
+      res.json(sampleListings);
+    } catch (error: any) {
+      console.error('Error fetching housing listings:', error);
+      res.status(500).json({ error: "Failed to fetch housing listings" });
+    }
+  });
+
   // ===== FINANCIAL GOALS ENDPOINTS =====
 
   // Get user's financial goals

@@ -797,7 +797,68 @@ export class DatabaseStorage implements IStorage {
       .offset(query.offset || 0);
   }
 
-  async getJobListing(id: number): Promise<JobListing | undefined> {
+  async getJobListings(filters: {
+    search?: string;
+    location?: string;
+    jobType?: string;
+    experience?: string;
+    industry?: string;
+    remote?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<JobListing[]> {
+    const conditions = [eq(jobListings.isActive, true)];
+    
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(jobListings.title, `%${filters.search}%`),
+          ilike(jobListings.company, `%${filters.search}%`),
+          ilike(jobListings.description, `%${filters.search}%`)
+        )
+      );
+    }
+    
+    if (filters.location) {
+      conditions.push(
+        or(
+          ilike(jobListings.location, `%${filters.location}%`),
+          ilike(jobListings.city, `%${filters.location}%`),
+          ilike(jobListings.country, `%${filters.location}%`)
+        )
+      );
+    }
+    
+    if (filters.jobType) {
+      conditions.push(eq(jobListings.jobType, filters.jobType));
+    }
+    
+    if (filters.experience) {
+      conditions.push(eq(jobListings.experience, filters.experience));
+    }
+    
+    if (filters.industry) {
+      conditions.push(eq(jobListings.industry, filters.industry));
+    }
+    
+    if (filters.remote !== undefined) {
+      conditions.push(eq(jobListings.remote, filters.remote));
+    }
+    
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+    
+    return await db
+      .select()
+      .from(jobListings)
+      .where(and(...conditions))
+      .orderBy(desc(jobListings.postedDate))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getJobListingById(id: number): Promise<JobListing | undefined> {
     const [job] = await db.select().from(jobListings).where(eq(jobListings.id, id));
     return job || undefined;
   }
@@ -904,7 +965,86 @@ export class DatabaseStorage implements IStorage {
     return newHousing;
   }
 
-  async updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing> {
+  async getHousingListings(filters: {
+    search?: string;
+    location?: string;
+    propertyType?: string;
+    minPrice?: number;
+    maxPrice?: number;
+    bedrooms?: number;
+    furnished?: boolean;
+    page?: number;
+    limit?: number;
+  }): Promise<HousingListing[]> {
+    const conditions = [eq(housingListings.isActive, true)];
+    
+    if (filters.search) {
+      conditions.push(
+        or(
+          ilike(housingListings.title, `%${filters.search}%`),
+          ilike(housingListings.description, `%${filters.search}%`),
+          ilike(housingListings.address, `%${filters.search}%`)
+        )
+      );
+    }
+    
+    if (filters.location) {
+      conditions.push(
+        or(
+          ilike(housingListings.city, `%${filters.location}%`),
+          ilike(housingListings.country, `%${filters.location}%`),
+          ilike(housingListings.address, `%${filters.location}%`)
+        )
+      );
+    }
+    
+    if (filters.propertyType) {
+      conditions.push(eq(housingListings.propertyType, filters.propertyType));
+    }
+    
+    if (filters.minPrice !== undefined) {
+      conditions.push(gte(housingListings.rentAmount, filters.minPrice.toString()));
+    }
+    
+    if (filters.maxPrice !== undefined) {
+      conditions.push(lte(housingListings.rentAmount, filters.maxPrice.toString()));
+    }
+    
+    if (filters.bedrooms !== undefined) {
+      conditions.push(eq(housingListings.bedrooms, filters.bedrooms));
+    }
+    
+    if (filters.furnished !== undefined) {
+      conditions.push(eq(housingListings.furnished, filters.furnished));
+    }
+    
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const offset = (page - 1) * limit;
+    
+    return await db
+      .select()
+      .from(housingListings)
+      .where(and(...conditions))
+      .orderBy(desc(housingListings.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getHousingListingById(id: number): Promise<HousingListing | undefined> {
+    const [housing] = await db.select().from(housingListings).where(eq(housingListings.id, id));
+    return housing || undefined;
+  }
+
+  async getHousingListingsByUserId(userId: number): Promise<HousingListing[]> {
+    return await db
+      .select()
+      .from(housingListings)
+      .where(eq(housingListings.userId, userId))
+      .orderBy(desc(housingListings.createdAt));
+  }
+
+  async updateHousingListing(id: number, updates: Partial<HousingListing>): Promise<HousingListing> {
     const [updatedHousing] = await db
       .update(housingListings)
       .set({ ...updates, updatedAt: new Date() })
