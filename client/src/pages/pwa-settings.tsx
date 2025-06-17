@@ -1,352 +1,277 @@
-import { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Download, Bell, Wifi, WifiOff, Smartphone, Settings, RefreshCw, Check, X } from 'lucide-react';
-import { pwaManager } from '@/utils/pwa';
-import { useToast } from "@/hooks/use-toast";
-import { PWAStatus } from '@/components/PWAComponents';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Smartphone, 
+  Bell, 
+  Download, 
+  Wifi, 
+  RefreshCw, 
+  Shield,
+  Settings,
+  ArrowLeft
+} from 'lucide-react';
+import { usePWA } from '@/hooks/usePWA';
+import { useLocation } from 'wouter';
+import { Sidebar } from '@/components/sidebar';
 
 export default function PWASettings() {
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-  const [isInstallable, setIsInstallable] = useState(false);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { 
+    isInstallable, 
+    isInstalled, 
+    isOnline, 
+    isUpdateAvailable,
+    installApp,
+    updateApp,
+    requestNotificationPermission 
+  } = usePWA();
 
-  useEffect(() => {
-    // Initial state check
-    setNotificationPermission(pwaManager.getNotificationPermission());
-    setIsInstallable(pwaManager.isInstallable());
-    setIsOnline(pwaManager.isOnline());
+  const [notificationsEnabled, setNotificationsEnabled] = React.useState(
+    Notification.permission === 'granted'
+  );
 
-    // Listen for PWA events
-    const handleInstallAvailable = () => setIsInstallable(true);
-    const handleInstallCompleted = () => setIsInstallable(false);
-    const handleConnectionChange = (online: boolean) => setIsOnline(online);
-
-    window.addEventListener('pwa-install-available', handleInstallAvailable);
-    window.addEventListener('pwa-install-completed', handleInstallCompleted);
-    pwaManager.setupConnectionListener(handleConnectionChange);
-
-    return () => {
-      window.removeEventListener('pwa-install-available', handleInstallAvailable);
-      window.removeEventListener('pwa-install-completed', handleInstallCompleted);
-    };
-  }, []);
-
-  const handleInstallApp = async () => {
-    setIsLoading(true);
+  const handleInstall = async () => {
     try {
-      const success = await pwaManager.installApp();
-      if (success) {
-        toast({
-          title: "App Installed Successfully",
-          description: "Cush is now available from your home screen.",
-        });
-      } else {
-        toast({
-          title: "Installation Cancelled",
-          description: "App installation was cancelled by the user.",
-          variant: "destructive",
-        });
-      }
+      await installApp();
     } catch (error) {
-      toast({
-        title: "Installation Failed",
-        description: "Failed to install the app. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Installation failed:', error);
     }
   };
 
   const handleNotificationToggle = async (enabled: boolean) => {
-    setIsLoading(true);
-    try {
-      if (enabled) {
-        const success = await pwaManager.requestNotificationPermission();
-        if (success) {
-          setNotificationPermission('granted');
-          setIsSubscribed(true);
-          toast({
-            title: "Notifications Enabled",
-            description: "You'll receive important financial updates.",
-          });
-        } else {
-          toast({
-            title: "Permission Denied",
-            description: "Enable notifications in your browser settings.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        const success = await pwaManager.unsubscribeFromPushNotifications();
-        if (success) {
-          setIsSubscribed(false);
-          toast({
-            title: "Notifications Disabled",
-            description: "You won't receive push notifications.",
-          });
-        }
+    if (enabled) {
+      try {
+        const permission = await requestNotificationPermission();
+        setNotificationsEnabled(permission === 'granted');
+      } catch (error) {
+        console.error('Notification permission failed:', error);
+        setNotificationsEnabled(false);
       }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to update notification settings.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCacheUpdate = async () => {
-    setIsLoading(true);
-    try {
-      await pwaManager.updateServiceWorker();
-      toast({
-        title: "Cache Updated",
-        description: "App data has been refreshed.",
-      });
-    } catch (error) {
-      toast({
-        title: "Update Failed",
-        description: "Failed to update app cache.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+    } else {
+      setNotificationsEnabled(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">App Settings</h1>
-        <p className="text-muted-foreground">
-          Manage your Progressive Web App experience and offline capabilities.
-        </p>
-      </div>
-
-      {/* Connection Status */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              {isOnline ? (
-                <Wifi className="h-5 w-5 text-green-600" />
-              ) : (
-                <WifiOff className="h-5 w-5 text-red-600" />
-              )}
-              <CardTitle>Connection Status</CardTitle>
-            </div>
-            <Badge variant={isOnline ? "default" : "destructive"}>
-              {isOnline ? "Online" : "Offline"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {isOnline
-              ? "You're connected to the internet. All features are available."
-              : "You're offline. Some features may be limited, but cached data is still accessible."}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* App Installation */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Smartphone className="h-5 w-5 text-blue-600" />
+    <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
+      <Sidebar />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          <div className="p-6 max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="flex items-center mb-6">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation('/settings')}
+                className="mr-4"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
               <div>
-                <CardTitle>App Installation</CardTitle>
-                <CardDescription>Install Cush as a native app</CardDescription>
+                <h1 className="text-2xl font-bold">PWA Settings</h1>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Manage your Progressive Web App preferences
+                </p>
               </div>
             </div>
-            <Badge variant={isInstallable ? "default" : "secondary"}>
-              {isInstallable ? "Available" : "Installed"}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {isInstallable
-              ? "Install Cush on your device for faster access and a native app experience."
-              : "Cush is already installed or installation is not available on this device."}
-          </p>
-          {isInstallable && (
-            <Button
-              onClick={handleInstallApp}
-              disabled={isLoading}
-              className="w-full sm:w-auto"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Installing...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Install App
-                </>
-              )}
-            </Button>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Push Notifications */}
-      <Card className="mb-6">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Bell className="h-5 w-5 text-purple-600" />
-              <div>
-                <CardTitle>Push Notifications</CardTitle>
-                <CardDescription>Get real-time financial updates</CardDescription>
-              </div>
+            <div className="space-y-6">
+              {/* Installation Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Smartphone className="h-5 w-5 mr-2" />
+                    App Installation
+                  </CardTitle>
+                  <CardDescription>
+                    Install Cush as a native app for better performance and offline access
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span>Installation Status:</span>
+                      <Badge variant={isInstalled ? "default" : "secondary"}>
+                        {isInstalled ? "Installed" : "Not Installed"}
+                      </Badge>
+                    </div>
+                    {isInstallable && !isInstalled && (
+                      <Button onClick={handleInstall} size="sm">
+                        <Download className="h-4 w-4 mr-2" />
+                        Install App
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {isInstalled && (
+                    <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                      <p className="text-sm text-green-800 dark:text-green-200">
+                        Cush is installed and ready to use offline!
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Update Status */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <RefreshCw className="h-5 w-5 mr-2" />
+                    App Updates
+                  </CardTitle>
+                  <CardDescription>
+                    Keep your app up to date with the latest features and security fixes
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span>Update Status:</span>
+                      <Badge variant={isUpdateAvailable ? "destructive" : "default"}>
+                        {isUpdateAvailable ? "Update Available" : "Up to Date"}
+                      </Badge>
+                    </div>
+                    {isUpdateAvailable && (
+                      <Button onClick={updateApp} size="sm">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Update Now
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Notifications */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Bell className="h-5 w-5 mr-2" />
+                    Push Notifications
+                  </CardTitle>
+                  <CardDescription>
+                    Receive important updates about your finances and community events
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="notifications">Enable Notifications</Label>
+                    <Switch
+                      id="notifications"
+                      checked={notificationsEnabled}
+                      onCheckedChange={handleNotificationToggle}
+                    />
+                  </div>
+                  
+                  {notificationsEnabled && (
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                      <p className="text-sm text-blue-800 dark:text-blue-200">
+                        You'll receive notifications for transaction alerts, goal achievements, and community updates.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Offline Features */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Wifi className="h-5 w-5 mr-2" />
+                    Offline Features
+                  </CardTitle>
+                  <CardDescription>
+                    Access your financial data even when offline
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <span>Connection Status:</span>
+                      <Badge variant={isOnline ? "default" : "secondary"}>
+                        {isOnline ? "Online" : "Offline"}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h4 className="font-medium">Available Offline:</h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                      <li>• View cached dashboard data</li>
+                      <li>• Access recent transactions</li>
+                      <li>• Browse community insights</li>
+                      <li>• Use financial calculators</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Security & Privacy */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Shield className="h-5 w-5 mr-2" />
+                    Security & Privacy
+                  </CardTitle>
+                  <CardDescription>
+                    Your data is protected with enterprise-grade security
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <h4 className="font-medium">PWA Security Features:</h4>
+                    <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                      <li>• HTTPS encryption for all data transmission</li>
+                      <li>• Local data encryption for offline storage</li>
+                      <li>• Automatic security updates</li>
+                      <li>• Secure service worker implementation</li>
+                    </ul>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Technical Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Settings className="h-5 w-5 mr-2" />
+                    Technical Information
+                  </CardTitle>
+                  <CardDescription>
+                    Technical details about your PWA installation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <strong>Service Worker:</strong> {
+                        'serviceWorker' in navigator ? 'Supported' : 'Not Supported'
+                      }
+                    </div>
+                    <div>
+                      <strong>Push Notifications:</strong> {
+                        'Notification' in window ? 'Supported' : 'Not Supported'
+                      }
+                    </div>
+                    <div>
+                      <strong>Background Sync:</strong> {
+                        'serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype 
+                          ? 'Supported' : 'Not Supported'
+                      }
+                    </div>
+                    <div>
+                      <strong>App Cache:</strong> Active
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <div className="flex items-center space-x-2">
-              <Badge variant={
-                notificationPermission === 'granted' ? "default" :
-                notificationPermission === 'denied' ? "destructive" : "secondary"
-              }>
-                {notificationPermission === 'granted' ? "Enabled" :
-                 notificationPermission === 'denied' ? "Blocked" : "Not Set"}
-              </Badge>
-              {pwaManager.isNotificationSupported() && notificationPermission !== 'denied' && (
-                <Switch
-                  checked={notificationPermission === 'granted' && isSubscribed}
-                  onCheckedChange={handleNotificationToggle}
-                  disabled={isLoading}
-                />
-              )}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            {notificationPermission === 'granted'
-              ? "You'll receive notifications for important financial updates, AI insights, and account activity."
-              : notificationPermission === 'denied'
-              ? "Notifications are blocked. Enable them in your browser settings to receive updates."
-              : "Enable notifications to get real-time alerts about your financial activity and AI insights."}
-          </p>
-        </CardContent>
-      </Card>
-
-      <Separator className="my-6" />
-
-      {/* PWA Features Overview */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Settings className="h-5 w-5" />
-            <span>PWA Features</span>
-          </CardTitle>
-          <CardDescription>
-            Overview of Progressive Web App capabilities
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PWAStatus />
-        </CardContent>
-      </Card>
-
-      {/* Advanced Options */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Advanced Options</CardTitle>
-          <CardDescription>
-            Manage app cache and data synchronization
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h4 className="font-medium">Offline Data Cache</h4>
-              <p className="text-sm text-muted-foreground">
-                Stores your financial data for offline access
-              </p>
-            </div>
-            <Badge variant="default">
-              <Check className="h-3 w-3 mr-1" />
-              Active
-            </Badge>
-          </div>
-
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h4 className="font-medium">Background Sync</h4>
-              <p className="text-sm text-muted-foreground">
-                Syncs data when connection is restored
-              </p>
-            </div>
-            <Badge variant="default">
-              <Check className="h-3 w-3 mr-1" />
-              Enabled
-            </Badge>
-          </div>
-
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h4 className="font-medium">Update Cache</h4>
-              <p className="text-sm text-muted-foreground">
-                Refresh cached app data and resources
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCacheUpdate}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Update
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* PWA Benefits */}
-      <div className="mt-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border">
-        <h3 className="font-semibold mb-4">Benefits of Installing Cush</h3>
-        <div className="grid md:grid-cols-2 gap-4 text-sm">
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Faster loading times with offline caching</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Native app-like experience</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Push notifications for important updates</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Access to financial data while offline</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Automatic background data synchronization</span>
-          </div>
-          <div className="flex items-start space-x-2">
-            <Check className="h-4 w-4 text-green-600 mt-0.5" />
-            <span>Secure, encrypted local data storage</span>
           </div>
         </div>
       </div>

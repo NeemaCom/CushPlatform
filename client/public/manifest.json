@@ -1,15 +1,15 @@
 {
-  "name": "Cush - Smart Financial Platform",
+  "name": "Cush - Global Immigration Services",
   "short_name": "Cush",
-  "description": "Intelligent financial management with AI-powered insights and community support",
+  "description": "Leading digital platform for global immigration services, mentorship, and financial management",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
-  "lang": "en-US",
+  "orientation": "portrait-primary",
   "scope": "/",
-  "categories": ["finance", "productivity", "utilities"],
+  "lang": "en",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-72x72.png",
@@ -66,52 +66,21 @@
       "short_name": "Dashboard",
       "description": "View your financial dashboard",
       "url": "/dashboard",
-      "icons": [
-        {
-          "src": "/icons/dashboard-shortcut.png",
-          "sizes": "96x96"
-        }
-      ]
+      "icons": [{ "src": "/icons/dashboard-96x96.png", "sizes": "96x96" }]
     },
     {
-      "name": "Analytics",
-      "short_name": "Analytics",
-      "description": "View financial analytics and AI insights",
-      "url": "/analytics",
-      "icons": [
-        {
-          "src": "/icons/analytics-shortcut.png",
-          "sizes": "96x96"
-        }
-      ]
-    },
-    {
-      "name": "AI Assistant",
+      "name": "Imisi AI Assistant",
       "short_name": "Imisi",
-      "description": "Chat with Imisi AI assistant",
+      "description": "Chat with your AI migration assistant",
       "url": "/imisi",
-      "icons": [
-        {
-          "src": "/icons/ai-shortcut.png",
-          "sizes": "96x96"
-        }
-      ]
-    }
-  ],
-  "screenshots": [
-    {
-      "src": "/screenshots/dashboard-wide.png",
-      "sizes": "1280x720",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Dashboard view with financial overview"
+      "icons": [{ "src": "/icons/imisi-96x96.png", "sizes": "96x96" }]
     },
     {
-      "src": "/screenshots/dashboard-narrow.png",
-      "sizes": "375x667",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Mobile dashboard view"
+      "name": "Community",
+      "short_name": "Community",
+      "description": "Access community insights and events",
+      "url": "/community",
+      "icons": [{ "src": "/icons/community-96x96.png", "sizes": "96x96" }]
     }
   ]
 }
