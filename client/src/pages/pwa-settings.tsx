@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 import { useLocation } from 'wouter';
-import { Sidebar } from '@/components/sidebar';
+import { SimpleSidebar } from '@/components/simple-sidebar';
 
 export default function PWASettings() {
   const [, setLocation] = useLocation();
@@ -59,7 +59,7 @@ export default function PWASettings() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <Sidebar />
+      <SimpleSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-auto">
           <div className="p-6 max-w-4xl mx-auto">
