@@ -59,8 +59,8 @@ export default function PWASettings() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <SimpleSidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <EnhancedSidebar />
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
         <div className="flex-1 overflow-auto">
           <div className="p-6 max-w-4xl mx-auto">
             {/* Header */}
