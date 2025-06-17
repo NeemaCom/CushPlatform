@@ -4,7 +4,7 @@ import App from "./App";
 import ErrorBoundary from "./components/ErrorBoundary";
 import "./index.css";
 
-// App wrapped in ErrorBoundary to catch errors
+// Full app with ErrorBoundary to catch and display errors
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <App />
