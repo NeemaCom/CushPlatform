@@ -133,8 +133,8 @@ export default function Settings() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-white">
         <div className="flex">
-          <SimpleSidebar />
-          <div className="flex-1 ml-64">
+          <EnhancedSidebar />
+          <div className="flex-1 lg:ml-64">
             <div className="p-6">
               <div className="max-w-4xl mx-auto">
                 <Skeleton className="h-8 w-48 mb-8" />
