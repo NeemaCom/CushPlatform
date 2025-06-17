@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnhancedSidebar } from "@/components/enhanced-sidebar";
+import { VersionIndicator } from "@/components/version-indicator";
 import { BalanceChart } from "@/components/balance-chart";
 import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
@@ -115,9 +116,7 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl lg:text-2xl font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">Dashboard</h1>
-                  <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200 hidden sm:inline-flex">
-                    v2.1.0-enhanced-sidebar
-                  </Badge>
+                  <VersionIndicator />
                 </div>
                 <p className="text-gray-600 text-sm lg:text-base truncate">Welcome back, {dashboardData?.user.name || 'User'}!</p>
               </div>
