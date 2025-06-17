@@ -18,6 +18,10 @@ import {
   goalProgress,
   jobListings,
   housingListings,
+  widgetTypes,
+  userWidgets,
+  widgetRatings,
+  dashboardLayouts,
   type User, 
   type SafeUser,
   type InsertUser,
@@ -57,7 +61,15 @@ import {
   type InsertHousingListing,
   type SearchJobsQuery,
   type SearchHousingQuery,
-  type UpdateHousingListing
+  type UpdateHousingListing,
+  type WidgetType,
+  type UserWidget,
+  type WidgetRating,
+  type DashboardLayout,
+  type InsertWidgetType,
+  type InsertUserWidget,
+  type InsertWidgetRating,
+  type InsertDashboardLayout
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, ilike, gte, lte, sql } from "drizzle-orm";
@@ -1121,6 +1133,181 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(userAuditLogs.createdAt))
       .limit(limit)
       .offset(offset);
+  }
+
+  // Widget Marketplace Methods
+  async createWidgetType(widgetType: InsertWidgetType): Promise<WidgetType> {
+    const [created] = await db.insert(widgetTypes).values(widgetType).returning();
+    return created;
+  }
+
+  async getAllWidgetTypes(): Promise<WidgetType[]> {
+    return await db
+      .select()
+      .from(widgetTypes)
+      .where(eq(widgetTypes.isActive, true))
+      .orderBy(desc(widgetTypes.downloadCount), desc(widgetTypes.rating));
+  }
+
+  async getWidgetTypesByCategory(category: string): Promise<WidgetType[]> {
+    return await db
+      .select()
+      .from(widgetTypes)
+      .where(and(eq(widgetTypes.category, category), eq(widgetTypes.isActive, true)))
+      .orderBy(desc(widgetTypes.downloadCount), desc(widgetTypes.rating));
+  }
+
+  async getWidgetTypeById(id: number): Promise<WidgetType | undefined> {
+    const [widget] = await db.select().from(widgetTypes).where(eq(widgetTypes.id, id));
+    return widget || undefined;
+  }
+
+  async updateWidgetType(id: number, updates: Partial<WidgetType>): Promise<WidgetType> {
+    const [updated] = await db
+      .update(widgetTypes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(widgetTypes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async incrementWidgetDownloadCount(id: number): Promise<void> {
+    await db
+      .update(widgetTypes)
+      .set({ downloadCount: sql`${widgetTypes.downloadCount} + 1` })
+      .where(eq(widgetTypes.id, id));
+  }
+
+  async addUserWidget(userWidget: InsertUserWidget): Promise<UserWidget> {
+    const [created] = await db.insert(userWidgets).values(userWidget).returning();
+    // Increment download count
+    await this.incrementWidgetDownloadCount(userWidget.widgetTypeId);
+    return created;
+  }
+
+  async getUserWidgets(userId: number): Promise<(UserWidget & { widgetType: WidgetType })[]> {
+    return await db
+      .select({
+        ...userWidgets,
+        widgetType: widgetTypes,
+      })
+      .from(userWidgets)
+      .innerJoin(widgetTypes, eq(userWidgets.widgetTypeId, widgetTypes.id))
+      .where(eq(userWidgets.userId, userId))
+      .orderBy(userWidgets.createdAt);
+  }
+
+  async updateUserWidget(id: number, updates: Partial<UserWidget>): Promise<UserWidget> {
+    const [updated] = await db
+      .update(userWidgets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userWidgets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async removeUserWidget(id: number): Promise<void> {
+    await db.delete(userWidgets).where(eq(userWidgets.id, id));
+  }
+
+  async addWidgetRating(rating: InsertWidgetRating): Promise<WidgetRating> {
+    const [created] = await db.insert(widgetRatings).values(rating).returning();
+    
+    // Update widget type average rating
+    const avgResult = await db
+      .select({
+        avgRating: sql<number>`ROUND(AVG(${widgetRatings.rating}), 2)`,
+        count: sql<number>`COUNT(*)`
+      })
+      .from(widgetRatings)
+      .where(eq(widgetRatings.widgetTypeId, rating.widgetTypeId));
+
+    if (avgResult[0]) {
+      await db
+        .update(widgetTypes)
+        .set({
+          rating: avgResult[0].avgRating.toString(),
+          ratingCount: avgResult[0].count
+        })
+        .where(eq(widgetTypes.id, rating.widgetTypeId));
+    }
+
+    return created;
+  }
+
+  async getWidgetRatings(widgetTypeId: number): Promise<(WidgetRating & { user: { firstName: string; lastName: string } })[]> {
+    return await db
+      .select({
+        ...widgetRatings,
+        user: {
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(widgetRatings)
+      .innerJoin(users, eq(widgetRatings.userId, users.id))
+      .where(eq(widgetRatings.widgetTypeId, widgetTypeId))
+      .orderBy(desc(widgetRatings.createdAt));
+  }
+
+  async getUserWidgetRating(userId: number, widgetTypeId: number): Promise<WidgetRating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(widgetRatings)
+      .where(and(eq(widgetRatings.userId, userId), eq(widgetRatings.widgetTypeId, widgetTypeId)));
+    return rating || undefined;
+  }
+
+  async createDashboardLayout(layout: InsertDashboardLayout): Promise<DashboardLayout> {
+    const [created] = await db.insert(dashboardLayouts).values(layout).returning();
+    return created;
+  }
+
+  async getUserDashboardLayouts(userId: number): Promise<DashboardLayout[]> {
+    return await db
+      .select()
+      .from(dashboardLayouts)
+      .where(eq(dashboardLayouts.userId, userId))
+      .orderBy(desc(dashboardLayouts.isDefault), dashboardLayouts.name);
+  }
+
+  async updateDashboardLayout(id: number, updates: Partial<DashboardLayout>): Promise<DashboardLayout> {
+    const [updated] = await db
+      .update(dashboardLayouts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(dashboardLayouts.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteDashboardLayout(id: number): Promise<void> {
+    await db.delete(dashboardLayouts).where(eq(dashboardLayouts.id, id));
+  }
+
+  async getPublicDashboardLayouts(): Promise<DashboardLayout[]> {
+    return await db
+      .select()
+      .from(dashboardLayouts)
+      .where(eq(dashboardLayouts.isPublic, true))
+      .orderBy(dashboardLayouts.name);
+  }
+
+  async searchWidgets(query: string): Promise<WidgetType[]> {
+    return await db
+      .select()
+      .from(widgetTypes)
+      .where(
+        and(
+          eq(widgetTypes.isActive, true),
+          or(
+            ilike(widgetTypes.displayName, `%${query}%`),
+            ilike(widgetTypes.description, `%${query}%`),
+            ilike(widgetTypes.category, `%${query}%`)
+          )
+        )
+      )
+      .orderBy(desc(widgetTypes.downloadCount), desc(widgetTypes.rating))
+      .limit(20);
   }
 }
 

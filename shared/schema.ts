@@ -498,6 +498,113 @@ export const goalProgressRelations = relations(goalProgress, ({ one }) => ({
   }),
 }));
 
+// Widget marketplace tables
+export const widgetTypes = pgTable("widget_types", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // financial, analytics, productivity, social, etc.
+  version: text("version").default("1.0.0"),
+  developer: text("developer").notNull(),
+  icon: text("icon"), // Lucide icon name or URL
+  previewImage: text("preview_image"),
+  isActive: boolean("is_active").default(true),
+  isPremium: boolean("is_premium").default(false),
+  price: decimal("price", { precision: 10, scale: 2 }).default("0.00"),
+  downloadCount: integer("download_count").default(0),
+  rating: decimal("rating", { precision: 3, scale: 2 }).default("0.00"),
+  ratingCount: integer("rating_count").default(0),
+  configSchema: json("config_schema").$type<Record<string, any>>(), // JSON schema for widget configuration
+  permissions: text("permissions").array(), // required permissions
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userWidgets = pgTable("user_widgets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  widgetTypeId: integer("widget_type_id").notNull().references(() => widgetTypes.id, { onDelete: "cascade" }),
+  position: json("position").$type<{ x: number; y: number; w: number; h: number }>().notNull(),
+  config: json("config").$type<Record<string, any>>(), // widget-specific configuration
+  isVisible: boolean("is_visible").default(true),
+  title: text("title"), // custom title override
+  refreshInterval: integer("refresh_interval").default(300), // seconds
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const widgetRatings = pgTable("widget_ratings", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  widgetTypeId: integer("widget_type_id").notNull().references(() => widgetTypes.id, { onDelete: "cascade" }),
+  rating: integer("rating").notNull(), // 1-5 stars
+  review: text("review"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dashboardLayouts = pgTable("dashboard_layouts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  isDefault: boolean("is_default").default(false),
+  isPublic: boolean("is_public").default(false),
+  layout: json("layout").$type<Array<{ i: string; x: number; y: number; w: number; h: number }>>().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Widget marketplace relations
+export const widgetTypesRelations = relations(widgetTypes, ({ many }) => ({
+  userWidgets: many(userWidgets),
+  ratings: many(widgetRatings),
+}));
+
+export const userWidgetsRelations = relations(userWidgets, ({ one }) => ({
+  user: one(users, {
+    fields: [userWidgets.userId],
+    references: [users.id],
+  }),
+  widgetType: one(widgetTypes, {
+    fields: [userWidgets.widgetTypeId],
+    references: [widgetTypes.id],
+  }),
+}));
+
+export const widgetRatingsRelations = relations(widgetRatings, ({ one }) => ({
+  user: one(users, {
+    fields: [widgetRatings.userId],
+    references: [users.id],
+  }),
+  widgetType: one(widgetTypes, {
+    fields: [widgetRatings.widgetTypeId],
+    references: [widgetTypes.id],
+  }),
+}));
+
+export const dashboardLayoutsRelations = relations(dashboardLayouts, ({ one }) => ({
+  user: one(users, {
+    fields: [dashboardLayouts.userId],
+    references: [users.id],
+  }),
+}));
+
+// Widget marketplace Zod schemas
+export const insertWidgetTypeSchema = createInsertSchema(widgetTypes);
+export const insertUserWidgetSchema = createInsertSchema(userWidgets);
+export const insertWidgetRatingSchema = createInsertSchema(widgetRatings);
+export const insertDashboardLayoutSchema = createInsertSchema(dashboardLayouts);
+
+export type InsertWidgetType = z.infer<typeof insertWidgetTypeSchema>;
+export type InsertUserWidget = z.infer<typeof insertUserWidgetSchema>;
+export type InsertWidgetRating = z.infer<typeof insertWidgetRatingSchema>;
+export type InsertDashboardLayout = z.infer<typeof insertDashboardLayoutSchema>;
+
+export type WidgetType = typeof widgetTypes.$inferSelect;
+export type UserWidget = typeof userWidgets.$inferSelect;
+export type WidgetRating = typeof widgetRatings.$inferSelect;
+export type DashboardLayout = typeof dashboardLayouts.$inferSelect;
+
 export const housingListingsRelations = relations(housingListings, ({ one }) => ({
   user: one(users, {
     fields: [housingListings.userId],
