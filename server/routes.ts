@@ -633,7 +633,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           savingsChange: 12.5,
         },
         spendingCategories: [
-          { name: "Housing", amount: 1200, color: "#2563eb" },
+          { name: "Rent", amount: 1200, color: "#2563eb" },
           { name: "Food", amount: 450, color: "#16a34a" },
           { name: "Transportation", amount: 320, color: "#ca8a04" },
           { name: "Entertainment", amount: 180, color: "#dc2626" },
@@ -2098,34 +2098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== HOUSING DISCOVERY BOARD API ROUTES =====
 
-  // Get all housing listings with filtering
-      const listings = await storage.getHousingListings({
-        search: search as string,
-        location: location as string,
-        propertyType: propertyType as string,
-        minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
-        maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
-        bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
-        furnished: furnished === 'true' ? true : furnished === 'false' ? false : undefined,
-        page: parseInt(page as string),
-        limit: parseInt(limit as string)
-      });
-
-      res.json(listings);
-    } catch (error: any) {
-      console.error('Error fetching housing listings:', error);
-      res.status(500).json({ error: "Failed to fetch housing listings" });
-    }
-  });
-
-  // Housing search endpoint
-  // Get single housing listing
-  // Get user's housing listings
-  // Create housing listing
-  // Update housing listing
-  // Delete housing listing
   const httpServer = createServer(app);
   return httpServer;
 }

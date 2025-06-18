@@ -102,7 +102,7 @@ export const insights = pgTable("insights", {
   content: text("content").notNull(),
   excerpt: text("excerpt"), // Short description for listings
   authorId: integer("author_id").notNull().references(() => users.id),
-  category: text("category").notNull(), // migration, finance, legal, housing, employment
+  category: text("category").notNull(), // migration, finance, legal, employment
   tags: text("tags").array(), // Additional categorization
   status: text("status").default("published"), // draft, published, archived
   viewCount: integer("view_count").default(0),
@@ -117,7 +117,7 @@ export const insights = pgTable("insights", {
 export const mentors = pgTable("mentors", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
-  specialty: text("specialty").notNull(), // finance, legal, career, housing, immigration
+  specialty: text("specialty").notNull(), // finance, legal, career, immigration
   bio: text("bio").notNull(),
   experience: text("experience"), // Years of experience or background
   availability: json("availability").$type<{
@@ -266,7 +266,7 @@ export const financialGoals = pgTable("financial_goals", {
   currency: text("currency").default("USD"),
   targetDate: timestamp("target_date"),
   priority: text("priority").default("medium"), // high, medium, low
-  category: text("category"), // housing, travel, education, retirement, etc.
+  category: text("category"), // travel, education, retirement, etc.
   isActive: boolean("is_active").default(true),
   isCompleted: boolean("is_completed").default(false),
   completedAt: timestamp("completed_at"),
@@ -799,7 +799,7 @@ export const createInsightSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title too long"),
   content: z.string().min(1, "Content is required"),
   excerpt: z.string().max(500, "Excerpt too long").optional(),
-  category: z.enum(["migration", "finance", "legal", "housing", "employment"]),
+  category: z.enum(["migration", "finance", "legal", "employment"]),
   tags: z.array(z.string()).optional(),
   featuredImage: z.string().url().optional(),
   readTime: z.number().min(1).optional(),
