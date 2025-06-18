@@ -7,7 +7,7 @@ export default function TestDashboard() {
       <h1 className="text-2xl font-bold mb-4">Test Dashboard - Cache Cleared</h1>
       <div className="flex items-center space-x-2">
         <TrendingUp className="w-6 h-6 text-blue-500" />
-        <span>Icon loaded successfully without BarChart3</span>
+        <span>Icon loaded successfully</span>
       </div>
       <div className="mt-4 p-4 bg-green-100 rounded">
         <p>If you see this message, the caching issue is resolved.</p>
