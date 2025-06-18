@@ -319,7 +319,46 @@ export const jobListings = pgTable("job_listings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Achievement Badges System
+export const achievementBadges = pgTable("achievement_badges", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  icon: text("icon").notNull(), // emoji or icon name
+  category: text("category").notNull(), // savings, spending, goals, streaks, milestones
+  criteria: json("criteria").$type<{
+    type: string; // amount_saved, goal_completed, spending_streak, etc.
+    threshold?: number;
+    duration?: string; // days, weeks, months
+    conditions?: Record<string, any>;
+  }>().notNull(),
+  rarity: text("rarity").notNull().default("common"), // common, rare, epic, legendary
+  points: integer("points").notNull().default(10),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
+export const userAchievements = pgTable("user_achievements", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  badgeId: integer("badge_id").notNull().references(() => achievementBadges.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow().notNull(),
+  progress: json("progress").$type<Record<string, any>>(), // current progress data
+  isVisible: boolean("is_visible").default(true),
+  notificationSent: boolean("notification_sent").default(false),
+});
+
+export const achievementProgress = pgTable("achievement_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  badgeId: integer("badge_id").notNull().references(() => achievementBadges.id),
+  currentValue: decimal("current_value", { precision: 10, scale: 2 }).default("0"),
+  targetValue: decimal("target_value", { precision: 10, scale: 2 }).notNull(),
+  progressData: json("progress_data").$type<Record<string, any>>(),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  isCompleted: boolean("is_completed").default(false),
+});
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -335,7 +374,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   mentorSessions: many(mentorSessions),
   loanPreQualifications: many(loanPreQualifications),
   financialGoals: many(financialGoals),
-
+  userAchievements: many(userAchievements),
+  achievementProgress: many(achievementProgress),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -469,7 +509,33 @@ export const goalProgressRelations = relations(goalProgress, ({ one }) => ({
   }),
 }));
 
+// Achievement Relations
+export const achievementBadgesRelations = relations(achievementBadges, ({ many }) => ({
+  userAchievements: many(userAchievements),
+  achievementProgress: many(achievementProgress),
+}));
 
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+  badge: one(achievementBadges, {
+    fields: [userAchievements.badgeId],
+    references: [achievementBadges.id],
+  }),
+}));
+
+export const achievementProgressRelations = relations(achievementProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [achievementProgress.userId],
+    references: [users.id],
+  }),
+  badge: one(achievementBadges, {
+    fields: [achievementProgress.badgeId],
+    references: [achievementBadges.id],
+  }),
+}));
 
 // Schemas
 export const registerSchema = z.object({
@@ -889,3 +955,41 @@ export type RegisterEvent = z.infer<typeof registerEventSchema>;
 export type MentorSession = typeof mentorSessions.$inferSelect;
 export type InsertMentorSession = z.infer<typeof insertMentorSessionSchema>;
 export type BookMentorSession = z.infer<typeof bookMentorSessionSchema>;
+
+// ===== ACHIEVEMENT BADGES SYSTEM =====
+
+// Achievement Badges schemas
+export const insertAchievementBadgeSchema = createInsertSchema(achievementBadges).pick({
+  name: true,
+  title: true,
+  description: true,
+  icon: true,
+  category: true,
+  criteria: true,
+  rarity: true,
+  points: true,
+  isActive: true,
+});
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).pick({
+  badgeId: true,
+  progress: true,
+  isVisible: true,
+  notificationSent: true,
+});
+
+export const insertAchievementProgressSchema = createInsertSchema(achievementProgress).pick({
+  badgeId: true,
+  currentValue: true,
+  targetValue: true,
+  progressData: true,
+  isCompleted: true,
+});
+
+// Achievement types
+export type AchievementBadge = typeof achievementBadges.$inferSelect;
+export type UserAchievement = typeof userAchievements.$inferSelect;
+export type AchievementProgress = typeof achievementProgress.$inferSelect;
+export type InsertAchievementBadge = z.infer<typeof insertAchievementBadgeSchema>;
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type InsertAchievementProgress = z.infer<typeof insertAchievementProgressSchema>;

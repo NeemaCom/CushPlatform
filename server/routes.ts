@@ -2098,6 +2098,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== ACHIEVEMENT BADGES ROUTES =====
+  
+  // Get user's achievements
+  app.get('/api/achievements', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { achievementService } = await import('./achievement-service.js');
+      const achievements = await achievementService.getUserAchievements(userId);
+      
+      res.json(achievements);
+    } catch (error) {
+      console.error('Error fetching achievements:', error);
+      res.status(500).json({ error: "Failed to fetch achievements" });
+    }
+  });
+
+  // Get user's progress on all badges
+  app.get('/api/achievements/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { achievementService } = await import('./achievement-service.js');
+      const progress = await achievementService.getUserProgress(userId);
+      
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching achievement progress:', error);
+      res.status(500).json({ error: "Failed to fetch achievement progress" });
+    }
+  });
+
+  // Get achievement statistics
+  app.get('/api/achievements/stats', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { achievementService } = await import('./achievement-service.js');
+      const stats = await achievementService.getAchievementStats(userId);
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching achievement stats:', error);
+      res.status(500).json({ error: "Failed to fetch achievement stats" });
+    }
+  });
+
+  // Check and update user achievements (triggered after financial actions)
+  app.post('/api/achievements/check', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+
+      const { achievementService } = await import('./achievement-service.js');
+      const newAchievements = await achievementService.checkUserAchievements(userId);
+      
+      res.json({ 
+        newAchievements,
+        count: newAchievements.length 
+      });
+    } catch (error) {
+      console.error('Error checking achievements:', error);
+      res.status(500).json({ error: "Failed to check achievements" });
+    }
+  });
+
+  // Initialize default badges (admin only)
+  app.post('/api/admin/achievements/initialize', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { achievementService } = await import('./achievement-service.js');
+      await achievementService.initializeDefaultBadges();
+      
+      res.json({ message: "Default badges initialized successfully" });
+    } catch (error) {
+      console.error('Error initializing badges:', error);
+      res.status(500).json({ error: "Failed to initialize badges" });
+    }
+  });
 
   const httpServer = createServer(app);
   return httpServer;
