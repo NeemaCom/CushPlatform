@@ -5,6 +5,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import Homepage from "@/pages/homepage";
 import DashboardNew from "@/pages/dashboard-new";
+import TestDashboard from "@/pages/test-dashboard";
 import Analytics from "@/pages/analytics";
 import Imisi from "@/pages/imisi";
 import Login from "@/pages/login";
@@ -34,7 +35,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Homepage} />
-      <Route path="/dashboard" component={DashboardNew} />
+      <Route path="/dashboard" component={TestDashboard} />
+      <Route path="/dashboard-full" component={DashboardNew} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/imisi" component={Imisi} />
       <Route path="/loans" component={Loans} />
