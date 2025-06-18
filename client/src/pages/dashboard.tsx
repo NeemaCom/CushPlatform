@@ -1,13 +1,18 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EnhancedSidebar } from "@/components/enhanced-sidebar";
 import { VersionIndicator } from "@/components/version-indicator";
+import { BalanceChart } from "@/components/balance-chart";
+import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
+import { FinancialGoalsWidget } from "@/components/FinancialGoalsWidget";
 import { 
+  Bell, 
   Wallet, 
   TrendingUp, 
   TrendingDown, 
@@ -15,8 +20,10 @@ import {
   Crown, 
   Sparkles, 
   ArrowLeftRight,
+  DollarSign,
   CreditCard
 } from "lucide-react";
+import { getQueryFn } from "@/lib/queryClient";
 
 interface DashboardData {
   user: {
@@ -48,13 +55,7 @@ interface DashboardData {
 export default function Dashboard() {
   const { data, isLoading, error } = useQuery<DashboardData>({
     queryKey: ['/api/dashboard'],
-    queryFn: async () => {
-      const response = await fetch('/api/dashboard');
-      if (!response.ok) {
-        throw new Error('Failed to fetch dashboard data');
-      }
-      return response.json();
-    }
+    queryFn: getQueryFn({ on401: 'redirect' })
   });
 
   if (isLoading) {
@@ -92,7 +93,12 @@ export default function Dashboard() {
               <h2 className="text-xl font-semibold">Failed to load dashboard</h2>
               <p className="text-sm mt-2">Please try refreshing the page</p>
             </div>
-            <Button onClick={() => window.location.reload()}>Retry</Button>
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4"
+            >
+              Retry
+            </Button>
           </div>
         </div>
       </div>
@@ -148,13 +154,14 @@ export default function Dashboard() {
           </div>
           <p className="text-gray-600">Here's your financial overview for today</p>
           
-          <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+          {/* Enhanced Sidebar Success Message */}
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-center">
-              <Sparkles className="w-5 h-5 text-green-600 mr-2" />
-              <p className="text-green-800 font-medium">Dashboard Loaded Successfully</p>
+              <Sparkles className="w-5 h-5 text-blue-600 mr-2" />
+              <p className="text-blue-800 font-medium">Enhanced Sidebar Active</p>
             </div>
-            <p className="text-green-600 text-sm mt-1">
-              All chart references removed. Enhanced sidebar with grouped navigation is active.
+            <p className="text-blue-600 text-sm mt-1">
+              Grouped navigation with visual badges and mobile responsive design is now active!
             </p>
           </div>
         </div>
@@ -236,9 +243,13 @@ export default function Dashboard() {
                 ${defaultData.monthlyStats.income.toLocaleString()}
               </div>
               <div className="flex items-center mt-2">
-                <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                <span className="text-xs text-green-600">
-                  {defaultData.monthlyStats.incomeChange}% from last month
+                {defaultData.monthlyStats.incomeChange >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                )}
+                <span className={`text-xs ${defaultData.monthlyStats.incomeChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {Math.abs(defaultData.monthlyStats.incomeChange)}% from last month
                 </span>
               </div>
             </CardContent>
@@ -256,9 +267,13 @@ export default function Dashboard() {
                 ${defaultData.monthlyStats.expenses.toLocaleString()}
               </div>
               <div className="flex items-center mt-2">
-                <TrendingDown className="h-3 w-3 text-green-500 mr-1" />
-                <span className="text-xs text-green-600">
-                  {Math.abs(defaultData.monthlyStats.expensesChange)}% reduction
+                {defaultData.monthlyStats.expensesChange >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-red-500 mr-1" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-green-500 mr-1" />
+                )}
+                <span className={`text-xs ${defaultData.monthlyStats.expensesChange >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+                  {Math.abs(defaultData.monthlyStats.expensesChange)}% from last month
                 </span>
               </div>
             </CardContent>
@@ -276,9 +291,13 @@ export default function Dashboard() {
                 ${defaultData.monthlyStats.savings.toLocaleString()}
               </div>
               <div className="flex items-center mt-2">
-                <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
-                <span className="text-xs text-green-600">
-                  {defaultData.monthlyStats.savingsChange}% increase
+                {defaultData.monthlyStats.savingsChange >= 0 ? (
+                  <TrendingUp className="h-3 w-3 text-green-500 mr-1" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-red-500 mr-1" />
+                )}
+                <span className={`text-xs ${defaultData.monthlyStats.savingsChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {Math.abs(defaultData.monthlyStats.savingsChange)}% from last month
                 </span>
               </div>
             </CardContent>
@@ -347,6 +366,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
+        {/* Chat Head */}
         <ImisiChatHead />
       </div>
     </div>
