@@ -1,6 +1,0 @@
-{
-  "version": "2.2.0-no-charts",
-  "build": "2025-01-18-21:15",
-  "features": ["enhanced-sidebar", "mobile-responsive", "grouped-navigation", "chart-free-dashboard"],
-  "timestamp": 1737238500000
-}

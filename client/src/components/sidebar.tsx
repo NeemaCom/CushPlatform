@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { 
   Home, 
-  TrendingUp, 
+  BarChart3, 
   ArrowLeftRight, 
   Wallet, 
   Settings, 
@@ -29,7 +29,7 @@ const sidebarItems = [
   { icon: CreditCard, label: "Loans", href: "/loans" },
   { icon: Briefcase, label: "Jobs", href: "/jobs" },
   { icon: Building, label: "Housing", href: "/housing" },
-  { icon: TrendingUp, label: "Analytics", href: "/analytics" },
+  { icon: BarChart3, label: "Analytics", href: "/analytics" },
   { icon: ArrowLeftRight, label: "Transactions", href: "/transactions" },
   { icon: Wallet, label: "Accounts", href: "/accounts" },
   { icon: Settings, label: "Settings", href: "/settings" },

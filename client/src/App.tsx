@@ -3,8 +3,10 @@ import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { PWAManager } from "@/components/PWAComponents";
 import Homepage from "@/pages/homepage";
-import UserDashboard from "@/pages/user-dashboard";
+import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
 import Imisi from "@/pages/imisi";
 import Login from "@/pages/login";
@@ -24,7 +26,6 @@ import CreateInsight from "@/pages/create-insight";
 import PWASettings from "@/pages/pwa-settings";
 import PrivacyPolicy from "@/pages/privacy-policy";
 import TermsOfService from "@/pages/terms-of-service";
-import WidgetMarketplace from "@/pages/widget-marketplace";
 import TestPage from "@/pages/test-page";
 import SimpleTest from "@/pages/simple-test";
 import LegalTest from "@/pages/legal-test";
@@ -34,13 +35,12 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Homepage} />
-      <Route path="/dashboard" component={UserDashboard} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/imisi" component={Imisi} />
       <Route path="/loans" component={Loans} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/housing" component={Housing} />
-      <Route path="/widget-marketplace" component={WidgetMarketplace} />
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={Admin} />
       <Route path="/login" component={Login} />
@@ -66,8 +66,11 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster />
-      <Router />
+      <TooltipProvider>
+        <Toaster />
+        <PWAManager />
+        <Router />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
