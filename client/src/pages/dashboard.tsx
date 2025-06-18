@@ -1,6 +1,5 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -108,7 +107,7 @@ export default function Dashboard() {
   const defaultData = {
     user: {
       name: data?.user?.name || "User",
-      email: data?.user?.email || "user@example.com",
+      email: data?.user?.email || "user@example.com", 
       initials: data?.user?.initials || "U"
     },
     accounts: {
@@ -140,29 +139,22 @@ export default function Dashboard() {
         <VersionIndicator />
         
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-8">
+          <div>
             <h1 className="text-3xl font-bold text-gray-900">
               Welcome back, {defaultData.user.name}
             </h1>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary" className="bg-green-100 text-green-800">
-                <Crown className="w-3 h-3 mr-1" />
-                Premium
-              </Badge>
-            </div>
+            <p className="text-gray-600 mt-1">Here's your financial overview for today</p>
           </div>
-          <p className="text-gray-600">Here's your financial overview for today</p>
-          
-          {/* Enhanced Sidebar Success Message */}
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center">
-              <Sparkles className="w-5 h-5 text-blue-600 mr-2" />
-              <p className="text-blue-800 font-medium">Enhanced Sidebar Active</p>
-            </div>
-            <p className="text-blue-600 text-sm mt-1">
-              Grouped navigation with visual badges and mobile responsive design is now active!
-            </p>
+          <div className="flex items-center space-x-4">
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <Crown className="w-3 h-3 mr-1" />
+              Premium
+            </Badge>
+            <Button variant="outline" size="sm">
+              <Bell className="w-4 h-4 mr-2" />
+              Notifications
+            </Button>
           </div>
         </div>
 
@@ -236,7 +228,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium text-gray-600">
                 Monthly Income
               </CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
+              <DollarSign className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-gray-900">
@@ -304,69 +296,74 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <div className="mb-8">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <button className="flex flex-col items-center p-4 rounded-xl bg-blue-50 hover:bg-blue-100 transition-colors group">
-              <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <ArrowLeftRight className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">Transfer</span>
-            </button>
-            
-            <button className="flex flex-col items-center p-4 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <PiggyBank className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">Save</span>
-            </button>
-            
-            <button className="flex flex-col items-center p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors group">
-              <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <TrendingUp className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">Analytics</span>
-            </button>
-            
-            <button className="flex flex-col items-center p-4 rounded-xl bg-yellow-50 hover:bg-yellow-100 transition-colors group">
-              <div className="w-12 h-12 bg-yellow-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                <Sparkles className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-sm font-medium text-gray-700">Invest</span>
-            </button>
+        {/* Main Content Area */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-2">
+            <BalanceChart />
+          </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Sparkles className="w-5 h-5 mr-2 text-blue-500" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button className="w-full justify-start" variant="ghost">
+                  <ArrowLeftRight className="w-4 h-4 mr-2" />
+                  Transfer Money
+                </Button>
+                <Button className="w-full justify-start" variant="ghost">
+                  <PiggyBank className="w-4 h-4 mr-2" />
+                  Add to Savings
+                </Button>
+                <Button className="w-full justify-start" variant="ghost">
+                  <TrendingUp className="w-4 h-4 mr-2" />
+                  View Analytics
+                </Button>
+                <Button className="w-full justify-start" variant="ghost">
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Pay Bills
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <TrendingUp className="w-5 h-5 mr-2 text-green-500" />
+                  Spending Categories
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {defaultData.spendingCategories.map((category, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div 
+                          className="w-3 h-3 rounded-full" 
+                          style={{ backgroundColor: category.color }}
+                        ></div>
+                        <span className="text-sm font-medium text-gray-700">{category.name}</span>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900">
+                        ${category.amount.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        {/* Spending Categories */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <TrendingUp className="w-5 h-5 mr-2 text-gray-600" />
-              Spending Categories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {defaultData.spendingCategories.map((category, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div 
-                      className="w-4 h-4 rounded-full" 
-                      style={{ backgroundColor: category.color }}
-                    ></div>
-                    <span className="text-sm font-medium text-gray-700">{category.name}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900">
-                    ${category.amount.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        {/* Recent Transactions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <TransactionList />
+          <FinancialGoalsWidget />
+        </div>
 
-        {/* Chat Head */}
         <ImisiChatHead />
       </div>
     </div>
