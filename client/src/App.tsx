@@ -4,7 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import Homepage from "@/pages/homepage";
-import MainDashboard from "@/pages/main-dashboard";
+import UserDashboard from "@/pages/user-dashboard";
 import Analytics from "@/pages/analytics";
 import Imisi from "@/pages/imisi";
 import Login from "@/pages/login";
@@ -34,7 +34,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Homepage} />
-      <Route path="/dashboard" component={MainDashboard} />
+      <Route path="/dashboard" component={UserDashboard} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/imisi" component={Imisi} />
       <Route path="/loans" component={Loans} />
