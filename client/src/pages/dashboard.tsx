@@ -21,7 +21,7 @@ import {
   Crown, 
   Sparkles, 
   ArrowLeftRight,
-  BarChart3 
+
 } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
 
