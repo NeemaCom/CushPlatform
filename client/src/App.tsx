@@ -17,6 +17,7 @@ import Subscribe from "@/pages/subscribe";
 import Community from "@/pages/community";
 import Loans from "@/pages/loans";
 import Jobs from "@/pages/jobs";
+import { AchievementsPage } from "@/pages/achievements";
 
 import Settings from "@/pages/settings";
 import Admin from "@/pages/admin";
@@ -40,6 +41,7 @@ function Router() {
       <Route path="/imisi" component={Imisi} />
       <Route path="/loans" component={Loans} />
       <Route path="/jobs" component={Jobs} />
+      <Route path="/achievements" component={AchievementsPage} />
 
       <Route path="/settings" component={Settings} />
       <Route path="/admin" component={Admin} />
