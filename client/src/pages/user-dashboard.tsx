@@ -20,7 +20,8 @@ import {
   Sparkles, 
   ArrowLeftRight,
   DollarSign,
-  CreditCard
+  CreditCard,
+  CheckCircle
 } from "lucide-react";
 
 interface DashboardData {
@@ -50,11 +51,13 @@ interface DashboardData {
   }>;
 }
 
-export default function MainDashboard() {
+export default function UserDashboard() {
+  const cacheBuster = Date.now();
+  
   const { data, isLoading, error } = useQuery<DashboardData>({
-    queryKey: ['/api/dashboard'],
+    queryKey: ['/api/dashboard', cacheBuster],
     queryFn: async () => {
-      const response = await fetch('/api/dashboard');
+      const response = await fetch(`/api/dashboard?t=${cacheBuster}`);
       if (!response.ok) {
         throw new Error('Failed to fetch dashboard data');
       }
@@ -135,11 +138,11 @@ export default function MainDashboard() {
         
         <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <div className="flex items-center">
-            <Sparkles className="w-5 h-5 text-green-600 mr-2" />
-            <p className="text-green-800 font-medium">Chart-Free Dashboard Active</p>
+            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+            <p className="text-green-800 font-medium">Clean Dashboard Loaded Successfully</p>
           </div>
           <p className="text-green-600 text-sm mt-1">
-            All chart components removed. Version 2.2.0-no-charts loaded successfully.
+            Cache cleared. No chart dependencies. Version 2.2.0-no-charts active.
           </p>
         </div>
         
@@ -148,7 +151,7 @@ export default function MainDashboard() {
             <h1 className="text-3xl font-bold text-gray-900">
               Welcome back, {defaultData.user.name}
             </h1>
-            <p className="text-gray-600 mt-1">Here's your financial overview for today</p>
+            <p className="text-gray-600 mt-1">Financial overview dashboard</p>
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant="secondary" className="bg-green-100 text-green-800">
