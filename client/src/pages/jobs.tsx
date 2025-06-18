@@ -276,8 +276,8 @@ export default function Jobs() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="text-gray-600 dark:text-gray-400 line-clamp-3">
-                        {job.description}
+                      <p className="text-gray-600 dark:text-gray-400 overflow-hidden text-ellipsis">
+                        {job.description.length > 150 ? `${job.description.substring(0, 150)}...` : job.description}
                       </p>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
