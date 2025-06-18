@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { setupNextJs, createIntegratedServer } from "./next-integration";
 
 const app = express();
 
@@ -48,7 +49,7 @@ app.use((req, res, next) => {
 
 // Export server creation function for Vercel
 export async function createServer() {
-  const server = await registerRoutes(app);
+  const httpServer = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -57,15 +58,16 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Always serve the app on port 5000 (except for serverless platforms like Vercel)
-  // This serves both the API and the client
+  // Setup Next.js integration
+  await setupNextJs(app);
+
+  // Create integrated server
+  const server = createIntegratedServer(app);
+
+  // Serve on port 5000 for compatibility with workflow
   if (!process.env.VERCEL) {
     const port = process.env.PORT || 5000;
-    server.listen({
-      port: Number(port),
-      host: "0.0.0.0",
-      reusePort: true,
-    }, () => {
+    server.listen(Number(port), "0.0.0.0", () => {
       log(`serving on port ${port}`);
     });
   }
