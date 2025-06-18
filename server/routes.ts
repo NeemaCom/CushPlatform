@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import session from "express-session";
@@ -215,8 +215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Enhanced login endpoint
-  app.post("/api/auth/signin", authRateLimit, async (req: AuthenticatedRequest, res) => {
+  // Enhanced login endpoint (both signin and login for compatibility)
+  const loginHandler = async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { username, password } = loginSchema.parse(req.body);
       
@@ -288,7 +288,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       res.status(500).json({ error: "Login failed" });
     }
-  });
+  };
+
+  // Register both signin and login endpoints for compatibility
+  app.post("/api/auth/signin", authRateLimit, loginHandler);
+  app.post("/api/auth/login", authRateLimit, loginHandler);
 
   // Enhanced logout endpoint
   app.post("/api/auth/logout", async (req: AuthenticatedRequest, res) => {
