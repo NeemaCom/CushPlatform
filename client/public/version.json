@@ -1,6 +1,6 @@
 {
-  "version": "2.1.1-cache-cleared",
-  "build": "2025-01-17-23:31",
-  "features": ["enhanced-sidebar", "mobile-responsive", "grouped-navigation", "version-indicator"],
-  "timestamp": 1737156660000
+  "version": "2.2.0-no-charts",
+  "build": "2025-01-18-21:15",
+  "features": ["enhanced-sidebar", "mobile-responsive", "grouped-navigation", "chart-free-dashboard"],
+  "timestamp": 1737238500000
 }
