@@ -144,7 +144,7 @@ export default function PrivacyPolicy() {
               <div className="space-y-3">
                 <h3 className="font-medium text-gray-800">How to Exercise Rights</h3>
                 <p className="text-gray-700 text-sm">
-                  Contact us at <strong>privacy@cush.com</strong> or use the privacy controls 
+                  Contact us at <strong>privacy@we-cush.com</strong> or use the privacy controls 
                   in your account settings. We will respond to requests within 30 days.
                 </p>
               </div>
