@@ -10,6 +10,7 @@ import { BalanceChart } from "@/components/balance-chart";
 import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
 import { FinancialGoalsWidget } from "@/components/FinancialGoalsWidget";
+import { AchievementWidget } from "@/components/AchievementWidget";
 import { Bell, Wallet, TrendingUp, TrendingDown, PiggyBank, Crown, Sparkles } from "lucide-react";
 import { getQueryFn } from "@/lib/queryClient";
 
@@ -296,42 +297,8 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              {/* Account Summary */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Account Summary</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Current Account</span>
-                      <span className="font-medium">
-                        £{accounts.current.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Savings Account</span>
-                      <span className="font-medium">
-                        £{accounts.savings.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Investment Account</span>
-                      <span className="font-medium">
-                        £{accounts.investment.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    <div className="border-t pt-3 mt-3">
-                      <div className="flex items-center justify-between font-semibold">
-                        <span className="text-gray-900">Total Assets</span>
-                        <span className="text-cush-blue-600">
-                          £{accounts.total.toLocaleString('en-GB', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Achievement Progress */}
+              <AchievementWidget />
             </div>
           </div>
         </div>
