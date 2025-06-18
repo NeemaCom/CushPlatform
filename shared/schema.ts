@@ -807,7 +807,7 @@ export const createInsightSchema = z.object({
 });
 
 export const createMentorSchema = z.object({
-  specialty: z.enum(["finance", "legal", "career", "housing", "immigration"]),
+  specialty: z.enum(["finance", "legal", "career", "immigration"]),
   bio: z.string().min(50, "Bio must be at least 50 characters").max(1000, "Bio too long"),
   experience: z.string().max(500, "Experience description too long").optional(),
   availability: z.object({
