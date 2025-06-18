@@ -11,6 +11,7 @@ import { BalanceChart } from "@/components/balance-chart";
 import { TransactionList } from "@/components/transaction-list";
 import { ImisiChatHead } from "@/components/imisi-chat";
 import { FinancialGoalsWidget } from "@/components/FinancialGoalsWidget";
+// Force cache refresh
 import { 
   Bell, 
   Wallet, 
@@ -289,7 +290,7 @@ export default function Dashboard() {
                 
                 <button className="flex flex-col items-center p-4 rounded-xl bg-purple-50 hover:bg-purple-100 transition-colors group">
                   <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-                    <BarChart3 className="w-6 h-6 text-white" />
+                    <TrendingUp className="w-6 h-6 text-white" />
                   </div>
                   <span className="text-sm font-medium text-gray-700">Analytics</span>
                 </button>
@@ -330,7 +331,7 @@ export default function Dashboard() {
                     ) : (
                       <div className="text-center py-8">
                         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <BarChart3 className="w-8 h-8 text-gray-400" />
+                          <TrendingUp className="w-8 h-8 text-gray-400" />
                         </div>
                         <p className="text-gray-500">No spending data yet</p>
                         <p className="text-sm text-gray-400">Start tracking your expenses</p>
