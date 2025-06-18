@@ -55,7 +55,7 @@ import {
 
   type InsertJobListing,
   type SearchJobsQuery,
-  type UpdateHousingListing
+
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, or, ilike, gte, lte, sql } from "drizzle-orm";
@@ -160,22 +160,6 @@ export interface IStorage {
   updateJobListing(id: number, updates: Partial<JobListing>): Promise<JobListing>;
   deleteJobListing(id: number): Promise<void>;
 
-  getHousingListings(filters: {
-    search?: string;
-    location?: string;
-    propertyType?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    bedrooms?: number;
-    furnished?: boolean;
-    page?: number;
-    limit?: number;
-  }): Promise<HousingListing[]>;
-  getHousingListingById(id: number): Promise<HousingListing | undefined>;
-  getHousingListingsByUserId(userId: number): Promise<HousingListing[]>;
-  createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing>;
-  updateHousingListing(id: number, updates: Partial<HousingListing>): Promise<HousingListing>;
-  deleteHousingListing(id: number): Promise<void>;
 
   // Admin-specific methods
   getAllUsers(limit?: number, offset?: number): Promise<User[]>;
@@ -877,169 +861,6 @@ export class DatabaseStorage implements IStorage {
 
   async deleteJobListing(id: number): Promise<void> {
     await db.delete(jobListings).where(eq(jobListings.id, id));
-  }
-
-  // Housing Listings methods
-  async searchHousing(query: SearchHousingQuery): Promise<HousingListing[]> {
-    const conditions = [eq(housingListings.isActive, true)];
-    
-    if (query.location) {
-      conditions.push(
-        or(
-          ilike(housingListings.address, `%${query.location}%`),
-          ilike(housingListings.city, `%${query.location}%`)
-        )
-      );
-    }
-    
-    if (query.country) {
-      conditions.push(eq(housingListings.country, query.country));
-    }
-    
-    if (query.city) {
-      conditions.push(eq(housingListings.city, query.city));
-    }
-    
-    if (query.propertyType) {
-      conditions.push(eq(housingListings.propertyType, query.propertyType));
-    }
-    
-    if (query.minRent) {
-      conditions.push(gte(housingListings.rentAmount, query.minRent));
-    }
-    
-    if (query.maxRent) {
-      conditions.push(lte(housingListings.rentAmount, query.maxRent));
-    }
-    
-    if (query.bedrooms !== undefined) {
-      conditions.push(eq(housingListings.bedrooms, query.bedrooms));
-    }
-    
-    if (query.bathrooms !== undefined) {
-      conditions.push(gte(housingListings.bathrooms, query.bathrooms.toString()));
-    }
-    
-    if (query.furnished !== undefined) {
-      conditions.push(eq(housingListings.furnished, query.furnished));
-    }
-    
-    if (query.petsAllowed !== undefined) {
-      conditions.push(eq(housingListings.petsAllowed, query.petsAllowed));
-    }
-    
-    if (query.utilitiesIncluded !== undefined) {
-      conditions.push(eq(housingListings.utilitiesIncluded, query.utilitiesIncluded));
-    }
-    
-    if (query.availableFrom) {
-      conditions.push(gte(housingListings.availabilityDate, new Date(query.availableFrom)));
-    }
-    
-    return await db
-      .select()
-      .from(housingListings)
-      .where(and(...conditions))
-      .orderBy(desc(housingListings.createdAt))
-      .limit(query.limit || 20)
-      .offset(query.offset || 0);
-  }
-
-  async getHousingListingById(id: number): Promise<HousingListing | undefined> {
-    const [housing] = await db.select().from(housingListings).where(eq(housingListings.id, id));
-    return housing || undefined;
-  }
-
-  async getHousingListingsByUserId(userId: number): Promise<HousingListing[]> {
-    return await db
-      .select()
-      .from(housingListings)
-      .where(eq(housingListings.userId, userId))
-      .orderBy(desc(housingListings.createdAt));
-  }
-
-  async getHousingListings(filters: {
-    search?: string;
-    location?: string;
-    propertyType?: string;
-    minPrice?: number;
-    maxPrice?: number;
-    bedrooms?: number;
-    furnished?: boolean;
-    page?: number;
-    limit?: number;
-  }): Promise<HousingListing[]> {
-    const conditions = [eq(housingListings.isActive, true)];
-    
-    if (filters.search) {
-      conditions.push(
-        or(
-          ilike(housingListings.title, `%${filters.search}%`),
-          ilike(housingListings.description, `%${filters.search}%`),
-          ilike(housingListings.address, `%${filters.search}%`)
-        )
-      );
-    }
-    
-    if (filters.location) {
-      conditions.push(
-        or(
-          ilike(housingListings.address, `%${filters.location}%`),
-          ilike(housingListings.city, `%${filters.location}%`),
-          ilike(housingListings.country, `%${filters.location}%`)
-        )
-      );
-    }
-    
-    if (filters.propertyType) {
-      conditions.push(eq(housingListings.propertyType, filters.propertyType));
-    }
-    
-    if (filters.minPrice) {
-      conditions.push(gte(housingListings.rentAmount, filters.minPrice.toString()));
-    }
-    
-    if (filters.maxPrice) {
-      conditions.push(lte(housingListings.rentAmount, filters.maxPrice.toString()));
-    }
-    
-    if (filters.bedrooms !== undefined) {
-      conditions.push(eq(housingListings.bedrooms, filters.bedrooms));
-    }
-    
-    if (filters.furnished !== undefined) {
-      conditions.push(eq(housingListings.furnished, filters.furnished));
-    }
-    
-    const page = filters.page || 1;
-    const limit = filters.limit || 20;
-    const offset = (page - 1) * limit;
-    
-    return await db
-      .select()
-      .from(housingListings)
-      .where(and(...conditions))
-      .orderBy(desc(housingListings.createdAt))
-      .limit(limit)
-      .offset(offset);
-  }
-
-  async createHousingListing(housing: InsertHousingListing & { userId: number }): Promise<HousingListing> {
-    const [newHousing] = await db.insert(housingListings).values(housing).returning();
-    return newHousing;
-  }
-
-  async updateHousingListing(id: number, updates: UpdateHousingListing): Promise<HousingListing> {
-    const [updatedHousing] = await db
-      .update(housingListings)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(housingListings.id, id))
-      .returning();
-    return updatedHousing;
-  }
-
-  async deleteHousingListing(id: number): Promise<void> {
-    await db.delete(housingListings).where(eq(housingListings.id, id));
   }
 
   // Admin-specific methods implementation
