@@ -115,9 +115,9 @@ function Terms() {
           <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginTop: '30px', marginBottom: '15px' }}>Contact Us</h2>
           <p style={{ marginBottom: '10px' }}>For questions about these Terms of Service, contact us:</p>
           <ul style={{ marginLeft: '20px', marginBottom: '15px' }}>
-            <li>Email: legal@cush.com</li>
-            <li>Support: support@cush.com</li>
-            <li>Business Inquiries: business@cush.com</li>
+            <li>Email: legal@we-cush.com</li>
+            <li>Support: support@we-cush.com</li>
+            <li>Business Inquiries: business@we-cush.com</li>
             <li>In-Platform: Use the support chat in your account dashboard</li>
           </ul>
 

@@ -72,8 +72,8 @@ function Privacy() {
           <h2 style={{ fontSize: '1.5rem', fontWeight: '600', marginTop: '30px', marginBottom: '15px' }}>Contact Us</h2>
           <p style={{ marginBottom: '10px' }}>For privacy-related questions, contact us:</p>
           <ul style={{ marginLeft: '20px', marginBottom: '15px' }}>
-            <li>Email: privacy@cush.com</li>
-            <li>Data Protection Officer: dpo@cush.com</li>
+            <li>Email: privacy@we-cush.com</li>
+            <li>Data Protection Officer: dpo@we-cush.com</li>
             <li>Support: Available through your account dashboard</li>
           </ul>
 

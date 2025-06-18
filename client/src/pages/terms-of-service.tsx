@@ -267,9 +267,9 @@ export default function TermsOfService() {
                 If you have questions about these Terms of Service, please contact us:
               </p>
               <div className="space-y-2 text-sm text-gray-700">
-                <p><strong>Email:</strong> legal@cush.com</p>
-                <p><strong>Support:</strong> support@cush.com</p>
-                <p><strong>Business Inquiries:</strong> business@cush.com</p>
+                <p><strong>Email:</strong> legal@we-cush.com</p>
+                <p><strong>Support:</strong> support@we-cush.com</p>
+                <p><strong>Business Inquiries:</strong> business@we-cush.com</p>
                 <p><strong>In-Platform:</strong> Use the support chat in your account dashboard</p>
               </div>
             </div>
