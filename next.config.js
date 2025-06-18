@@ -1,10 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
-  experimental: {
-    appDir: true,
-  },
   async rewrites() {
     return [
       {
@@ -12,6 +8,13 @@ const nextConfig = {
         destination: 'http://localhost:5000/api/:path*',
       },
     ]
+  },
+  serverRuntimeConfig: {
+    // Will only be available on the server side
+  },
+  publicRuntimeConfig: {
+    // Will be available on both server and client
+    apiUrl: process.env.NODE_ENV === 'production' ? 'https://your-domain.com' : 'http://localhost:5000',
   },
   images: {
     domains: ['localhost'],
@@ -29,4 +32,4 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+export default nextConfig
