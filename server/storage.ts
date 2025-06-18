@@ -820,7 +820,7 @@ export class DatabaseStorage implements IStorage {
           ilike(jobListings.title, `%${filters.search}%`),
           ilike(jobListings.company, `%${filters.search}%`),
           ilike(jobListings.description, `%${filters.search}%`)
-        )
+        )!
       );
     }
     
@@ -830,7 +830,7 @@ export class DatabaseStorage implements IStorage {
           ilike(jobListings.location, `%${filters.location}%`),
           ilike(jobListings.city, `%${filters.location}%`),
           ilike(jobListings.country, `%${filters.location}%`)
-        )
+        )!
       );
     }
     
@@ -998,11 +998,11 @@ export class DatabaseStorage implements IStorage {
     }
     
     if (filters.minPrice) {
-      conditions.push(gte(housingListings.rentAmount, filters.minPrice));
+      conditions.push(gte(housingListings.rentAmount, filters.minPrice.toString()));
     }
     
     if (filters.maxPrice) {
-      conditions.push(lte(housingListings.rentAmount, filters.maxPrice));
+      conditions.push(lte(housingListings.rentAmount, filters.maxPrice.toString()));
     }
     
     if (filters.bedrooms !== undefined) {

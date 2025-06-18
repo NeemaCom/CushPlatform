@@ -2053,6 +2053,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== JOBS DISCOVERY BOARD API ROUTES =====
+
+  // Get all job listings with filtering
+  app.get('/api/jobs', async (req: AuthenticatedRequest, res) => {
+    try {
+      const { 
+        search, 
+        location, 
+        jobType, 
+        experience, 
+        industry, 
+        remote,
+        page = 1,
+        limit = 20
+      } = req.query;
+
+      const jobs = await storage.getJobListings({
+        search: search as string,
+        location: location as string,
+        jobType: jobType as string,
+        experience: experience as string,
+        industry: industry as string,
+        remote: remote === 'true' ? true : remote === 'false' ? false : undefined,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string)
+      });
+
+      res.json(jobs);
+    } catch (error: any) {
+      console.error('Error fetching job listings:', error);
+      res.status(500).json({ error: "Failed to fetch job listings" });
+    }
+  });
+
+  // Get specific job listing
+  app.get('/api/jobs/:id', async (req: AuthenticatedRequest, res) => {
+    try {
+      const jobId = parseInt(req.params.id);
+      const job = await storage.getJobListingById(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job listing not found" });
+      }
+      
+      res.json(job);
+    } catch (error: any) {
+      console.error('Error fetching job listing:', error);
+      res.status(500).json({ error: "Failed to fetch job listing" });
+    }
+  });
+
+  // ===== HOUSING DISCOVERY BOARD API ROUTES =====
+
   // Housing search endpoint
   app.get('/api/housing/search', async (req, res) => {
     try {
@@ -2072,7 +2125,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/housing/:id', async (req, res) => {
     try {
       const housingId = parseInt(req.params.id);
-      const housing = await storage.getHousingListing(housingId);
+      const housing = await storage.getHousingListingById(housingId);
       
       if (!housing) {
         return res.status(404).json({ error: "Housing not found" });
@@ -2089,7 +2142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/housing/my-listings', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const listings = await storage.getUserHousingListings(userId);
+      const listings = await storage.getHousingListingsByUserId(userId);
       res.json(listings);
     } catch (error: any) {
       console.error('Get user housing error:', error);
@@ -2126,7 +2179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const housingId = parseInt(req.params.id);
       
       // Verify ownership
-      const existingListing = await storage.getHousingListing(housingId);
+      const existingListing = await storage.getHousingListingById(housingId);
       if (!existingListing || existingListing.userId !== userId) {
         return res.status(403).json({ error: "Not authorized to update this listing" });
       }
@@ -2155,7 +2208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const housingId = parseInt(req.params.id);
       
       // Verify ownership
-      const existingListing = await storage.getHousingListing(housingId);
+      const existingListing = await storage.getHousingListingById(housingId);
       if (!existingListing || existingListing.userId !== userId) {
         return res.status(403).json({ error: "Not authorized to delete this listing" });
       }
