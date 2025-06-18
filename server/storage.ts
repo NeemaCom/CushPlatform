@@ -17,7 +17,7 @@ import {
   financialGoals,
   goalProgress,
   jobListings,
-  housingListings,
+
   type User, 
   type SafeUser,
   type InsertUser,
@@ -52,11 +52,9 @@ import {
   type GoalProgress,
   type InsertGoalProgress,
   type JobListing,
-  type HousingListing,
+
   type InsertJobListing,
-  type InsertHousingListing,
   type SearchJobsQuery,
-  type SearchHousingQuery,
   type UpdateHousingListing
 } from "@shared/schema";
 import { db } from "./db";

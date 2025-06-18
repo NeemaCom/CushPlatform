@@ -319,36 +319,7 @@ export const jobListings = pgTable("job_listings", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Housing Listings table - accommodation options
-export const housingListings = pgTable("housing_listings", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").references(() => users.id), // landlord/poster
-  title: text("title").notNull(),
-  address: text("address").notNull(),
-  city: text("city").notNull(),
-  country: text("country").notNull(),
-  postalCode: text("postal_code"),
-  rentAmount: decimal("rent_amount", { precision: 10, scale: 2 }).notNull(),
-  currency: text("currency").default("USD"),
-  propertyType: text("property_type").notNull(), // room, apartment, house, studio
-  bedrooms: integer("bedrooms").notNull(),
-  bathrooms: decimal("bathrooms", { precision: 3, scale: 1 }).notNull(),
-  furnished: boolean("furnished").default(false),
-  utilitiesIncluded: boolean("utilities_included").default(false),
-  petsAllowed: boolean("pets_allowed").default(false),
-  availabilityDate: timestamp("availability_date").notNull(),
-  description: text("description").notNull(),
-  amenities: text("amenities").array(),
-  photos: text("photos").array(), // URLs to images
-  contactEmail: text("contact_email"),
-  contactPhone: text("contact_phone"),
-  area: decimal("area", { precision: 8, scale: 2 }), // square meters/feet
-  deposit: decimal("deposit", { precision: 10, scale: 2 }),
-  minimumStay: integer("minimum_stay"), // months
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
+
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
@@ -364,7 +335,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   mentorSessions: many(mentorSessions),
   loanPreQualifications: many(loanPreQualifications),
   financialGoals: many(financialGoals),
-  housingListings: many(housingListings),
+
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -498,12 +469,7 @@ export const goalProgressRelations = relations(goalProgress, ({ one }) => ({
   }),
 }));
 
-export const housingListingsRelations = relations(housingListings, ({ one }) => ({
-  user: one(users, {
-    fields: [housingListings.userId],
-    references: [users.id],
-  }),
-}));
+
 
 // Schemas
 export const registerSchema = z.object({
@@ -819,31 +785,7 @@ export const searchJobsSchema = z.object({
   offset: z.number().min(0).default(0),
 });
 
-// Housing Listing schemas
-export const insertHousingListingSchema = createInsertSchema(housingListings).pick({
-  title: true,
-  address: true,
-  city: true,
-  country: true,
-  postalCode: true,
-  rentAmount: true,
-  currency: true,
-  propertyType: true,
-  bedrooms: true,
-  bathrooms: true,
-  furnished: true,
-  utilitiesIncluded: true,
-  petsAllowed: true,
-  availabilityDate: true,
-  description: true,
-  amenities: true,
-  photos: true,
-  contactEmail: true,
-  contactPhone: true,
-  area: true,
-  deposit: true,
-  minimumStay: true,
-});
+
 
 export const searchHousingSchema = z.object({
   location: z.string().optional(),
