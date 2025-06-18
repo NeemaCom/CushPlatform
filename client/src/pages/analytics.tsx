@@ -5,8 +5,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { SimpleSidebar } from "@/components/simple-sidebar";
-// Charts removed - using simple data display instead
+import { Sidebar } from "@/components/sidebar";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from "recharts";
 import {
   TrendingUp,
   TrendingDown,
@@ -165,7 +181,7 @@ export default function Analytics() {
   if (isLoading) {
     return (
       <div className="flex">
-        <SimpleSidebar />
+        <Sidebar />
         <div className="flex-1 ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
           <div className="container mx-auto px-4 py-8">
             <div className="animate-pulse space-y-6">
@@ -184,7 +200,7 @@ export default function Analytics() {
 
   return (
     <div className="flex">
-      <SimpleSidebar />
+      <Sidebar />
       <div className="flex-1 ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
           {/* Header */}
@@ -310,17 +326,17 @@ export default function Analytics() {
                     <CardDescription>Monthly cash flow overview</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
-                      {(analytics?.transactions?.monthly || []).map((item: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <span className="font-medium">{item.month}</span>
-                          <div className="flex space-x-4">
-                            <span className="text-green-600">Income: {formatCurrency(item.income)}</span>
-                            <span className="text-red-600">Expenses: {formatCurrency(item.expenses)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <AreaChart data={analytics?.transactions?.monthly || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                        <Legend />
+                        <Area type="monotone" dataKey="income" stackId="1" stroke="#10b981" fill="#10b981" fillOpacity={0.6} />
+                        <Area type="monotone" dataKey="expenses" stackId="2" stroke="#ef4444" fill="#ef4444" fillOpacity={0.6} />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
 
@@ -330,20 +346,24 @@ export default function Analytics() {
                     <CardDescription>Current period breakdown</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(analytics?.spending?.categories || []).map((category: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center space-x-2">
-                            <div 
-                              className="w-4 h-4 rounded-full" 
-                              style={{ backgroundColor: spendingColors[index % spendingColors.length] }}
-                            ></div>
-                            <span className="font-medium">{category.name}</span>
-                          </div>
-                          <span className="text-gray-900">{formatCurrency(category.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={analytics?.spending?.categories || []}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="amount"
+                          label={({ name, percentage }) => `${name} ${percentage}%`}
+                        >
+                          {(analytics?.spending?.categories || []).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={spendingColors[index % spendingColors.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </CardContent>
                 </Card>
               </div>
@@ -384,14 +404,15 @@ export default function Analytics() {
                   <CardDescription>Monthly income over time</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {(analytics?.income?.monthly || []).map((item: any, index: number) => (
-                      <div key={index} className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                        <span className="font-medium">{item.month}</span>
-                        <span className="text-blue-600 font-semibold">{formatCurrency(item.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <LineChart data={analytics?.income?.monthly || []}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                      <Line type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={3} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </CardContent>
               </Card>
             </TabsContent>

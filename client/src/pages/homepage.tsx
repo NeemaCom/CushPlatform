@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { TrendingUp, Shield, Smartphone, ChevronRight } from "lucide-react";
+import { BarChart3, Shield, Smartphone, ChevronRight } from "lucide-react";
 import cushLogo from "@assets/Logo + Typeface_PNG (4)_1749870664804.png";
 
 export default function Homepage() {
@@ -115,7 +115,7 @@ export default function Homepage() {
           <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="text-center">
               <div className="bg-cush-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto">
-                <TrendingUp className="text-cush-blue-600 w-8 h-8" />
+                <BarChart3 className="text-cush-blue-600 w-8 h-8" />
               </div>
               <h3 className="mt-6 text-xl font-semibold text-gray-900">Smart Analytics</h3>
               <p className="mt-4 text-gray-600">Get intelligent insights into your spending patterns and financial trends with advanced analytics.</p>

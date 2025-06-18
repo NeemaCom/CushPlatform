@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Calendar, BookOpen, MessageCircle, Clock, MapPin, User } from "lucide-react";
-import { SimpleSidebar } from "@/components/simple-sidebar";
+import { Sidebar } from "@/components/sidebar";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -146,7 +146,7 @@ export default function CommunityPage() {
 
   return (
     <div className="flex">
-      <SimpleSidebar />
+      <Sidebar />
       <div className="flex-1 ml-64 min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-800">
         <div className="container mx-auto px-4 py-8">
         {/* Header */}

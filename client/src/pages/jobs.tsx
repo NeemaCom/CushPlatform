@@ -21,7 +21,7 @@ import {
   Globe,
   Calendar
 } from 'lucide-react';
-import { SimpleSidebar } from '@/components/simple-sidebar';
+import { Sidebar } from '@/components/sidebar';
 
 interface JobListing {
   id: number;
@@ -101,7 +101,7 @@ export default function Jobs() {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-      <SimpleSidebar />
+      <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 overflow-auto">
           <div className="p-6 max-w-7xl mx-auto">
