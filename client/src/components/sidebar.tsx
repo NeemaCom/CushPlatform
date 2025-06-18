@@ -15,7 +15,8 @@ import {
   Briefcase,
   Building,
   CreditCard as VirtualWallet,
-  Shield
+  Shield,
+  Trophy
 } from "lucide-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, getQueryFn } from "@/lib/queryClient";
@@ -25,6 +26,7 @@ const sidebarItems = [
   { icon: VirtualWallet, label: "Virtual Wallet", href: "#", disabled: true },
   { icon: Home, label: "Dashboard", href: "/dashboard" },
   { icon: MessageCircle, label: "Imisi 2.0", href: "/imisi" },
+  { icon: Trophy, label: "Achievements", href: "/achievements" },
   { icon: Users, label: "Community", href: "/community" },
   { icon: CreditCard, label: "Loans", href: "/loans" },
   { icon: Briefcase, label: "Jobs", href: "/jobs" },
