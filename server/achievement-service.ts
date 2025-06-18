@@ -307,7 +307,7 @@ export class AchievementService {
           .from(financialGoals)
           .where(and(
             eq(financialGoals.userId, userId),
-            eq(financialGoals.status, "completed")
+            eq(financialGoals.isActive, false) // Using isActive field to represent completion
           ));
         currentValue = completedGoals[0]?.count || 0;
         isUnlocked = currentValue >= targetValue;

@@ -2103,10 +2103,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's achievements
   app.get('/api/achievements', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
+      if (!req.user?.id) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      const userId = req.user.id;
 
       const { achievementService } = await import('./achievement-service.js');
       const achievements = await achievementService.getUserAchievements(userId);
@@ -2121,10 +2121,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get user's progress on all badges
   app.get('/api/achievements/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
+      if (!req.user?.id) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      const userId = req.user.id;
 
       const { achievementService } = await import('./achievement-service.js');
       const progress = await achievementService.getUserProgress(userId);
@@ -2139,10 +2139,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get achievement statistics
   app.get('/api/achievements/stats', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
+      if (!req.user?.id) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      const userId = req.user.id;
 
       const { achievementService } = await import('./achievement-service.js');
       const stats = await achievementService.getAchievementStats(userId);
@@ -2157,10 +2157,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Check and update user achievements (triggered after financial actions)
   app.post('/api/achievements/check', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) {
+      if (!req.user?.id) {
         return res.status(401).json({ error: "User not authenticated" });
       }
+      const userId = req.user.id;
 
       const { achievementService } = await import('./achievement-service.js');
       const newAchievements = await achievementService.checkUserAchievements(userId);
