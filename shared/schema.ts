@@ -787,57 +787,12 @@ export const searchJobsSchema = z.object({
 
 
 
-export const searchHousingSchema = z.object({
-  location: z.string().optional(),
-  country: z.string().optional(),
-  city: z.string().optional(),
-  propertyType: z.enum(["room", "apartment", "house", "studio"]).optional(),
-  minRent: z.string().optional(),
-  maxRent: z.string().optional(),
-  bedrooms: z.number().min(0).optional(),
-  bathrooms: z.number().min(0).optional(),
-  furnished: z.boolean().optional(),
-  petsAllowed: z.boolean().optional(),
-  utilitiesIncluded: z.boolean().optional(),
-  availableFrom: z.string().optional(),
-  limit: z.number().min(1).max(50).default(20),
-  offset: z.number().min(0).default(0),
-});
 
-export const updateHousingListingSchema = createInsertSchema(housingListings).pick({
-  title: true,
-  address: true,
-  city: true,
-  country: true,
-  postalCode: true,
-  rentAmount: true,
-  currency: true,
-  propertyType: true,
-  bedrooms: true,
-  bathrooms: true,
-  furnished: true,
-  utilitiesIncluded: true,
-  petsAllowed: true,
-  availabilityDate: true,
-  description: true,
-  amenities: true,
-  photos: true,
-  contactEmail: true,
-  contactPhone: true,
-  area: true,
-  deposit: true,
-  minimumStay: true,
-  isActive: true,
-}).partial();
 
-// Job & Housing type exports
+// Job type exports
 export type JobListing = typeof jobListings.$inferSelect;
-export type HousingListing = typeof housingListings.$inferSelect;
 export type InsertJobListing = z.infer<typeof insertJobListingSchema>;
-export type InsertHousingListing = z.infer<typeof insertHousingListingSchema>;
 export type SearchJobsQuery = z.infer<typeof searchJobsSchema>;
-export type SearchHousingQuery = z.infer<typeof searchHousingSchema>;
-export type UpdateHousingListing = z.infer<typeof updateHousingListingSchema>;
 
 // Validation schemas for API endpoints
 export const createInsightSchema = z.object({
