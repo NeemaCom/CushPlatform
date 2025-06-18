@@ -2106,6 +2106,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== HOUSING DISCOVERY BOARD API ROUTES =====
 
+  // Get all housing listings with filtering
+  app.get('/api/housing', async (req: AuthenticatedRequest, res) => {
+    try {
+      const { 
+        search, 
+        location, 
+        propertyType, 
+        minPrice, 
+        maxPrice, 
+        bedrooms, 
+        furnished,
+        page = 1,
+        limit = 20
+      } = req.query;
+
+      const listings = await storage.getHousingListings({
+        search: search as string,
+        location: location as string,
+        propertyType: propertyType as string,
+        minPrice: minPrice ? parseFloat(minPrice as string) : undefined,
+        maxPrice: maxPrice ? parseFloat(maxPrice as string) : undefined,
+        bedrooms: bedrooms ? parseInt(bedrooms as string) : undefined,
+        furnished: furnished === 'true' ? true : furnished === 'false' ? false : undefined,
+        page: parseInt(page as string),
+        limit: parseInt(limit as string)
+      });
+
+      res.json(listings);
+    } catch (error: any) {
+      console.error('Error fetching housing listings:', error);
+      res.status(500).json({ error: "Failed to fetch housing listings" });
+    }
+  });
+
   // Housing search endpoint
   app.get('/api/housing/search', async (req, res) => {
     try {
