@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { 
   Home, 
-  BarChart3, 
+  TrendingUp, 
   ArrowLeftRight, 
   Wallet, 
   Settings, 
@@ -47,7 +47,7 @@ const navigationGroups: NavGroup[] = [
     icon: Home,
     items: [
       { icon: Home, label: "Dashboard", href: "/dashboard" },
-      { icon: BarChart3, label: "Analytics", href: "/analytics" },
+      { icon: TrendingUp, label: "Analytics", href: "/analytics" },
     ]
   },
   {
