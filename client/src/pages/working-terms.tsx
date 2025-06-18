@@ -257,8 +257,8 @@ const WorkingTerms: React.FC = () => {
                 </p>
                 
                 <div className="space-y-2 text-sm">
-                  <p><strong>Email:</strong> legal@cush.com</p>
-                  <p><strong>Support:</strong> support@cush.com</p>
+                  <p><strong>Email:</strong> legal@we-cush.com</p>
+                  <p><strong>Support:</strong> support@we-cush.com</p>
                   <p><strong>Address:</strong> Cush Legal Team, [Company Address]</p>
                 </div>
               </div>

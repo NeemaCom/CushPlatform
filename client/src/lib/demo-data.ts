@@ -4,7 +4,7 @@ export const isDemoMode = import.meta.env.PROD && !import.meta.env.VITE_API_URL;
 export const demoUser = {
   id: 1,
   username: "demo_user",
-  email: "demo@cush.com",
+  email: "demo@we-cush.com",
   initials: "DU",
   role: "customer" as const,
   hasActiveSubscription: false

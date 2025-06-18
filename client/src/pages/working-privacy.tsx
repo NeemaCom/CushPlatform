@@ -159,8 +159,8 @@ const WorkingPrivacy: React.FC = () => {
                 </p>
                 
                 <div className="space-y-2 text-sm">
-                  <p><strong>Email:</strong> privacy@cush.com</p>
-                  <p><strong>Data Protection Officer:</strong> dpo@cush.com</p>
+                  <p><strong>Email:</strong> privacy@we-cush.com</p>
+                  <p><strong>Data Protection Officer:</strong> dpo@we-cush.com</p>
                   <p><strong>Address:</strong> Cush Privacy Team, [Company Address]</p>
                 </div>
               </div>

@@ -184,8 +184,8 @@ export default function PrivacyPolicy() {
                 If you have questions about this Privacy Policy or our data practices, please contact us:
               </p>
               <div className="space-y-2 text-sm text-gray-700">
-                <p><strong>Email:</strong> privacy@cush.com</p>
-                <p><strong>Data Protection Officer:</strong> dpo@cush.com</p>
+                <p><strong>Email:</strong> privacy@we-cush.com</p>
+                <p><strong>Data Protection Officer:</strong> dpo@we-cush.com</p>
                 <p><strong>Support:</strong> Available through your account dashboard</p>
               </div>
             </div>
