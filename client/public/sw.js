@@ -28,9 +28,7 @@ self.addEventListener('install', (event) => {
       .then((cache) => {
         return cache.addAll(CORE_ASSETS);
       })
-      .then(() => {
-        self.skipWaiting();
-      })
+      // Don't skip waiting to prevent aggressive updates
   );
 });
 
@@ -43,9 +41,8 @@ self.addEventListener('activate', (event) => {
           .filter((cacheName) => cacheName !== CACHE_NAME)
           .map((cacheName) => caches.delete(cacheName))
       );
-    }).then(() => {
-      self.clients.claim();
     })
+    // Don't claim clients immediately to prevent forced refreshes
   );
 });
 
