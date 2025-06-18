@@ -3,6 +3,18 @@ import { registerRoutes } from "./routes";
 
 const app = express();
 
+// Logging function
+export function log(message: string, source = "express") {
+  const formattedTime = new Date().toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  });
+
+  console.log(`${formattedTime} [${source}] ${message}`);
+}
+
 // Express configuration
 app.set('trust proxy', 1);
 
@@ -27,11 +39,6 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -50,14 +57,6 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Setup Vite in development, static serving in production
-  if (process.env.NODE_ENV === 'development') {
-    await setupVite(app, server);
-  } else {
-    // Serve static files in production
-    serveStatic(app);
-  }
-
   // Always serve the app on port 5000 (except for serverless platforms like Vercel)
   // This serves both the API and the client
   if (!process.env.VERCEL) {
@@ -74,7 +73,7 @@ export async function createServer() {
   return server;
 }
 
-// Start server in all environments except serverless platforms
-if (!process.env.VERCEL) {
-  createServer();
+// Start the server in development mode
+if (process.env.NODE_ENV === 'development') {
+  createServer().catch(console.error);
 }
