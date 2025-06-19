@@ -59,22 +59,36 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Serve static files and handle SPA routing
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(process.cwd(), 'dist')));
+  // In development, proxy frontend requests to Vite dev server
+  if (process.env.NODE_ENV === 'development') {
+    const { createProxyMiddleware } = await import('http-proxy-middleware');
+    
+    // Proxy all non-API requests to Vite dev server
+    app.use('/', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        next();
+      } else {
+        createProxyMiddleware({
+          target: 'http://localhost:3000',
+          changeOrigin: true,
+          ws: true
+        })(req, res, next);
+      }
+    });
   } else {
-    // In development, serve static files from public directory
-    app.use(express.static(path.join(process.cwd(), 'public')));
+    // Production: serve built files
+    app.use(express.static(path.join(process.cwd(), 'dist')));
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+      }
+    });
   }
   
   // Handle SPA routing - serve index.html for all non-API routes
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      if (process.env.NODE_ENV === 'production') {
-        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-      } else {
-        res.sendFile(path.join(process.cwd(), 'index.html'));
-      }
+      res.sendFile(path.join(process.cwd(), 'index.html'));
     }
   });
 
