@@ -59,35 +59,21 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // In development, proxy frontend requests to Vite dev server
-  if (process.env.NODE_ENV === 'development') {
-    const { createProxyMiddleware } = await import('http-proxy-middleware');
-    
-    // Proxy all non-API requests to Vite dev server
-    app.use('/', (req, res, next) => {
-      if (req.path.startsWith('/api/')) {
-        next();
-      } else {
-        createProxyMiddleware({
-          target: 'http://localhost:3000',
-          changeOrigin: true,
-          ws: true
-        })(req, res, next);
+  // Configure static file serving
+  app.use(express.static('.', {
+    index: false,
+    setHeaders: (res, path) => {
+      if (path.endsWith('.js') || path.endsWith('.mjs')) {
+        res.setHeader('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.ts') || path.endsWith('.tsx')) {
+        res.setHeader('Content-Type', 'text/javascript');
       }
-    });
-  } else {
-    // Production: serve built files
-    app.use(express.static(path.join(process.cwd(), 'dist')));
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-      }
-    });
-  }
-  
-  // Handle SPA routing - serve index.html for all non-API routes
+    }
+  }));
+
+  // Handle frontend routes
   app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
+    if (!req.path.startsWith('/api/')) {
       res.sendFile(path.join(process.cwd(), 'index.html'));
     }
   });
