@@ -59,19 +59,16 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Configure static file serving
+  // Serve static files and handle SPA routing
   app.use(express.static('.', {
-    index: false,
     setHeaders: (res, path) => {
       if (path.endsWith('.js') || path.endsWith('.mjs')) {
         res.setHeader('Content-Type', 'application/javascript');
-      } else if (path.endsWith('.ts') || path.endsWith('.tsx')) {
-        res.setHeader('Content-Type', 'text/javascript');
       }
     }
   }));
 
-  // Handle frontend routes
+  // Handle SPA routing
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
       res.sendFile(path.join(process.cwd(), 'index.html'));
