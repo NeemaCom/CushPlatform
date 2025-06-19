@@ -59,17 +59,24 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Serve static files from dist in production
+  // Serve static files and handle SPA routing
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(process.cwd(), 'dist')));
-    
-    // Serve index.html for all non-API routes
-    app.get('*', (req, res) => {
-      if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-      }
-    });
+  } else {
+    // In development, serve static files from public directory
+    app.use(express.static(path.join(process.cwd(), 'public')));
   }
+  
+  // Handle SPA routing - serve index.html for all non-API routes
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+      if (process.env.NODE_ENV === 'production') {
+        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+      } else {
+        res.sendFile(path.join(process.cwd(), 'index.html'));
+      }
+    }
+  });
 
   const server = createHttpServer(app);
 
