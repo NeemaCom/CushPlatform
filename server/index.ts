@@ -71,7 +71,7 @@ export async function createServer() {
     });
   }
 
-  const server = createServer(app);
+  const server = createHttpServer(app);
 
   // Serve on port 5000 for compatibility with workflow
   if (!process.env.VERCEL) {
