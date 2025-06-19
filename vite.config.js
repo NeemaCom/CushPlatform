@@ -23,6 +23,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(process.cwd(), './src'),
       '@assets': path.resolve(process.cwd(), './attached_assets'),
+      '@shared': path.resolve(process.cwd(), './shared'),
     },
   },
 });
