@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createServer as createHttpServer } from "http";
 import { registerRoutes } from "./routes";
-import { setupNextJs, createIntegratedServer } from "./next-integration";
+import path from "path";
 
 const app = express();
 
@@ -58,11 +59,19 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Setup Next.js integration
-  await setupNextJs(app);
+  // Serve static files from dist in production
+  if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(process.cwd(), 'dist')));
+    
+    // Serve index.html for all non-API routes
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
+      }
+    });
+  }
 
-  // Create integrated server
-  const server = createIntegratedServer(app);
+  const server = createServer(app);
 
   // Serve on port 5000 for compatibility with workflow
   if (!process.env.VERCEL) {
@@ -77,5 +86,5 @@ export async function createServer() {
 
 // Start the server in development mode
 if (process.env.NODE_ENV === 'development') {
-  createServer().catch(console.error);
+  createServer();
 }
