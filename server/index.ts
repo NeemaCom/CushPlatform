@@ -59,16 +59,17 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Serve static files directly
-  app.use(express.static('.', {
+  // Serve static files from public directory first
+  app.use(express.static('public', {
     setHeaders: (res, path) => {
-      if (path.endsWith('.js') || path.endsWith('.mjs')) {
+      if (path.endsWith('.js')) {
         res.setHeader('Content-Type', 'application/javascript');
-      } else if (path.endsWith('.ts') || path.endsWith('.tsx')) {
-        res.setHeader('Content-Type', 'text/javascript');
       }
     }
   }));
+  
+  // Serve other static files from root
+  app.use(express.static('.', { index: false }));
 
   // Handle SPA routing
   app.get('*', (req, res) => {
