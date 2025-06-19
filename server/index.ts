@@ -59,11 +59,13 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  // Serve static files and handle SPA routing
+  // Serve static files directly
   app.use(express.static('.', {
     setHeaders: (res, path) => {
       if (path.endsWith('.js') || path.endsWith('.mjs')) {
         res.setHeader('Content-Type', 'application/javascript');
+      } else if (path.endsWith('.ts') || path.endsWith('.tsx')) {
+        res.setHeader('Content-Type', 'text/javascript');
       }
     }
   }));
