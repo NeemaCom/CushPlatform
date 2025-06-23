@@ -2417,6 +2417,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI Predictive Analytics endpoints
+  app.get('/api/ai/predictive-insights', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { aiPredictiveService } = await import('./ai-predictive-service');
+      const insights = await aiPredictiveService.generatePredictiveInsights(req.userId!);
+      res.json(insights);
+    } catch (error) {
+      console.error('Error generating predictive insights:', error);
+      res.status(500).json({ error: 'Failed to generate predictive insights' });
+    }
+  });
+
+  app.get('/api/ai/smart-alerts', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { aiPredictiveService } = await import('./ai-predictive-service');
+      const alerts = await aiPredictiveService.generateSmartAlerts(req.userId!);
+      res.json(alerts);
+    } catch (error) {
+      console.error('Error generating smart alerts:', error);
+      res.status(500).json({ error: 'Failed to generate smart alerts' });
+    }
+  });
+
+  app.get('/api/ai/financial-forecast', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { aiPredictiveService } = await import('./ai-predictive-service');
+      const forecast = await aiPredictiveService.generateFinancialForecast(req.userId!);
+      res.json(forecast);
+    } catch (error) {
+      console.error('Error generating financial forecast:', error);
+      res.status(500).json({ error: 'Failed to generate financial forecast' });
+    }
+  });
+
   // Financial Insights API
   app.get("/api/financial-insights", isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {
