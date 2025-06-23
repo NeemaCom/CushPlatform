@@ -1,6 +1,253 @@
 // Simple React application entry point
 const { useState, useEffect, createElement: e } = React;
 
+// Authentication Component
+function AuthComponent() {
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const [testCredentials, setTestCredentials] = useState(null);
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // Get test credentials for development
+    fetch('/api/test-credentials')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => setTestCredentials(data))
+      .catch(() => {});
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm)
+      });
+      
+      if (response.ok) {
+        window.location.reload();
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Login failed');
+      }
+    } catch (error) {
+      alert('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const useTestAccount = (credentials) => {
+    setLoginForm({ email: credentials.email, password: credentials.password });
+  };
+
+  return e('div', {
+    style: {
+      textAlign: 'center',
+      padding: '3rem',
+      maxWidth: '400px',
+      margin: '0 auto'
+    }
+  }, [
+    e('h2', {
+      key: 'title',
+      style: { color: '#1f2937', marginBottom: '0.5rem' }
+    }, 'Sign in to Cush Platform'),
+    
+    e('p', {
+      key: 'subtitle',
+      style: { color: '#6b7280', marginBottom: '2rem' }
+    }, 'Access your personalized financial dashboard'),
+
+    // Login Form
+    e('form', {
+      key: 'login-form',
+      onSubmit: handleLogin,
+      style: { marginBottom: '2rem' }
+    }, [
+      e('div', {
+        key: 'email-group',
+        style: { marginBottom: '1rem', textAlign: 'left' }
+      }, [
+        e('label', {
+          key: 'email-label',
+          style: { display: 'block', marginBottom: '0.5rem', fontWeight: '500' }
+        }, 'Email'),
+        e('input', {
+          key: 'email-input',
+          type: 'email',
+          value: loginForm.email,
+          onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
+          required: true,
+          style: {
+            width: '100%',
+            padding: '0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.375rem',
+            fontSize: '1rem'
+          }
+        })
+      ]),
+      
+      e('div', {
+        key: 'password-group',
+        style: { marginBottom: '1.5rem', textAlign: 'left' }
+      }, [
+        e('label', {
+          key: 'password-label',
+          style: { display: 'block', marginBottom: '0.5rem', fontWeight: '500' }
+        }, 'Password'),
+        e('input', {
+          key: 'password-input',
+          type: 'password',
+          value: loginForm.password,
+          onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
+          required: true,
+          style: {
+            width: '100%',
+            padding: '0.75rem',
+            border: '1px solid #d1d5db',
+            borderRadius: '0.375rem',
+            fontSize: '1rem'
+          }
+        })
+      ]),
+      
+      e('button', {
+        key: 'submit-btn',
+        type: 'submit',
+        disabled: loading,
+        style: {
+          width: '100%',
+          backgroundColor: loading ? '#9ca3af' : '#3b82f6',
+          color: 'white',
+          padding: '0.75rem',
+          border: 'none',
+          borderRadius: '0.375rem',
+          fontSize: '1rem',
+          fontWeight: '500',
+          cursor: loading ? 'not-allowed' : 'pointer'
+        }
+      }, loading ? 'Signing in...' : 'Sign In')
+    ]),
+
+    // Test Accounts Section
+    testCredentials && e('div', {
+      key: 'test-accounts',
+      style: {
+        borderTop: '1px solid #e5e7eb',
+        paddingTop: '2rem'
+      }
+    }, [
+      e('button', {
+        key: 'toggle-test',
+        onClick: () => setShowTestAccounts(!showTestAccounts),
+        style: {
+          backgroundColor: '#f3f4f6',
+          color: '#374151',
+          padding: '0.5rem 1rem',
+          border: '1px solid #d1d5db',
+          borderRadius: '0.375rem',
+          fontSize: '0.875rem',
+          cursor: 'pointer',
+          marginBottom: '1rem'
+        }
+      }, showTestAccounts ? 'Hide Test Accounts' : 'Show Test Accounts'),
+      
+      showTestAccounts && e('div', {
+        key: 'test-list',
+        style: { textAlign: 'left' }
+      }, [
+        e('p', {
+          key: 'test-note',
+          style: { fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }
+        }, 'Click on any test account to auto-fill the login form:'),
+        
+        e('div', {
+          key: 'test-accounts-list',
+          style: { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
+        }, testCredentials.testAccounts.map((account, i) =>
+          e('div', {
+            key: i,
+            onClick: () => useTestAccount(account),
+            style: {
+              padding: '1rem',
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s'
+            },
+            onMouseEnter: (e) => e.target.style.backgroundColor = '#f3f4f6',
+            onMouseLeave: (e) => e.target.style.backgroundColor = '#f9fafb'
+          }, [
+            e('div', {
+              key: 'account-header',
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }
+            }, [
+              e('strong', { key: 'email' }, account.email),
+              e('span', {
+                key: 'role',
+                style: {
+                  fontSize: '0.75rem',
+                  padding: '0.25rem 0.5rem',
+                  backgroundColor: account.role === 'admin' ? '#dbeafe' : '#dcfce7',
+                  color: account.role === 'admin' ? '#1e40af' : '#166534',
+                  borderRadius: '0.25rem'
+                }
+              }, account.role)
+            ]),
+            e('p', {
+              key: 'description',
+              style: { fontSize: '0.875rem', color: '#6b7280', margin: 0 }
+            }, account.description)
+          ])
+        ))
+      ])
+    ]),
+
+    // Google OAuth option
+    e('div', {
+      key: 'oauth-divider',
+      style: {
+        borderTop: '1px solid #e5e7eb',
+        paddingTop: '2rem',
+        marginTop: '2rem'
+      }
+    }, [
+      e('p', {
+        key: 'or-text',
+        style: { fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }
+      }, 'Or continue with:'),
+      
+      e('button', {
+        key: 'google-btn',
+        onClick: () => window.location.href = '/api/auth/google',
+        style: {
+          backgroundColor: '#fff',
+          color: '#374151',
+          padding: '0.75rem 1.5rem',
+          border: '1px solid #d1d5db',
+          borderRadius: '0.375rem',
+          fontSize: '1rem',
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '0.5rem',
+          margin: '0 auto'
+        }
+      }, [
+        e('span', { key: 'google-icon' }, '🔗'),
+        e('span', { key: 'google-text' }, 'Sign in with Google')
+      ])
+    ])
+  ]);
+}
+
 // Enhanced Dashboard Component
 function EnhancedDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
@@ -442,35 +689,7 @@ function App() {
     }, [
       user ? 
         React.createElement(EnhancedDashboard, { key: 'dashboard' }) :
-        React.createElement('div', {
-          key: 'auth',
-          style: {
-            textAlign: 'center',
-            padding: '3rem'
-          }
-        }, [
-          React.createElement('h2', {
-            key: 'signin-title',
-            style: { color: '#1f2937' }
-          }, 'Sign in to your account'),
-          React.createElement('p', {
-            key: 'signin-desc',
-            style: { color: '#6b7280', marginBottom: '2rem' }
-          }, 'Access your personalized immigration services dashboard'),
-          React.createElement('button', {
-            key: 'signin-btn',
-            style: {
-              backgroundColor: '#3b82f6',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '0.5rem',
-              fontSize: '1rem',
-              cursor: 'pointer'
-            },
-            onClick: () => window.location.href = '/api/auth/google'
-          }, 'Sign in with Google')
-        ])
+        React.createElement(AuthComponent, { key: 'auth' })
     ])
   ]);
 }
