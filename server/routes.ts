@@ -218,13 +218,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Enhanced login endpoint (both signin and login for compatibility)
   const loginHandler = async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { username, password } = loginSchema.parse(req.body);
+      const { email, username, password } = loginSchema.parse(req.body);
       
       // Support login with either username or email
-      let user = await storage.getUserByUsername(username);
+      const loginIdentifier = email || username;
+      let user = await storage.getUserByEmail(loginIdentifier!);
       if (!user) {
-        // Try to find user by email if username lookup failed
-        user = await storage.getUserByEmail(username);
+        // Try to find user by username if email lookup failed
+        user = await storage.getUserByUsername(loginIdentifier!);
       }
       
       if (!user) {
