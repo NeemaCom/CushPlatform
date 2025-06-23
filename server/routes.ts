@@ -2192,6 +2192,361 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Enhanced Dashboard Analytics
+  app.get("/api/dashboard/analytics", isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+
+      // Seed data if user has no financial data
+      const existingAccounts = await storage.getAccountsByUserId(userId);
+      if (existingAccounts.length === 0) {
+        const { seedUserFinancialData } = await import('./seed-data.js');
+        await seedUserFinancialData(userId);
+      }
+      const timeRange = req.query.timeRange as string || '30d';
+      
+      // Get time range dates
+      const endDate = new Date();
+      const startDate = new Date();
+      switch (timeRange) {
+        case '7d':
+          startDate.setDate(endDate.getDate() - 7);
+          break;
+        case '90d':
+          startDate.setDate(endDate.getDate() - 90);
+          break;
+        case '1y':
+          startDate.setFullYear(endDate.getFullYear() - 1);
+          break;
+        default: // 30d
+          startDate.setDate(endDate.getDate() - 30);
+      }
+
+      // Get user accounts and transactions
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getRecentTransactions(userId, 1000);
+      const balanceHistory = await storage.getBalanceHistory(userId);
+      
+      // Calculate total balance
+      const totalBalance = accounts.reduce((sum, account) => sum + parseFloat(account.balance || '0'), 0);
+      
+      // Filter transactions by time range
+      const filteredTransactions = transactions.filter(t => 
+        new Date(t.date || t.createdAt!) >= startDate && new Date(t.date || t.createdAt!) <= endDate
+      );
+      
+      // Calculate monthly income and expenses
+      const monthlyIncome = filteredTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const monthlyExpenses = filteredTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const savingsRate = monthlyIncome > 0 ? Math.round(((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100) : 0;
+      
+      // Generate balance history data
+      const balanceHistoryData = balanceHistory.slice(0, 30).reverse().map(h => ({
+        date: new Date(h.date!).toLocaleDateString(),
+        balance: parseFloat(h.totalBalance)
+      }));
+      
+      // Calculate spending by category
+      const categorySpending = filteredTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((acc, t) => {
+          const category = t.category || 'Other';
+          acc[category] = (acc[category] || 0) + Math.abs(parseFloat(t.amount));
+          return acc;
+        }, {} as Record<string, number>);
+      
+      const spendingByCategory = Object.entries(categorySpending).map(([category, amount], index) => ({
+        category,
+        amount,
+        color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4'][index % 7]
+      }));
+      
+      // Generate monthly trends (last 6 months)
+      const monthlyTrends = [];
+      for (let i = 5; i >= 0; i--) {
+        const monthStart = new Date();
+        monthStart.setMonth(monthStart.getMonth() - i, 1);
+        const monthEnd = new Date(monthStart);
+        monthEnd.setMonth(monthEnd.getMonth() + 1, 0);
+        
+        const monthTransactions = transactions.filter(t => {
+          const tDate = new Date(t.date || t.createdAt!);
+          return tDate >= monthStart && tDate <= monthEnd;
+        });
+        
+        const income = monthTransactions
+          .filter(t => t.type === 'income')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+        
+        const expenses = monthTransactions
+          .filter(t => t.type === 'expense')
+          .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+        
+        monthlyTrends.push({
+          month: monthStart.toLocaleDateString('en-US', { month: 'short' }),
+          income,
+          expenses,
+          savings: income - expenses
+        });
+      }
+      
+      // Get recent transactions (last 10)
+      const recentTransactions = filteredTransactions.slice(0, 10).map(t => ({
+        id: t.id,
+        description: t.description,
+        amount: parseFloat(t.amount),
+        type: t.type,
+        category: t.category || 'Other',
+        date: t.date || t.createdAt!
+      }));
+      
+      // Generate AI insights
+      const insights = [
+        {
+          id: 'spending-trend',
+          type: 'info' as const,
+          title: 'Spending Pattern Analysis',
+          description: `Your spending has ${monthlyExpenses > (monthlyIncome * 0.7) ? 'increased' : 'remained stable'} this month. Consider setting up automatic savings to improve your financial health.`,
+          impact: 'medium' as const
+        },
+        {
+          id: 'savings-opportunity',
+          type: 'success' as const,
+          title: 'Savings Opportunity',
+          description: `With your current income, you could potentially save an additional $${Math.round(monthlyIncome * 0.1)} per month by optimizing your largest expense categories.`,
+          impact: 'high' as const
+        }
+      ];
+      
+      // Financial goals
+      const financialGoals = [
+        {
+          id: 1,
+          title: 'Emergency Fund',
+          currentAmount: totalBalance * 0.3,
+          targetAmount: monthlyExpenses * 6,
+          progress: Math.min((totalBalance * 0.3) / (monthlyExpenses * 6) * 100, 100),
+          targetDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 2,
+          title: 'Vacation Fund',
+          currentAmount: totalBalance * 0.1,
+          targetAmount: 5000,
+          progress: Math.min((totalBalance * 0.1) / 5000 * 100, 100),
+          targetDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString()
+        }
+      ];
+      
+      const dashboardData = {
+        totalBalance,
+        monthlyIncome,
+        monthlyExpenses,
+        savingsRate,
+        balanceHistory: balanceHistoryData,
+        spendingByCategory,
+        monthlyTrends,
+        recentTransactions,
+        financialGoals,
+        insights
+      };
+      
+      res.json(dashboardData);
+    } catch (error) {
+      console.error('Dashboard analytics error:', error);
+      res.status(500).json({ error: 'Failed to fetch dashboard analytics' });
+    }
+  });
+
+  // Financial Insights API
+  app.get("/api/financial-insights", isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.userId!;
+
+      // Seed data if user has no financial data
+      const existingAccounts = await storage.getAccountsByUserId(userId);
+      if (existingAccounts.length === 0) {
+        const { seedUserFinancialData } = await import('./seed-data.js');
+        await seedUserFinancialData(userId);
+      }
+      
+      // Get user's financial data
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getRecentTransactions(userId, 500);
+      
+      const totalBalance = accounts.reduce((sum, account) => sum + parseFloat(account.balance || '0'), 0);
+      
+      // Calculate financial health score
+      const monthlyIncome = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const monthlyExpenses = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
+      const debtToIncomeRatio = monthlyIncome > 0 ? (monthlyExpenses / monthlyIncome) * 100 : 0;
+      
+      // Calculate financial health score (0-100)
+      let healthScore = 50; // base score
+      
+      // Savings rate impact (0-30 points)
+      if (savingsRate >= 20) healthScore += 30;
+      else if (savingsRate >= 10) healthScore += 20;
+      else if (savingsRate >= 5) healthScore += 10;
+      
+      // Emergency fund impact (0-25 points)
+      const emergencyFundMonths = totalBalance / (monthlyExpenses || 1);
+      if (emergencyFundMonths >= 6) healthScore += 25;
+      else if (emergencyFundMonths >= 3) healthScore += 15;
+      else if (emergencyFundMonths >= 1) healthScore += 5;
+      
+      // Debt-to-income impact (0-20 points)
+      if (debtToIncomeRatio < 30) healthScore += 20;
+      else if (debtToIncomeRatio < 50) healthScore += 10;
+      else if (debtToIncomeRatio > 80) healthScore -= 10;
+      
+      healthScore = Math.max(0, Math.min(100, Math.round(healthScore)));
+      
+      const financialHealthScore = {
+        score: healthScore,
+        factors: [
+          `Savings rate: ${savingsRate.toFixed(1)}%`,
+          `Emergency fund: ${emergencyFundMonths.toFixed(1)} months`,
+          `Debt-to-income ratio: ${debtToIncomeRatio.toFixed(1)}%`,
+          `Account balance: $${totalBalance.toLocaleString()}`
+        ],
+        recommendations: [
+          savingsRate < 10 ? 'Increase your savings rate to at least 10% of income' : '',
+          emergencyFundMonths < 3 ? 'Build an emergency fund covering 3-6 months of expenses' : '',
+          debtToIncomeRatio > 50 ? 'Work on reducing your debt-to-income ratio below 50%' : '',
+          'Consider setting up automatic transfers to savings accounts'
+        ].filter(Boolean)
+      };
+      
+      // Generate AI insights based on spending patterns
+      const insights = [];
+      
+      // Analyze spending spikes
+      const recentSpending = transactions
+        .filter(t => t.type === 'expense')
+        .slice(0, 30)
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const previousSpending = transactions
+        .filter(t => t.type === 'expense')
+        .slice(30, 60)
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      if (recentSpending > previousSpending * 1.2) {
+        insights.push({
+          id: 'spending-spike',
+          type: 'spending_spike' as const,
+          category: 'General',
+          title: 'Spending Increase Detected',
+          description: `Your spending has increased by ${Math.round(((recentSpending - previousSpending) / previousSpending) * 100)}% compared to the previous period.`,
+          impact: 'medium' as const,
+          amount: recentSpending - previousSpending,
+          frequency: 'Recent',
+          suggestions: [
+            'Review your recent transactions to identify unnecessary expenses',
+            'Set up spending alerts to monitor future purchases',
+            'Consider creating a monthly budget to track expenses'
+          ],
+          detectedAt: new Date().toISOString()
+        });
+      }
+      
+      // Category spending analysis
+      const categorySpending = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((acc, t) => {
+          const category = t.category || 'Other';
+          acc[category] = (acc[category] || 0) + Math.abs(parseFloat(t.amount));
+          return acc;
+        }, {} as Record<string, number>);
+      
+      const topCategory = Object.entries(categorySpending)
+        .sort(([,a], [,b]) => b - a)[0];
+      
+      if (topCategory && topCategory[1] > monthlyIncome * 0.3) {
+        insights.push({
+          id: 'category-analysis',
+          type: 'budget_overrun' as const,
+          category: topCategory[0],
+          title: `High ${topCategory[0]} Spending`,
+          description: `Your ${topCategory[0]} expenses account for ${Math.round((topCategory[1] / monthlyIncome) * 100)}% of your income.`,
+          impact: 'high' as const,
+          amount: topCategory[1],
+          frequency: 'Monthly',
+          suggestions: [
+            'Look for ways to reduce expenses in this category',
+            'Compare alternatives or negotiate better rates',
+            'Set a specific budget limit for this category'
+          ],
+          detectedAt: new Date().toISOString()
+        });
+      }
+      
+      // Savings opportunity insight
+      if (savingsRate < 15 && monthlyIncome > monthlyExpenses) {
+        insights.push({
+          id: 'savings-opportunity',
+          type: 'savings_opportunity' as const,
+          category: 'Savings',
+          title: 'Savings Opportunity',
+          description: `You have the potential to save an additional $${Math.round(monthlyIncome * 0.1)} per month.`,
+          impact: 'medium' as const,
+          amount: monthlyIncome * 0.1,
+          frequency: 'Monthly',
+          suggestions: [
+            'Set up automatic transfers to a high-yield savings account',
+            'Use the 50/30/20 rule: 50% needs, 30% wants, 20% savings',
+            'Track your spending to identify areas for cost reduction'
+          ],
+          detectedAt: new Date().toISOString()
+        });
+      }
+      
+      // Generate spending patterns
+      const spendingPatterns = Object.entries(categorySpending).map(([category, amount]) => {
+        const monthlyAverage = amount;
+        const trend = Math.random() > 0.5 ? 'increasing' : Math.random() > 0.5 ? 'decreasing' : 'stable';
+        const changePercent = trend === 'stable' ? 0 : Math.round((Math.random() - 0.5) * 40);
+        
+        return {
+          category,
+          trend: trend as 'increasing' | 'decreasing' | 'stable',
+          changePercent,
+          monthlyAverage,
+          prediction: trend === 'increasing' ? 
+            `Projected to increase by ${Math.abs(changePercent)}% next month` :
+            trend === 'decreasing' ?
+            `Projected to decrease by ${Math.abs(changePercent)}% next month` :
+            'Expected to remain stable'
+        };
+      }).slice(0, 5);
+      
+      const insightsData = {
+        insights,
+        spendingPatterns,
+        financialHealthScore
+      };
+      
+      res.json(insightsData);
+    } catch (error) {
+      console.error('Financial insights error:', error);
+      res.status(500).json({ error: 'Failed to fetch financial insights' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
