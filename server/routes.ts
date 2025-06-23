@@ -759,10 +759,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasActiveSubscription
       };
 
-      // Generate AI response using Gemini
+      // Enhanced migration-focused response using Imisi Enhanced Service
+      const { imisiEnhancedService } = await import('./imisi-enhanced-service');
+      
+      // Check if this is a migration assessment request
+      if (message.toLowerCase().includes('assess') || message.toLowerCase().includes('eligibility')) {
+        const migrationProfile = {
+          userId,
+          targetCountry: 'Canada', // Default, could be extracted from message
+          currentCountry: user.nationality || 'Unknown',
+          profession: 'Software Engineer', // Could be from user profile
+          education: 'Bachelor\'s Degree',
+          languageSkills: ['English'],
+          workExperience: 5,
+          age: 30,
+          familySize: 1,
+          budget: currentBalance,
+        };
+
+        const assessment = await imisiEnhancedService.generateMigrationAssessment(migrationProfile);
+        
+        const finalSessionId = sessionId || Math.random().toString(36).substring(2, 15);
+        const chatMessage = await storage.createChatMessage({
+          userId,
+          message,
+          response: `Based on your profile, I've identified ${assessment.eligiblePathways.length} potential migration pathways. Your recommended pathway is: ${assessment.recommendedPathway.name}`,
+          context: null,
+          sessionId: finalSessionId || undefined
+        });
+
+        return res.json({
+          id: chatMessage.id,
+          message: `Based on your profile, I've identified ${assessment.eligiblePathways.length} potential migration pathways. Your recommended pathway is: ${assessment.recommendedPathway.name}`,
+          assessment: assessment,
+          suggestions: assessment.nextSteps,
+          actions: [
+            {
+              type: 'view_pathway',
+              label: 'View Detailed Pathway',
+              data: assessment.recommendedPathway
+            },
+            {
+              type: 'financial_plan',
+              label: 'View Financial Plan',
+              data: assessment.financialPlan
+            }
+          ],
+          sessionId: chatMessage.sessionId,
+          timestamp: chatMessage.createdAt
+        });
+      }
+
+      // Regular chat response using existing Gemini service
       const aiResponse = await geminiService.generateResponse(message, context);
 
-      // Store chat message in database
       const finalSessionId = sessionId || Math.random().toString(36).substring(2, 15);
       const chatMessage = await storage.createChatMessage({
         userId,
@@ -790,6 +840,97 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       res.status(500).json({ error: "AI assistant temporarily unavailable" });
+    }
+  });
+
+  // Enhanced Imisi endpoints
+  app.get("/api/imisi/migration-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Mock migration profile - in real app this would be stored
+      const migrationProfile = {
+        userId,
+        targetCountry: 'Canada',
+        currentCountry: user.nationality || 'Unknown',
+        profession: 'Software Engineer',
+        education: 'Bachelor\'s Degree',
+        languageSkills: ['English'],
+        workExperience: 5,
+        age: 30,
+        familySize: 1,
+        budget: 25000,
+        currentStep: 'Document preparation',
+        completedSteps: ['Language test', 'Educational assessment']
+      };
+
+      res.json(migrationProfile);
+    } catch (error) {
+      console.error("Migration profile error:", error);
+      res.status(500).json({ error: "Failed to fetch migration profile" });
+    }
+  });
+
+  app.post("/api/imisi/financial-plan", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { imisiEnhancedService } = await import('./imisi-enhanced-service');
+      
+      // Get user's migration profile
+      const user = await storage.getUser(userId);
+      const accounts = await storage.getAccountsByUserId(userId);
+      const currentBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || "0"), 0);
+
+      const migrationProfile = {
+        userId,
+        targetCountry: req.body.targetCountry || 'Canada',
+        currentCountry: user?.nationality || 'Unknown',
+        profession: req.body.profession || 'Software Engineer',
+        education: req.body.education || 'Bachelor\'s Degree',
+        languageSkills: req.body.languageSkills || ['English'],
+        workExperience: req.body.workExperience || 5,
+        age: req.body.age || 30,
+        familySize: req.body.familySize || 1,
+        budget: currentBalance,
+      };
+
+      const financialPlan = await imisiEnhancedService.generateFinancialBreakdown(migrationProfile);
+      res.json(financialPlan);
+    } catch (error) {
+      console.error("Financial plan error:", error);
+      res.status(500).json({ error: "Failed to generate financial plan" });
+    }
+  });
+
+  app.post("/api/imisi/checklist", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { imisiEnhancedService } = await import('./imisi-enhanced-service');
+      
+      const user = await storage.getUser(userId);
+      const migrationProfile = {
+        userId,
+        targetCountry: req.body.targetCountry || 'Canada',
+        currentCountry: user?.nationality || 'Unknown',
+        profession: req.body.profession || 'Software Engineer',
+        education: req.body.education || 'Bachelor\'s Degree',
+        languageSkills: req.body.languageSkills || ['English'],
+        workExperience: req.body.workExperience || 5,
+        age: req.body.age || 30,
+        familySize: req.body.familySize || 1,
+        budget: 25000,
+      };
+
+      const checklist = await imisiEnhancedService.generatePreDepartureChecklist(migrationProfile);
+      res.json(checklist);
+    } catch (error) {
+      console.error("Checklist error:", error);
+      res.status(500).json({ error: "Failed to generate checklist" });
     }
   });
 
