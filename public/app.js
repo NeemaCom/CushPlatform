@@ -118,5 +118,6 @@ function App() {
   ]);
 }
 
-// Mount the React application
-ReactDOM.render(React.createElement(App), document.getElementById('root'));
+// Mount the React application using React 18 API
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(App));
