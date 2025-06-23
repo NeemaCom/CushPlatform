@@ -43,7 +43,7 @@ interface ChatHistoryResponse {
 export function ImisiChatHead() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [hasNewSuggestion, setHasNewSuggestion] = useState(false);
+  const [hasNewSuggestion, setHasNewSuggestion] = useState(true);
   const [, setLocation] = useLocation();
 
   // Get proactive suggestions
@@ -77,27 +77,112 @@ export function ImisiChatHead() {
 
   return (
     <>
-      {/* Animated Chat Head */}
+      {/* Proactive Suggestion Bubble */}
+      {proactiveSuggestion?.suggestion && !isOpen && hasNewSuggestion && (
+        <div className="fixed bottom-24 right-6 z-40 max-w-xs animate-fadeIn">
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-xl shadow-lg border border-blue-200 dark:border-blue-700 p-4 relative">
+            <button
+              onClick={() => setHasNewSuggestion(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex items-start gap-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <span className="text-white text-sm">🤖</span>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900 dark:text-white mb-1">Imisi suggests:</p>
+                <p className="text-sm text-gray-700 dark:text-gray-300 pr-4">{proactiveSuggestion.suggestion}</p>
+                <button
+                  onClick={toggleChat}
+                  className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Chat with Imisi →
+                </button>
+              </div>
+            </div>
+            <div className="absolute bottom-0 right-8 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-blue-200 dark:border-t-blue-700 transform translate-y-full"></div>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Chat Head */}
       <div className="fixed bottom-6 right-6 z-50">
-        <Button
+        <button
           onClick={toggleChat}
-          className={`
-            relative w-14 h-14 rounded-full shadow-xl transition-all duration-300 
-            pulsing-orb hover:scale-110
-            ${hasNewSuggestion ? 'animate-bounce' : ''}
-          `}
+          className={`relative w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group overflow-hidden ${
+            isOpen ? 'scale-110' : 'hover:scale-105'
+          } ${hasNewSuggestion ? 'animate-bounce' : ''}`}
         >
-          <MessageCircle className="w-6 h-6" />
-        </Button>
+          {/* Animated Background */}
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          
+          {/* Icon Container */}
+          <div className="relative z-10 transition-transform duration-200">
+            {isOpen ? (
+              <X className="h-6 w-6 text-white" />
+            ) : (
+              <div className="flex items-center justify-center">
+                <MessageCircle className="h-6 w-6 text-white" />
+                <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+                  <span className="text-xs">🧠</span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Pulse Animation */}
+          <div className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20"></div>
+          
+          {/* Online Indicator */}
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
+            <div className="w-2 h-2 bg-green-600 rounded-full animate-pulse"></div>
+          </div>
+
+          {/* AI Badge */}
+          <div className="absolute -bottom-1 -left-1 bg-white rounded-full px-2 py-0.5 shadow-md">
+            <span className="text-xs font-bold text-blue-600">AI</span>
+          </div>
+        </button>
       </div>
 
+      {/* Enhanced Chat Interface */}
       {isOpen && (
-        <div className={`
-          fixed bottom-24 right-6 z-40 w-96 transition-all duration-300
-          ${isMinimized ? 'h-14' : 'h-[500px]'}
-        `}>
-          <Card className="h-full shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
-            <CardHeader className="pb-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg">
+        <div className={`fixed bottom-24 right-6 z-40 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ${
+          isMinimized ? 'h-12' : 'h-[600px]'
+        }`}>
+          {/* Header */}
+          <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                <span className="text-lg">🤖</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">Imisi 2.0</h3>
+                <p className="text-sm opacity-90">AI Migration Concierge</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-xs font-medium">Online</span>
+                </div>
+                <button
+                  onClick={() => setIsMinimized(!isMinimized)}
+                  className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors"
+                >
+                  {isMinimized ? <Bot className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Chat Content */}
+          {!isMinimized && (
+            <ImisiChatInterface />
+          )}
+        </div>
+      )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Bot className="w-5 h-5" />
