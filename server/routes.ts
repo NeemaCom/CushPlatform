@@ -2192,6 +2192,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create test users endpoint
+  app.post('/api/admin/create-test-users', async (req: AuthenticatedRequest, res) => {
+    try {
+      const { createTestUsers } = await import('./create-test-users.js');
+      const users = await createTestUsers();
+      
+      res.json({ 
+        message: "Test users created successfully",
+        users: users.map(u => ({
+          id: u.id,
+          email: u.email,
+          username: u.username,
+          role: u.role
+        }))
+      });
+    } catch (error) {
+      console.error('Error creating test users:', error);
+      res.status(500).json({ error: "Failed to create test users" });
+    }
+  });
+
+  // Get test user credentials (development only)
+  app.get('/api/test-credentials', async (req: AuthenticatedRequest, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    res.json({
+      testAccounts: [
+        {
+          email: 'demo@cush.com',
+          password: 'demo123',
+          role: 'customer',
+          description: 'Demo customer account with sample financial data'
+        },
+        {
+          email: 'admin@cush.com', 
+          password: 'admin123',
+          role: 'admin',
+          description: 'Admin account with full platform access'
+        },
+        {
+          email: 'customer@cush.com',
+          password: 'customer123', 
+          role: 'customer',
+          description: 'Test customer account'
+        }
+      ],
+      note: 'These are test accounts for development and demo purposes only'
+    });
+  });
+
   // Enhanced Dashboard Analytics
   app.get("/api/dashboard/analytics", isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {
