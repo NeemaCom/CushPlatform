@@ -1,3 +1,6 @@
+// Simple React application entry point
+const { useState, useEffect, createElement: e } = React;
+
 // Homepage Hero Section
 function HeroSection() {
   return e('section', {
@@ -21,7 +24,10 @@ function HeroSection() {
           e('div', { className: 'flex flex-col sm:flex-row gap-4' },
             e('button', {
               className: 'bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-3 rounded-lg transition-colors',
-              onClick: () => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })
+              onClick: () => {
+                const authSection = document.getElementById('auth-section');
+                if (authSection) authSection.scrollIntoView({ behavior: 'smooth' });
+              }
             }, 'Start Your Journey'),
             e('button', {
               className: 'border-2 border-white text-white hover:bg-white hover:text-blue-600 font-semibold px-8 py-3 rounded-lg transition-colors'
@@ -1202,9 +1208,19 @@ function App() {
 
   return user ? 
     e(MainDashboard, { key: 'dashboard', user }) :
-    e(AuthComponent, { key: 'auth' });
+    e(NewHomepage, { key: 'homepage' });
 }
 
-// Mount the React application using React 18 API
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+// New Homepage Component
+function NewHomepage() {
+  return e('div', { className: 'min-h-screen' }, [
+    e(HeroSection, { key: 'hero' }),
+    e(FeaturesSection, { key: 'features' }),
+    e(TestimonialsSection, { key: 'testimonials' }),
+    e(CommunityPreview, { key: 'community' }),
+    e(AuthComponent, { key: 'auth' })
+  ]);
+}
+
+// Mount the React application
+ReactDOM.render(e(App), document.getElementById('root'));
