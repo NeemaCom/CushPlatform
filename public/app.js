@@ -432,122 +432,117 @@ function CommunityPreview() {
     ])
   ]);
 }
-  const features = [
-    { icon: '🤖', title: 'AI-Powered Guidance', desc: 'Get personalized immigration advice from Imisi, our AI concierge trained on the latest immigration policies.' },
-    { icon: '💰', title: 'Financial Planning', desc: 'Calculate immigration costs, plan your budget, and track expenses with integrated financial tools.' },
-    { icon: '👥', title: 'Expert Mentorship', desc: 'Connect with immigration experts and successful immigrants who can guide you through your journey.' },
-    { icon: '📄', title: 'Document Management', desc: 'Organize, track, and verify all your immigration documents with our secure digital vault.' },
-    { icon: '🗺️', title: 'Local Job Discovery', desc: 'Find job opportunities in your target country with location-based job matching.' },
-    { icon: '💳', title: 'Loan Referrals', desc: 'Access immigration loans and financing options through our trusted partner network.' }
-  ];
 
-  return e('section', { className: 'py-16 bg-white' },
-    e('div', { className: 'container mx-auto px-6' },
-      e('div', { className: 'text-center mb-12' },
-        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
-          'Everything You Need for Immigration Success'
-        ),
-        e('p', { className: 'text-lg text-gray-600 max-w-3xl mx-auto' },
-          'From AI-powered guidance to financial planning, we provide comprehensive tools and support for every step of your immigration journey'
-        )
-      ),
-      e('div', { className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-6' },
-        ...features.map((feature, index) =>
-          e('div', {
-            key: index,
-            className: 'group hover:shadow-xl transition-all duration-300 border rounded-lg p-6 hover:-translate-y-1'
-          },
-            e('div', { className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300' },
-              e('span', { className: 'text-2xl' }, feature.icon)
-            ),
-            e('h3', { className: 'text-xl font-bold text-gray-900 mb-3' }, feature.title),
-            e('p', { className: 'text-gray-600 leading-relaxed' }, feature.desc)
-          )
-        )
-      )
-    )
-  );
-}
-
-// Testimonials Section
+// Simple Testimonials Section - Fixed syntax
 function TestimonialsSection() {
-  const testimonials = [
-    { name: 'Sarah Chen', role: 'Software Engineer', country: 'Canada', content: 'Cush made my Express Entry application seamless. The AI guidance was incredibly accurate, and I received my PR in just 6 months!', journey: 'Nigeria → Canada' },
-    { name: 'David Rodriguez', role: 'Healthcare Professional', country: 'Australia', content: 'The financial planning tools helped me budget perfectly for my move. The community support was invaluable during the entire process.', journey: 'Philippines → Australia' },
-    { name: 'Amara Okonkwo', role: 'Business Analyst', country: 'UK', content: 'From document preparation to settlement planning, Cush guided me every step of the way. Now living my dream in London!', journey: 'Ghana → United Kingdom' }
-  ];
-
-  return e('section', { className: 'py-16 bg-gray-50' },
-    e('div', { className: 'container mx-auto px-6' },
-      e('div', { className: 'text-center mb-12' },
-        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+  return e('section', { className: 'py-16 bg-gray-50' }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      e('div', { key: 'header', className: 'text-center mb-12' }, [
+        e('h2', { key: 'title', className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
           'Success Stories From Our Community'
         ),
-        e('p', { className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+        e('p', { key: 'subtitle', className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
           'Join thousands who have successfully navigated their immigration journey with Cush'
         )
-      ),
-      e('div', { className: 'grid md:grid-cols-3 gap-6' },
-        ...testimonials.map((testimonial, index) =>
-          e('div', {
-            key: index,
-            className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow'
-          },
-            e('div', { className: 'flex items-center mb-4' },
-              Array.from({ length: 5 }).map((_, i) =>
-                e('span', { key: i, className: 'text-yellow-400' }, '⭐')
-              )
-            ),
-            e('p', { className: 'text-gray-700 mb-4 italic' }, `"${testimonial.content}"`),
-            e('div', { className: 'flex items-center gap-3' },
-              e('div', { className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold' },
-                testimonial.name.split(' ').map(n => n[0]).join('')
-              ),
-              e('div', null,
-                e('h4', { className: 'font-semibold text-gray-900' }, testimonial.name),
-                e('p', { className: 'text-sm text-gray-600' }, testimonial.role),
-                e('p', { className: 'text-xs text-blue-600 font-medium' }, testimonial.journey)
-              )
+      ]),
+      e('div', { key: 'grid', className: 'grid md:grid-cols-3 gap-6' }, [
+        e('div', { key: 'testimonial1', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
+          e('div', { key: 'stars1', className: 'flex items-center mb-4' }, 
+            Array.from({ length: 5 }).map((_, i) =>
+              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
             )
-          )
-        )
-      )
-    )
-  );
+          ),
+          e('p', { key: 'quote1', className: 'text-gray-700 mb-4 italic' }, '"Cush made my Express Entry application seamless. The AI guidance was incredibly accurate, and I received my PR in just 6 months!"'),
+          e('div', { key: 'profile1', className: 'flex items-center gap-3' }, [
+            e('div', { key: 'avatar1', className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'SC'),
+            e('div', { key: 'info1' }, [
+              e('h4', { key: 'name1', className: 'font-semibold text-gray-900' }, 'Sarah Chen'),
+              e('p', { key: 'role1', className: 'text-sm text-gray-600' }, 'Software Engineer'),
+              e('p', { key: 'journey1', className: 'text-xs text-blue-600 font-medium' }, 'Nigeria → Canada')
+            ])
+          ])
+        ]),
+        e('div', { key: 'testimonial2', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
+          e('div', { key: 'stars2', className: 'flex items-center mb-4' }, 
+            Array.from({ length: 5 }).map((_, i) =>
+              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+            )
+          ),
+          e('p', { key: 'quote2', className: 'text-gray-700 mb-4 italic' }, '"The financial planning tools helped me budget perfectly for my move. The community support was invaluable during the entire process."'),
+          e('div', { key: 'profile2', className: 'flex items-center gap-3' }, [
+            e('div', { key: 'avatar2', className: 'w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'DR'),
+            e('div', { key: 'info2' }, [
+              e('h4', { key: 'name2', className: 'font-semibold text-gray-900' }, 'David Rodriguez'),
+              e('p', { key: 'role2', className: 'text-sm text-gray-600' }, 'Healthcare Professional'),
+              e('p', { key: 'journey2', className: 'text-xs text-blue-600 font-medium' }, 'Philippines → Australia')
+            ])
+          ])
+        ]),
+        e('div', { key: 'testimonial3', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
+          e('div', { key: 'stars3', className: 'flex items-center mb-4' }, 
+            Array.from({ length: 5 }).map((_, i) =>
+              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+            )
+          ),
+          e('p', { key: 'quote3', className: 'text-gray-700 mb-4 italic' }, '"From document preparation to settlement planning, Cush guided me every step of the way. Now living my dream in London!"'),
+          e('div', { key: 'profile3', className: 'flex items-center gap-3' }, [
+            e('div', { key: 'avatar3', className: 'w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'AO'),
+            e('div', { key: 'info3' }, [
+              e('h4', { key: 'name3', className: 'font-semibold text-gray-900' }, 'Amara Okonkwo'),
+              e('p', { key: 'role3', className: 'text-sm text-gray-600' }, 'Business Analyst'),
+              e('p', { key: 'journey3', className: 'text-xs text-blue-600 font-medium' }, 'Ghana → United Kingdom')
+            ])
+          ])
+        ])
+      ])
+    ])
+  ]);
 }
 
-// Community Preview Section
+// Community Preview Section - Fixed syntax
 function CommunityPreview() {
-  const communityStats = [
-    { label: 'Active Members', value: '50,000+', icon: '👥' },
-    { label: 'Countries Represented', value: '180+', icon: '🌍' },
-    { label: 'Success Stories', value: '12,500+', icon: '❤️' },
-    { label: 'Monthly Discussions', value: '25,000+', icon: '💬' }
-  ];
-
-  return e('section', { className: 'py-16 bg-gradient-to-br from-blue-50 to-purple-50' },
-    e('div', { className: 'container mx-auto px-6' },
-      e('div', { className: 'text-center mb-12' },
-        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+  return e('section', { className: 'py-16 bg-gradient-to-br from-blue-50 to-purple-50' }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      e('div', { key: 'header', className: 'text-center mb-12' }, [
+        e('h2', { key: 'title', className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
           'Join Our Global Community'
         ),
-        e('p', { className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+        e('p', { key: 'subtitle', className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
           'Connect with fellow immigrants, share experiences, and get support from people who understand your journey'
         )
-      ),
-      e('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12' },
-        ...communityStats.map((stat, index) =>
-          e('div', { key: index, className: 'text-center' },
-            e('div', { className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3' },
-              e('span', { className: 'text-2xl' }, stat.icon)
-            ),
-            e('div', { className: 'text-2xl font-bold text-gray-900' }, stat.value),
-            e('div', { className: 'text-sm text-gray-600' }, stat.label)
-          )
-        )
-      )
-    )
-  );
+      ]),
+      e('div', { key: 'stats', className: 'grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12' }, [
+        e('div', { key: 'stat1', className: 'text-center' }, [
+          e('div', { key: 'icon1', className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3' },
+            e('span', { key: 'emoji1', className: 'text-2xl' }, '👥')
+          ),
+          e('div', { key: 'value1', className: 'text-2xl font-bold text-gray-900' }, '50,000+'),
+          e('div', { key: 'label1', className: 'text-sm text-gray-600' }, 'Active Members')
+        ]),
+        e('div', { key: 'stat2', className: 'text-center' }, [
+          e('div', { key: 'icon2', className: 'w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-3' },
+            e('span', { key: 'emoji2', className: 'text-2xl' }, '🌍')
+          ),
+          e('div', { key: 'value2', className: 'text-2xl font-bold text-gray-900' }, '180+'),
+          e('div', { key: 'label2', className: 'text-sm text-gray-600' }, 'Countries Represented')
+        ]),
+        e('div', { key: 'stat3', className: 'text-center' }, [
+          e('div', { key: 'icon3', className: 'w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-3' },
+            e('span', { key: 'emoji3', className: 'text-2xl' }, '❤️')
+          ),
+          e('div', { key: 'value3', className: 'text-2xl font-bold text-gray-900' }, '12,500+'),
+          e('div', { key: 'label3', className: 'text-sm text-gray-600' }, 'Success Stories')
+        ]),
+        e('div', { key: 'stat4', className: 'text-center' }, [
+          e('div', { key: 'icon4', className: 'w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-3' },
+            e('span', { key: 'emoji4', className: 'text-2xl' }, '💬')
+          ),
+          e('div', { key: 'value4', className: 'text-2xl font-bold text-gray-900' }, '25,000+'),
+          e('div', { key: 'label4', className: 'text-sm text-gray-600' }, 'Monthly Discussions')
+        ])
+      ])
+    ])
+  ]);
 }
 
 // Authentication Component - Based on design mockup
