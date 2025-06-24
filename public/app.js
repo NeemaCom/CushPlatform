@@ -1,5 +1,157 @@
-// Simple React application entry point
-const { useState, useEffect, createElement: e } = React;
+// Homepage Hero Section
+function HeroSection() {
+  return e('section', {
+    className: 'relative bg-gradient-to-br from-blue-600 via-blue-700 to-purple-800 text-white py-20 overflow-hidden'
+  },
+    e('div', { className: 'absolute inset-0 opacity-30' }),
+    e('div', { className: 'container mx-auto px-6 relative z-10' },
+      e('div', { className: 'grid lg:grid-cols-2 gap-12 items-center' },
+        e('div', { className: 'space-y-8' },
+          e('div', { className: 'space-y-4' },
+            e('h1', { className: 'text-5xl lg:text-6xl font-bold leading-tight' },
+              'Simplify Your ',
+              e('span', { className: 'bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent' },
+                'Migration Journey'
+              )
+            ),
+            e('p', { className: 'text-xl text-blue-100 leading-relaxed' },
+              'Transform your global immigration experience with AI-powered guidance, financial planning, and expert community support.'
+            )
+          ),
+          e('div', { className: 'flex flex-col sm:flex-row gap-4' },
+            e('button', {
+              className: 'bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-3 rounded-lg transition-colors',
+              onClick: () => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })
+            }, 'Start Your Journey'),
+            e('button', {
+              className: 'border-2 border-white text-white hover:bg-white hover:text-blue-600 font-semibold px-8 py-3 rounded-lg transition-colors'
+            }, 'Watch Demo')
+          )
+        )
+      )
+    )
+  );
+}
+
+// Features Section
+function FeaturesSection() {
+  const features = [
+    { icon: '🤖', title: 'AI-Powered Guidance', desc: 'Get personalized immigration advice from Imisi, our AI concierge trained on the latest immigration policies.' },
+    { icon: '💰', title: 'Financial Planning', desc: 'Calculate immigration costs, plan your budget, and track expenses with integrated financial tools.' },
+    { icon: '👥', title: 'Expert Mentorship', desc: 'Connect with immigration experts and successful immigrants who can guide you through your journey.' },
+    { icon: '📄', title: 'Document Management', desc: 'Organize, track, and verify all your immigration documents with our secure digital vault.' },
+    { icon: '🗺️', title: 'Local Job Discovery', desc: 'Find job opportunities in your target country with location-based job matching.' },
+    { icon: '💳', title: 'Loan Referrals', desc: 'Access immigration loans and financing options through our trusted partner network.' }
+  ];
+
+  return e('section', { className: 'py-16 bg-white' },
+    e('div', { className: 'container mx-auto px-6' },
+      e('div', { className: 'text-center mb-12' },
+        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+          'Everything You Need for Immigration Success'
+        ),
+        e('p', { className: 'text-lg text-gray-600 max-w-3xl mx-auto' },
+          'From AI-powered guidance to financial planning, we provide comprehensive tools and support for every step of your immigration journey'
+        )
+      ),
+      e('div', { className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-6' },
+        ...features.map((feature, index) =>
+          e('div', {
+            key: index,
+            className: 'group hover:shadow-xl transition-all duration-300 border rounded-lg p-6 hover:-translate-y-1'
+          },
+            e('div', { className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300' },
+              e('span', { className: 'text-2xl' }, feature.icon)
+            ),
+            e('h3', { className: 'text-xl font-bold text-gray-900 mb-3' }, feature.title),
+            e('p', { className: 'text-gray-600 leading-relaxed' }, feature.desc)
+          )
+        )
+      )
+    )
+  );
+}
+
+// Testimonials Section
+function TestimonialsSection() {
+  const testimonials = [
+    { name: 'Sarah Chen', role: 'Software Engineer', country: 'Canada', content: 'Cush made my Express Entry application seamless. The AI guidance was incredibly accurate, and I received my PR in just 6 months!', journey: 'Nigeria → Canada' },
+    { name: 'David Rodriguez', role: 'Healthcare Professional', country: 'Australia', content: 'The financial planning tools helped me budget perfectly for my move. The community support was invaluable during the entire process.', journey: 'Philippines → Australia' },
+    { name: 'Amara Okonkwo', role: 'Business Analyst', country: 'UK', content: 'From document preparation to settlement planning, Cush guided me every step of the way. Now living my dream in London!', journey: 'Ghana → United Kingdom' }
+  ];
+
+  return e('section', { className: 'py-16 bg-gray-50' },
+    e('div', { className: 'container mx-auto px-6' },
+      e('div', { className: 'text-center mb-12' },
+        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+          'Success Stories From Our Community'
+        ),
+        e('p', { className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+          'Join thousands who have successfully navigated their immigration journey with Cush'
+        )
+      ),
+      e('div', { className: 'grid md:grid-cols-3 gap-6' },
+        ...testimonials.map((testimonial, index) =>
+          e('div', {
+            key: index,
+            className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow'
+          },
+            e('div', { className: 'flex items-center mb-4' },
+              Array.from({ length: 5 }).map((_, i) =>
+                e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+              )
+            ),
+            e('p', { className: 'text-gray-700 mb-4 italic' }, `"${testimonial.content}"`),
+            e('div', { className: 'flex items-center gap-3' },
+              e('div', { className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold' },
+                testimonial.name.split(' ').map(n => n[0]).join('')
+              ),
+              e('div', null,
+                e('h4', { className: 'font-semibold text-gray-900' }, testimonial.name),
+                e('p', { className: 'text-sm text-gray-600' }, testimonial.role),
+                e('p', { className: 'text-xs text-blue-600 font-medium' }, testimonial.journey)
+              )
+            )
+          )
+        )
+      )
+    )
+  );
+}
+
+// Community Preview Section
+function CommunityPreview() {
+  const communityStats = [
+    { label: 'Active Members', value: '50,000+', icon: '👥' },
+    { label: 'Countries Represented', value: '180+', icon: '🌍' },
+    { label: 'Success Stories', value: '12,500+', icon: '❤️' },
+    { label: 'Monthly Discussions', value: '25,000+', icon: '💬' }
+  ];
+
+  return e('section', { className: 'py-16 bg-gradient-to-br from-blue-50 to-purple-50' },
+    e('div', { className: 'container mx-auto px-6' },
+      e('div', { className: 'text-center mb-12' },
+        e('h2', { className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+          'Join Our Global Community'
+        ),
+        e('p', { className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+          'Connect with fellow immigrants, share experiences, and get support from people who understand your journey'
+        )
+      ),
+      e('div', { className: 'grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12' },
+        ...communityStats.map((stat, index) =>
+          e('div', { key: index, className: 'text-center' },
+            e('div', { className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3' },
+              e('span', { className: 'text-2xl' }, stat.icon)
+            ),
+            e('div', { className: 'text-2xl font-bold text-gray-900' }, stat.value),
+            e('div', { className: 'text-sm text-gray-600' }, stat.label)
+          )
+        )
+      )
+    )
+  );
+}
 
 // Authentication Component
 function AuthComponent() {
