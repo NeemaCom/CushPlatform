@@ -1,494 +1,194 @@
-// Simple React application entry point
+// React 18 Components for Cush Platform
 const { useState, useEffect, createElement: e } = React;
+const { createRoot } = ReactDOM;
 
-// Homepage Hero Section - Based on design mockup
+// Hero Section Component
 function HeroSection() {
-  return e('section', {
-    className: 'relative min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 text-white overflow-hidden'
+  return e('section', { 
+    className: 'relative min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-purple-900 flex items-center justify-center overflow-hidden'
   }, [
     // Background Pattern
     e('div', {
       key: 'bg-pattern',
-      className: 'absolute inset-0 opacity-20',
+      className: 'absolute inset-0 opacity-10',
       style: {
-        backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)'
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='3'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
       }
     }),
-    
+
     // Main Content
     e('div', { 
       key: 'content',
-      className: 'relative z-10 container mx-auto px-6 py-20 flex items-center min-h-screen'
+      className: 'container mx-auto px-6 text-center relative z-10'
     }, [
-      e('div', { 
-        key: 'hero-content',
-        className: 'grid lg:grid-cols-2 gap-16 items-center w-full'
+      // Logo
+      e('div', {
+        key: 'logo',
+        className: 'mb-8 flex justify-center'
       }, [
-        // Left Content
-        e('div', { key: 'left', className: 'space-y-8' }, [
-          e('div', { key: 'badge', className: 'inline-flex items-center px-4 py-2 bg-blue-500/20 rounded-full border border-blue-400/30' }, [
-            e('span', { key: 'dot', className: 'w-2 h-2 bg-green-400 rounded-full mr-2' }),
-            e('span', { key: 'text', className: 'text-sm text-blue-100' }, 'AI-Powered Immigration Platform')
-          ]),
-          
-          e('h1', { 
-            key: 'title',
-            className: 'text-5xl lg:text-7xl font-bold leading-tight'
-          }, [
-            'Your ',
-            e('span', { 
-              key: 'highlight',
-              className: 'bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent'
-            }, 'Global'),
-            e('br', { key: 'br' }),
-            'Immigration',
-            e('br', { key: 'br2' }),
-            'Partner'
-          ]),
-          
-          e('p', { 
-            key: 'subtitle',
-            className: 'text-xl text-slate-300 leading-relaxed max-w-xl'
-          }, 'Navigate your immigration journey with confidence. Get personalized guidance, financial planning, and connect with a global community of successful immigrants.'),
-          
-          e('div', { 
-            key: 'cta-buttons',
-            className: 'flex flex-col sm:flex-row gap-4 pt-4'
-          }, [
-            e('button', {
-              key: 'primary',
-              className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1',
-              onClick: () => {
-                const authSection = document.getElementById('auth-section');
-                if (authSection) authSection.scrollIntoView({ behavior: 'smooth' });
-              }
-            }, 'Start Your Journey →'),
-            e('button', {
-              key: 'secondary',
-              className: 'border-2 border-slate-400/50 text-slate-300 hover:bg-slate-800/50 hover:border-slate-300 font-semibold px-8 py-4 rounded-xl transition-all duration-300'
-            }, 'Watch Demo')
-          ])
-        ]),
-        
-        // Right Content - Statistics/Visual Elements
-        e('div', { key: 'right', className: 'relative' }, [
-          e('div', { 
-            key: 'stats-card',
-            className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl'
-          }, [
-            e('h3', { 
-              key: 'stats-title',
-              className: 'text-2xl font-bold mb-6 text-center'
-            }, 'Success Stories'),
-            
-            e('div', { 
-              key: 'stats-grid',
-              className: 'grid grid-cols-2 gap-6'
-            }, [
-              e('div', { key: 'stat1', className: 'text-center' }, [
-                e('div', { key: 'number', className: 'text-3xl font-bold text-cyan-400' }, '50K+'),
-                e('div', { key: 'label', className: 'text-sm text-slate-300' }, 'Successful Migrations')
-              ]),
-              e('div', { key: 'stat2', className: 'text-center' }, [
-                e('div', { key: 'number', className: 'text-3xl font-bold text-green-400' }, '156'),
-                e('div', { key: 'label', className: 'text-sm text-slate-300' }, 'Countries Supported')
-              ]),
-              e('div', { key: 'stat3', className: 'text-center' }, [
-                e('div', { key: 'number', className: 'text-3xl font-bold text-purple-400' }, '98%'),
-                e('div', { key: 'label', className: 'text-sm text-slate-300' }, 'Success Rate')
-              ]),
-              e('div', { key: 'stat4', className: 'text-center' }, [
-                e('div', { key: 'number', className: 'text-3xl font-bold text-yellow-400' }, '24/7'),
-                e('div', { key: 'label', className: 'text-sm text-slate-300' }, 'AI Support')
-              ])
-            ])
-          ])
-        ])
-      ])
-    ])
-  ]);
-}
-
-// Features Section - Based on design mockup  
-function FeaturesSection() {
-  const features = [
-    { 
-      icon: '🤖', 
-      title: 'AI Immigration Assistant', 
-      desc: 'Get 24/7 personalized guidance from Imisi 2.0, powered by the latest immigration expertise and real-time policy updates.',
-      gradient: 'from-blue-500 to-cyan-500'
-    },
-    { 
-      icon: '💰', 
-      title: 'Smart Financial Planning', 
-      desc: 'Advanced cost calculators, budget optimization, and personalized financial roadmaps for your immigration journey.',
-      gradient: 'from-green-500 to-emerald-500'
-    },
-    { 
-      icon: '🏠', 
-      title: 'Local Job Discovery', 
-      desc: 'AI-matched employment opportunities with verified visa sponsorship from trusted partner companies.',
-      gradient: 'from-purple-500 to-violet-500'
-    },
-    { 
-      icon: '🏆', 
-      title: 'Achievement System', 
-      desc: 'Gamified progress tracking with rewards, milestones, and community recognition for your achievements.',
-      gradient: 'from-yellow-500 to-orange-500'
-    },
-    { 
-      icon: '👥', 
-      title: 'Global Community', 
-      desc: 'Connect with 50K+ successful immigrants, access expert mentorship, and share experiences globally.',
-      gradient: 'from-pink-500 to-rose-500'
-    },
-    { 
-      icon: '💳', 
-      title: 'Financial Services', 
-      desc: 'Pre-approved loans, banking solutions, and financial products specifically designed for immigrants.',
-      gradient: 'from-indigo-500 to-blue-500'
-    }
-  ];
-
-  return e('section', {
-    id: 'features',
-    className: 'py-24 bg-gradient-to-b from-slate-50 to-white'
-  }, [
-    e('div', { 
-      key: 'container',
-      className: 'container mx-auto px-6'
-    }, [
-      // Header
-      e('div', { 
-        key: 'header',
-        className: 'text-center mb-16'
-      }, [
-        e('div', { 
-          key: 'label',
-          className: 'inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-4'
-        }, 'Platform Features'),
-        
-        e('h2', { 
-          key: 'title',
-          className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6'
-        }, 'Everything You Need in One Platform'),
-        
-        e('p', { 
-          key: 'subtitle',
-          className: 'text-xl text-gray-600 max-w-3xl mx-auto'
-        }, 'Our comprehensive suite of tools and services guides you through every step of your immigration journey with confidence and support.')
-      ]),
-      
-      // Features Grid
-      e('div', { 
-        key: 'grid',
-        className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-8'
-      }, features.map((feature, index) =>
         e('div', {
-          key: index,
-          className: 'group relative bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-gray-200 hover:border-gray-300 hover:-translate-y-2'
-        }, [
-          // Gradient Background
-          e('div', {
-            key: 'bg',
-            className: `absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`
-          }),
-          
-          // Icon
-          e('div', { 
-            key: 'icon',
-            className: `relative w-16 h-16 bg-gradient-to-br ${feature.gradient} rounded-xl flex items-center justify-center text-2xl text-white mb-6 group-hover:scale-110 transition-transform duration-300`
-          }, feature.icon),
-          
-          // Content
-          e('div', { key: 'content', className: 'relative' }, [
-            e('h3', { 
-              key: 'title',
-              className: 'text-xl font-bold text-gray-900 mb-3'
-            }, feature.title),
-            
-            e('p', { 
-              key: 'desc',
-              className: 'text-gray-600 leading-relaxed'
-            }, feature.desc)
-          ])
-        ])
-      ))
-    ])
-  ]);
-}
-
-// Testimonials Section - Based on design mockup
-function TestimonialsSection() {
-  const testimonials = [
-    {
-      name: 'Sarah Chen',
-      title: 'Software Engineer at Meta',
-      country: 'Singapore → USA',
-      rating: 5,
-      image: 'https://images.unsplash.com/photo-1494790108755-2616b612b739?w=150&h=150&fit=crop&crop=face',
-      text: 'Cush transformed my H-1B journey. The AI guidance was spot-on, and I connected with mentors who helped me land my dream job at Meta.',
-      timeline: '8 months',
-      visaType: 'H-1B'
-    },
-    {
-      name: 'Miguel Rodriguez',
-      title: 'Data Scientist at SAP',
-      country: 'Spain → Germany',
-      rating: 5,
-      image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      text: 'The financial planning tools were game-changing. I budgeted perfectly for Berlin and got my Blue Card approved in record time.',
-      timeline: '6 months',
-      visaType: 'EU Blue Card'
-    },
-    {
-      name: 'Priya Patel',
-      title: 'Research Scientist',
-      country: 'India → Australia',
-      rating: 5,
-      image: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&h=150&fit=crop&crop=face',
-      text: 'Found my research position through Cush\'s job matching. The visa sponsorship verification saved me months of uncertainty.',
-      timeline: '10 months',
-      visaType: 'Skilled Migration'
-    }
-  ];
-
-  return e('section', {
-    id: 'testimonials',
-    className: 'py-24 bg-white'
-  }, [
-    e('div', { 
-      key: 'container',
-      className: 'container mx-auto px-6'
-    }, [
-      // Header
-      e('div', { 
-        key: 'header',
-        className: 'text-center mb-16'
-      }, [
-        e('div', { 
-          key: 'label',
-          className: 'inline-flex items-center px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium mb-4'
-        }, 'Success Stories'),
-        
-        e('h2', { 
-          key: 'title',
-          className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6'
-        }, 'Real People, Real Success'),
-        
-        e('p', { 
-          key: 'subtitle',
-          className: 'text-xl text-gray-600 max-w-3xl mx-auto'
-        }, 'Join over 50,000 successful immigrants who achieved their dreams with our comprehensive platform and expert guidance.')
+          key: 'logo-icon',
+          className: 'w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-3xl flex items-center justify-center text-white text-3xl font-bold shadow-2xl'
+        }, 'C')
       ]),
-      
-      // Testimonials Grid
-      e('div', { 
-        key: 'grid',
-        className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-8'
-      }, testimonials.map((testimonial, index) =>
-        e('div', {
-          key: index,
-          className: 'group bg-gradient-to-br from-slate-50 to-blue-50 p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 border border-slate-200 hover:border-blue-300 hover:-translate-y-1'
-        }, [
-          // Header with Profile
-          e('div', { 
-            key: 'profile',
-            className: 'flex items-center mb-6'
-          }, [
-            e('div', { 
-              key: 'avatar',
-              className: 'w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold mr-4'
-            }, testimonial.name.charAt(0)),
-            
-            e('div', { key: 'info' }, [
-              e('h4', { 
-                key: 'name',
-                className: 'font-bold text-gray-900 text-lg'
-              }, testimonial.name),
-              
-              e('p', { 
-                key: 'title',
-                className: 'text-sm text-gray-600 font-medium'
-              }, testimonial.title),
-              
-              e('div', { 
-                key: 'rating',
-                className: 'flex text-yellow-400 mt-1'
-              }, Array(testimonial.rating).fill(0).map((_, i) => 
-                e('span', { key: i, className: 'text-sm' }, '⭐')
-              ))
-            ])
-          ]),
-          
-          // Quote
-          e('blockquote', { 
-            key: 'quote',
-            className: 'text-gray-700 leading-relaxed mb-6 italic'
-          }, `"${testimonial.text}"`),
-          
-          // Migration Details
-          e('div', { 
-            key: 'details',
-            className: 'space-y-3'
-          }, [
-            e('div', { 
-              key: 'migration',
-              className: 'flex items-center justify-between p-3 bg-white/60 rounded-lg'
-            }, [
-              e('span', { 
-                key: 'label',
-                className: 'text-sm font-medium text-gray-600'
-              }, 'Migration Path'),
-              e('span', { 
-                key: 'value',
-                className: 'text-sm font-bold text-gray-900'
-              }, testimonial.country)
-            ]),
-            
-            e('div', { 
-              key: 'bottom-row',
-              className: 'flex items-center justify-between gap-2'
-            }, [
-              e('div', { 
-                key: 'visa',
-                className: 'px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium'
-              }, testimonial.visaType),
-              
-              e('div', { 
-                key: 'timeline',
-                className: 'px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium'
-              }, testimonial.timeline)
-            ])
-          ])
-        ])
-      ))
-    ])
-  ]);
-}
 
-// Community Preview Section
-function CommunityPreview() {
-  return e('section', {
-    className: 'py-24 bg-gradient-to-br from-indigo-50 to-blue-100'
-  }, [
-    e('div', { 
-      key: 'container',
-      className: 'container mx-auto px-6'
-    }, [
-      e('div', { 
-        key: 'header',
-        className: 'text-center mb-16'
+      // Headline
+      e('h1', {
+        key: 'headline',
+        className: 'text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight'
       }, [
-        e('div', { 
-          key: 'label',
-          className: 'inline-flex items-center px-4 py-2 bg-purple-100 text-purple-800 rounded-full text-sm font-medium mb-4'
-        }, 'Global Community'),
-        
-        e('h2', { 
-          key: 'title',
-          className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6'
-        }, 'Connect with Fellow Immigrants'),
-        
-        e('p', { 
-          key: 'subtitle',
-          className: 'text-xl text-gray-600 max-w-3xl mx-auto'
-        }, 'Join a thriving community of immigrants who support each other through every step of the journey.')
+        e('span', { key: 'line1', className: 'block' }, 'Your Global Immigration'),
+        e('span', { key: 'line2', className: 'block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent' }, 'Success Partner')
       ]),
-      
-      e('div', { 
+
+      // Subtitle
+      e('p', {
+        key: 'subtitle',
+        className: 'text-xl md:text-2xl text-slate-300 mb-12 max-w-4xl mx-auto leading-relaxed'
+      }, 'Navigate your immigration journey with AI-powered guidance, financial planning, community support, and expert mentorship - all in one comprehensive platform.'),
+
+      // Statistics Card
+      e('div', {
         key: 'stats',
-        className: 'grid md:grid-cols-4 gap-8 mb-12'
+        className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl max-w-4xl mx-auto mb-12'
       }, [
-        { number: '50K+', label: 'Active Members', color: 'text-blue-600' },
-        { number: '156', label: 'Countries', color: 'text-green-600' },
-        { number: '2.3K', label: 'Success Stories', color: 'text-purple-600' },
-        { number: '24/7', label: 'Support', color: 'text-orange-600' }
-      ].map((stat, index) =>
-        e('div', { 
-          key: index,
-          className: 'text-center bg-white p-6 rounded-xl shadow-lg'
+        e('div', {
+          key: 'stats-grid',
+          className: 'grid grid-cols-2 lg:grid-cols-4 gap-6'
         }, [
-          e('div', { 
-            key: 'number',
-            className: `text-3xl font-bold ${stat.color} mb-2`
-          }, stat.number),
-          e('div', { 
-            key: 'label',
-            className: 'text-gray-600 font-medium'
-          }, stat.label)
+          e('div', { key: 'stat1', className: 'text-center' }, [
+            e('div', { key: 'number', className: 'text-3xl lg:text-4xl font-bold text-cyan-400 mb-2' }, '50K+'),
+            e('div', { key: 'label', className: 'text-slate-300 text-sm lg:text-base' }, 'Success Stories')
+          ]),
+          e('div', { key: 'stat2', className: 'text-center' }, [
+            e('div', { key: 'number', className: 'text-3xl lg:text-4xl font-bold text-blue-400 mb-2' }, '180+'),
+            e('div', { key: 'label', className: 'text-slate-300 text-sm lg:text-base' }, 'Countries Supported')
+          ]),
+          e('div', { key: 'stat3', className: 'text-center' }, [
+            e('div', { key: 'number', className: 'text-3xl lg:text-4xl font-bold text-purple-400 mb-2' }, '95%'),
+            e('div', { key: 'label', className: 'text-slate-300 text-sm lg:text-base' }, 'Success Rate')
+          ]),
+          e('div', { key: 'stat4', className: 'text-center' }, [
+            e('div', { key: 'number', className: 'text-3xl lg:text-4xl font-bold text-green-400 mb-2' }, '24/7'),
+            e('div', { key: 'label', className: 'text-slate-300 text-sm lg:text-base' }, 'AI Support')
+          ])
         ])
-      )),
-      
-      e('div', { 
-        key: 'cta',
-        className: 'text-center'
+      ]),
+
+      // CTA Buttons
+      e('div', {
+        key: 'cta-buttons',
+        className: 'flex flex-col sm:flex-row gap-4 justify-center'
       }, [
         e('button', {
-          key: 'join-button',
-          className: 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1'
-        }, 'Join Our Community →')
+          key: 'get-started',
+          className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1',
+          onClick: () => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })
+        }, 'Start Your Journey →'),
+        e('button', {
+          key: 'learn-more',
+          className: 'bg-white/10 backdrop-blur-sm hover:bg-white/20 text-white font-semibold px-8 py-4 rounded-xl border border-white/30 transition-all duration-300 hover:border-white/50'
+        }, 'Learn More')
       ])
     ])
   ]);
 }
 
-// Simple Testimonials Section - Fixed syntax
-function TestimonialsSection() {
-  return e('section', { className: 'py-16 bg-gray-50' }, [
+// Features Section Component
+function FeaturesSection() {
+  const features = [
+    { icon: '🤖', title: 'AI-Powered Guidance', desc: 'Get personalized immigration advice from Imisi, our AI concierge trained on the latest immigration policies.' },
+    { icon: '💰', title: 'Financial Planning', desc: 'Calculate immigration costs, plan your budget, and track expenses with integrated financial tools.' },
+    { icon: '👥', title: 'Expert Mentorship', desc: 'Connect with immigration experts and successful immigrants who can guide you through your journey.' },
+    { icon: '📄', title: 'Document Management', desc: 'Organize, track, and verify all your immigration documents with our secure digital vault.' },
+    { icon: '🗺️', title: 'Local Job Discovery', desc: 'Find job opportunities in your target country with location-based job matching.' },
+    { icon: '💳', title: 'Loan Referrals', desc: 'Access immigration loans and financing options through our trusted partner network.' }
+  ];
+
+  return e('section', { className: 'py-20 bg-white' }, [
     e('div', { key: 'container', className: 'container mx-auto px-6' }, [
-      e('div', { key: 'header', className: 'text-center mb-12' }, [
-        e('h2', { key: 'title', className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('h2', { key: 'title', className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6' },
+          'Everything You Need for Immigration Success'
+        ),
+        e('p', { key: 'subtitle', className: 'text-xl text-gray-600 max-w-3xl mx-auto' },
+          'From AI-powered guidance to financial planning, we provide comprehensive tools and support for every step of your immigration journey'
+        )
+      ]),
+      e('div', { key: 'grid', className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-8' },
+        features.map((feature, index) =>
+          e('div', {
+            key: index,
+            className: 'group hover:shadow-2xl transition-all duration-300 border rounded-xl p-8 hover:-translate-y-2 bg-white'
+          }, [
+            e('div', { key: 'icon', className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300' },
+              e('span', { key: 'emoji', className: 'text-3xl' }, feature.icon)
+            ),
+            e('h3', { key: 'title', className: 'text-2xl font-bold text-gray-900 mb-4' }, feature.title),
+            e('p', { key: 'desc', className: 'text-gray-600 leading-relaxed' }, feature.desc)
+          ])
+        )
+      )
+    ])
+  ]);
+}
+
+// Testimonials Section Component
+function TestimonialsSection() {
+  return e('section', { className: 'py-20 bg-gray-50' }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('h2', { key: 'title', className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6' },
           'Success Stories From Our Community'
         ),
-        e('p', { key: 'subtitle', className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+        e('p', { key: 'subtitle', className: 'text-xl text-gray-600 max-w-2xl mx-auto' },
           'Join thousands who have successfully navigated their immigration journey with Cush'
         )
       ]),
-      e('div', { key: 'grid', className: 'grid md:grid-cols-3 gap-6' }, [
-        e('div', { key: 'testimonial1', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
-          e('div', { key: 'stars1', className: 'flex items-center mb-4' }, 
+      e('div', { key: 'grid', className: 'grid md:grid-cols-3 gap-8' }, [
+        e('div', { key: 'testimonial1', className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow' }, [
+          e('div', { key: 'stars1', className: 'flex items-center mb-6' }, 
             Array.from({ length: 5 }).map((_, i) =>
-              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+              e('span', { key: i, className: 'text-yellow-400 text-xl' }, '⭐')
             )
           ),
-          e('p', { key: 'quote1', className: 'text-gray-700 mb-4 italic' }, '"Cush made my Express Entry application seamless. The AI guidance was incredibly accurate, and I received my PR in just 6 months!"'),
-          e('div', { key: 'profile1', className: 'flex items-center gap-3' }, [
-            e('div', { key: 'avatar1', className: 'w-12 h-12 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'SC'),
+          e('p', { key: 'quote1', className: 'text-gray-700 mb-6 italic text-lg' }, '"Cush made my Express Entry application seamless. The AI guidance was incredibly accurate, and I received my PR in just 6 months!"'),
+          e('div', { key: 'profile1', className: 'flex items-center gap-4' }, [
+            e('div', { key: 'avatar1', className: 'w-14 h-14 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-semibold text-lg' }, 'SC'),
             e('div', { key: 'info1' }, [
-              e('h4', { key: 'name1', className: 'font-semibold text-gray-900' }, 'Sarah Chen'),
+              e('h4', { key: 'name1', className: 'font-semibold text-gray-900 text-lg' }, 'Sarah Chen'),
               e('p', { key: 'role1', className: 'text-sm text-gray-600' }, 'Software Engineer'),
               e('p', { key: 'journey1', className: 'text-xs text-blue-600 font-medium' }, 'Nigeria → Canada')
             ])
           ])
         ]),
-        e('div', { key: 'testimonial2', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
-          e('div', { key: 'stars2', className: 'flex items-center mb-4' }, 
+        e('div', { key: 'testimonial2', className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow' }, [
+          e('div', { key: 'stars2', className: 'flex items-center mb-6' }, 
             Array.from({ length: 5 }).map((_, i) =>
-              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+              e('span', { key: i, className: 'text-yellow-400 text-xl' }, '⭐')
             )
           ),
-          e('p', { key: 'quote2', className: 'text-gray-700 mb-4 italic' }, '"The financial planning tools helped me budget perfectly for my move. The community support was invaluable during the entire process."'),
-          e('div', { key: 'profile2', className: 'flex items-center gap-3' }, [
-            e('div', { key: 'avatar2', className: 'w-12 h-12 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'DR'),
+          e('p', { key: 'quote2', className: 'text-gray-700 mb-6 italic text-lg' }, '"The financial planning tools helped me budget perfectly for my move. The community support was invaluable during the entire process."'),
+          e('div', { key: 'profile2', className: 'flex items-center gap-4' }, [
+            e('div', { key: 'avatar2', className: 'w-14 h-14 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-lg' }, 'DR'),
             e('div', { key: 'info2' }, [
-              e('h4', { key: 'name2', className: 'font-semibold text-gray-900' }, 'David Rodriguez'),
+              e('h4', { key: 'name2', className: 'font-semibold text-gray-900 text-lg' }, 'David Rodriguez'),
               e('p', { key: 'role2', className: 'text-sm text-gray-600' }, 'Healthcare Professional'),
               e('p', { key: 'journey2', className: 'text-xs text-blue-600 font-medium' }, 'Philippines → Australia')
             ])
           ])
         ]),
-        e('div', { key: 'testimonial3', className: 'bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow' }, [
-          e('div', { key: 'stars3', className: 'flex items-center mb-4' }, 
+        e('div', { key: 'testimonial3', className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow' }, [
+          e('div', { key: 'stars3', className: 'flex items-center mb-6' }, 
             Array.from({ length: 5 }).map((_, i) =>
-              e('span', { key: i, className: 'text-yellow-400' }, '⭐')
+              e('span', { key: i, className: 'text-yellow-400 text-xl' }, '⭐')
             )
           ),
-          e('p', { key: 'quote3', className: 'text-gray-700 mb-4 italic' }, '"From document preparation to settlement planning, Cush guided me every step of the way. Now living my dream in London!"'),
-          e('div', { key: 'profile3', className: 'flex items-center gap-3' }, [
-            e('div', { key: 'avatar3', className: 'w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold' }, 'AO'),
+          e('p', { key: 'quote3', className: 'text-gray-700 mb-6 italic text-lg' }, '"From document preparation to settlement planning, Cush guided me every step of the way. Now living my dream in London!"'),
+          e('div', { key: 'profile3', className: 'flex items-center gap-4' }, [
+            e('div', { key: 'avatar3', className: 'w-14 h-14 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-lg' }, 'AO'),
             e('div', { key: 'info3' }, [
-              e('h4', { key: 'name3', className: 'font-semibold text-gray-900' }, 'Amara Okonkwo'),
+              e('h4', { key: 'name3', className: 'font-semibold text-gray-900 text-lg' }, 'Amara Okonkwo'),
               e('p', { key: 'role3', className: 'text-sm text-gray-600' }, 'Business Analyst'),
               e('p', { key: 'journey3', className: 'text-xs text-blue-600 font-medium' }, 'Ghana → United Kingdom')
             ])
@@ -499,53 +199,53 @@ function TestimonialsSection() {
   ]);
 }
 
-// Community Preview Section - Fixed syntax
+// Community Preview Section
 function CommunityPreview() {
-  return e('section', { className: 'py-16 bg-gradient-to-br from-blue-50 to-purple-50' }, [
+  return e('section', { className: 'py-20 bg-gradient-to-br from-blue-50 to-purple-50' }, [
     e('div', { key: 'container', className: 'container mx-auto px-6' }, [
-      e('div', { key: 'header', className: 'text-center mb-12' }, [
-        e('h2', { key: 'title', className: 'text-3xl lg:text-4xl font-bold text-gray-900 mb-4' },
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('h2', { key: 'title', className: 'text-4xl lg:text-5xl font-bold text-gray-900 mb-6' },
           'Join Our Global Community'
         ),
-        e('p', { key: 'subtitle', className: 'text-lg text-gray-600 max-w-2xl mx-auto' },
+        e('p', { key: 'subtitle', className: 'text-xl text-gray-600 max-w-2xl mx-auto' },
           'Connect with fellow immigrants, share experiences, and get support from people who understand your journey'
         )
       ]),
-      e('div', { key: 'stats', className: 'grid grid-cols-2 lg:grid-cols-4 gap-6 mb-12' }, [
+      e('div', { key: 'stats', className: 'grid grid-cols-2 lg:grid-cols-4 gap-8 mb-12' }, [
         e('div', { key: 'stat1', className: 'text-center' }, [
-          e('div', { key: 'icon1', className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3' },
-            e('span', { key: 'emoji1', className: 'text-2xl' }, '👥')
+          e('div', { key: 'icon1', className: 'w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4' },
+            e('span', { key: 'emoji1', className: 'text-3xl' }, '👥')
           ),
-          e('div', { key: 'value1', className: 'text-2xl font-bold text-gray-900' }, '50,000+'),
-          e('div', { key: 'label1', className: 'text-sm text-gray-600' }, 'Active Members')
+          e('div', { key: 'value1', className: 'text-3xl font-bold text-gray-900' }, '50,000+'),
+          e('div', { key: 'label1', className: 'text-gray-600' }, 'Active Members')
         ]),
         e('div', { key: 'stat2', className: 'text-center' }, [
-          e('div', { key: 'icon2', className: 'w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-3' },
-            e('span', { key: 'emoji2', className: 'text-2xl' }, '🌍')
+          e('div', { key: 'icon2', className: 'w-20 h-20 bg-gradient-to-r from-green-500 to-blue-500 rounded-full flex items-center justify-center mx-auto mb-4' },
+            e('span', { key: 'emoji2', className: 'text-3xl' }, '🌍')
           ),
-          e('div', { key: 'value2', className: 'text-2xl font-bold text-gray-900' }, '180+'),
-          e('div', { key: 'label2', className: 'text-sm text-gray-600' }, 'Countries Represented')
+          e('div', { key: 'value2', className: 'text-3xl font-bold text-gray-900' }, '180+'),
+          e('div', { key: 'label2', className: 'text-gray-600' }, 'Countries Represented')
         ]),
         e('div', { key: 'stat3', className: 'text-center' }, [
-          e('div', { key: 'icon3', className: 'w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-3' },
-            e('span', { key: 'emoji3', className: 'text-2xl' }, '❤️')
+          e('div', { key: 'icon3', className: 'w-20 h-20 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4' },
+            e('span', { key: 'emoji3', className: 'text-3xl' }, '❤️')
           ),
-          e('div', { key: 'value3', className: 'text-2xl font-bold text-gray-900' }, '12,500+'),
-          e('div', { key: 'label3', className: 'text-sm text-gray-600' }, 'Success Stories')
+          e('div', { key: 'value3', className: 'text-3xl font-bold text-gray-900' }, '12,500+'),
+          e('div', { key: 'label3', className: 'text-gray-600' }, 'Success Stories')
         ]),
         e('div', { key: 'stat4', className: 'text-center' }, [
-          e('div', { key: 'icon4', className: 'w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-3' },
-            e('span', { key: 'emoji4', className: 'text-2xl' }, '💬')
+          e('div', { key: 'icon4', className: 'w-20 h-20 bg-gradient-to-r from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-4' },
+            e('span', { key: 'emoji4', className: 'text-3xl' }, '💬')
           ),
-          e('div', { key: 'value4', className: 'text-2xl font-bold text-gray-900' }, '25,000+'),
-          e('div', { key: 'label4', className: 'text-sm text-gray-600' }, 'Monthly Discussions')
+          e('div', { key: 'value4', className: 'text-3xl font-bold text-gray-900' }, '25,000+'),
+          e('div', { key: 'label4', className: 'text-gray-600' }, 'Monthly Discussions')
         ])
       ])
     ])
   ]);
 }
 
-// Authentication Component - Based on design mockup
+// Authentication Component
 function AuthComponent() {
   const [showTestAccounts, setShowTestAccounts] = useState(false);
   const [testCredentials, setTestCredentials] = useState(null);
@@ -553,7 +253,6 @@ function AuthComponent() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Get test credentials for development
     fetch('/api/test-credentials')
       .then(res => res.ok ? res.json() : null)
       .then(data => setTestCredentials(data))
@@ -600,7 +299,6 @@ function AuthComponent() {
         key: 'content',
         className: 'max-w-md mx-auto'
       }, [
-        // Header
         e('div', { 
           key: 'header',
           className: 'text-center mb-8'
@@ -609,19 +307,16 @@ function AuthComponent() {
             key: 'logo',
             className: 'w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6'
           }, 'C'),
-          
           e('h2', { 
             key: 'title',
             className: 'text-3xl font-bold text-white mb-2'
           }, 'Welcome to Cush'),
-          
           e('p', { 
             key: 'subtitle',
             className: 'text-slate-300'
           }, 'Sign in to access your personalized immigration dashboard')
         ]),
         
-        // Login Form
         e('div', { 
           key: 'form-container',
           className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-8 border border-white/20 shadow-2xl'
@@ -631,7 +326,6 @@ function AuthComponent() {
             onSubmit: handleLogin,
             className: 'space-y-6'
           }, [
-            // Email Field
             e('div', { key: 'email-field' }, [
               e('label', { 
                 key: 'email-label',
@@ -648,7 +342,6 @@ function AuthComponent() {
               })
             ]),
             
-            // Password Field
             e('div', { key: 'password-field' }, [
               e('label', { 
                 key: 'password-label',
@@ -665,7 +358,6 @@ function AuthComponent() {
               })
             ]),
             
-            // Submit Button
             e('button', {
               key: 'submit-button',
               type: 'submit',
@@ -674,7 +366,6 @@ function AuthComponent() {
             }, loading ? 'Signing in...' : 'Sign In')
           ]),
           
-          // Test Accounts Section
           testCredentials && e('div', {
             key: 'test-accounts',
             className: 'mt-8 pt-6 border-t border-white/20'
@@ -700,564 +391,173 @@ function AuthComponent() {
       ])
     ])
   ]);
-    }, 'Sign in to Cush Platform'),
-    
-    e('p', {
-      key: 'subtitle',
-      style: { color: '#6b7280', marginBottom: '2rem' }
-    }, 'Access your personalized financial dashboard'),
-
-    // Login Form
-    e('form', {
-      key: 'login-form',
-      onSubmit: handleLogin,
-      style: { marginBottom: '2rem' }
-    }, [
-      e('div', {
-        key: 'email-group',
-        style: { marginBottom: '1rem', textAlign: 'left' }
-      }, [
-        e('label', {
-          key: 'email-label',
-          style: { display: 'block', marginBottom: '0.5rem', fontWeight: '500' }
-        }, 'Email'),
-        e('input', {
-          key: 'email-input',
-          type: 'email',
-          value: loginForm.email,
-          onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
-          required: true,
-          style: {
-            width: '100%',
-            padding: '0.75rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            fontSize: '1rem'
-          }
-        })
-      ]),
-      
-      e('div', {
-        key: 'password-group',
-        style: { marginBottom: '1.5rem', textAlign: 'left' }
-      }, [
-        e('label', {
-          key: 'password-label',
-          style: { display: 'block', marginBottom: '0.5rem', fontWeight: '500' }
-        }, 'Password'),
-        e('input', {
-          key: 'password-input',
-          type: 'password',
-          value: loginForm.password,
-          onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
-          required: true,
-          style: {
-            width: '100%',
-            padding: '0.75rem',
-            border: '1px solid #d1d5db',
-            borderRadius: '0.375rem',
-            fontSize: '1rem'
-          }
-        })
-      ]),
-      
-      e('button', {
-        key: 'submit-btn',
-        type: 'submit',
-        disabled: loading,
-        style: {
-          width: '100%',
-          backgroundColor: loading ? '#9ca3af' : '#3b82f6',
-          color: 'white',
-          padding: '0.75rem',
-          border: 'none',
-          borderRadius: '0.375rem',
-          fontSize: '1rem',
-          fontWeight: '500',
-          cursor: loading ? 'not-allowed' : 'pointer'
-        }
-      }, loading ? 'Signing in...' : 'Sign In')
-    ]),
-
-    // Test Accounts Section
-    testCredentials && e('div', {
-      key: 'test-accounts',
-      style: {
-        borderTop: '1px solid #e5e7eb',
-        paddingTop: '2rem'
-      }
-    }, [
-      e('button', {
-        key: 'toggle-test',
-        onClick: () => setShowTestAccounts(!showTestAccounts),
-        style: {
-          backgroundColor: '#f3f4f6',
-          color: '#374151',
-          padding: '0.5rem 1rem',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.375rem',
-          fontSize: '0.875rem',
-          cursor: 'pointer',
-          marginBottom: '1rem'
-        }
-      }, showTestAccounts ? 'Hide Test Accounts' : 'Show Test Accounts'),
-      
-      showTestAccounts && e('div', {
-        key: 'test-list',
-        style: { textAlign: 'left' }
-      }, [
-        e('p', {
-          key: 'test-note',
-          style: { fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }
-        }, 'Click on any test account to auto-fill the login form:'),
-        
-        e('div', {
-          key: 'test-accounts-list',
-          style: { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
-        }, testCredentials.testAccounts.map((account, i) =>
-          e('div', {
-            key: i,
-            onClick: () => useTestAccount(account),
-            style: {
-              padding: '1rem',
-              backgroundColor: '#f9fafb',
-              border: '1px solid #e5e7eb',
-              borderRadius: '0.375rem',
-              cursor: 'pointer',
-              transition: 'background-color 0.2s'
-            },
-            onMouseEnter: (e) => e.target.style.backgroundColor = '#f3f4f6',
-            onMouseLeave: (e) => e.target.style.backgroundColor = '#f9fafb'
-          }, [
-            e('div', {
-              key: 'account-header',
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }
-            }, [
-              e('strong', { key: 'email' }, account.email),
-              e('span', {
-                key: 'role',
-                style: {
-                  fontSize: '0.75rem',
-                  padding: '0.25rem 0.5rem',
-                  backgroundColor: account.role === 'admin' ? '#dbeafe' : '#dcfce7',
-                  color: account.role === 'admin' ? '#1e40af' : '#166534',
-                  borderRadius: '0.25rem'
-                }
-              }, account.role)
-            ]),
-            e('p', {
-              key: 'description',
-              style: { fontSize: '0.875rem', color: '#6b7280', margin: 0 }
-            }, account.description)
-          ])
-        ))
-      ])
-    ]),
-
-    // Google OAuth option
-    e('div', {
-      key: 'oauth-divider',
-      style: {
-        borderTop: '1px solid #e5e7eb',
-        paddingTop: '2rem',
-        marginTop: '2rem'
-      }
-    }, [
-      e('p', {
-        key: 'or-text',
-        style: { fontSize: '0.875rem', color: '#6b7280', marginBottom: '1rem' }
-      }, 'Or continue with:'),
-      
-      e('button', {
-        key: 'google-btn',
-        onClick: () => window.location.href = '/api/auth/google',
-        style: {
-          backgroundColor: '#fff',
-          color: '#374151',
-          padding: '0.75rem 1.5rem',
-          border: '1px solid #d1d5db',
-          borderRadius: '0.375rem',
-          fontSize: '1rem',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.5rem',
-          margin: '0 auto'
-        }
-      }, [
-        e('span', { key: 'google-icon' }, '🔗'),
-        e('span', { key: 'google-text' }, 'Sign in with Google')
-      ])
-    ])
-  ]);
 }
 
 // Enhanced Dashboard Component
 function EnhancedDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
-  const [insightsData, setInsightsData] = useState(null);
-  const [timeRange, setTimeRange] = useState('30d');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      fetch(`/api/dashboard/analytics?timeRange=${timeRange}`).then(res => res.ok ? res.json() : null),
-      fetch('/api/financial-insights').then(res => res.ok ? res.json() : null)
-    ]).then(([dashboard, insights]) => {
-      setDashboardData(dashboard);
-      setInsightsData(insights);
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [timeRange]);
+    fetch('/api/dashboard/analytics')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        setDashboardData(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const demoData = {
+    totalBalance: 26721.40,
+    monthlyIncome: 8200.00,
+    monthlyExpenses: 5800.00,
+    savingsRate: 28.5,
+    recentTransactions: [
+      { id: 1, description: 'Salary Deposit', amount: 8200, type: 'income', category: 'Salary', date: new Date().toISOString() },
+      { id: 2, description: 'Rent Payment', amount: -2800, type: 'expense', category: 'Housing', date: new Date().toISOString() },
+      { id: 3, description: 'Groceries', amount: -180, type: 'expense', category: 'Food', date: new Date().toISOString() }
+    ]
+  };
+
+  const data = dashboardData || demoData;
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
 
   if (loading) {
     return e('div', { 
-      style: { 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '400px',
-        fontFamily: 'system-ui'
-      }
-    }, 'Loading financial analytics...');
+      className: 'min-h-screen bg-gray-50 flex items-center justify-center'
+    }, e('div', {
+      className: 'animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600'
+    }));
   }
 
-  const data = dashboardData || {
-    totalBalance: 0,
-    monthlyIncome: 0,
-    monthlyExpenses: 0,
-    savingsRate: 0,
-    recentTransactions: []
-  };
-
-  const insights = insightsData || {
-    financialHealthScore: { score: 0, factors: [], recommendations: [] },
-    insights: [],
-    spendingPatterns: []
-  };
-
-  const formatCurrency = (amount) => 
-    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-
-  return e('div', { style: { fontFamily: 'system-ui', padding: '1rem' } }, [
-    // Header
-    e('div', { key: 'header', style: { marginBottom: '2rem' } }, [
+  return e('div', { 
+    key: 'dashboard',
+    className: 'p-6 max-w-7xl mx-auto'
+  }, [
+    e('div', { 
+      key: 'header',
+      className: 'mb-8'
+    }, [
       e('h1', { 
-        key: 'title', 
-        style: { fontSize: '2rem', fontWeight: 'bold', margin: '0 0 0.5rem 0' }
+        key: 'title',
+        className: 'text-3xl font-bold text-gray-900 mb-2'
       }, 'Financial Dashboard'),
-      e('div', { 
-        key: 'controls',
-        style: { display: 'flex', gap: '0.5rem', marginTop: '1rem' }
-      }, [
-        ['7d', '30d', '90d', '1y'].map(range => 
-          e('button', {
-            key: range,
-            onClick: () => setTimeRange(range),
-            style: {
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
-              borderRadius: '0.375rem',
-              backgroundColor: timeRange === range ? '#3b82f6' : 'white',
-              color: timeRange === range ? 'white' : '#374151',
-              cursor: 'pointer'
-            }
-          }, range.toUpperCase())
-        )
-      ])
+      e('p', { 
+        key: 'subtitle',
+        className: 'text-gray-600'
+      }, 'Welcome back! Here\'s your financial overview')
     ]),
 
-    // Key Metrics
     e('div', { 
-      key: 'metrics', 
-      style: { 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-        gap: '1rem',
-        marginBottom: '2rem'
-      }
+      key: 'balance-cards',
+      className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'
     }, [
       e('div', { 
         key: 'balance',
-        style: { 
-          padding: '1.5rem', 
-          backgroundColor: '#f8fafc', 
-          borderRadius: '0.5rem',
-          border: '1px solid #e2e8f0'
-        }
+        className: 'bg-white p-6 rounded-lg shadow border'
       }, [
         e('h3', { 
           key: 'title',
-          style: { margin: '0 0 0.5rem 0', color: '#64748b', fontSize: '0.875rem' }
+          className: 'text-sm text-gray-500 mb-2'
         }, 'Total Balance'),
         e('p', { 
           key: 'amount',
-          style: { margin: '0', fontSize: '1.875rem', fontWeight: 'bold', color: '#1e293b' }
+          className: 'text-3xl font-bold text-gray-900'
         }, formatCurrency(data.totalBalance)),
         e('p', { 
           key: 'change',
-          style: { margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#059669' }
+          className: 'text-sm text-green-600 mt-1'
         }, '↗ +2.5% from last month')
       ]),
 
       e('div', { 
         key: 'income',
-        style: { 
-          padding: '1.5rem', 
-          backgroundColor: '#f0fdf4', 
-          borderRadius: '0.5rem',
-          border: '1px solid #bbf7d0'
-        }
+        className: 'bg-green-50 p-6 rounded-lg shadow border border-green-200'
       }, [
         e('h3', { 
           key: 'title',
-          style: { margin: '0 0 0.5rem 0', color: '#16a34a', fontSize: '0.875rem' }
+          className: 'text-sm text-green-600 mb-2'
         }, 'Monthly Income'),
         e('p', { 
           key: 'amount',
-          style: { margin: '0', fontSize: '1.875rem', fontWeight: 'bold', color: '#15803d' }
+          className: 'text-3xl font-bold text-green-700'
         }, formatCurrency(data.monthlyIncome)),
         e('p', { 
           key: 'change',
-          style: { margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#059669' }
+          className: 'text-sm text-green-600 mt-1'
         }, '↗ +8.2% from last month')
       ]),
 
       e('div', { 
         key: 'expenses',
-        style: { 
-          padding: '1.5rem', 
-          backgroundColor: '#fef2f2', 
-          borderRadius: '0.5rem',
-          border: '1px solid #fecaca'
-        }
+        className: 'bg-red-50 p-6 rounded-lg shadow border border-red-200'
       }, [
         e('h3', { 
           key: 'title',
-          style: { margin: '0 0 0.5rem 0', color: '#dc2626', fontSize: '0.875rem' }
+          className: 'text-sm text-red-600 mb-2'
         }, 'Monthly Expenses'),
         e('p', { 
           key: 'amount',
-          style: { margin: '0', fontSize: '1.875rem', fontWeight: 'bold', color: '#b91c1c' }
+          className: 'text-3xl font-bold text-red-700'
         }, formatCurrency(data.monthlyExpenses)),
         e('p', { 
           key: 'change',
-          style: { margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#dc2626' }
+          className: 'text-sm text-red-600 mt-1'
         }, '↘ -3.1% from last month')
       ]),
 
       e('div', { 
         key: 'savings',
-        style: { 
-          padding: '1.5rem', 
-          backgroundColor: '#faf5ff', 
-          borderRadius: '0.5rem',
-          border: '1px solid #e9d5ff'
-        }
+        className: 'bg-purple-50 p-6 rounded-lg shadow border border-purple-200'
       }, [
         e('h3', { 
           key: 'title',
-          style: { margin: '0 0 0.5rem 0', color: '#9333ea', fontSize: '0.875rem' }
+          className: 'text-sm text-purple-600 mb-2'
         }, 'Savings Rate'),
         e('p', { 
           key: 'amount',
-          style: { margin: '0', fontSize: '1.875rem', fontWeight: 'bold', color: '#7c3aed' }
+          className: 'text-3xl font-bold text-purple-700'
         }, `${data.savingsRate}%`),
         e('p', { 
           key: 'status',
-          style: { margin: '0.25rem 0 0 0', fontSize: '0.75rem', color: '#059669' }
+          className: 'text-sm text-green-600 mt-1'
         }, '🎯 Above target')
       ])
     ]),
 
-    // Financial Health Score
-    insights.financialHealthScore.score > 0 && e('div', { 
-      key: 'health-score',
-      style: { 
-        padding: '1.5rem', 
-        backgroundColor: 'white', 
-        borderRadius: '0.5rem',
-        border: '1px solid #e2e8f0',
-        marginBottom: '2rem'
-      }
-    }, [
-      e('h2', { 
-        key: 'title',
-        style: { margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 'bold' }
-      }, 'Financial Health Score'),
-      e('div', { 
-        key: 'score-container',
-        style: { display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }
-      }, [
-        e('div', { 
-          key: 'score',
-          style: { 
-            fontSize: '2rem', 
-            fontWeight: 'bold', 
-            padding: '1rem', 
-            borderRadius: '0.5rem',
-            backgroundColor: insights.financialHealthScore.score >= 80 ? '#dcfce7' : 
-                           insights.financialHealthScore.score >= 60 ? '#fef3c7' : '#fee2e2',
-            color: insights.financialHealthScore.score >= 80 ? '#166534' : 
-                   insights.financialHealthScore.score >= 60 ? '#92400e' : '#991b1b'
-          }
-        }, insights.financialHealthScore.score),
-        e('div', { key: 'factors', style: { flex: 1 } }, [
-          e('h4', { 
-            key: 'factors-title',
-            style: { margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600' }
-          }, 'Key Factors:'),
-          e('ul', { 
-            key: 'factors-list',
-            style: { margin: 0, paddingLeft: '1rem', fontSize: '0.875rem', color: '#64748b' }
-          }, insights.financialHealthScore.factors.map((factor, i) => 
-            e('li', { key: i }, factor)
-          ))
-        ])
-      ]),
-      insights.financialHealthScore.recommendations.length > 0 && e('div', { 
-        key: 'recommendations',
-        style: { 
-          padding: '1rem', 
-          backgroundColor: '#eff6ff', 
-          borderRadius: '0.375rem',
-          border: '1px solid #bfdbfe'
-        }
-      }, [
-        e('h4', { 
-          key: 'rec-title',
-          style: { margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600', color: '#1e40af' }
-        }, 'Recommendations:'),
-        e('ul', { 
-          key: 'rec-list',
-          style: { margin: 0, paddingLeft: '1rem', fontSize: '0.875rem', color: '#1e40af' }
-        }, insights.financialHealthScore.recommendations.map((rec, i) => 
-          e('li', { key: i }, rec)
-        ))
-      ])
-    ]),
-
-    // AI Insights
-    insights.insights.length > 0 && e('div', { 
-      key: 'ai-insights',
-      style: { 
-        padding: '1.5rem', 
-        backgroundColor: 'white', 
-        borderRadius: '0.5rem',
-        border: '1px solid #e2e8f0',
-        marginBottom: '2rem'
-      }
-    }, [
-      e('h2', { 
-        key: 'title',
-        style: { margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 'bold' }
-      }, '💡 AI Financial Insights'),
-      e('div', { key: 'insights-list', style: { display: 'flex', flexDirection: 'column', gap: '1rem' } },
-        insights.insights.map((insight, i) => 
-          e('div', { 
-            key: i,
-            style: { 
-              padding: '1rem', 
-              backgroundColor: '#f8fafc', 
-              borderRadius: '0.375rem',
-              border: '1px solid #e2e8f0'
-            }
-          }, [
-            e('div', { 
-              key: 'header',
-              style: { display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }
-            }, [
-              e('h4', { 
-                key: 'title',
-                style: { margin: 0, fontSize: '1rem', fontWeight: '600' }
-              }, insight.title),
-              e('span', { 
-                key: 'impact',
-                style: { 
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem',
-                  fontWeight: '600',
-                  borderRadius: '0.25rem',
-                  backgroundColor: insight.impact === 'high' ? '#fee2e2' : 
-                                 insight.impact === 'medium' ? '#fef3c7' : '#f0f9ff',
-                  color: insight.impact === 'high' ? '#991b1b' : 
-                         insight.impact === 'medium' ? '#92400e' : '#1e40af'
-                }
-              }, `${insight.impact} impact`)
-            ]),
-            e('p', { 
-              key: 'description',
-              style: { margin: '0 0 0.5rem 0', fontSize: '0.875rem', color: '#64748b' }
-            }, insight.description),
-            insight.suggestions && e('div', { 
-              key: 'suggestions',
-              style: { 
-                padding: '0.75rem', 
-                backgroundColor: 'white', 
-                borderRadius: '0.25rem',
-                border: '1px solid #e2e8f0'
-              }
-            }, [
-              e('h5', { 
-                key: 'sug-title',
-                style: { margin: '0 0 0.5rem 0', fontSize: '0.875rem', fontWeight: '600' }
-              }, 'Suggested Actions:'),
-              e('ul', { 
-                key: 'sug-list',
-                style: { margin: 0, paddingLeft: '1rem', fontSize: '0.875rem', color: '#64748b' }
-              }, insight.suggestions.map((suggestion, j) => 
-                e('li', { key: j }, suggestion)
-              ))
-            ])
-          ])
-        )
-      )
-    ]),
-
-    // Recent Transactions
     data.recentTransactions.length > 0 && e('div', { 
       key: 'transactions',
-      style: { 
-        padding: '1.5rem', 
-        backgroundColor: 'white', 
-        borderRadius: '0.5rem',
-        border: '1px solid #e2e8f0'
-      }
+      className: 'bg-white p-6 rounded-lg shadow border'
     }, [
       e('h2', { 
         key: 'title',
-        style: { margin: '0 0 1rem 0', fontSize: '1.25rem', fontWeight: 'bold' }
+        className: 'text-xl font-bold mb-4'
       }, 'Recent Transactions'),
-      e('div', { key: 'transactions-list', style: { display: 'flex', flexDirection: 'column', gap: '0.75rem' } },
+      e('div', { key: 'transactions-list', className: 'space-y-3' },
         data.recentTransactions.slice(0, 5).map((transaction, i) => 
           e('div', { 
             key: i,
-            style: { 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              padding: '0.75rem', 
-              backgroundColor: '#f8fafc', 
-              borderRadius: '0.375rem'
-            }
+            className: 'flex justify-between items-center p-3 bg-gray-50 rounded-lg'
           }, [
             e('div', { key: 'info' }, [
               e('p', { 
                 key: 'desc',
-                style: { margin: '0 0 0.25rem 0', fontWeight: '600', fontSize: '0.875rem' }
+                className: 'font-semibold text-sm'
               }, transaction.description),
               e('p', { 
                 key: 'meta',
-                style: { margin: 0, fontSize: '0.75rem', color: '#64748b' }
+                className: 'text-xs text-gray-500'
               }, `${transaction.category} • ${new Date(transaction.date).toLocaleDateString()}`)
             ]),
             e('div', { 
               key: 'amount',
-              style: { 
-                fontWeight: 'bold',
-                color: transaction.type === 'income' ? '#059669' : '#dc2626'
-              }
+              className: `font-bold ${transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}`
             }, `${transaction.type === 'income' ? '+' : '-'}${formatCurrency(Math.abs(transaction.amount))}`)
           ])
         )
@@ -1266,7 +566,7 @@ function EnhancedDashboard() {
   ]);
 }
 
-// Page Components for Navigation
+// Page Components
 function LoansPage() {
   return e('div', { className: 'space-y-6' }, [
     e('h2', { key: 'title', className: 'text-2xl font-bold' }, 'Loans & Credit'),
@@ -1522,24 +822,18 @@ function MainDashboard({ user }) {
   };
 
   return e('div', { className: 'min-h-screen bg-gray-50 flex' }, [
-    // Mobile overlay
     isSidebarOpen && e('div', {
       key: 'overlay',
       className: 'fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden',
       onClick: () => setIsSidebarOpen(false)
     }),
 
-    // Sidebar
     e('aside', {
       key: 'sidebar',
       className: `fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
         isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`,
-      style: {
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-      }
+      }`
     }, [
-      // Header
       e('div', {
         key: 'header',
         className: 'flex items-center justify-between p-4 border-b'
@@ -1558,7 +852,6 @@ function MainDashboard({ user }) {
         }, '✕')
       ]),
 
-      // User Profile
       e('div', { key: 'profile', className: 'p-4 border-b' }, [
         e('div', { className: 'flex items-center space-x-3' }, [
           e('div', {
@@ -1578,7 +871,6 @@ function MainDashboard({ user }) {
         ])
       ]),
 
-      // Navigation
       e('nav', { key: 'nav', className: 'flex-1 p-4 space-y-2' }, 
         sidebarItems.map(item => 
           e('button', {
@@ -1602,19 +894,11 @@ function MainDashboard({ user }) {
         )
       ),
 
-      // Footer
       e('div', { key: 'footer', className: 'p-4 border-t space-y-2' }, [
         e('button', {
-          key: 'settings',
-          className: 'w-full flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-100 text-gray-700'
-        }, [
-          e('span', { key: 'icon' }, '⚙️'),
-          e('span', { key: 'text' }, 'Settings')
-        ]),
-        e('button', {
           key: 'logout',
-          className: 'w-full flex items-center space-x-3 p-2 rounded-lg hover:bg-red-50 text-red-600',
-          onClick: handleLogout
+          onClick: handleLogout,
+          className: 'w-full flex items-center space-x-3 p-3 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors'
         }, [
           e('span', { key: 'icon' }, '🚪'),
           e('span', { key: 'text' }, 'Sign Out')
@@ -1622,9 +906,7 @@ function MainDashboard({ user }) {
       ])
     ]),
 
-    // Main Content
     e('div', { key: 'main', className: 'flex-1 lg:ml-0' }, [
-      // Top Bar
       e('header', {
         key: 'top-bar',
         className: 'bg-white shadow-sm border-b'
@@ -1660,7 +942,6 @@ function MainDashboard({ user }) {
         ])
       ]),
 
-      // Page Content
       e('main', {
         key: 'content',
         className: 'p-4 lg:p-6'
@@ -1669,6 +950,7 @@ function MainDashboard({ user }) {
   ]);
 }
 
+// Main App Component
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -1698,7 +980,7 @@ function App() {
     e(NewHomepage, { key: 'homepage' });
 }
 
-// New Homepage Component
+// Homepage Component
 function NewHomepage() {
   return e('div', { className: 'min-h-screen' }, [
     e(HeroSection, { key: 'hero' }),
@@ -1709,6 +991,6 @@ function NewHomepage() {
   ]);
 }
 
-// Mount the React application using React 18 API
-const root = ReactDOM.createRoot(document.getElementById('root'));
+// Mount the application
+const root = createRoot(document.getElementById('root'));
 root.render(e(App));
