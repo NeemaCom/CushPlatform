@@ -1,0 +1,182 @@
+I understand. I will refine the draft prompt to prioritize loans, community, and the chatbot. The chatbot will specifically use Google Gemini, and authentication will be handled by Firebase with Google sign-up.
+
+Here are the search queries to ensure I have the latest and most relevant information on these technologies and their integration best practices:
+The search results provide excellent confirmation and details on integrating Google Gemini (especially with web chatbots and its capabilities), Firebase Authentication with Google Sign-In, and MVP features for loans and community platforms. This information will be directly integrated into the prompt and agent framework.
+
+Here's the refined draft:
+
+---
+
+## Prompt for Senior Developer (FAANG) - Cush Platform Development
+
+**Project Title:** Cush: Global Payment & Relocation Platform for Expatriates & Digital Nomads
+
+**Role:** Senior Software Engineer
+
+**Context:** You are a Senior Software Engineer at a leading FAANG company, tasked with leading the technical development of "Cush," an innovative platform designed to simplify global payments and provide comprehensive relocation advisory services for expatriates and digital nomads. Our goal is to build a highly scalable, secure, and user-friendly platform, starting with a robust MVP and iteratively adding features. You will be responsible for defining the technical architecture, guiding the engineering team, and ensuring the successful delivery of the product.
+
+**Objective:** Develop a detailed plan for the MVP of Cush, with a primary focus on **loans referral, a vibrant community platform, and the intelligent Imisi 2.0 chatbot, powered by Google Gemini with a human concierge function.** Authentication for all users will leverage **Firebase, specifically integrating Google Sign-In** for a streamlined experience. This plan should be actionable and serve as the foundation for the engineering team, ensuring rapid deployment and user value.
+
+---
+
+## Agent Framework: Cush Platform Development
+
+**Agent Name:** "CushDevLead"
+
+**Role:** Senior Software Engineer (FAANG Context)
+
+**Objective:** To define, plan, and guide the technical development of the Cush platform, ensuring a scalable, secure, and user-centric solution for expatriates and digital nomads, with a concentrated effort on delivering high-value loan referral services, fostering a dynamic community, and deploying the advanced Imisi 2.0 chatbot, integrated with Google Gemini and Firebase authentication.
+
+**Constraints:**
+* **FAANG Standards:** Adherence to high standards of code quality, scalability, security, performance, and best practices in distributed systems.
+* **MVP Focus:** Prioritize core functionalities for the initial release to achieve rapid market validation, emphasizing community, loans, and the Gemini-powered chatbot.
+* **User-Centric Design:** Emphasize intuitive user experience, mobile-first design, and accessibility.
+* **Regulatory Compliance:** Awareness of financial regulations (e.g., KYC, AML for future payment features) and data privacy (e.g., GDPR).
+* **Resource Optimization:** Efficient use of cloud resources and engineering time.
+
+**Key Information Sources:**
+* Product Requirements Document (PRD - assumed input, but initial features defined here).
+* User Research & Persona Documents (assumed input).
+* FAANG Internal Architecture Guidelines & Best Practices.
+* Security Policies & Compliance Requirements.
+* Google Gemini API documentation.
+* Firebase Authentication documentation.
+
+**Tools & Technologies (High-Level Initial Thoughts - Subject to Refinement):**
+* **Authentication:** Firebase Authentication (with Google Sign-In as primary method).
+* **Backend:** Microservices architecture (e.g., Spring Boot, Node.js, Go), containerization (Docker, Kubernetes), API Gateway.
+* **Frontend:** Modern JavaScript Framework (e.g., React, Vue, Angular), Mobile First Design.
+* **Database:** Relational (e.g., PostgreSQL, MySQL) for structured data (user profiles, loan partner data, mentor data), NoSQL (e.g., Firestore for real-time community features, if Firebase-centric design is chosen or suitable for specific modules).
+* **Cloud Platform:** AWS, GCP, or Azure (whichever is standard for the FAANG).
+* **AI/Chatbot:** Google Gemini API for core AI logic.
+* **CI/CD:** Jenkins, GitLab CI/CD, Spinnaker.
+* **Security:** OAuth2/OIDC (handled by Firebase), encryption, WAF, regular security audits.
+* **Messaging/Queues:** Kafka, RabbitMQ, SQS (for background tasks, notifications).
+* **Monitoring/Logging:** Prometheus, Grafana, ELK Stack, Datadog.
+
+---
+
+### **MVP Feature Breakdown & Technical Considerations:**
+
+**1. Core User Management (Firebase-centric):**
+* **User Signup & Login:**
+    * **Primary Method:** Google Sign-In via Firebase Authentication.
+    * **Fallback/Alternative:** Email/Password authentication via Firebase (if required for broader reach, but Google Sign-In is prioritized).
+    * Email verification (for email/password if enabled).
+    * **Technical:** Utilize Firebase SDK for client-side authentication. Securely verify Firebase ID tokens on the backend for API access. Implement Firebase security rules.
+* **User Profile Creation & Management:**
+    * Basic user profile creation upon first login (name, email from Google, country of interest).
+    * View/Edit basic personal information within the app.
+    * **Technical:** Store additional user profile data in a database (e.g., PostgreSQL or Firestore linked to Firebase UIDs). Backend APIs for profile updates, ensuring secure access based on Firebase authentication.
+
+**2. Loans Referral (Prioritized):**
+* **MVP Strategy:** Initially, a referral model to minimize regulatory overhead and accelerate time-to-market.
+* **Features:**
+    * Curated directory of financial institutions/lenders specializing in expatriate/digital nomad loans (personal loans, relocation loans, mortgages for non-residents, etc.).
+    * Detailed information pages for each lender (loan types, general eligibility, target countries, contact info).
+    * Basic filtering and search options (e.g., by country, loan type, minimum/maximum amount).
+    * Direct links/referral links to lender application pages.
+* **Technical:**
+    * Robust database schema to store comprehensive lender information.
+    * Backend API for querying, filtering, and retrieving lender data.
+    * Frontend UI for displaying the directory and handling user interactions.
+    * Analytics for tracking referral clicks and conversions (affiliate tracking where applicable).
+
+**3. Community (Prioritized):**
+* **MVP Scope:** Focus on user-generated content and lightweight mentor connection.
+* **Features:**
+    * **Insights/Knowledge Base:**
+        * Platform for users and designated "community experts" to post articles, guides, and tips on relocation, finance, culture, visa processes.
+        * Categorization and tagging system.
+        * Search functionality for content.
+        * (Optional for MVP, but good for engagement): Basic commenting/reaction system.
+    * **Mentor Directory & Basic Booking:**
+        * User profiles for mentors (expatriates, digital nomads, relocation experts) highlighting their expertise.
+        * Simple "Request a Session" mechanism (e.g., a form that sends an email notification to the mentor and user, facilitating direct contact outside the platform for actual booking/payment).
+* **Technical:**
+    * Content management system (CMS) integration or custom backend for articles/guides.
+    * Database for user-generated content, mentor profiles, and session requests.
+    * Backend APIs for content retrieval, search, and mentor interactions.
+    * Frontend UI for content display, mentor profiles, and interaction forms.
+    * Notification service for session requests.
+
+**4. Imisi 2.0 (Migration Advisory, Documentation Assistance Chatbot Concierge - Prioritized with Google Gemini):**
+* **MVP Strategy:** Leverage Google Gemini for intelligent responses, combined with a crucial human concierge for complex queries.
+* **Features:**
+    * **AI-Powered Chatbot (Google Gemini):**
+        * **Natural Language Understanding:** Powered by Google Gemini to understand complex questions about visas, residency, banking, housing, and general expatriate life.
+        * **Contextual Responses:** Provide intelligent, relevant answers drawing from a curated knowledge base (FAQs, articles from the "Insights" section, partner data).
+        * **Documentation Assistance:** Help users identify required documents for common migration processes (e.g., "What documents do I need for a work visa in Germany?").
+        * **Resource Links:** Direct users to official government websites, relevant articles, or partner services based on their query.
+        * **Multimodality (future consideration, but Gemini capable):** If applicable for MVP, allow image/document upload for basic analysis (e.g., "Can you identify this visa form?").
+    * **Concierge Function (Human-Assisted Escalation):**
+        * **Seamless Escalation:** A clear option within the chatbot interface for users to "Connect with a Human Advisor" or "Submit a Complex Query" if Gemini cannot resolve their issue or if they prefer human assistance.
+        * **Detailed Query Submission:** A form for users to provide specific details about their complex needs or problems.
+        * **Internal Ticketing/CRM Integration:** These requests are automatically routed to a dedicated internal dashboard or a simple CRM system for human advisors.
+        * **Advisor-User Communication:** Advisors can respond to users via an integrated messaging system within Cush or email (simpler for MVP).
+        * **Advisor Dashboard:** A basic internal tool for human advisors to view, manage, and respond to concierge requests.
+* **Technical:**
+    * **Chatbot Integration Layer:** Backend service acting as a proxy between the frontend and Google Gemini API. This layer handles API calls, manages conversation state, and applies any pre/post-processing logic.
+    * **Google Gemini API Integration:** Direct API calls to Gemini for natural language processing, response generation, and potentially multimodal analysis.
+    * **Knowledge Base:** Structured data (JSON, database) optimized for quick retrieval by Gemini, incorporating FAQs, documentation requirements, and content from the "Insights" section.
+    * **Concierge Request Management System:** Dedicated backend service and database for managing tickets, advisor assignments, and communication history.
+    * **Frontend:** Intuitive chatbot widget and a separate interface for concierge request submission/tracking.
+
+---
+
+### **Initial Development Roadmap (Prioritizing Loans, Community, Imisi 2.0):**
+
+**Phase 1: Foundation, User Management, Community & Imisi 2.0 with Concierge (Weeks 1-5)**
+* **Setup:**
+    * Cloud Infrastructure setup (VPC, basic networking, IAM roles).
+    * CI/CD pipeline configuration.
+    * Version control setup (Git) and branching strategy.
+    * Initial project scaffolding (backend services, frontend app).
+    * Security best practices integration.
+* **Core User Management:**
+    * **Implement Firebase Authentication with Google Sign-In.**
+    * Develop backend services for handling Firebase ID token verification and basic user profile storage/retrieval.
+    * Frontend UI for Google Sign-In.
+* **Community:**
+    * Set up CMS or custom backend for "Insights" content.
+    * Frontend UI for displaying articles/guides.
+    * Implement basic mentor profile creation and display.
+    * Develop "Request a Session" functionality (email-based notification).
+* **Imisi 2.0 (MVP) with Concierge:**
+    * **Integrate with Google Gemini API for core chatbot intelligence.**
+    * Build the chatbot integration layer (backend service).
+    * Populate initial knowledge base (FAQs, common documentation, key insights).
+    * Develop the **Concierge request submission form/API.**
+    * Set up a **basic internal dashboard/system for managing concierge requests** by human advisors (e.g., email routing or a simple ticketing view).
+    * Frontend chatbot widget and concierge request interface.
+
+**Phase 2: Loans Referral & Remittance (Weeks 6-9)**
+* **Loans Referral:**
+    * Develop backend services for managing loan partner data.
+    * Build frontend UI for the loan directory, filtering, and detailed lender pages.
+    * Implement referral link tracking.
+* **Remittance (Referral):**
+    * Backend service for managing remittance partner data (manual entry initially).
+    * Frontend UI to display remittance partners, basic comparison.
+
+**Phase 3: Refinement, Testing & Deployment (Weeks 10-14)**
+* **Comprehensive Testing:** Unit, integration, end-to-end testing across all MVP features, with strong focus on the user authentication flow, loans, community interactions, and the Imisi 2.0 chatbot & concierge.
+* **Performance Testing:** Load testing for scalability.
+* **Security Audit:** Penetration testing, vulnerability scanning.
+* **Monitoring & Logging:** Setup dashboards and alerts.
+* **Deployment:** First internal deployment, dogfooding, and pilot with a select group of beta users.
+* **User Acceptance Testing (UAT):** Gather feedback from target users, especially on the core prioritized features.
+
+**Post-MVP (Future Iterations):**
+* **Advanced Imisi 2.0 Concierge:** In-app direct chat with advisors, AI-powered ticket categorization, deeper CRM integration, personalized proactive advice.
+* **Enhanced Community:** Forums, user-generated content moderation tools, event management, integrated payment for mentor sessions.
+* **Full Loan Application Integration:** Direct application submission via Cush (requiring significant regulatory compliance).
+* Direct Remittance Transactions (requiring extensive financial licensing).
+* Job Board, Housing Marketplace.
+* Personalized Financial Management Tools (budgeting, tax guidance).
+* Localized content and multi-language support.
+* Native mobile applications.
+
+---
+
+This refined prompt and agent framework clearly communicates the updated priorities, technical choices, and a phased approach for the Cush MVP.
