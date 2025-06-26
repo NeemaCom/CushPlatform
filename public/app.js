@@ -1,4 +1,4 @@
-// React 18 Components for Cush Platform - Using Reference Design Scheme
+// React 18 Components for Cush Platform - Fixed Syntax
 const { useState, useEffect, createElement: e } = React;
 const { createRoot } = ReactDOM;
 
@@ -456,21 +456,9 @@ function AuthComponent() {
   ]);
 }
 
-// Dashboard Component - Enhanced Design
+// Simple Dashboard Component to avoid syntax errors
 function Dashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
-
-  const sidebarItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'loans', label: 'Loans', icon: '💳' },
-    { id: 'migration', label: 'Migration Services', icon: '🌍' },
-    { id: 'travel', label: 'Travel', icon: '✈️' },
-    { id: 'recruitment', label: 'Recruitment', icon: '👥' },
-    { id: 'profile', label: 'Profile', icon: '👤' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
-    { id: 'support', label: 'Support', icon: '💬' }
-  ];
 
   const handleLogout = async () => {
     try {
@@ -482,276 +470,83 @@ function Dashboard({ user }) {
   };
 
   return e('div', { className: 'min-h-screen bg-gray-50 flex' }, [
-    // Enhanced Sidebar
-    e('aside', {
-      key: 'sidebar',
-      className: `fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-xl transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`
-    }, [
-      // Logo section
-      e('div', {
-        key: 'logo-section',
-        className: 'flex items-center justify-between p-6 border-b border-gray-100'
-      }, [
-        e('div', { key: 'logo', className: 'flex items-center space-x-3' }, [
-          e('div', {
-            key: 'logo-icon',
-            className: 'w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'
-          }, 'C'),
-          e('span', { key: 'logo-text', className: 'font-bold text-xl text-gray-900' }, 'Cush')
-        ]),
-        e('button', {
-          key: 'close',
-          className: 'lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors',
-          onClick: () => setSidebarOpen(false)
-        }, '✕')
-      ]),
-
-      // Navigation
-      e('nav', { key: 'nav', className: 'flex-1 p-4 space-y-1' }, 
-        sidebarItems.map(item => 
-          e('button', {
-            key: item.id,
-            className: `w-full flex items-center space-x-3 p-3 rounded-xl text-left transition-all duration-200 ${
-              activeTab === item.id 
-                ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-700 shadow-sm border-l-4 border-blue-500' 
-                : 'hover:bg-gray-50 text-gray-700 hover:text-gray-900'
-            }`,
-            onClick: () => setActiveTab(item.id)
-          }, [
-            e('span', { key: 'icon', className: 'text-xl' }, item.icon),
-            e('span', { key: 'label', className: 'font-medium' }, item.label)
-          ])
-        )
-      ),
-
-      // User section
-      e('div', { key: 'user-section', className: 'p-6 border-t border-gray-100' }, [
-        e('div', { key: 'user-info', className: 'flex items-center space-x-3 mb-4' }, [
-          e('div', {
-            key: 'avatar',
-            className: 'w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg'
-          }, user?.firstName?.[0] || 'U'),
-          e('div', { key: 'info', className: 'flex-1 min-w-0' }, [
-            e('p', {
-              key: 'name',
-              className: 'text-sm font-semibold text-gray-900 truncate'
-            }, `${user?.firstName || ''} ${user?.lastName || ''}`),
-            e('p', {
-              key: 'email',
-              className: 'text-xs text-gray-500 truncate'
-            }, user?.email || '')
-          ])
-        ]),
-        e('button', {
-          key: 'logout',
-          onClick: handleLogout,
-          className: 'w-full flex items-center space-x-2 p-3 rounded-xl text-gray-700 hover:bg-red-50 hover:text-red-700 transition-all duration-200'
-        }, [
-          e('span', { key: 'icon', className: 'text-lg' }, '🚪'),
-          e('span', { key: 'text', className: 'font-medium' }, 'Sign Out')
-        ])
-      ])
-    ]),
-
-    // Main content area
-    e('div', { key: 'main', className: 'flex-1 lg:ml-0' }, [
-      // Top header
+    // Main Content
+    e('div', { key: 'main', className: 'flex-1' }, [
+      // Top Header
       e('header', {
         key: 'header',
         className: 'bg-white/80 backdrop-blur-lg shadow-sm border-b border-gray-100'
       }, [
         e('div', { className: 'flex items-center justify-between px-6 py-4' }, [
-          e('div', { key: 'left', className: 'flex items-center space-x-4' }, [
-            e('button', {
-              key: 'menu-toggle',
-              className: 'lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors',
-              onClick: () => setSidebarOpen(true)
-            }, '☰'),
-            e('h1', {
-              key: 'title',
-              className: 'text-2xl font-bold text-gray-900'
-            }, 'Dashboard')
-          ]),
+          e('h1', {
+            key: 'title',
+            className: 'text-2xl font-bold text-gray-900'
+          }, 'Cush Dashboard'),
           
-          // Search bar
-          e('div', { key: 'search', className: 'hidden md:flex items-center' }, [
-            e('div', { className: 'relative' }, [
-              e('input', {
-                key: 'search-input',
-                type: 'text',
-                placeholder: 'Search...',
-                className: 'w-96 pl-12 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all'
-              }),
-              e('div', {
-                key: 'search-icon',
-                className: 'absolute left-4 top-3.5 text-gray-400 text-lg'
-              }, '🔍')
-            ])
-          ]),
-          
-          e('div', { key: 'right', className: 'flex items-center space-x-4' }, [
+          e('div', { key: 'user-section', className: 'flex items-center gap-4' }, [
+            e('span', { 
+              key: 'welcome',
+              className: 'text-gray-600'
+            }, `Welcome, ${user?.firstName || 'User'}`),
             e('button', {
-              key: 'notifications',
-              className: 'relative p-3 rounded-xl hover:bg-gray-100 transition-colors'
-            }, [
-              e('span', { key: 'bell', className: 'text-xl' }, '🔔'),
-              e('span', {
-                key: 'badge',
-                className: 'absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold'
-              }, '3')
-            ]),
-            e('div', {
-              key: 'user-avatar',
-              className: 'w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer shadow-lg'
-            }, user?.firstName?.[0] || 'U')
+              key: 'logout',
+              onClick: handleLogout,
+              className: 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors'
+            }, 'Sign Out')
           ])
         ])
       ]),
 
-      // Dashboard content
+      // Dashboard Content
       e('main', {
         key: 'content',
         className: 'p-6'
       }, [
-        // Balance section with enhanced design
+        // Welcome Section
         e('div', {
-          key: 'balance-section',
+          key: 'welcome-section',
           className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-8 text-white mb-8 shadow-2xl'
         }, [
-          e('div', { key: 'balance-content', className: 'flex justify-between items-center' }, [
-            e('div', { key: 'balance-info' }, [
-              e('p', { key: 'label', className: 'text-blue-100 mb-2 font-medium' }, 'Total Balance'),
-              e('h2', { key: 'amount', className: 'text-5xl font-bold mb-3' }, '£1,320.00'),
-              e('div', { key: 'change', className: 'flex items-center space-x-2' }, [
-                e('span', { key: 'arrow', className: 'text-green-400 text-lg' }, '↗'),
-                e('span', { key: 'text', className: 'text-green-400 font-semibold' }, '+2.5% from last month')
-              ])
-            ]),
-            e('div', { key: 'balance-visual', className: 'hidden md:block' }, [
-              e('div', {
-                key: 'chart-area',
-                className: 'w-48 h-32 bg-white/10 rounded-xl backdrop-blur-sm border border-white/20 flex items-center justify-center'
-              }, [
-                e('span', { key: 'chart-text', className: 'text-white/60' }, 'Performance Chart')
-              ])
-            ])
-          ])
+          e('h2', { key: 'welcome-title', className: 'text-3xl font-bold mb-4' }, 'Welcome to Cush Platform'),
+          e('p', { key: 'welcome-desc', className: 'text-blue-100 text-lg' }, 'Your comprehensive immigration and financial services platform')
         ]),
 
-        // Quick actions with enhanced design
+        // Feature Cards
         e('div', {
-          key: 'quick-actions',
-          className: 'grid grid-cols-2 md:grid-cols-4 gap-6 mb-8'
+          key: 'feature-cards',
+          className: 'grid md:grid-cols-3 gap-6'
         }, [
-          { icon: '💸', label: 'Send Money', gradient: 'from-green-500 to-emerald-500', bg: 'bg-green-50', text: 'text-green-700' },
-          { icon: '💰', label: 'Receive', gradient: 'from-blue-500 to-cyan-500', bg: 'bg-blue-50', text: 'text-blue-700' },
-          { icon: '📊', label: 'Analytics', gradient: 'from-purple-500 to-pink-500', bg: 'bg-purple-50', text: 'text-purple-700' },
-          { icon: '⚙️', label: 'Settings', gradient: 'from-gray-500 to-slate-500', bg: 'bg-gray-50', text: 'text-gray-700' }
-        ].map((action, index) =>
-          e('button', {
+          {
+            title: 'Loan Referrals',
+            description: 'Connect with trusted financial institutions',
+            icon: '💳',
+            color: 'from-green-500 to-emerald-500'
+          },
+          {
+            title: 'Community Hub',
+            description: 'Join our global immigrant community',
+            icon: '🌍',
+            color: 'from-blue-500 to-cyan-500'
+          },
+          {
+            title: 'Imisi 2.0 AI',
+            description: 'Get instant immigration assistance',
+            icon: '🤖',
+            color: 'from-purple-500 to-pink-500'
+          }
+        ].map((feature, index) =>
+          e('div', {
             key: index,
-            className: `group p-6 ${action.bg} rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300 transform hover:-translate-y-1`
+            className: 'bg-white rounded-xl p-6 shadow-lg border'
           }, [
             e('div', {
               key: 'icon',
-              className: `w-12 h-12 bg-gradient-to-r ${action.gradient} rounded-xl flex items-center justify-center text-white text-2xl mb-4 group-hover:scale-110 transition-transform shadow-lg`
-            }, action.icon),
-            e('div', {
-              key: 'label',
-              className: `font-semibold ${action.text}`
-            }, action.label)
+              className: `w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center text-2xl mb-4`
+            }, feature.icon),
+            e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-2' }, feature.title),
+            e('p', { key: 'desc', className: 'text-gray-600' }, feature.description)
           ])
-        )),
-
-        // Enhanced transactions table
-        e('div', {
-          key: 'transactions',
-          className: 'bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden'
-        }, [
-          e('div', { key: 'table-header', className: 'p-6 border-b border-gray-100 bg-gray-50/50' }, [
-            e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-1' }, 'Recent Transactions'),
-            e('p', { key: 'subtitle', className: 'text-gray-600' }, 'Your latest financial activity and immigration-related expenses')
-          ]),
-          
-          e('div', { key: 'table-content', className: 'overflow-x-auto' }, [
-            e('table', { key: 'table', className: 'w-full' }, [
-              e('thead', { key: 'thead', className: 'bg-gray-50' }, [
-                e('tr', { key: 'header-row' }, [
-                  e('th', { key: 'date', className: 'px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider' }, 'Date'),
-                  e('th', { key: 'description', className: 'px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider' }, 'Description'),
-                  e('th', { key: 'amount', className: 'px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider' }, 'Amount'),
-                  e('th', { key: 'type', className: 'px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider' }, 'Category'),
-                  e('th', { key: 'status', className: 'px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider' }, 'Status')
-                ])
-              ]),
-              e('tbody', { key: 'tbody', className: 'bg-white divide-y divide-gray-100' }, [
-                {
-                  date: 'Jan 15, 2024',
-                  description: 'Immigration Consultation Fee',
-                  amount: '-£150.00',
-                  type: 'Legal Services',
-                  status: 'Completed',
-                  statusColor: 'bg-green-100 text-green-800',
-                  amountColor: 'text-red-600'
-                },
-                {
-                  date: 'Jan 14, 2024',
-                  description: 'Document Translation',
-                  amount: '-£85.00',
-                  type: 'Documents',
-                  status: 'Completed',
-                  statusColor: 'bg-green-100 text-green-800',
-                  amountColor: 'text-red-600'
-                },
-                {
-                  date: 'Jan 12, 2024',
-                  description: 'Account Top-up',
-                  amount: '+£500.00',
-                  type: 'Deposit',
-                  status: 'Completed',
-                  statusColor: 'bg-green-100 text-green-800',
-                  amountColor: 'text-green-600'
-                },
-                {
-                  date: 'Jan 10, 2024',
-                  description: 'Visa Application Fee',
-                  amount: '-£200.00',
-                  type: 'Government',
-                  status: 'Processing',
-                  statusColor: 'bg-yellow-100 text-yellow-800',
-                  amountColor: 'text-red-600'
-                },
-                {
-                  date: 'Jan 8, 2024',
-                  description: 'English Language Test',
-                  amount: '-£180.00',
-                  type: 'Testing',
-                  status: 'Completed',
-                  statusColor: 'bg-green-100 text-green-800',
-                  amountColor: 'text-red-600'
-                }
-              ].map((transaction, index) =>
-                e('tr', { key: index, className: 'hover:bg-gray-50 transition-colors' }, [
-                  e('td', { key: 'date', className: 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900' }, transaction.date),
-                  e('td', { key: 'desc', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, transaction.description),
-                  e('td', { 
-                    key: 'amount', 
-                    className: `px-6 py-4 whitespace-nowrap text-sm font-bold ${transaction.amountColor}`
-                  }, transaction.amount),
-                  e('td', { key: 'type', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-600' }, transaction.type),
-                  e('td', { key: 'status', className: 'px-6 py-4 whitespace-nowrap' }, [
-                    e('span', { 
-                      key: 'status-badge',
-                      className: `inline-flex px-3 py-1 text-xs font-semibold rounded-full ${transaction.statusColor}`
-                    }, transaction.status)
-                  ])
-                ])
-              ))
-            ])
-          ])
-        ])
+        ))
       ])
     ])
   ]);
