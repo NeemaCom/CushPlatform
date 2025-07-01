@@ -1059,13 +1059,33 @@ function AuthComponent() {
 // Simple Dashboard Component to avoid syntax errors
 function Dashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [currentView, setCurrentView] = useState('dashboard');
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
-      window.location.reload();
+      const response = await fetch('/api/auth/logout', { 
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        // Clear any local storage/session storage if needed
+        localStorage.clear();
+        sessionStorage.clear();
+        // Force reload to ensure clean state
+        window.location.href = '/';
+      } else {
+        console.error('Logout failed with status:', response.status);
+        // Force redirect anyway for security
+        window.location.href = '/';
+      }
     } catch (error) {
       console.error('Logout failed:', error);
+      // Force redirect anyway for security
+      window.location.href = '/';
     }
   };
 
@@ -1089,6 +1109,11 @@ function Dashboard({ user }) {
               className: 'text-gray-600'
             }, `Welcome, ${user?.firstName || 'User'}`),
             e('button', {
+              key: 'account',
+              onClick: () => setCurrentView('account'),
+              className: 'bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors'
+            }, 'Account'),
+            e('button', {
               key: 'logout',
               onClick: handleLogout,
               className: 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors'
@@ -1102,6 +1127,8 @@ function Dashboard({ user }) {
         key: 'content',
         className: 'p-6'
       }, [
+        // Render different views based on currentView
+        currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : [
         // Welcome Section
         e('div', {
           key: 'welcome-section',
@@ -1760,6 +1787,377 @@ function ImisiChatHead() {
             }, [
               e('span', { key: 'send-icon', className: 'text-sm' }, isTyping ? '⏳' : '→')
             ])
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// User Account Page Component
+function UserAccountPage({ user, onBack }) {
+  const [activeTab, setActiveTab] = useState('profile');
+  const [profileForm, setProfileForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    email: user?.email || '',
+    phoneNumber: user?.phoneNumber || '',
+    nationality: user?.nationality || ''
+  });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  const showMessage = (type, text) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+  };
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify(profileForm)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        showMessage('success', 'Profile updated successfully!');
+        // Update user data in parent component would be ideal here
+      } else {
+        showMessage('error', data.error || 'Profile update failed');
+      }
+    } catch (error) {
+      showMessage('error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showMessage('error', 'New passwords do not match');
+      return;
+    }
+    
+    if (passwordForm.newPassword.length < 8) {
+      showMessage('error', 'New password must be at least 8 characters long');
+      return;
+    }
+    
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/change-password', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        showMessage('success', 'Password changed successfully!');
+        setPasswordForm({
+          currentPassword: '',
+          newPassword: '',
+          confirmPassword: ''
+        });
+      } else {
+        showMessage('error', data.error || 'Password change failed');
+      }
+    } catch (error) {
+      showMessage('error', 'Network error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return e('div', { className: 'max-w-4xl mx-auto' }, [
+    // Header
+    e('div', {
+      key: 'header',
+      className: 'flex items-center justify-between mb-8'
+    }, [
+      e('div', { key: 'title-section' }, [
+        e('button', {
+          key: 'back-btn',
+          onClick: onBack,
+          className: 'text-blue-600 hover:text-blue-800 mb-2 flex items-center gap-2 transition-colors'
+        }, ['← Back to Dashboard']),
+        e('h1', {
+          key: 'title',
+          className: 'text-3xl font-bold text-gray-900'
+        }, 'Account Settings'),
+        e('p', {
+          key: 'subtitle',
+          className: 'text-gray-600 mt-2'
+        }, 'Manage your account information and security settings')
+      ])
+    ]),
+
+    // Message display
+    message.text && e('div', {
+      key: 'message',
+      className: `mb-6 p-4 rounded-lg ${
+        message.type === 'success' 
+          ? 'bg-green-50 border border-green-200 text-green-800' 
+          : 'bg-red-50 border border-red-200 text-red-800'
+      }`
+    }, message.text),
+
+    // Tab Navigation
+    e('div', {
+      key: 'tabs',
+      className: 'bg-white rounded-xl shadow-lg overflow-hidden'
+    }, [
+      e('div', {
+        key: 'tab-headers',
+        className: 'flex border-b border-gray-200'
+      }, [
+        e('button', {
+          key: 'profile-tab',
+          onClick: () => setActiveTab('profile'),
+          className: `px-6 py-4 font-medium transition-colors ${
+            activeTab === 'profile'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`
+        }, 'Profile Information'),
+        e('button', {
+          key: 'security-tab',
+          onClick: () => setActiveTab('security'),
+          className: `px-6 py-4 font-medium transition-colors ${
+            activeTab === 'security'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`
+        }, 'Security')
+      ]),
+
+      // Tab Content
+      e('div', {
+        key: 'tab-content',
+        className: 'p-8'
+      }, [
+        // Profile Tab
+        activeTab === 'profile' && e('form', {
+          key: 'profile-form',
+          onSubmit: handleProfileUpdate,
+          className: 'space-y-6'
+        }, [
+          e('div', {
+            key: 'form-header',
+            className: 'pb-4 border-b border-gray-200'
+          }, [
+            e('h2', {
+              key: 'form-title',
+              className: 'text-xl font-semibold text-gray-900'
+            }, 'Personal Information'),
+            e('p', {
+              key: 'form-desc',
+              className: 'text-gray-600 mt-1'
+            }, 'Update your personal details and contact information')
+          ]),
+
+          e('div', {
+            key: 'name-fields',
+            className: 'grid grid-cols-1 md:grid-cols-2 gap-6'
+          }, [
+            e('div', { key: 'first-name' }, [
+              e('label', {
+                key: 'first-name-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'First Name'),
+              e('input', {
+                key: 'first-name-input',
+                type: 'text',
+                value: profileForm.firstName,
+                onChange: (e) => setProfileForm({ ...profileForm, firstName: e.target.value }),
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+                placeholder: 'Enter your first name'
+              })
+            ]),
+            e('div', { key: 'last-name' }, [
+              e('label', {
+                key: 'last-name-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Last Name'),
+              e('input', {
+                key: 'last-name-input',
+                type: 'text',
+                value: profileForm.lastName,
+                onChange: (e) => setProfileForm({ ...profileForm, lastName: e.target.value }),
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+                placeholder: 'Enter your last name'
+              })
+            ])
+          ]),
+
+          e('div', { key: 'email-field' }, [
+            e('label', {
+              key: 'email-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Email Address'),
+            e('input', {
+              key: 'email-input',
+              type: 'email',
+              value: profileForm.email,
+              onChange: (e) => setProfileForm({ ...profileForm, email: e.target.value }),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+              placeholder: 'Enter your email address'
+            })
+          ]),
+
+          e('div', {
+            key: 'contact-fields',
+            className: 'grid grid-cols-1 md:grid-cols-2 gap-6'
+          }, [
+            e('div', { key: 'phone' }, [
+              e('label', {
+                key: 'phone-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Phone Number'),
+              e('input', {
+                key: 'phone-input',
+                type: 'tel',
+                value: profileForm.phoneNumber,
+                onChange: (e) => setProfileForm({ ...profileForm, phoneNumber: e.target.value }),
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+                placeholder: 'Enter your phone number'
+              })
+            ]),
+            e('div', { key: 'nationality' }, [
+              e('label', {
+                key: 'nationality-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Nationality'),
+              e('input', {
+                key: 'nationality-input',
+                type: 'text',
+                value: profileForm.nationality,
+                onChange: (e) => setProfileForm({ ...profileForm, nationality: e.target.value }),
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+                placeholder: 'Enter your nationality'
+              })
+            ])
+          ]),
+
+          e('div', {
+            key: 'profile-actions',
+            className: 'pt-6 border-t border-gray-200'
+          }, [
+            e('button', {
+              key: 'save-profile',
+              type: 'submit',
+              disabled: loading,
+              className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold px-8 py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none'
+            }, loading ? 'Saving...' : 'Save Changes')
+          ])
+        ]),
+
+        // Security Tab
+        activeTab === 'security' && e('form', {
+          key: 'security-form',
+          onSubmit: handlePasswordChange,
+          className: 'space-y-6'
+        }, [
+          e('div', {
+            key: 'security-header',
+            className: 'pb-4 border-b border-gray-200'
+          }, [
+            e('h2', {
+              key: 'security-title',
+              className: 'text-xl font-semibold text-gray-900'
+            }, 'Change Password'),
+            e('p', {
+              key: 'security-desc',
+              className: 'text-gray-600 mt-1'
+            }, 'Update your password to keep your account secure')
+          ]),
+
+          e('div', { key: 'current-password' }, [
+            e('label', {
+              key: 'current-password-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Current Password'),
+            e('input', {
+              key: 'current-password-input',
+              type: 'password',
+              value: passwordForm.currentPassword,
+              onChange: (e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value }),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+              placeholder: 'Enter your current password',
+              required: true
+            })
+          ]),
+
+          e('div', { key: 'new-password' }, [
+            e('label', {
+              key: 'new-password-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'New Password'),
+            e('input', {
+              key: 'new-password-input',
+              type: 'password',
+              value: passwordForm.newPassword,
+              onChange: (e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value }),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+              placeholder: 'Enter your new password',
+              required: true
+            }),
+            e('p', {
+              key: 'password-help',
+              className: 'text-sm text-gray-500 mt-1'
+            }, 'Password must be at least 8 characters long')
+          ]),
+
+          e('div', { key: 'confirm-password' }, [
+            e('label', {
+              key: 'confirm-password-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Confirm New Password'),
+            e('input', {
+              key: 'confirm-password-input',
+              type: 'password',
+              value: passwordForm.confirmPassword,
+              onChange: (e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value }),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all',
+              placeholder: 'Confirm your new password',
+              required: true
+            })
+          ]),
+
+          e('div', {
+            key: 'security-actions',
+            className: 'pt-6 border-t border-gray-200'
+          }, [
+            e('button', {
+              key: 'change-password',
+              type: 'submit',
+              disabled: loading,
+              className: 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold px-8 py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none'
+            }, loading ? 'Changing Password...' : 'Change Password')
           ])
         ])
       ])

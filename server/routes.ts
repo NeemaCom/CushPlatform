@@ -329,6 +329,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(req.user);
   });
 
+  // Update user profile endpoint
+  app.put("/api/auth/profile", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const updateData = updateProfileSchema.parse(req.body);
+      
+      // Check if email is being changed and if it already exists
+      if (updateData.email) {
+        const existingUser = await storage.getUserByEmail(updateData.email);
+        if (existingUser && existingUser.id !== userId) {
+          return res.status(400).json({ error: "Email already exists" });
+        }
+      }
+      
+      // Update user
+      const updatedUser = await storage.updateUser(userId, updateData);
+      
+      await SecurityLogger.logAuthEvent(
+        'profile_updated',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { fields: Object.keys(updateData) }
+      );
+      
+      const safeUser = createSafeUser(updatedUser);
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Profile update error:", error);
+      await SecurityLogger.logAuthEvent(
+        'profile_update_error',
+        req.userId || null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid input data", details: error.errors });
+      }
+      res.status(500).json({ error: "Profile update failed" });
+    }
+  });
+
+  // Change password endpoint
+  app.put("/api/auth/change-password", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+      
+      // Get user with password hash
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Verify current password
+      const isValidPassword = await EncryptionService.verifyPassword(currentPassword, user.passwordHash);
+      if (!isValidPassword) {
+        await SecurityLogger.logAuthEvent(
+          'password_change_failed',
+          userId,
+          false,
+          req.ip,
+          req.get('User-Agent'),
+          { reason: 'invalid_current_password' }
+        );
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+      
+      // Validate new password strength
+      const passwordCheck = validatePasswordStrength(newPassword);
+      if (!passwordCheck.isValid) {
+        return res.status(400).json({ 
+          error: "New password does not meet security requirements",
+          details: passwordCheck.errors 
+        });
+      }
+      
+      // Hash new password
+      const hashedPassword = await EncryptionService.hashPassword(newPassword);
+      
+      // Update password
+      await storage.updateUser(userId, { passwordHash: hashedPassword });
+      
+      await SecurityLogger.logAuthEvent(
+        'password_changed',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json({ message: "Password changed successfully" });
+    } catch (error) {
+      console.error("Password change error:", error);
+      await SecurityLogger.logAuthEvent(
+        'password_change_error',
+        req.userId || null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Password change failed" });
+    }
+  });
+
   // Password recovery endpoint
   app.post("/api/auth/recover-password", authRateLimit, async (req: AuthenticatedRequest, res) => {
     try {
