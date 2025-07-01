@@ -26,9 +26,10 @@ function NavigationHeader() {
         className: 'flex items-center justify-between'
       }, [
         // Logo
-        e('div', {
+        e('button', {
           key: 'logo',
-          className: 'flex items-center gap-3'
+          onClick: () => navigate('home'),
+          className: 'flex items-center gap-3 hover:opacity-80 transition-opacity'
         }, [
           e('div', {
             key: 'logo-icon',
@@ -61,12 +62,12 @@ function NavigationHeader() {
           }, [
             e('button', {
               key: 'sign-in',
-              onClick: () => scrollToSection('auth-section'),
+              onClick: () => navigate('signin'),
               className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all'
             }, 'Sign In'),
             e('button', {
               key: 'get-started',
-              onClick: () => scrollToSection('auth-section'),
+              onClick: () => navigate('signin'),
               className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
             }, 'Get Started')
           ])
@@ -121,12 +122,12 @@ function NavigationHeader() {
           }, [
             e('button', {
               key: 'mobile-sign-in',
-              onClick: () => scrollToSection('auth-section'),
+              onClick: () => navigate('signin'),
               className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all text-center'
             }, 'Sign In'),
             e('button', {
               key: 'mobile-get-started',
-              onClick: () => scrollToSection('auth-section'),
+              onClick: () => navigate('signin'),
               className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
             }, 'Get Started')
           ])
@@ -225,14 +226,15 @@ function HeroSection() {
           e('button', {
             key: 'primary',
             className: 'group bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105',
-            onClick: () => document.getElementById('auth-section')?.scrollIntoView({ behavior: 'smooth' })
+            onClick: () => navigate('signin')
           }, [
             'Start Your Journey ',
             e('span', { key: 'arrow', className: 'inline-block transform group-hover:translate-x-1 transition-transform' }, '→')
           ]),
           e('button', {
             key: 'secondary',
-            className: 'bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-semibold px-10 py-4 rounded-full border border-white/30 transition-all duration-300 hover:border-white/50 hover:shadow-lg'
+            className: 'bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-semibold px-10 py-4 rounded-full border border-white/30 transition-all duration-300 hover:border-white/50 hover:shadow-lg',
+            onClick: () => scrollToSection('services-section')
           }, 'Explore Features')
         ])
       ])
@@ -240,7 +242,7 @@ function HeroSection() {
   ]);
 }
 
-// Services Section - Premium Design
+// Services Section - Premium Design  
 function ServicesSection() {
   const services = [
     {
@@ -273,7 +275,10 @@ function ServicesSection() {
     }
   ];
 
-  return e('section', { className: 'py-24 bg-gradient-to-b from-gray-50 to-white' }, [
+  return e('section', { 
+    id: 'services-section',
+    className: 'py-24 bg-gradient-to-b from-gray-50 to-white' 
+  }, [
     e('div', { key: 'container', className: 'container mx-auto px-6' }, [
       // Section header
       e('div', { key: 'header', className: 'text-center mb-20' }, [
@@ -756,12 +761,12 @@ function ContactSection() {
   ]);
 }
 
-// Modern Authentication Component
-function AuthComponent() {
-  const [showTestAccounts, setShowTestAccounts] = useState(false);
-  const [testCredentials, setTestCredentials] = useState(null);
+// Standalone Sign In Page
+function SignInPage() {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
+  const [testCredentials, setTestCredentials] = useState(null);
+  const [showTestAccounts, setShowTestAccounts] = useState(false);
 
   useEffect(() => {
     fetch('/api/test-credentials')
@@ -798,110 +803,254 @@ function AuthComponent() {
     setLoginForm({ email: credentials.email, password: credentials.password });
   };
 
+  return e('div', {
+    className: 'min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center relative overflow-hidden'
+  }, [
+    // Background pattern
+    e('div', {
+      key: 'pattern',
+      className: 'absolute inset-0 opacity-10',
+      style: {
+        backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
+        backgroundSize: '30px 30px'
+      }
+    }),
+
+    // Header Navigation
+    e('nav', {
+      key: 'nav',
+      className: 'absolute top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md border-b border-white/20'
+    }, [
+      e('div', {
+        key: 'nav-container',
+        className: 'container mx-auto px-6 py-4'
+      }, [
+        e('div', {
+          key: 'nav-content',
+          className: 'flex items-center justify-between'
+        }, [
+          // Logo
+          e('button', {
+            key: 'logo',
+            onClick: () => navigate('home'),
+            className: 'flex items-center gap-3 hover:opacity-80 transition-opacity'
+          }, [
+            e('div', {
+              key: 'logo-icon',
+              className: 'w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'
+            }, 'C'),
+            e('span', {
+              key: 'logo-text',
+              className: 'text-xl font-bold text-white'
+            }, 'CUSH')
+          ]),
+
+          // Back to Home
+          e('button', {
+            key: 'back-home',
+            onClick: () => navigate('home'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, '← Back to Home')
+        ])
+      ])
+    ]),
+
+    // Sign In Form
+    e('div', { 
+      key: 'signin-container',
+      className: 'relative z-10 w-full max-w-md mx-auto px-6'
+    }, [
+      // Header
+      e('div', { 
+        key: 'header',
+        className: 'text-center mb-8'
+      }, [
+        e('div', {
+          key: 'logo',
+          className: 'w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-6 shadow-2xl'
+        }, 'C'),
+        e('h1', { 
+          key: 'title',
+          className: 'text-4xl font-bold text-white mb-3'
+        }, 'Welcome Back'),
+        e('p', { 
+          key: 'subtitle',
+          className: 'text-blue-100 text-lg'
+        }, 'Sign in to continue your immigration journey')
+      ]),
+      
+      // Login form
+      e('div', {
+        key: 'form-container',
+        className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20'
+      }, [
+        e('form', {
+          key: 'login-form',
+          onSubmit: handleLogin,
+          className: 'space-y-6'
+        }, [
+          e('div', { key: 'email-field' }, [
+            e('label', { 
+              key: 'email-label',
+              className: 'block text-sm font-semibold text-white mb-2'
+            }, 'Email Address'),
+            e('input', {
+              key: 'email-input',
+              type: 'email',
+              value: loginForm.email,
+              onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
+              required: true,
+              className: 'w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all',
+              placeholder: 'Enter your email'
+            })
+          ]),
+          
+          e('div', { key: 'password-field' }, [
+            e('label', { 
+              key: 'password-label',
+              className: 'block text-sm font-semibold text-white mb-2'
+            }, 'Password'),
+            e('input', {
+              key: 'password-input',
+              type: 'password',
+              value: loginForm.password,
+              onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
+              required: true,
+              className: 'w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all',
+              placeholder: 'Enter your password'
+            })
+          ]),
+          
+          e('button', {
+            key: 'submit-button',
+            type: 'submit',
+            disabled: loading,
+            className: `w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 disabled:transform-none ${loading ? 'cursor-not-allowed' : ''}`
+          }, loading ? 'Signing in...' : 'Sign In')
+        ]),
+
+        // Forgot Password
+        e('div', {
+          key: 'forgot-password',
+          className: 'text-center mt-6'
+        }, [
+          e('button', {
+            key: 'forgot-link',
+            className: 'text-blue-200 hover:text-white text-sm transition-colors'
+          }, 'Forgot your password?')
+        ]),
+        
+        // Test accounts
+        testCredentials && e('div', {
+          key: 'test-accounts',
+          className: 'mt-8 pt-6 border-t border-white/20'
+        }, [
+          e('button', {
+            key: 'toggle-test',
+            onClick: () => setShowTestAccounts(!showTestAccounts),
+            className: 'w-full text-sm text-blue-200 hover:text-white font-medium transition-colors mb-4'
+          }, showTestAccounts ? 'Hide Test Accounts' : 'Use Demo Account'),
+          
+          showTestAccounts && testCredentials.testAccounts && e('div', { 
+            key: 'test-list',
+            className: 'space-y-3'
+          }, testCredentials.testAccounts.map((account, index) =>
+            e('button', {
+              key: index,
+              onClick: () => useTestAccount(account),
+              className: 'block w-full p-3 text-left text-sm bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-all duration-200 hover:shadow-md text-white'
+            }, [
+              e('div', { key: 'email', className: 'font-medium' }, account.email),
+              e('div', { key: 'role', className: 'text-blue-200 text-xs mt-1' }, `${account.role} - ${account.description}`)
+            ])
+          ))
+        ]),
+
+        // Sign Up Link
+        e('div', {
+          key: 'signup-link',
+          className: 'text-center mt-8 pt-6 border-t border-white/20'
+        }, [
+          e('p', {
+            key: 'signup-text',
+            className: 'text-blue-200 text-sm'
+          }, [
+            "Don't have an account? ",
+            e('button', {
+              key: 'signup-button',
+              className: 'text-white font-medium hover:underline transition-all'
+            }, 'Sign up for free')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Modern Authentication Component (simplified for homepage)
+function AuthComponent() {
   return e('section', {
     id: 'auth-section',
     className: 'py-24 bg-gradient-to-br from-blue-50 via-white to-purple-50'
   }, [
     e('div', { 
       key: 'container',
-      className: 'container mx-auto px-6'
+      className: 'container mx-auto px-6 text-center'
     }, [
       e('div', { 
         key: 'content',
-        className: 'max-w-md mx-auto'
+        className: 'max-w-3xl mx-auto'
       }, [
         // Header
         e('div', { 
           key: 'header',
-          className: 'text-center mb-8'
+          className: 'mb-12'
         }, [
-          e('div', {
-            key: 'logo',
-            className: 'w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg'
-          }, 'C'),
           e('h2', { 
             key: 'title',
-            className: 'text-3xl font-bold text-gray-900 mb-2'
-          }, 'Welcome Back'),
+            className: 'text-4xl md:text-5xl font-bold text-gray-900 mb-6'
+          }, 'Ready to Begin?'),
           e('p', { 
             key: 'subtitle',
-            className: 'text-gray-600'
-          }, 'Sign in to continue your immigration journey')
+            className: 'text-xl text-gray-600 leading-relaxed'
+          }, 'Join thousands of successful immigrants who have transformed their dreams into reality with Cush.')
         ]),
-        
-        // Login form
+
+        // CTA Buttons
         e('div', {
-          key: 'form-container',
-          className: 'bg-white/80 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20'
+          key: 'cta-buttons',
+          className: 'flex flex-col sm:flex-row gap-4 justify-center items-center mb-12'
         }, [
-          e('form', {
-            key: 'login-form',
-            onSubmit: handleLogin,
-            className: 'space-y-6'
+          e('button', {
+            key: 'get-started',
+            onClick: () => navigate('signin'),
+            className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold px-12 py-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1'
+          }, 'Get Started Now'),
+          e('button', {
+            key: 'sign-in',
+            onClick: () => navigate('signin'),
+            className: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-semibold px-12 py-4 rounded-xl transition-all duration-300'
+          }, 'Sign In')
+        ]),
+
+        // Trust indicators
+        e('div', {
+          key: 'trust-indicators',
+          className: 'grid grid-cols-2 md:grid-cols-4 gap-8 text-center'
+        }, [
+          { icon: '🔒', text: 'Bank-level Security' },
+          { icon: '🌟', text: '5-Star Support' },
+          { icon: '⚡', text: 'Instant Processing' },
+          { icon: '✓', text: '99% Success Rate' }
+        ].map((item, index) =>
+          e('div', {
+            key: index,
+            className: 'flex flex-col items-center'
           }, [
-            e('div', { key: 'email-field' }, [
-              e('label', { 
-                key: 'email-label',
-                className: 'block text-sm font-semibold text-gray-700 mb-2'
-              }, 'Email Address'),
-              e('input', {
-                key: 'email-input',
-                type: 'email',
-                value: loginForm.email,
-                onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
-                required: true,
-                className: 'w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all',
-                placeholder: 'Enter your email'
-              })
-            ]),
-            
-            e('div', { key: 'password-field' }, [
-              e('label', { 
-                key: 'password-label',
-                className: 'block text-sm font-semibold text-gray-700 mb-2'
-              }, 'Password'),
-              e('input', {
-                key: 'password-input',
-                type: 'password',
-                value: loginForm.password,
-                onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
-                required: true,
-                className: 'w-full px-4 py-3 bg-white/50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm transition-all',
-                placeholder: 'Enter your password'
-              })
-            ]),
-            
-            e('button', {
-              key: 'submit-button',
-              type: 'submit',
-              disabled: loading,
-              className: `w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1 disabled:transform-none ${loading ? 'cursor-not-allowed' : ''}`
-            }, loading ? 'Signing in...' : 'Sign In')
-          ]),
-          
-          // Test accounts
-          testCredentials && e('div', {
-            key: 'test-accounts',
-            className: 'mt-6 pt-6 border-t border-gray-200'
-          }, [
-            e('button', {
-              key: 'toggle-test',
-              onClick: () => setShowTestAccounts(!showTestAccounts),
-              className: 'w-full text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors'
-            }, showTestAccounts ? 'Hide Test Accounts' : 'Show Test Accounts'),
-            
-            showTestAccounts && testCredentials.testAccounts && e('div', { 
-              key: 'test-list',
-              className: 'mt-4 space-y-2'
-            }, testCredentials.testAccounts.map((account, index) =>
-              e('button', {
-                key: index,
-                onClick: () => useTestAccount(account),
-                className: 'block w-full p-3 text-left text-sm bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-md'
-              }, `${account.email} (${account.role})`)
-            ))
+            e('div', { key: 'icon', className: 'text-3xl mb-2' }, item.icon),
+            e('p', { key: 'text', className: 'text-sm font-medium text-gray-700' }, item.text)
           ])
-        ])
+        ))
       ])
     ])
   ]);
@@ -1042,7 +1191,7 @@ function App() {
 
   return user ? 
     e(Dashboard, { key: 'dashboard', user }) :
-    e(Homepage, { key: 'homepage' });
+    e(AppRouter, { key: 'router' });
 }
 
 // Homepage Component
@@ -1055,6 +1204,36 @@ function Homepage() {
     e(ContactSection, { key: 'contact' }),
     e(AuthComponent, { key: 'auth' })
   ]);
+}
+
+// Main App Router Component
+function AppRouter() {
+  const [currentRoute, setCurrentRoute] = useState(() => {
+    return window.location.hash.substring(1) || 'home';
+  });
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      setCurrentRoute(window.location.hash.substring(1) || 'home');
+    };
+    
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  // Global navigate function
+  window.navigate = (route) => {
+    window.location.hash = route;
+    setCurrentRoute(route);
+  };
+
+  switch (currentRoute) {
+    case 'signin':
+      return e(SignInPage, { key: 'signin' });
+    case 'home':
+    default:
+      return e(Homepage, { key: 'homepage' });
+  }
 }
 
 // Mount the application
