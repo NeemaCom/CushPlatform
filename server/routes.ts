@@ -59,12 +59,28 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Health check endpoint for deployment (only for API paths)
+  // Enhanced health check endpoint for deployment platforms
   app.get('/api/health', (req, res) => {
     res.status(200).json({ 
-      status: 'healthy', 
+      status: 'healthy',
+      service: 'Cush Platform API',
       uptime: process.uptime(),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0'
+    });
+  });
+
+  // Additional health check for load balancers (Cloud Run, etc.)
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'OK' });
+  });
+
+  // Readiness probe endpoint
+  app.get('/ready', (req, res) => {
+    res.status(200).json({ 
+      ready: true,
+      timestamp: new Date().toISOString() 
     });
   });
 

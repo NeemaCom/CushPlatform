@@ -48,7 +48,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Export server creation function for Vercel
+// Export server creation function for Vercel and Cloud Run
 export async function createServer() {
   const httpServer = await registerRoutes(app);
 
@@ -71,7 +71,20 @@ export async function createServer() {
   // Serve other static files from root
   app.use(express.static('.', { index: false }));
 
-  // Handle SPA routing
+  // Root health check endpoint for deployment platforms (production only)
+  if (process.env.NODE_ENV === 'production') {
+    app.get('/', (req, res) => {
+      res.status(200).json({ 
+        status: 'healthy',
+        service: 'Cush Platform API',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    });
+  }
+
+  // Handle SPA routing (serve HTML for non-API paths, and root in development)
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
       res.sendFile(path.join(process.cwd(), 'index.html'));
@@ -80,12 +93,47 @@ export async function createServer() {
 
   const server = createHttpServer(app);
 
-  // Serve on port 5000 for compatibility with workflow
+  // Enhanced port configuration for different deployment environments
   if (!process.env.VERCEL) {
+    // Cloud Run uses PORT environment variable, fallback to 5000 for local development
     const port = process.env.PORT || 5000;
-    server.listen(Number(port), "0.0.0.0", () => {
-      log(`serving on port ${port}`);
+    const host = '0.0.0.0'; // Always bind to all interfaces for Cloud Run compatibility
+    
+    server.listen(Number(port), host, () => {
+      log(`serving on ${host}:${port} (environment: ${process.env.NODE_ENV || 'development'})`);
     });
+
+    // Graceful shutdown handling for production deployments
+    const gracefulShutdown = () => {
+      log('Received termination signal. Starting graceful shutdown...');
+      server.close(() => {
+        log('HTTP server closed. Exiting process.');
+        process.exit(0);
+      });
+
+      // Force close after 10 seconds
+      setTimeout(() => {
+        log('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+      }, 10000);
+    };
+
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+
+    // Handle uncaught exceptions in production
+    if (process.env.NODE_ENV === 'production') {
+      process.on('uncaughtException', (err) => {
+        log(`Uncaught Exception: ${err.message}`);
+        console.error(err.stack);
+        gracefulShutdown();
+      });
+
+      process.on('unhandledRejection', (reason, promise) => {
+        log(`Unhandled Rejection at: ${promise}, reason: ${reason}`);
+        gracefulShutdown();
+      });
+    }
   }
 
   return server;
