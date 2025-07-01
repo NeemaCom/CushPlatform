@@ -1190,7 +1190,10 @@ function App() {
   }
 
   return user ? 
-    e(Dashboard, { key: 'dashboard', user }) :
+    e('div', { key: 'app-container' }, [
+      e(Dashboard, { key: 'dashboard', user }),
+      e(ImisiChatHead, { key: 'imisi-chat' })
+    ]) :
     e(AppRouter, { key: 'router' });
 }
 
@@ -1234,6 +1237,207 @@ function AppRouter() {
     default:
       return e(Homepage, { key: 'homepage' });
   }
+}
+
+// Imisi Chat Head Component
+function ImisiChatHead() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [hasNewSuggestion, setHasNewSuggestion] = useState(false);
+
+  const toggleChat = () => {
+    setIsOpen(!isOpen);
+    setHasNewSuggestion(false);
+    if (!isOpen) {
+      setIsMinimized(false);
+    }
+  };
+
+  return e('div', { key: 'imisi-chathead' }, [
+    // Floating Chat Button
+    e('div', {
+      key: 'chat-button',
+      className: 'fixed bottom-6 right-6 z-50'
+    }, [
+      e('button', {
+        key: 'chat-btn',
+        onClick: toggleChat,
+        className: `relative w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group overflow-hidden ${
+          isOpen ? 'scale-110' : 'hover:scale-105'
+        } ${hasNewSuggestion ? 'animate-bounce' : ''}`
+      }, [
+        // Animated Background
+        e('div', {
+          key: 'bg',
+          className: 'absolute inset-0 bg-gradient-to-r from-purple-600 to-blue-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full'
+        }),
+        
+        // Icon Container
+        e('div', {
+          key: 'icon-container',
+          className: 'relative z-10 transition-transform duration-200'
+        }, [
+          isOpen ? 
+            e('span', { key: 'close', className: 'text-white text-2xl' }, '✕') :
+            e('div', { key: 'chat-icon', className: 'flex items-center justify-center' }, [
+              e('span', { key: 'message', className: 'text-white text-2xl' }, '💬'),
+              e('div', {
+                key: 'ai-badge',
+                className: 'absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center'
+              }, [
+                e('span', { key: 'brain', className: 'text-xs' }, '🧠')
+              ])
+            ])
+        ]),
+        
+        // Pulse Animation
+        e('div', {
+          key: 'pulse',
+          className: 'absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20'
+        }),
+        
+        // Online Indicator
+        e('div', {
+          key: 'online',
+          className: 'absolute -top-1 -right-1 w-5 h-5 bg-green-400 rounded-full border-2 border-white flex items-center justify-center'
+        }, [
+          e('div', {
+            key: 'pulse-dot',
+            className: 'w-2 h-2 bg-green-600 rounded-full animate-pulse'
+          })
+        ]),
+
+        // AI Badge
+        e('div', {
+          key: 'ai-label',
+          className: 'absolute -bottom-1 -left-1 bg-white rounded-full px-2 py-0.5 shadow-md'
+        }, [
+          e('span', {
+            key: 'ai-text',
+            className: 'text-xs font-bold text-blue-600'
+          }, 'AI')
+        ])
+      ])
+    ]),
+
+    // Chat Interface
+    isOpen && e('div', {
+      key: 'chat-interface',
+      className: `fixed bottom-24 right-6 z-40 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col transition-all duration-300 ${
+        isMinimized ? 'h-12' : 'h-[600px]'
+      }`
+    }, [
+      // Header
+      e('div', {
+        key: 'chat-header',
+        className: 'p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl'
+      }, [
+        e('div', {
+          key: 'header-content',
+          className: 'flex items-center gap-3'
+        }, [
+          e('div', {
+            key: 'avatar',
+            className: 'w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm'
+          }, [
+            e('span', { key: 'robot', className: 'text-lg' }, '🤖')
+          ]),
+          e('div', { key: 'info', className: 'flex-1' }, [
+            e('h3', {
+              key: 'title',
+              className: 'font-semibold text-lg'
+            }, 'Imisi 2.0'),
+            e('p', {
+              key: 'subtitle',
+              className: 'text-sm opacity-90'
+            }, 'AI Migration Concierge')
+          ]),
+          e('div', {
+            key: 'controls',
+            className: 'flex items-center gap-2'
+          }, [
+            e('div', {
+              key: 'status',
+              className: 'flex items-center gap-1'
+            }, [
+              e('div', {
+                key: 'status-dot',
+                className: 'w-2 h-2 bg-green-400 rounded-full animate-pulse'
+              }),
+              e('span', {
+                key: 'status-text',
+                className: 'text-xs font-medium'
+              }, 'Online')
+            ]),
+            e('button', {
+              key: 'minimize',
+              onClick: () => setIsMinimized(!isMinimized),
+              className: 'w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors'
+            }, [
+              e('span', {
+                key: 'min-icon',
+                className: 'text-sm'
+              }, isMinimized ? '🤖' : '−')
+            ])
+          ])
+        ])
+      ]),
+
+      // Chat Content (when not minimized)
+      !isMinimized && e('div', {
+        key: 'chat-content',
+        className: 'flex-1 flex flex-col'
+      }, [
+        // Messages Area
+        e('div', {
+          key: 'messages',
+          className: 'flex-1 p-4 overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'welcome',
+            className: 'text-center text-gray-500 py-8'
+          }, [
+            e('div', {
+              key: 'bot-icon',
+              className: 'text-4xl mb-3'
+            }, '🤖'),
+            e('p', {
+              key: 'welcome-text',
+              className: 'text-sm mb-2'
+            }, "Hi! I'm Imisi 2.0, your AI assistant."),
+            e('p', {
+              key: 'help-text',
+              className: 'text-xs'
+            }, 'Ask me about immigration, finances, or anything else!')
+          ])
+        ]),
+
+        // Input Area
+        e('div', {
+          key: 'input-area',
+          className: 'border-t p-4'
+        }, [
+          e('div', {
+            key: 'input-form',
+            className: 'flex gap-2'
+          }, [
+            e('input', {
+              key: 'message-input',
+              type: 'text',
+              placeholder: 'Ask Imisi anything...',
+              className: 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all'
+            }),
+            e('button', {
+              key: 'send-btn',
+              className: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105'
+            }, [
+              e('span', { key: 'send-icon', className: 'text-sm' }, '→')
+            ])
+          ])
+        ])
+      ])
+    ])
+  ]);
 }
 
 // Mount the application
