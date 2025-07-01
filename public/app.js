@@ -2,11 +2,148 @@
 const { useState, useEffect, createElement: e } = React;
 const { createRoot } = ReactDOM;
 
+// Navigation Header Component
+function NavigationHeader() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+    setIsMenuOpen(false);
+  };
+
+  return e('nav', {
+    className: 'absolute top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md border-b border-white/20'
+  }, [
+    e('div', {
+      key: 'nav-container',
+      className: 'container mx-auto px-6 py-4'
+    }, [
+      e('div', {
+        key: 'nav-content',
+        className: 'flex items-center justify-between'
+      }, [
+        // Logo
+        e('div', {
+          key: 'logo',
+          className: 'flex items-center gap-3'
+        }, [
+          e('div', {
+            key: 'logo-icon',
+            className: 'w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'
+          }, 'C'),
+          e('span', {
+            key: 'logo-text',
+            className: 'text-xl font-bold text-white'
+          }, 'CUSH')
+        ]),
+
+        // Desktop Navigation
+        e('div', {
+          key: 'desktop-nav',
+          className: 'hidden md:flex items-center gap-8'
+        }, [
+          e('button', {
+            key: 'about-link',
+            onClick: () => scrollToSection('about-section'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, 'About Us'),
+          e('button', {
+            key: 'contact-link',
+            onClick: () => scrollToSection('contact-section'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, 'Contact'),
+          e('div', {
+            key: 'auth-buttons',
+            className: 'flex items-center gap-3 ml-4'
+          }, [
+            e('button', {
+              key: 'sign-in',
+              onClick: () => scrollToSection('auth-section'),
+              className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all'
+            }, 'Sign In'),
+            e('button', {
+              key: 'get-started',
+              onClick: () => scrollToSection('auth-section'),
+              className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
+            }, 'Get Started')
+          ])
+        ]),
+
+        // Mobile Menu Button
+        e('button', {
+          key: 'mobile-menu-btn',
+          onClick: () => setIsMenuOpen(!isMenuOpen),
+          className: 'md:hidden text-white p-2'
+        }, [
+          e('svg', {
+            key: 'menu-icon',
+            className: 'w-6 h-6',
+            fill: 'none',
+            stroke: 'currentColor',
+            viewBox: '0 0 24 24'
+          }, [
+            e('path', {
+              key: 'menu-path',
+              strokeLinecap: 'round',
+              strokeLinejoin: 'round',
+              strokeWidth: 2,
+              d: isMenuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 6h16M4 12h16M4 18h16'
+            })
+          ])
+        ])
+      ]),
+
+      // Mobile Menu
+      isMenuOpen && e('div', {
+        key: 'mobile-menu',
+        className: 'md:hidden mt-4 py-4 border-t border-white/20'
+      }, [
+        e('div', {
+          key: 'mobile-links',
+          className: 'flex flex-col gap-4'
+        }, [
+          e('button', {
+            key: 'mobile-about',
+            onClick: () => scrollToSection('about-section'),
+            className: 'text-white/90 hover:text-white font-medium text-left'
+          }, 'About Us'),
+          e('button', {
+            key: 'mobile-contact',
+            onClick: () => scrollToSection('contact-section'),
+            className: 'text-white/90 hover:text-white font-medium text-left'
+          }, 'Contact'),
+          e('div', {
+            key: 'mobile-auth',
+            className: 'flex flex-col gap-2 mt-2'
+          }, [
+            e('button', {
+              key: 'mobile-sign-in',
+              onClick: () => scrollToSection('auth-section'),
+              className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all text-center'
+            }, 'Sign In'),
+            e('button', {
+              key: 'mobile-get-started',
+              onClick: () => scrollToSection('auth-section'),
+              className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
+            }, 'Get Started')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
 // Homepage Hero Section - Based on Reference Design
 function HeroSection() {
   return e('section', { 
     className: 'relative bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 min-h-screen flex items-center justify-center overflow-hidden'
   }, [
+    // Navigation Header
+    e(NavigationHeader, { key: 'navigation' }),
+    
     // Background pattern overlay
     e('div', {
       key: 'pattern',
@@ -301,6 +438,320 @@ function TestimonialsSection() {
           ])
         ])
       ))
+    ])
+  ]);
+}
+
+// About Us Section
+function AboutUsSection() {
+  const stats = [
+    { number: '50,000+', label: 'Successful Migrations', icon: '🎯' },
+    { number: '180+', label: 'Countries Served', icon: '🌍' },
+    { number: '95%', label: 'Success Rate', icon: '📈' },
+    { number: '24/7', label: 'AI Support', icon: '🤖' }
+  ];
+
+  const values = [
+    {
+      title: 'Innovation',
+      description: 'Leveraging cutting-edge AI technology to simplify complex immigration processes.',
+      icon: '💡',
+      gradient: 'from-blue-500 to-cyan-500'
+    },
+    {
+      title: 'Integrity',
+      description: 'Transparent, honest guidance with no hidden fees or false promises.',
+      icon: '🤝',
+      gradient: 'from-green-500 to-emerald-500'
+    },
+    {
+      title: 'Inclusivity',
+      description: 'Supporting immigrants from all backgrounds with culturally sensitive assistance.',
+      icon: '🌈',
+      gradient: 'from-purple-500 to-pink-500'
+    }
+  ];
+
+  return e('section', {
+    id: 'about-section',
+    className: 'py-24 bg-gradient-to-b from-white to-blue-50'
+  }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      // Header
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('div', {
+          key: 'badge',
+          className: 'inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full mb-6'
+        }, [
+          e('span', { key: 'dot', className: 'w-2 h-2 bg-blue-500 rounded-full mr-2' }),
+          'About Cush'
+        ]),
+        e('h2', {
+          key: 'title',
+          className: 'text-4xl md:text-5xl font-bold text-gray-900 mb-6'
+        }, 'Empowering Global Dreams'),
+        e('p', {
+          key: 'subtitle',
+          className: 'text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed'
+        }, 'Founded by immigrants for immigrants, Cush combines advanced AI technology with human expertise to make global mobility accessible, affordable, and achievable for everyone.')
+      ]),
+
+      // Stats
+      e('div', {
+        key: 'stats',
+        className: 'grid grid-cols-2 md:grid-cols-4 gap-8 mb-20'
+      }, stats.map((stat, index) =>
+        e('div', {
+          key: index,
+          className: 'text-center bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
+        }, [
+          e('div', { key: 'icon', className: 'text-4xl mb-3' }, stat.icon),
+          e('div', { key: 'number', className: 'text-3xl font-bold text-gray-900 mb-2' }, stat.number),
+          e('div', { key: 'label', className: 'text-gray-600 font-medium' }, stat.label)
+        ])
+      )),
+
+      // Mission Statement
+      e('div', {
+        key: 'mission',
+        className: 'bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-12 text-white text-center mb-20'
+      }, [
+        e('h3', {
+          key: 'mission-title',
+          className: 'text-3xl font-bold mb-6'
+        }, 'Our Mission'),
+        e('p', {
+          key: 'mission-text',
+          className: 'text-xl leading-relaxed max-w-4xl mx-auto'
+        }, 'To democratize global mobility by providing intelligent, comprehensive, and personalized immigration solutions that turn dreams of living abroad into reality, regardless of background or circumstance.')
+      ]),
+
+      // Values
+      e('div', { key: 'values' }, [
+        e('h3', {
+          key: 'values-title',
+          className: 'text-3xl font-bold text-gray-900 text-center mb-12'
+        }, 'Our Core Values'),
+        e('div', {
+          key: 'values-grid',
+          className: 'grid md:grid-cols-3 gap-8'
+        }, values.map((value, index) =>
+          e('div', {
+            key: index,
+            className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-all hover:-translate-y-2'
+          }, [
+            e('div', {
+              key: 'value-icon',
+              className: `w-16 h-16 bg-gradient-to-r ${value.gradient} rounded-2xl flex items-center justify-center text-3xl mb-6 shadow-lg`
+            }, value.icon),
+            e('h4', {
+              key: 'value-title',
+              className: 'text-xl font-bold text-gray-900 mb-4'
+            }, value.title),
+            e('p', {
+              key: 'value-desc',
+              className: 'text-gray-600 leading-relaxed'
+            }, value.description)
+          ])
+        ))
+      ])
+    ])
+  ]);
+}
+
+// Contact Section
+function ContactSection() {
+  const [contactForm, setContactForm] = useState({
+    name: '',
+    email: '',
+    subject: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Simulate form submission
+    setTimeout(() => {
+      alert('Thank you for your message! We\'ll get back to you within 24 hours.');
+      setContactForm({ name: '', email: '', subject: '', message: '' });
+      setIsSubmitting(false);
+    }, 1000);
+  };
+
+  const contactMethods = [
+    {
+      title: 'Email Support',
+      description: 'Get personalized assistance from our expert team',
+      contact: 'support@cush.com',
+      icon: '📧',
+      color: 'from-blue-500 to-cyan-500'
+    },
+    {
+      title: 'Live Chat',
+      description: 'Chat with Imisi 2.0 AI or request human assistance',
+      contact: 'Available 24/7',
+      icon: '💬',
+      color: 'from-green-500 to-emerald-500'
+    },
+    {
+      title: 'Phone Support',
+      description: 'Speak directly with our immigration experts',
+      contact: '+1 (555) 123-CUSH',
+      icon: '📞',
+      color: 'from-purple-500 to-pink-500'
+    }
+  ];
+
+  return e('section', {
+    id: 'contact-section',
+    className: 'py-24 bg-gray-900'
+  }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      // Header
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('h2', {
+          key: 'title',
+          className: 'text-4xl md:text-5xl font-bold text-white mb-6'
+        }, 'Get in Touch'),
+        e('p', {
+          key: 'subtitle',
+          className: 'text-xl text-gray-300 max-w-2xl mx-auto'
+        }, 'Have questions about your immigration journey? Our team of experts is here to help you every step of the way.')
+      ]),
+
+      e('div', {
+        key: 'content',
+        className: 'grid lg:grid-cols-2 gap-12 max-w-6xl mx-auto'
+      }, [
+        // Contact Methods
+        e('div', { key: 'contact-methods' }, [
+          e('h3', {
+            key: 'methods-title',
+            className: 'text-2xl font-bold text-white mb-8'
+          }, 'Contact Methods'),
+          e('div', {
+            key: 'methods-grid',
+            className: 'space-y-6'
+          }, contactMethods.map((method, index) =>
+            e('div', {
+              key: index,
+              className: 'bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all'
+            }, [
+              e('div', {
+                key: 'method-header',
+                className: 'flex items-center gap-4 mb-4'
+              }, [
+                e('div', {
+                  key: 'method-icon',
+                  className: `w-12 h-12 bg-gradient-to-r ${method.color} rounded-xl flex items-center justify-center text-2xl shadow-lg`
+                }, method.icon),
+                e('div', { key: 'method-info' }, [
+                  e('h4', {
+                    key: 'method-title',
+                    className: 'text-lg font-semibold text-white'
+                  }, method.title),
+                  e('p', {
+                    key: 'method-desc',
+                    className: 'text-gray-300 text-sm'
+                  }, method.description)
+                ])
+              ]),
+              e('p', {
+                key: 'method-contact',
+                className: 'text-blue-400 font-medium pl-16'
+              }, method.contact)
+            ])
+          ))
+        ]),
+
+        // Contact Form
+        e('div', { key: 'contact-form' }, [
+          e('h3', {
+            key: 'form-title',
+            className: 'text-2xl font-bold text-white mb-8'
+          }, 'Send us a Message'),
+          e('form', {
+            key: 'form',
+            onSubmit: handleSubmit,
+            className: 'space-y-6'
+          }, [
+            e('div', {
+              key: 'name-email-row',
+              className: 'grid md:grid-cols-2 gap-4'
+            }, [
+              e('div', { key: 'name-field' }, [
+                e('label', {
+                  key: 'name-label',
+                  className: 'block text-sm font-medium text-gray-300 mb-2'
+                }, 'Full Name'),
+                e('input', {
+                  key: 'name-input',
+                  type: 'text',
+                  value: contactForm.name,
+                  onChange: (e) => setContactForm({ ...contactForm, name: e.target.value }),
+                  required: true,
+                  className: 'w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm',
+                  placeholder: 'Enter your full name'
+                })
+              ]),
+              e('div', { key: 'email-field' }, [
+                e('label', {
+                  key: 'email-label',
+                  className: 'block text-sm font-medium text-gray-300 mb-2'
+                }, 'Email Address'),
+                e('input', {
+                  key: 'email-input',
+                  type: 'email',
+                  value: contactForm.email,
+                  onChange: (e) => setContactForm({ ...contactForm, email: e.target.value }),
+                  required: true,
+                  className: 'w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm',
+                  placeholder: 'Enter your email'
+                })
+              ])
+            ]),
+            e('div', { key: 'subject-field' }, [
+              e('label', {
+                key: 'subject-label',
+                className: 'block text-sm font-medium text-gray-300 mb-2'
+              }, 'Subject'),
+              e('input', {
+                key: 'subject-input',
+                type: 'text',
+                value: contactForm.subject,
+                onChange: (e) => setContactForm({ ...contactForm, subject: e.target.value }),
+                required: true,
+                className: 'w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm',
+                placeholder: 'What can we help you with?'
+              })
+            ]),
+            e('div', { key: 'message-field' }, [
+              e('label', {
+                key: 'message-label',
+                className: 'block text-sm font-medium text-gray-300 mb-2'
+              }, 'Message'),
+              e('textarea', {
+                key: 'message-input',
+                value: contactForm.message,
+                onChange: (e) => setContactForm({ ...contactForm, message: e.target.value }),
+                required: true,
+                rows: 5,
+                className: 'w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent backdrop-blur-sm resize-none',
+                placeholder: 'Tell us more about your immigration goals and how we can help...'
+              })
+            ]),
+            e('button', {
+              key: 'submit-btn',
+              type: 'submit',
+              disabled: isSubmitting,
+              className: `w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl ${isSubmitting ? 'cursor-not-allowed' : ''}`
+            }, isSubmitting ? 'Sending...' : 'Send Message')
+          ])
+        ])
+      ])
     ])
   ]);
 }
@@ -600,6 +1051,8 @@ function Homepage() {
     e(HeroSection, { key: 'hero' }),
     e(ServicesSection, { key: 'services' }),
     e(TestimonialsSection, { key: 'testimonials' }),
+    e(AboutUsSection, { key: 'about' }),
+    e(ContactSection, { key: 'contact' }),
     e(AuthComponent, { key: 'auth' })
   ]);
 }
