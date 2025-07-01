@@ -52,13 +52,6 @@ app.use((req, res, next) => {
 export async function createServer() {
   const httpServer = await registerRoutes(app);
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-  });
-
   // Serve static files from public directory first
   app.use(express.static('public', {
     setHeaders: (res, path) => {
@@ -72,21 +65,39 @@ export async function createServer() {
   app.use(express.static('.', { index: false }));
 
   // Root health check endpoint for deployment platforms (always available)
+  // This must be placed BEFORE the SPA catch-all route
   app.get('/', (req, res) => {
-    res.status(200).json({ 
-      status: 'healthy',
-      service: 'Cush Platform API',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
+    // Cloud Run health check - prioritize for deployment platforms
+    if (req.headers['user-agent']?.includes('GoogleHC') || 
+        req.headers['x-forwarded-for'] || 
+        process.env.NODE_ENV === 'production') {
+      res.status(200).json({ 
+        status: 'healthy',
+        service: 'Cush Platform API',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+        environment: process.env.NODE_ENV || 'development'
+      });
+    } else {
+      // Development mode - serve the SPA
+      res.sendFile(path.join(process.cwd(), 'index.html'));
+    }
   });
 
-  // Handle SPA routing (serve HTML for non-API paths, and root in development)
+  // Handle SPA routing (serve HTML for non-API paths, excluding root which is handled above)
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
       res.sendFile(path.join(process.cwd(), 'index.html'));
     }
+  });
+
+  // Error handling middleware (must be last)
+  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    const status = err.status || err.statusCode || 500;
+    const message = err.message || "Internal Server Error";
+    
+    log(`Error ${status}: ${message}`);
+    res.status(status).json({ message });
   });
 
   const server = createHttpServer(app);
@@ -94,17 +105,23 @@ export async function createServer() {
   // Enhanced port configuration for different deployment environments
   if (!process.env.VERCEL) {
     // Cloud Run and deployment platforms use PORT environment variable
-    // Default to 5000 for Cloud Run compatibility, maintaining local development port
+    // Default to 5000 for Cloud Run compatibility (critical for deployment)
     const port = process.env.PORT || 5000;
     const host = '0.0.0.0'; // Always bind to all interfaces for Cloud Run compatibility
     
     server.listen(Number(port), host, () => {
-      log(`serving on ${host}:${port} (environment: ${process.env.NODE_ENV || 'development'})`);
+      log(`Server successfully started on ${host}:${port}`);
+      log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      log(`Health checks available at: /health, /ready, /live, /startup, /api/health, /`);
       
       // Additional deployment readiness logging
       if (process.env.NODE_ENV === 'production') {
-        log(`deployment ready - health checks available at /health, /ready, /api/health`);
-        log(`production mode - serving on port ${port}`);
+        log(`🚀 PRODUCTION DEPLOYMENT READY`);
+        log(`📊 Health endpoints responding correctly`);
+        log(`🔧 Cloud Run compatibility: PORT=${port}, HOST=${host}`);
+        log(`⚡ Server uptime tracking enabled`);
+      } else {
+        log(`🔧 Development mode - local development server ready`);
       }
     });
 

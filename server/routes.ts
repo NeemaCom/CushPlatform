@@ -84,6 +84,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Liveness probe endpoint for Cloud Run
+  app.get('/live', (req, res) => {
+    res.status(200).json({ 
+      alive: true,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString() 
+    });
+  });
+
+  // Startup probe endpoint
+  app.get('/startup', (req, res) => {
+    res.status(200).json({ 
+      started: true,
+      port: process.env.PORT || 5000,
+      environment: process.env.NODE_ENV || 'development',
+      timestamp: new Date().toISOString() 
+    });
+  });
+
   // Apply global rate limiting
   app.use(generalRateLimit);
   
