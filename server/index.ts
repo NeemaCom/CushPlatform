@@ -71,18 +71,16 @@ export async function createServer() {
   // Serve other static files from root
   app.use(express.static('.', { index: false }));
 
-  // Root health check endpoint for deployment platforms (production only)
-  if (process.env.NODE_ENV === 'production') {
-    app.get('/', (req, res) => {
-      res.status(200).json({ 
-        status: 'healthy',
-        service: 'Cush Platform API',
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-      });
+  // Root health check endpoint for deployment platforms (always available)
+  app.get('/', (req, res) => {
+    res.status(200).json({ 
+      status: 'healthy',
+      service: 'Cush Platform API',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
     });
-  }
+  });
 
   // Handle SPA routing (serve HTML for non-API paths, and root in development)
   app.get('*', (req, res) => {
@@ -96,8 +94,8 @@ export async function createServer() {
   // Enhanced port configuration for different deployment environments
   if (!process.env.VERCEL) {
     // Cloud Run and deployment platforms use PORT environment variable
-    // Default to 80 for production deployments, 5000 for local development
-    const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 5000);
+    // Default to 5000 for Cloud Run compatibility, maintaining local development port
+    const port = process.env.PORT || 5000;
     const host = '0.0.0.0'; // Always bind to all interfaces for Cloud Run compatibility
     
     server.listen(Number(port), host, () => {
@@ -175,7 +173,5 @@ export async function createServer() {
   return server;
 }
 
-// Start the server in development mode
-if (process.env.NODE_ENV === 'development') {
-  createServer();
-}
+// Always start the server - required for all environments including Cloud Run
+createServer();
