@@ -1128,53 +1128,54 @@ function Dashboard({ user }) {
         className: 'p-6'
       }, [
         // Render different views based on currentView
-        currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : [
-        // Welcome Section
-        e('div', {
-          key: 'welcome-section',
-          className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-8 text-white mb-8 shadow-2xl'
-        }, [
-          e('h2', { key: 'welcome-title', className: 'text-3xl font-bold mb-4' }, 'Welcome to Cush Platform'),
-          e('p', { key: 'welcome-desc', className: 'text-blue-100 text-lg' }, 'Your comprehensive immigration and financial services platform')
-        ]),
-
-        // Feature Cards
-        e('div', {
-          key: 'feature-cards',
-          className: 'grid md:grid-cols-3 gap-6'
-        }, [
-          {
-            title: 'Loan Referrals',
-            description: 'Connect with trusted financial institutions',
-            icon: '💳',
-            color: 'from-green-500 to-emerald-500'
-          },
-          {
-            title: 'Community Hub',
-            description: 'Join our global immigrant community',
-            icon: '🌍',
-            color: 'from-blue-500 to-cyan-500'
-          },
-          {
-            title: 'Imisi 2.0 AI',
-            description: 'Get instant immigration assistance',
-            icon: '🤖',
-            color: 'from-purple-500 to-pink-500'
-          }
-        ].map((feature, index) =>
+        currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
+        e('div', { key: 'dashboard-content' }, [
+          // Welcome Section
           e('div', {
-            key: index,
-            className: 'bg-white rounded-xl p-6 shadow-lg border'
+            key: 'welcome-section',
+            className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-8 text-white mb-8 shadow-2xl'
           }, [
+            e('h2', { key: 'welcome-title', className: 'text-3xl font-bold mb-4' }, 'Welcome to Cush Platform'),
+            e('p', { key: 'welcome-desc', className: 'text-blue-100 text-lg' }, 'Your comprehensive immigration and financial services platform')
+          ]),
+
+          // Feature Cards
+          e('div', {
+            key: 'feature-cards',
+            className: 'grid md:grid-cols-3 gap-6'
+          }, [
+            {
+              title: 'Loan Referrals',
+              description: 'Connect with trusted financial institutions',
+              icon: '💳',
+              color: 'from-green-500 to-emerald-500'
+            },
+            {
+              title: 'Community Hub',
+              description: 'Join our global immigrant community',
+              icon: '🌍',
+              color: 'from-blue-500 to-cyan-500'
+            },
+            {
+              title: 'Imisi 2.0 AI',
+              description: 'Get instant immigration assistance',
+              icon: '🤖',
+              color: 'from-purple-500 to-pink-500'
+            }
+          ].map((feature, index) =>
             e('div', {
-              key: 'icon',
-              className: `w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center text-2xl mb-4`
-            }, feature.icon),
-            e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-2' }, feature.title),
-            e('p', { key: 'desc', className: 'text-gray-600' }, feature.description)
-          ])
-        ))
-        ]
+              key: `feature-${index}`,
+              className: 'bg-white rounded-xl p-6 shadow-lg border'
+            }, [
+              e('div', {
+                key: 'icon',
+                className: `w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center text-2xl mb-4`
+              }, feature.icon),
+              e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-2' }, feature.title),
+              e('p', { key: 'desc', className: 'text-gray-600' }, feature.description)
+            ])
+          ))
+        ])
       ])
     ])
   ]);
