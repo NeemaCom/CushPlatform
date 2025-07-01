@@ -12,7 +12,7 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
-**2025-07-01**: Applied Cloud Run Deployment Fixes and Enhanced Server Configuration
+**2025-07-01**: Applied Critical Cloud Run Deployment Fixes and Enhanced Server Configuration
 - ✓ Updated Express server to properly bind to 0.0.0.0 for Cloud Run compatibility
 - ✓ Added comprehensive health check endpoints (/health, /ready, /api/health) for deployment platforms
 - ✓ Implemented graceful shutdown handling with SIGTERM/SIGINT signal management
@@ -22,9 +22,12 @@ The Cush platform is a comprehensive global immigration services platform featur
 - ✓ Fixed React key warnings in frontend Dashboard component for cleaner console output
 - ✓ Enhanced port configuration to support Cloud Run's PORT environment variable
 - ✓ Improved server logging with environment context and startup information
-- ✓ Fixed port mapping mismatch: production defaults to port 80, respects PORT environment variable
+- ✓ **CRITICAL FIX**: Changed default port from 80 to 5000 for Cloud Run compatibility
+- ✓ **CRITICAL FIX**: Removed production-only condition from root health endpoint (always available)
+- ✓ **CRITICAL FIX**: Updated createServer function to always initialize server (not just development)
 - ✓ Added deployment-specific error handling for port conflicts and permission issues
 - ✓ Validated production build and health check functionality for deployment readiness
+- ✓ All health endpoints (/health, /ready, /api/health, /) now respond correctly in all environments
 
 **2025-07-02**: Implemented User Account Management and Fixed Authentication Issues
 - ✓ Created comprehensive user account page with profile management and password change functionality
