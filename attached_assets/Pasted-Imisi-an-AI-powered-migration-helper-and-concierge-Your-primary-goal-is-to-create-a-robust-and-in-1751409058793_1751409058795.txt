@@ -1,0 +1,41 @@
+Imisi," an AI-powered migration helper and concierge. Your primary goal is to create a robust and intuitive system that provides users with comprehensive financial and migration pathway walkthroughs.
+
+Here are the key functionalities and characteristics Imisi should possess:
+
+**Core Functionality:**
+
+* **Financial Walkthroughs:**
+    * **Personalized Budgeting:** Guide users through creating a realistic budget for their migration journey, including pre-departure, travel, and initial settlement costs. This should factor in their destination country's cost of living and their individual financial situation.
+    * **Funding Options:** Provide information on various funding avenues, such as scholarships, grants, loans, and investment migration programs (where applicable and ethically sound).
+    * **Cost Estimation Tools:** Offer dynamic tools to estimate visa application fees, flight costs, accommodation expenses, and initial living expenses for selected destinations.
+    * **Financial Planning for Settlement:** Advise on opening bank accounts, tax implications, and managing finances in the new country.
+* **Migration Pathway Walkthroughs:**
+    * **Eligibility Assessment:** Guide users through assessing their eligibility for various visa categories (e.g., skilled worker, student, family reunification, investor) based on their profile (education, work experience, age, language proficiency).
+    * **Step-by-Step Application Guidance:** Provide clear, sequential instructions for visa applications, including required documents, forms, deadlines, and submission procedures.
+    * **Country-Specific Information:** Offer detailed information on immigration policies, cultural norms, healthcare systems, education opportunities, and job markets for popular migration destinations.
+    * **Pre-Departure Checklist:** Generate personalized checklists for essential pre-departure tasks, such as travel arrangements, packing, document preparation, and health checks.
+    * **Post-Arrival Support:** Provide initial guidance on settling in, including finding accommodation, navigating public transport, accessing local services, and understanding local laws.
+
+**User Experience (Chat Head Interface):**
+
+* **Intuitive Chat Head:** The primary user interface should be an interactive and visually appealing chat head that is easy to access and navigate.
+* **Natural Language Processing (NLP):** Imisi must understand and respond to natural language queries effectively, providing accurate and contextually relevant information.
+* **Proactive Assistance:** The chat head should be capable of offering proactive suggestions and prompts based on the user's progress and expressed needs.
+* **Personalized Interactions:** Tailor responses and information based on the user's input, location, and stated migration goals.
+* **Multi-Modal Communication:** While primarily text-based, consider the potential for incorporating images, links to official resources, and short explainer videos where beneficial.
+* **Progress Tracking:** Allow users to track their progress through the migration process, marking completed steps and highlighting upcoming tasks.
+* **Human Handoff (Optional but Recommended):** Design a seamless mechanism for users to escalate complex queries or specific needs to a human expert if Imisi cannot provide adequate assistance.
+
+**Technical Considerations:**
+
+* **Data Security & Privacy:** Implement robust measures to ensure the security and privacy of user data, adhering to relevant regulations (e.g., GDPR).
+* **Scalability:** Design the system to be scalable to handle a growing number of users and increasing data volumes.
+* **Integration Capabilities:** Consider potential integrations with official government immigration websites, financial institutions, and other relevant service providers (e.g., flight booking, accommodation platforms).
+* **Regular Updates:** Establish a process for regularly updating information on immigration policies, financial regulations, and country-specific details.
+
+**Tone and Persona:**
+
+* Imisi should be **empathetic, supportive, knowledgeable, and reliable**. It should instill confidence in users throughout their migration journey.
+* Maintain a **clear, concise, and easy-to-understand communication style**, avoiding jargon where possible.
+
+Your task is to outline the architecture, key modules, and development roadmap for Imisi, focusing on how these elements will deliver the described financial and migration pathway walkthroughs through an intuitive chat head interface.
