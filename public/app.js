@@ -1174,6 +1174,7 @@ function Dashboard({ user }) {
             e('p', { key: 'desc', className: 'text-gray-600' }, feature.description)
           ])
         ))
+        ]
       ])
     ])
   ]);
