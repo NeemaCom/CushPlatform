@@ -1244,13 +1244,257 @@ function ImisiChatHead() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [hasNewSuggestion, setHasNewSuggestion] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [userProgress, setUserProgress] = useState({
+    currentStep: 'assessment',
+    completedSteps: [],
+    migrationGoal: null,
+    financialProfile: null
+  });
 
   const toggleChat = () => {
     setIsOpen(!isOpen);
     setHasNewSuggestion(false);
     if (!isOpen) {
       setIsMinimized(false);
+      // Show proactive welcome message
+      if (messages.length === 0) {
+        setTimeout(() => {
+          addMessage('ai', "Hi! I'm Imisi 2.0, your AI migration concierge. I can help with visa pathways, financial planning, and settlement guidance. What's your migration goal?", {
+            type: 'welcome',
+            suggestions: ['Skilled Worker Visa', 'Student Visa', 'Family Reunification', 'Investment Migration']
+          });
+        }, 500);
+      }
     }
+  };
+
+  const addMessage = (sender, content, metadata = {}) => {
+    const newMessage = {
+      id: Date.now(),
+      sender,
+      content,
+      timestamp: new Date().toLocaleTimeString(),
+      metadata
+    };
+    setMessages(prev => [...prev, newMessage]);
+  };
+
+  const processAIResponse = async (userMessage) => {
+    setIsTyping(true);
+    
+    try {
+      // Simulate AI processing with contextual responses
+      const response = await generateImisiResponse(userMessage, userProgress);
+      
+      setTimeout(() => {
+        addMessage('ai', response.message, response.metadata);
+        
+        // Update user progress based on conversation
+        if (response.progressUpdate) {
+          setUserProgress(prev => ({
+            ...prev,
+            ...response.progressUpdate
+          }));
+        }
+        
+        setIsTyping(false);
+      }, 1000 + Math.random() * 1500); // Realistic response time
+      
+    } catch (error) {
+      setTimeout(() => {
+        addMessage('ai', "I'm having connectivity issues. Please try again or contact our human concierge for immediate assistance.", {
+          type: 'error',
+          actions: [{ label: 'Contact Human Expert', action: 'escalate' }]
+        });
+        setIsTyping(false);
+      }, 1000);
+    }
+  };
+
+  const generateImisiResponse = async (message, progress) => {
+    const lowerMessage = message.toLowerCase();
+    
+    // Financial Planning Responses
+    if (lowerMessage.includes('budget') || lowerMessage.includes('cost') || lowerMessage.includes('money')) {
+      return {
+        message: "I'll help you create a migration budget. Typical costs include visa fees ($500-$5000), flights ($800-$2500), initial settlement funds ($10k-$50k). Which destination country are you considering?",
+        metadata: {
+          type: 'financial_planning',
+          suggestions: ['Canada', 'Australia', 'UK', 'Germany', 'New Zealand'],
+          actions: [{ label: 'Create Budget Plan', action: 'budget_tool' }]
+        },
+        progressUpdate: { currentStep: 'financial_planning' }
+      };
+    }
+    
+    // Visa Pathway Assessment
+    if (lowerMessage.includes('visa') || lowerMessage.includes('eligibility') || lowerMessage.includes('qualify')) {
+      return {
+        message: "Let me assess your visa options. I need to know: your education level, work experience years, age, English proficiency, and target country. This determines your best pathway.",
+        metadata: {
+          type: 'eligibility_assessment',
+          suggestions: ['Bachelor + 5yrs exp', 'Master + 2yrs exp', 'PhD + any exp', 'Skilled trades'],
+          actions: [{ label: 'Start Assessment', action: 'eligibility_form' }]
+        },
+        progressUpdate: { currentStep: 'eligibility_assessment' }
+      };
+    }
+    
+    // Country-Specific Information
+    if (lowerMessage.includes('canada')) {
+      return {
+        message: "Canada offers Express Entry (6-12 months), Provincial Nominee Programs, and student pathways. Average settlement cost: CAD 25k-40k. Strong healthcare, education systems. Need CRS score 470+.",
+        metadata: {
+          type: 'country_info',
+          suggestions: ['Calculate CRS Score', 'PNP Programs', 'Job Market Info', 'Settlement Guide'],
+          actions: [{ label: 'Canada Pathway Guide', action: 'country_guide' }]
+        }
+      };
+    }
+    
+    if (lowerMessage.includes('australia')) {
+      return {
+        message: "Australia's SkillSelect system requires skilled occupation + points test. Processing: 4-12 months. Settlement costs: AUD 30k-50k. Excellent job market, quality of life. Points threshold: 65+.",
+        metadata: {
+          type: 'country_info',
+          suggestions: ['Check Skills List', 'Points Calculator', 'State Nomination', 'Cost Breakdown'],
+          actions: [{ label: 'Australia Guide', action: 'country_guide' }]
+        }
+      };
+    }
+    
+    // Document Preparation
+    if (lowerMessage.includes('document') || lowerMessage.includes('paperwork') || lowerMessage.includes('application')) {
+      return {
+        message: "Document checklist varies by visa type. Common needs: passport, education credentials, work references, language tests, police clearances, medical exams. I'll create your personalized list.",
+        metadata: {
+          type: 'document_prep',
+          suggestions: ['Educational Assessment', 'Language Tests', 'Police Clearance', 'Medical Exam'],
+          actions: [{ label: 'Generate Checklist', action: 'document_checklist' }]
+        },
+        progressUpdate: { currentStep: 'document_preparation' }
+      };
+    }
+    
+    // Timeline and Process
+    if (lowerMessage.includes('timeline') || lowerMessage.includes('how long') || lowerMessage.includes('process')) {
+      return {
+        message: "Migration timelines: Skilled visas 6-18 months, student visas 2-8 weeks, family visas 12-36 months. Factors: completeness, country demand, processing backlogs. I'll create your timeline.",
+        metadata: {
+          type: 'timeline_info',
+          suggestions: ['Express Processing', 'Document Delays', 'Interview Prep', 'Decision Factors'],
+          actions: [{ label: 'Personal Timeline', action: 'timeline_generator' }]
+        }
+      };
+    }
+    
+    // Settlement and Integration
+    if (lowerMessage.includes('settle') || lowerMessage.includes('arrival') || lowerMessage.includes('integration')) {
+      return {
+        message: "Post-arrival priorities: SIN/TFN, bank account, phone plan, housing, healthcare registration. First 30 days are crucial. I'll guide you through essential tasks step-by-step.",
+        metadata: {
+          type: 'settlement_guide',
+          suggestions: ['Banking Setup', 'Housing Search', 'Healthcare Access', 'Job Hunting'],
+          actions: [{ label: 'Settlement Checklist', action: 'settlement_plan' }]
+        },
+        progressUpdate: { currentStep: 'settlement_planning' }
+      };
+    }
+    
+    // Job Market and Career
+    if (lowerMessage.includes('job') || lowerMessage.includes('career') || lowerMessage.includes('work')) {
+      return {
+        message: "Job markets vary by occupation and location. Key factors: credential recognition, networking, local experience, industry demand. I'll help assess opportunities in your field.",
+        metadata: {
+          type: 'career_guidance',
+          suggestions: ['Credential Assessment', 'Job Market Analysis', 'Networking Tips', 'Resume Adaptation'],
+          actions: [{ label: 'Career Assessment', action: 'career_analysis' }]
+        }
+      };
+    }
+    
+    // Default/General Response
+    return {
+      message: "I'm here to help with migration planning! I can assist with visa eligibility, financial budgeting, document preparation, country comparisons, and settlement planning. What specific area interests you?",
+      metadata: {
+        type: 'general',
+        suggestions: ['Visa Options', 'Budget Planning', 'Country Comparison', 'Document Help', 'Settlement Guide'],
+        actions: [{ label: 'Migration Assessment', action: 'full_assessment' }]
+      }
+    };
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim()) return;
+    
+    addMessage('user', inputMessage);
+    processAIResponse(inputMessage);
+    setInputMessage('');
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    addMessage('user', suggestion);
+    processAIResponse(suggestion);
+  };
+
+  const handleActionClick = (action) => {
+    switch (action.action) {
+      case 'escalate':
+        addMessage('ai', "Connecting you with a human migration expert. They'll contact you within 2 hours via your registered email or phone.", {
+          type: 'escalation'
+        });
+        break;
+      case 'budget_tool':
+        addMessage('ai', "Opening budget calculator... Please provide: destination country, visa type, family size, and timeline. I'll calculate comprehensive costs including pre-departure and settlement funds.", {
+          type: 'tool_launch'
+        });
+        break;
+      case 'eligibility_form':
+        addMessage('ai', "Starting eligibility assessment... I'll ask about education, work experience, language skills, age, and funds. Takes 3-5 minutes for preliminary results.", {
+          type: 'assessment_start',
+          suggestions: ['Begin Assessment', 'Quick Eligibility Check']
+        });
+        break;
+      default:
+        addMessage('ai', "This feature will be available soon. For now, I can provide detailed guidance through our conversation. What specific help do you need?", {
+          type: 'feature_coming_soon'
+        });
+    }
+  };
+
+  const getProgressIndicator = () => {
+    const steps = ['assessment', 'financial_planning', 'document_preparation', 'application', 'settlement_planning'];
+    const currentIndex = steps.indexOf(userProgress.currentStep);
+    const progress = ((currentIndex + 1) / steps.length) * 100;
+    
+    return (
+      e('div', {
+        key: 'progress',
+        className: 'px-4 py-2 border-b border-gray-200'
+      }, [
+        e('div', {
+          key: 'progress-label',
+          className: 'text-xs text-gray-600 mb-1'
+        }, 'Migration Progress'),
+        e('div', {
+          key: 'progress-bar',
+          className: 'w-full bg-gray-200 rounded-full h-1.5'
+        }, [
+          e('div', {
+            key: 'progress-fill',
+            className: 'bg-gradient-to-r from-blue-500 to-purple-500 h-1.5 rounded-full transition-all duration-300',
+            style: { width: `${progress}%` }
+          })
+        ]),
+        e('div', {
+          key: 'progress-text',
+          className: 'text-xs text-gray-500 mt-1'
+        }, `Step ${currentIndex + 1}/5: ${userProgress.currentStep.replace('_', ' ')}`)
+      ])
+    );
   };
 
   return e('div', { key: 'imisi-chathead' }, [
@@ -1388,13 +1632,18 @@ function ImisiChatHead() {
         key: 'chat-content',
         className: 'flex-1 flex flex-col'
       }, [
+        // Progress Indicator
+        getProgressIndicator(),
+        
         // Messages Area
         e('div', {
           key: 'messages',
-          className: 'flex-1 p-4 overflow-y-auto'
+          className: 'flex-1 p-4 overflow-y-auto space-y-4',
+          style: { maxHeight: '400px' }
         }, [
-          e('div', {
-            key: 'welcome',
+          // Empty state
+          messages.length === 0 && e('div', {
+            key: 'empty-state',
             className: 'text-center text-gray-500 py-8'
           }, [
             e('div', {
@@ -1402,13 +1651,85 @@ function ImisiChatHead() {
               className: 'text-4xl mb-3'
             }, '🤖'),
             e('p', {
-              key: 'welcome-text',
+              key: 'ready-text',
               className: 'text-sm mb-2'
-            }, "Hi! I'm Imisi 2.0, your AI assistant."),
+            }, "Ready to help with your migration journey!"),
             e('p', {
-              key: 'help-text',
+              key: 'tap-text',
               className: 'text-xs'
-            }, 'Ask me about immigration, finances, or anything else!')
+            }, 'Tap the chat button to start')
+          ]),
+          
+          // Message list
+          ...messages.map(message => 
+            e('div', {
+              key: message.id,
+              className: `flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`
+            }, [
+              e('div', {
+                key: 'message-bubble',
+                className: `max-w-[80%] rounded-lg px-3 py-2 ${
+                  message.sender === 'user' 
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
+                    : 'bg-gray-100 text-gray-900'
+                }`
+              }, [
+                e('p', {
+                  key: 'content',
+                  className: 'text-sm leading-relaxed'
+                }, message.content),
+                
+                e('div', {
+                  key: 'timestamp',
+                  className: `text-xs mt-1 ${
+                    message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                  }`
+                }, message.timestamp),
+                
+                // AI message suggestions and actions
+                message.sender === 'ai' && message.metadata?.suggestions && e('div', {
+                  key: 'suggestions',
+                  className: 'mt-3 space-y-1'
+                }, message.metadata.suggestions.map((suggestion, i) =>
+                  e('button', {
+                    key: i,
+                    onClick: () => handleSuggestionClick(suggestion),
+                    className: 'block w-full text-left text-xs bg-white border border-gray-200 hover:border-blue-300 hover:bg-blue-50 rounded px-2 py-1 transition-all'
+                  }, suggestion)
+                )),
+                
+                message.sender === 'ai' && message.metadata?.actions && e('div', {
+                  key: 'actions',
+                  className: 'mt-3 space-y-1'
+                }, message.metadata.actions.map((action, i) =>
+                  e('button', {
+                    key: i,
+                    onClick: () => handleActionClick(action),
+                    className: 'block text-xs bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white rounded px-3 py-1 transition-all'
+                  }, action.label)
+                ))
+              ])
+            ])
+          ),
+          
+          // Typing indicator
+          isTyping && e('div', {
+            key: 'typing',
+            className: 'flex justify-start'
+          }, [
+            e('div', {
+              key: 'typing-bubble',
+              className: 'bg-gray-100 rounded-lg px-3 py-2'
+            }, [
+              e('div', {
+                key: 'typing-animation',
+                className: 'flex space-x-1'
+              }, [
+                e('div', { key: 'dot1', className: 'w-2 h-2 bg-gray-400 rounded-full animate-pulse' }),
+                e('div', { key: 'dot2', className: 'w-2 h-2 bg-gray-400 rounded-full animate-pulse', style: { animationDelay: '0.2s' } }),
+                e('div', { key: 'dot3', className: 'w-2 h-2 bg-gray-400 rounded-full animate-pulse', style: { animationDelay: '0.4s' } })
+              ])
+            ])
           ])
         ]),
 
@@ -1424,14 +1745,20 @@ function ImisiChatHead() {
             e('input', {
               key: 'message-input',
               type: 'text',
-              placeholder: 'Ask Imisi anything...',
-              className: 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all'
+              value: inputMessage,
+              onChange: (e) => setInputMessage(e.target.value),
+              onKeyPress: (e) => e.key === 'Enter' && handleSendMessage(),
+              placeholder: 'Ask about visas, budgets, timelines...',
+              disabled: isTyping,
+              className: 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50'
             }),
             e('button', {
               key: 'send-btn',
-              className: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105'
+              onClick: handleSendMessage,
+              disabled: !inputMessage.trim() || isTyping,
+              className: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed'
             }, [
-              e('span', { key: 'send-icon', className: 'text-sm' }, '→')
+              e('span', { key: 'send-icon', className: 'text-sm' }, isTyping ? '⏳' : '→')
             ])
           ])
         ])
