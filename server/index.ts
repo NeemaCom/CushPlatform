@@ -95,12 +95,48 @@ export async function createServer() {
 
   // Enhanced port configuration for different deployment environments
   if (!process.env.VERCEL) {
-    // Cloud Run uses PORT environment variable, fallback to 5000 for local development
-    const port = process.env.PORT || 5000;
+    // Cloud Run and deployment platforms use PORT environment variable
+    // Default to 80 for production deployments, 5000 for local development
+    const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 5000);
     const host = '0.0.0.0'; // Always bind to all interfaces for Cloud Run compatibility
     
     server.listen(Number(port), host, () => {
       log(`serving on ${host}:${port} (environment: ${process.env.NODE_ENV || 'development'})`);
+      
+      // Additional deployment readiness logging
+      if (process.env.NODE_ENV === 'production') {
+        log(`deployment ready - health checks available at /health, /ready, /api/health`);
+        log(`production mode - serving on port ${port}`);
+      }
+    });
+
+    // Handle server errors with deployment-friendly error handling
+    server.on('error', (err: any) => {
+      if (err.code === 'EADDRINUSE') {
+        log(`Error: Port ${port} is already in use`);
+        if (process.env.NODE_ENV === 'production') {
+          // In production, exit gracefully rather than retry
+          log(`Deployment failed - port ${port} unavailable`);
+          process.exit(1);
+        } else {
+          // In development, try next port
+          log(`Trying with port ${Number(port) + 1}...`);
+          server.listen(Number(port) + 1, host);
+        }
+      } else if (err.code === 'EACCES') {
+        log(`Error: Permission denied for port ${port}`);
+        if (process.env.NODE_ENV === 'production') {
+          log(`Deployment failed - insufficient permissions for port ${port}`);
+          process.exit(1);
+        }
+      } else {
+        log(`Server error: ${err.code} - ${err.message}`);
+        if (process.env.NODE_ENV === 'production') {
+          process.exit(1);
+        } else {
+          throw err;
+        }
+      }
     });
 
     // Graceful shutdown handling for production deployments
