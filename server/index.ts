@@ -67,10 +67,30 @@ export async function createServer() {
   // Root health check endpoint for deployment platforms (always available)
   // This must be placed BEFORE the SPA catch-all route
   app.get('/', (req, res) => {
-    // Cloud Run health check - prioritize for deployment platforms
-    if (req.headers['user-agent']?.includes('GoogleHC') || 
-        req.headers['x-forwarded-for'] || 
-        process.env.NODE_ENV === 'production') {
+    // Return health check ONLY for known health check user agents or explicit health parameter
+    const userAgent = req.headers['user-agent'] || '';
+    const acceptHeader = req.headers['accept'] || '';
+    
+    // More specific health check detection
+    const isHealthCheck = userAgent.includes('GoogleHC') || 
+                         userAgent.includes('kube-probe') ||
+                         userAgent.includes('HealthCheck') ||
+                         userAgent.includes('ELB-HealthChecker') ||
+                         userAgent.includes('Pingdom') ||
+                         userAgent.includes('UptimeRobot') ||
+                         req.query.health === 'check';
+    
+    // Log requests in production for debugging (temporarily)
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Root request:', {
+        userAgent: userAgent.substring(0, 100),
+        accept: acceptHeader.substring(0, 100),
+        isHealthCheck,
+        forwarded: req.headers['x-forwarded-for'] || 'none'
+      });
+    }
+    
+    if (isHealthCheck) {
       res.status(200).json({ 
         status: 'healthy',
         service: 'Cush Platform API',
@@ -79,7 +99,7 @@ export async function createServer() {
         environment: process.env.NODE_ENV || 'development'
       });
     } else {
-      // Development mode - serve the SPA
+      // Serve the SPA for all regular browser requests
       res.sendFile(path.join(process.cwd(), 'index.html'));
     }
   });
