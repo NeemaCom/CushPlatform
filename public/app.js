@@ -29,16 +29,14 @@ function NavigationHeader() {
         e('button', {
           key: 'logo',
           onClick: () => navigate('home'),
-          className: 'flex items-center gap-3 hover:opacity-80 transition-opacity'
+          className: 'flex items-center hover:opacity-80 transition-opacity'
         }, [
-          e('div', {
-            key: 'logo-icon',
-            className: 'w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'
-          }, 'C'),
-          e('span', {
-            key: 'logo-text',
-            className: 'text-xl font-bold text-white'
-          }, 'CUSH')
+          e('img', {
+            key: 'logo-image',
+            src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+            alt: 'Cush Logo',
+            className: 'h-8 w-auto'
+          })
         ]),
 
         // Desktop Navigation
@@ -761,9 +759,20 @@ function ContactSection() {
   ]);
 }
 
-// Standalone Sign In Page
+// Modern Sign In Page inspired by Vesti design
 function SignInPage() {
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [signupForm, setSignupForm] = useState({ 
+    firstName: '', 
+    lastName: '', 
+    email: '', 
+    address: '', 
+    country: '', 
+    phone: '',
+    password: '',
+    confirmPassword: ''
+  });
   const [loading, setLoading] = useState(false);
   const [testCredentials, setTestCredentials] = useState(null);
   const [showTestAccounts, setShowTestAccounts] = useState(false);
@@ -799,188 +808,439 @@ function SignInPage() {
     }
   };
 
+  const handleSignUp = async (e) => {
+    e.preventDefault();
+    if (signupForm.password !== signupForm.confirmPassword) {
+      alert('Passwords do not match');
+      return;
+    }
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: signupForm.email,
+          email: signupForm.email,
+          password: signupForm.password,
+          firstName: signupForm.firstName,
+          lastName: signupForm.lastName,
+          address: signupForm.address,
+          country: signupForm.country,
+          phone: signupForm.phone
+        })
+      });
+      
+      if (response.ok) {
+        alert('Account created successfully! Please sign in.');
+        setIsSignUp(false);
+        setLoginForm({ email: signupForm.email, password: '' });
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Registration failed');
+      }
+    } catch (error) {
+      alert('Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const useTestAccount = (credentials) => {
     setLoginForm({ email: credentials.email, password: credentials.password });
   };
 
   return e('div', {
-    className: 'min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 flex items-center justify-center relative overflow-hidden'
+    className: 'min-h-screen bg-gray-50 flex'
   }, [
-    // Background pattern
+    // Left side - Image and Branding (inspired by Vesti design)
     e('div', {
-      key: 'pattern',
-      className: 'absolute inset-0 opacity-10',
-      style: {
-        backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
-        backgroundSize: '30px 30px'
-      }
-    }),
-
-    // Header Navigation
-    e('nav', {
-      key: 'nav',
-      className: 'absolute top-0 left-0 right-0 z-50 bg-white/10 backdrop-blur-md border-b border-white/20'
+      key: 'left-side',
+      className: 'hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-900 via-indigo-800 to-purple-900 relative overflow-hidden'
     }, [
+      // Background image overlay
       e('div', {
-        key: 'nav-container',
-        className: 'container mx-auto px-6 py-4'
+        key: 'image-overlay',
+        className: 'absolute inset-0 bg-black/40'
+      }),
+      
+      // User image (using the smiling person from assets)
+      e('div', {
+        key: 'user-image',
+        className: 'absolute inset-0 flex items-center justify-center opacity-30'
       }, [
+        e('img', {
+          key: 'person-img',
+          src: '/attached_assets/guy smiling2_1751497479944.jpg',
+          alt: 'Happy User',
+          className: 'w-full h-full object-cover'
+        })
+      ]),
+
+      // Content overlay
+      e('div', {
+        key: 'content-overlay',
+        className: 'relative z-10 flex flex-col justify-between p-12 text-white'
+      }, [
+        // Logo
         e('div', {
-          key: 'nav-content',
-          className: 'flex items-center justify-between'
+          key: 'logo',
+          className: 'flex items-center'
         }, [
-          // Logo
-          e('button', {
-            key: 'logo',
-            onClick: () => navigate('home'),
-            className: 'flex items-center gap-3 hover:opacity-80 transition-opacity'
+          e('img', {
+            key: 'logo-img',
+            src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+            alt: 'Cush Logo',
+            className: 'h-10 w-auto'
+          })
+        ]),
+
+        // Main content
+        e('div', {
+          key: 'main-content',
+          className: 'flex-1 flex flex-col justify-center'
+        }, [
+          // Stats cards (inspired by Vesti)
+          e('div', {
+            key: 'stats-section',
+            className: 'mb-8'
           }, [
             e('div', {
-              key: 'logo-icon',
-              className: 'w-10 h-10 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg'
-            }, 'C'),
-            e('span', {
-              key: 'logo-text',
-              className: 'text-xl font-bold text-white'
-            }, 'CUSH')
+              key: 'savings-card',
+              className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-4 border border-white/20'
+            }, [
+              e('div', {
+                key: 'total-savings',
+                className: 'text-sm text-blue-200 mb-2'
+              }, 'GLOBAL OPPORTUNITIES'),
+              e('div', {
+                key: 'amount',
+                className: 'text-3xl font-bold text-white mb-1'
+              }, '2,500+'),
+              e('div', {
+                key: 'description',
+                className: 'text-blue-100 text-sm'
+              }, 'Immigration pathways available')
+            ]),
+            
+            e('div', {
+              key: 'flex-card',
+              className: 'bg-green-600/80 backdrop-blur-lg rounded-2xl p-4 border border-green-400/20'
+            }, [
+              e('div', {
+                key: 'flex-label',
+                className: 'text-sm text-green-100 mb-1'
+              }, 'SUCCESS RATE'),
+              e('div', {
+                key: 'flex-amount',
+                className: 'text-2xl font-bold text-white'
+              }, '94%'),
+              e('div', {
+                key: 'flex-desc',
+                className: 'text-green-100 text-xs'
+              }, 'Successful relocations')
+            ])
           ]),
 
-          // Back to Home
-          e('button', {
-            key: 'back-home',
-            onClick: () => navigate('home'),
-            className: 'text-white/90 hover:text-white font-medium transition-colors'
-          }, '← Back to Home')
-        ])
+          e('h1', {
+            key: 'title',
+            className: 'text-4xl font-bold mb-4'
+          }, 'Your Global Future Starts Here'),
+          
+          e('p', {
+            key: 'subtitle',
+            className: 'text-xl text-blue-100 leading-relaxed'
+          }, 'Join thousands who\'ve successfully relocated with our AI-powered immigration platform and financial services.')
+        ]),
+
+        // Footer text
+        e('div', {
+          key: 'footer-text',
+          className: 'text-sm text-blue-200'
+        }, 'Trusted by immigrants worldwide for seamless relocation')
       ])
     ]),
 
-    // Sign In Form
-    e('div', { 
-      key: 'signin-container',
-      className: 'relative z-10 w-full max-w-md mx-auto px-6'
+    // Right side - Auth Form
+    e('div', {
+      key: 'right-side',
+      className: 'w-full lg:w-1/2 flex items-center justify-center p-8'
     }, [
-      // Header
-      e('div', { 
-        key: 'header',
-        className: 'text-center mb-8'
-      }, [
-        e('div', {
-          key: 'logo',
-          className: 'w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-6 shadow-2xl'
-        }, 'C'),
-        e('h1', { 
-          key: 'title',
-          className: 'text-4xl font-bold text-white mb-3'
-        }, 'Welcome Back'),
-        e('p', { 
-          key: 'subtitle',
-          className: 'text-blue-100 text-lg'
-        }, 'Sign in to continue your immigration journey')
-      ]),
-      
-      // Login form
       e('div', {
         key: 'form-container',
-        className: 'bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20'
+        className: 'w-full max-w-md'
       }, [
-        e('form', {
-          key: 'login-form',
-          onSubmit: handleLogin,
-          className: 'space-y-6'
+        // Mobile logo
+        e('div', {
+          key: 'mobile-logo',
+          className: 'lg:hidden text-center mb-8'
         }, [
-          e('div', { key: 'email-field' }, [
-            e('label', { 
-              key: 'email-label',
-              className: 'block text-sm font-semibold text-white mb-2'
-            }, 'Email Address'),
+          e('img', {
+            key: 'mobile-logo-img',
+            src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+            alt: 'Cush Logo',
+            className: 'h-8 w-auto mx-auto mb-4'
+          }),
+          e('button', {
+            key: 'back-home',
+            onClick: () => navigate('home'),
+            className: 'text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors'
+          }, '← Back to Home')
+        ]),
+
+        // Form Header
+        e('div', {
+          key: 'form-header',
+          className: 'text-center mb-8'
+        }, [
+          e('h2', {
+            key: 'form-title',
+            className: 'text-3xl font-bold text-gray-900 mb-2'
+          }, isSignUp ? "Let's Get You Started" : 'Welcome Back'),
+          
+          e('p', {
+            key: 'form-subtitle',
+            className: 'text-gray-600'
+          }, isSignUp 
+            ? 'Input your details and let\'s help you unlock your global potential.'
+            : 'Sign in to continue your immigration journey'
+          )
+        ]),
+
+        // Auth Form
+        !isSignUp ? (
+          // Sign In Form
+          e('form', {
+            key: 'signin-form',
+            onSubmit: handleLogin,
+            className: 'space-y-6'
+          }, [
+            e('div', { key: 'email-field' }, [
+              e('input', {
+                key: 'email-input',
+                type: 'email',
+                value: loginForm.email,
+                onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
+                required: true,
+                className: 'w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                placeholder: 'ajitd@gmail.com'
+              })
+            ]),
+            
+            e('div', { key: 'password-field' }, [
+              e('input', {
+                key: 'password-input',
+                type: 'password',
+                value: loginForm.password,
+                onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
+                required: true,
+                className: 'w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                placeholder: 'Enter your password'
+              })
+            ]),
+
+            e('div', {
+              key: 'forgot-password',
+              className: 'text-left'
+            }, [
+              e('button', {
+                key: 'forgot-link',
+                type: 'button',
+                className: 'text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors'
+              }, 'Forgot Password? Reset here')
+            ]),
+            
+            e('button', {
+              key: 'submit-button',
+              type: 'submit',
+              disabled: loading,
+              className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading ? 'cursor-not-allowed' : ''}`
+            }, loading ? 'Signing in...' : 'Continue'),
+
+            e('div', {
+              key: 'signup-link',
+              className: 'text-center pt-4'
+            }, [
+              e('p', {
+                key: 'signup-text',
+                className: 'text-gray-600 text-sm'
+              }, [
+                "Are you new here? ",
+                e('button', {
+                  key: 'signup-button',
+                  type: 'button',
+                  onClick: () => setIsSignUp(true),
+                  className: 'text-blue-600 font-medium hover:underline transition-all'
+                }, 'Create account')
+              ])
+            ])
+          ])
+        ) : (
+          // Sign Up Form
+          e('form', {
+            key: 'signup-form',
+            onSubmit: handleSignUp,
+            className: 'space-y-4'
+          }, [
+            // Name fields
+            e('div', { key: 'name-fields', className: 'grid grid-cols-2 gap-4' }, [
+              e('input', {
+                key: 'firstname-input',
+                type: 'text',
+                value: signupForm.firstName,
+                onChange: (e) => setSignupForm({ ...signupForm, firstName: e.target.value }),
+                required: true,
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                placeholder: 'Daniel'
+              }),
+              e('input', {
+                key: 'lastname-input',
+                type: 'text',
+                value: signupForm.lastName,
+                onChange: (e) => setSignupForm({ ...signupForm, lastName: e.target.value }),
+                required: true,
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                placeholder: 'Ajibola'
+              })
+            ]),
+
+            // Info note
+            e('div', {
+              key: 'info-note',
+              className: 'flex items-start gap-2 text-sm text-gray-600 bg-green-50 p-3 rounded-lg'
+            }, [
+              e('div', {
+                key: 'info-icon',
+                className: 'w-4 h-4 bg-green-500 rounded-full flex-shrink-0 mt-0.5'
+              }),
+              e('span', {
+                key: 'info-text'
+              }, 'Full Name should be exactly how it is written on your ID')
+            ]),
+
             e('input', {
               key: 'email-input',
               type: 'email',
-              value: loginForm.email,
-              onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
+              value: signupForm.email,
+              onChange: (e) => setSignupForm({ ...signupForm, email: e.target.value }),
               required: true,
-              className: 'w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all',
-              placeholder: 'Enter your email'
-            })
-          ]),
-          
-          e('div', { key: 'password-field' }, [
-            e('label', { 
-              key: 'password-label',
-              className: 'block text-sm font-semibold text-white mb-2'
-            }, 'Password'),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+              placeholder: 'johndoe@gmail.com'
+            }),
+
+            e('input', {
+              key: 'address-input',
+              type: 'text',
+              value: signupForm.address,
+              onChange: (e) => setSignupForm({ ...signupForm, address: e.target.value }),
+              required: true,
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+              placeholder: 'Enter your Residential Address'
+            }),
+
+            // Country and Phone
+            e('div', { key: 'country-phone', className: 'flex gap-3' }, [
+              e('select', {
+                key: 'country-select',
+                value: signupForm.country,
+                onChange: (e) => setSignupForm({ ...signupForm, country: e.target.value }),
+                required: true,
+                className: 'flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 bg-white'
+              }, [
+                e('option', { key: 'select-country', value: '' }, 'Select Country'),
+                e('option', { key: 'ng', value: 'NG' }, '🇳🇬 Nigeria'),
+                e('option', { key: 'ca', value: 'CA' }, '🇨🇦 Canada'),
+                e('option', { key: 'us', value: 'US' }, '🇺🇸 United States'),
+                e('option', { key: 'uk', value: 'UK' }, '🇬🇧 United Kingdom'),
+                e('option', { key: 'au', value: 'AU' }, '🇦🇺 Australia'),
+              ]),
+
+              e('div', { key: 'phone-container', className: 'flex items-center border border-gray-300 rounded-xl bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent' }, [
+                e('div', { key: 'flag', className: 'pl-4 pr-2 text-gray-700 font-medium' }, '🇳🇬 +234'),
+                e('input', {
+                  key: 'phone-input',
+                  type: 'tel',
+                  value: signupForm.phone,
+                  onChange: (e) => setSignupForm({ ...signupForm, phone: e.target.value }),
+                  required: true,
+                  className: 'flex-1 py-3 pr-4 border-0 focus:outline-none text-gray-900 placeholder-gray-500',
+                  placeholder: '8012345678'
+                })
+              ])
+            ]),
+
             e('input', {
               key: 'password-input',
               type: 'password',
-              value: loginForm.password,
-              onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
+              value: signupForm.password,
+              onChange: (e) => setSignupForm({ ...signupForm, password: e.target.value }),
               required: true,
-              className: 'w-full px-4 py-3 bg-white/20 border border-white/30 rounded-xl text-white placeholder-blue-200 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent backdrop-blur-sm transition-all',
-              placeholder: 'Enter your password'
-            })
-          ]),
-          
-          e('button', {
-            key: 'submit-button',
-            type: 'submit',
-            disabled: loading,
-            className: `w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 disabled:transform-none ${loading ? 'cursor-not-allowed' : ''}`
-          }, loading ? 'Signing in...' : 'Sign In')
-        ]),
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+              placeholder: 'Create password'
+            }),
 
-        // Forgot Password
-        e('div', {
-          key: 'forgot-password',
-          className: 'text-center mt-6'
-        }, [
-          e('button', {
-            key: 'forgot-link',
-            className: 'text-blue-200 hover:text-white text-sm transition-colors'
-          }, 'Forgot your password?')
-        ]),
+            e('input', {
+              key: 'confirm-password-input',
+              type: 'password',
+              value: signupForm.confirmPassword,
+              onChange: (e) => setSignupForm({ ...signupForm, confirmPassword: e.target.value }),
+              required: true,
+              className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+              placeholder: 'Confirm password'
+            }),
+            
+            e('button', {
+              key: 'submit-button',
+              type: 'submit',
+              disabled: loading,
+              className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading ? 'cursor-not-allowed' : ''}`
+            }, loading ? 'Creating Account...' : 'Create Account'),
+
+            e('div', {
+              key: 'signin-link',
+              className: 'text-center pt-4'
+            }, [
+              e('p', {
+                key: 'signin-text',
+                className: 'text-gray-600 text-sm'
+              }, [
+                "Already have an account? ",
+                e('button', {
+                  key: 'signin-button',
+                  type: 'button',
+                  onClick: () => setIsSignUp(false),
+                  className: 'text-blue-600 font-medium hover:underline transition-all'
+                }, 'Sign in')
+              ])
+            ])
+          ])
+        ),
         
-        // Test accounts
-        testCredentials && e('div', {
+        // Test accounts (only for sign in)
+        !isSignUp && testCredentials && e('div', {
           key: 'test-accounts',
-          className: 'mt-8 pt-6 border-t border-white/20'
+          className: 'mt-8 pt-6 border-t border-gray-200'
         }, [
           e('button', {
             key: 'toggle-test',
             onClick: () => setShowTestAccounts(!showTestAccounts),
-            className: 'w-full text-sm text-blue-200 hover:text-white font-medium transition-colors mb-4'
-          }, showTestAccounts ? 'Hide Test Accounts' : 'Use Demo Account'),
+            className: 'w-full text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors mb-4'
+          }, showTestAccounts ? 'Hide Demo Accounts' : 'Use Demo Account'),
           
           showTestAccounts && testCredentials.testAccounts && e('div', { 
             key: 'test-list',
-            className: 'space-y-3'
+            className: 'space-y-2'
           }, testCredentials.testAccounts.map((account, index) =>
             e('button', {
               key: index,
               onClick: () => useTestAccount(account),
-              className: 'block w-full p-3 text-left text-sm bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-all duration-200 hover:shadow-md text-white'
+              className: 'block w-full p-3 text-left text-sm bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-md'
             }, [
-              e('div', { key: 'email', className: 'font-medium' }, account.email),
-              e('div', { key: 'role', className: 'text-blue-200 text-xs mt-1' }, `${account.role} - ${account.description}`)
+              e('div', { key: 'email', className: 'font-medium text-gray-900' }, account.email),
+              e('div', { key: 'role', className: 'text-gray-600 text-xs mt-1' }, `${account.role} - ${account.description}`)
             ])
           ))
-        ]),
-
-        // Sign Up Link
-        e('div', {
-          key: 'signup-link',
-          className: 'text-center mt-8 pt-6 border-t border-white/20'
-        }, [
-          e('p', {
-            key: 'signup-text',
-            className: 'text-blue-200 text-sm'
-          }, [
-            "Don't have an account? ",
-            e('button', {
-              key: 'signup-button',
-              className: 'text-white font-medium hover:underline transition-all'
-            }, 'Sign up for free')
-          ])
         ])
       ])
     ])
@@ -1098,10 +1358,21 @@ function Dashboard({ user }) {
         className: 'bg-white/80 backdrop-blur-lg shadow-sm border-b border-gray-100'
       }, [
         e('div', { className: 'flex items-center justify-between px-6 py-4' }, [
-          e('h1', {
-            key: 'title',
-            className: 'text-2xl font-bold text-gray-900'
-          }, 'Cush Dashboard'),
+          e('div', {
+            key: 'logo-title',
+            className: 'flex items-center gap-3'
+          }, [
+            e('img', {
+              key: 'dashboard-logo',
+              src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+              alt: 'Cush Logo',
+              className: 'h-8 w-auto'
+            }),
+            e('span', {
+              key: 'dashboard-text',
+              className: 'text-xl font-medium text-gray-700'
+            }, 'Dashboard')
+          ]),
           
           e('div', { key: 'user-section', className: 'flex items-center gap-4' }, [
             e('span', { 
