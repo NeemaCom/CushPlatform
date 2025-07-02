@@ -997,3 +997,68 @@ export type AchievementProgress = typeof achievementProgress.$inferSelect;
 export type InsertAchievementBadge = z.infer<typeof insertAchievementBadgeSchema>;
 export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
 export type InsertAchievementProgress = z.infer<typeof insertAchievementProgressSchema>;
+
+// ===== ADMIN FUNCTIONS SYSTEM =====
+
+// Admin action logs table
+export const adminActionLogs = pgTable("admin_action_logs", {
+  id: serial("id").primaryKey(),
+  adminId: integer("admin_id").references(() => users.id),
+  action: text("action").notNull(), // user_delete, user_restrict, user_activate, etc.
+  targetUserId: integer("target_user_id").references(() => users.id),
+  details: json("details"), // Additional action details
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User restrictions table
+export const userRestrictions = pgTable("user_restrictions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  restrictionType: text("restriction_type").notNull(), // account_suspended, feature_limited, etc.
+  reason: text("reason").notNull(),
+  restrictedBy: integer("restricted_by").references(() => users.id),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// System metrics table
+export const systemMetrics = pgTable("system_metrics", {
+  id: serial("id").primaryKey(),
+  metric: text("metric").notNull(), // active_users, total_transactions, etc.
+  value: text("value").notNull(),
+  period: text("period").notNull(), // daily, weekly, monthly
+  recordedAt: timestamp("recorded_at").defaultNow(),
+});
+
+// Admin schemas
+export const adminUserUpdateSchema = z.object({
+  role: z.enum(["customer", "admin"]).optional(),
+  isEmailVerified: z.boolean().optional(),
+  isPhoneVerified: z.boolean().optional(),
+  firstName: z.string().min(1).optional(),
+  lastName: z.string().min(1).optional(),
+  email: z.string().email().optional(),
+  phoneNumber: z.string().optional(),
+  nationality: z.string().optional(),
+});
+
+export const restrictUserSchema = z.object({
+  restrictionType: z.enum(["account_suspended", "feature_limited", "login_restricted", "transaction_blocked"]),
+  reason: z.string().min(1, "Reason is required"),
+  expiresAt: z.string().datetime().optional(),
+});
+
+export const adminActionLogSchema = z.object({
+  action: z.string().min(1),
+  targetUserId: z.number().optional(),
+  details: z.any().optional(),
+});
+
+// Admin type exports
+export type AdminActionLog = typeof adminActionLogs.$inferSelect;
+export type UserRestriction = typeof userRestrictions.$inferSelect;
+export type SystemMetric = typeof systemMetrics.$inferSelect;
+export type AdminUserUpdate = z.infer<typeof adminUserUpdateSchema>;
+export type RestrictUser = z.infer<typeof restrictUserSchema>;
+export type AdminActionLogData = z.infer<typeof adminActionLogSchema>;

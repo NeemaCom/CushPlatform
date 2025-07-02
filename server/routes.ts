@@ -2925,6 +2925,356 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== COMPREHENSIVE ADMIN FUNCTIONS =====
+
+  // Get admin dashboard statistics
+  app.get('/api/admin/dashboard/stats', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const stats = await storage.getAdminDashboardStats();
+      
+      await SecurityLogger.logSecurityEvent(
+        'admin_dashboard_accessed',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        {}
+      );
+
+      res.json(stats);
+    } catch (error: any) {
+      console.error('Admin dashboard stats error:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard statistics" });
+    }
+  });
+
+  // Enhanced user management - Get all users with advanced filtering
+  app.get('/api/admin/users/advanced', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const searchQuery = req.query.search as string;
+      const role = req.query.role as string;
+      const verified = req.query.verified as string;
+
+      let users = await storage.getAllUsers(limit, offset, searchQuery);
+      
+      // Additional filtering
+      if (role && ['admin', 'customer'].includes(role)) {
+        users = users.filter(user => user.role === role);
+      }
+      
+      if (verified === 'true') {
+        users = users.filter(user => user.isEmailVerified);
+      } else if (verified === 'false') {
+        users = users.filter(user => !user.isEmailVerified);
+      }
+
+      const totalCount = await storage.getUsersCount(searchQuery);
+
+      const safeUsers = users.map(user => createSafeUser(user));
+      
+      res.json({
+        users: safeUsers,
+        pagination: {
+          total: totalCount,
+          limit,
+          offset,
+          hasMore: offset + limit < totalCount
+        }
+      });
+    } catch (error: any) {
+      console.error('Admin advanced users list error:', error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Delete user (admin only)
+  app.delete('/api/admin/users/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const adminId = req.userId!;
+
+      if (userId === adminId) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      await storage.adminDeleteUser(userId, adminId);
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_user_deleted',
+        adminId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { deletedUserId: userId }
+      );
+
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error: any) {
+      console.error('Admin user deletion error:', error);
+      res.status(500).json({ error: error.message || "Failed to delete user" });
+    }
+  });
+
+  // Update user details (admin only)
+  app.put('/api/admin/users/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const adminId = req.userId!;
+      const updates = req.body;
+
+      // Validate updates
+      const allowedFields = ['role', 'isEmailVerified', 'isPhoneVerified', 'firstName', 'lastName', 'email', 'phoneNumber', 'nationality'];
+      const validUpdates: any = {};
+      
+      for (const field of allowedFields) {
+        if (updates[field] !== undefined) {
+          validUpdates[field] = updates[field];
+        }
+      }
+
+      if (Object.keys(validUpdates).length === 0) {
+        return res.status(400).json({ error: "No valid fields to update" });
+      }
+
+      const updatedUser = await storage.adminUpdateUser(userId, validUpdates, adminId);
+      const safeUser = createSafeUser(updatedUser);
+
+      res.json(safeUser);
+    } catch (error: any) {
+      console.error('Admin user update error:', error);
+      res.status(500).json({ error: error.message || "Failed to update user" });
+    }
+  });
+
+  // Restrict user account
+  app.post('/api/admin/users/:id/restrict', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const adminId = req.userId!;
+      const { restrictionType, reason, expiresAt } = req.body;
+
+      if (!restrictionType || !reason) {
+        return res.status(400).json({ error: "Restriction type and reason are required" });
+      }
+
+      const restriction = await storage.restrictUser(userId, {
+        restrictionType,
+        reason,
+        expiresAt: expiresAt ? new Date(expiresAt) : null
+      }, adminId);
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_user_restricted',
+        adminId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { targetUserId: userId, restrictionType, reason }
+      );
+
+      res.json({ success: true, restriction });
+    } catch (error: any) {
+      console.error('Admin user restriction error:', error);
+      res.status(500).json({ error: error.message || "Failed to restrict user" });
+    }
+  });
+
+  // Remove user restriction
+  app.delete('/api/admin/users/:id/restrict', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const adminId = req.userId!;
+
+      await storage.removeUserRestriction(userId, adminId);
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_user_unrestricted',
+        adminId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { targetUserId: userId }
+      );
+
+      res.json({ success: true, message: "User restrictions removed" });
+    } catch (error: any) {
+      console.error('Admin user unrestriction error:', error);
+      res.status(500).json({ error: error.message || "Failed to remove restrictions" });
+    }
+  });
+
+  // Get user details with admin info
+  app.get('/api/admin/users/:id/details', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      
+      const [user, transactions, accounts, restrictions] = await Promise.all([
+        storage.getUser(userId),
+        storage.getTransactionsByUserId(userId),
+        storage.getAccountsByUserId(userId),
+        storage.getUserRestrictions(userId)
+      ]);
+
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const safeUser = createSafeUser(user);
+      
+      res.json({
+        user: safeUser,
+        accounts: accounts.length,
+        totalTransactions: transactions.length,
+        recentTransactions: transactions.slice(0, 10),
+        restrictions,
+        lastLogin: user.lastLoginAt,
+        createdAt: user.createdAt
+      });
+    } catch (error: any) {
+      console.error('Admin user details error:', error);
+      res.status(500).json({ error: "Failed to fetch user details" });
+    }
+  });
+
+  // Get admin activity logs
+  app.get('/api/admin/activity-logs', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const logs = await storage.getAdminActionLogs(limit, offset);
+      
+      res.json({
+        logs,
+        pagination: {
+          limit,
+          offset,
+          hasMore: logs.length === limit
+        }
+      });
+    } catch (error: any) {
+      console.error('Admin activity logs error:', error);
+      res.status(500).json({ error: "Failed to fetch activity logs" });
+    }
+  });
+
+  // Bulk user operations
+  app.post('/api/admin/users/bulk-action', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { action, userIds, data } = req.body;
+      const adminId = req.userId!;
+
+      if (!action || !Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({ error: "Invalid bulk action request" });
+      }
+
+      const results = [];
+      const errors = [];
+
+      for (const userId of userIds) {
+        try {
+          let result;
+          switch (action) {
+            case 'delete':
+              if (userId === adminId) {
+                errors.push({ userId, error: "Cannot delete your own account" });
+                continue;
+              }
+              await storage.adminDeleteUser(userId, adminId);
+              result = { userId, action: 'deleted' };
+              break;
+            
+            case 'verify_email':
+              await storage.adminUpdateUser(userId, { isEmailVerified: true }, adminId);
+              result = { userId, action: 'email_verified' };
+              break;
+            
+            case 'change_role':
+              if (!data?.role || !['admin', 'customer'].includes(data.role)) {
+                errors.push({ userId, error: "Invalid role specified" });
+                continue;
+              }
+              await storage.adminUpdateUser(userId, { role: data.role }, adminId);
+              result = { userId, action: 'role_changed', newRole: data.role };
+              break;
+            
+            default:
+              errors.push({ userId, error: "Unknown action" });
+              continue;
+          }
+          results.push(result);
+        } catch (error: any) {
+          errors.push({ userId, error: error.message });
+        }
+      }
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_bulk_action',
+        adminId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { action, affectedUsers: userIds.length, successCount: results.length, errorCount: errors.length }
+      );
+
+      res.json({
+        success: errors.length === 0,
+        results,
+        errors,
+        summary: {
+          total: userIds.length,
+          successful: results.length,
+          failed: errors.length
+        }
+      });
+    } catch (error: any) {
+      console.error('Admin bulk action error:', error);
+      res.status(500).json({ error: "Failed to perform bulk action" });
+    }
+  });
+
+  // Export user data (admin only)
+  app.get('/api/admin/export/users', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const format = req.query.format as string || 'json';
+      const users = await storage.getAllUsers(10000); // Large limit for export
+      
+      const exportData = users.map(user => createSafeUser(user));
+
+      await SecurityLogger.logSecurityEvent(
+        'admin_data_export',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { type: 'users', format, count: exportData.length }
+      );
+
+      if (format === 'csv') {
+        // Simple CSV export
+        const csvHeader = 'ID,Username,Email,First Name,Last Name,Role,Created At,Last Login\n';
+        const csvData = exportData.map(user => 
+          `${user.id},${user.username},${user.email},${user.firstName},${user.lastName},${user.role},${user.createdAt},${user.lastLoginAt || ''}`
+        ).join('\n');
+        
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename="users_export.csv"');
+        res.send(csvHeader + csvData);
+      } else {
+        res.json({
+          exportedAt: new Date().toISOString(),
+          totalUsers: exportData.length,
+          users: exportData
+        });
+      }
+    } catch (error: any) {
+      console.error('Admin export error:', error);
+      res.status(500).json({ error: "Failed to export user data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

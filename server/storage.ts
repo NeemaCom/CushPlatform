@@ -162,13 +162,38 @@ export interface IStorage {
 
 
   // Admin-specific methods
-  getAllUsers(limit?: number, offset?: number): Promise<User[]>;
-  searchUsers(query: string): Promise<User[]>;
+  getAllUsers(limit?: number, offset?: number, searchQuery?: string): Promise<User[]>;
+  getUsersCount(searchQuery?: string): Promise<number>;
   getAllTransactions(limit?: number, offset?: number): Promise<Transaction[]>;
   getTransactionsByUserId(userId: number): Promise<Transaction[]>;
-  getUsersCount(): Promise<number>;
   getTransactionsCount(): Promise<number>;
   getAuditLogs(limit?: number, offset?: number): Promise<UserAuditLog[]>;
+  
+  // Admin user management
+  adminUpdateUser(id: number, updates: Partial<User>, adminId: number): Promise<User>;
+  adminDeleteUser(id: number, adminId: number): Promise<void>;
+  restrictUser(userId: number, restriction: any, adminId: number): Promise<any>;
+  removeUserRestriction(userId: number, adminId: number): Promise<void>;
+  getUserRestrictions(userId: number): Promise<any[]>;
+  
+  // Admin logging
+  createAdminActionLog(log: any): Promise<any>;
+  getAdminActionLogs(limit?: number, offset?: number): Promise<any[]>;
+  
+  // System metrics
+  getSystemMetrics(period?: string): Promise<any[]>;
+  recordSystemMetric(metric: string, value: string, period: string): Promise<any>;
+  
+  // Dashboard analytics for admin
+  getAdminDashboardStats(): Promise<{
+    totalUsers: number;
+    totalTransactions: number;
+    totalAccounts: number;
+    monthlyActiveUsers: number;
+    recentSignups: number;
+    avgTransactionsPerUser: number;
+    totalBalance: string;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -927,6 +952,194 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(userAuditLogs.createdAt))
       .limit(limit)
       .offset(offset);
+  }
+
+  // Enhanced admin methods
+  async getAllUsers(limit: number = 50, offset: number = 0, searchQuery?: string): Promise<User[]> {
+    let query = db.select().from(users);
+    
+    if (searchQuery) {
+      query = query.where(
+        or(
+          ilike(users.email, `%${searchQuery}%`),
+          ilike(users.username, `%${searchQuery}%`),
+          ilike(users.firstName, `%${searchQuery}%`),
+          ilike(users.lastName, `%${searchQuery}%`)
+        )
+      );
+    }
+    
+    return await query
+      .orderBy(desc(users.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getUsersCount(searchQuery?: string): Promise<number> {
+    let query = db.select({ count: sql<number>`count(*)` }).from(users);
+    
+    if (searchQuery) {
+      query = query.where(
+        or(
+          ilike(users.email, `%${searchQuery}%`),
+          ilike(users.username, `%${searchQuery}%`),
+          ilike(users.firstName, `%${searchQuery}%`),
+          ilike(users.lastName, `%${searchQuery}%`)
+        )
+      );
+    }
+    
+    const result = await query;
+    return result[0]?.count || 0;
+  }
+
+  async adminUpdateUser(id: number, updates: Partial<User>, adminId: number): Promise<User> {
+    const [updatedUser] = await db
+      .update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+
+    if (!updatedUser) {
+      throw new Error("User not found");
+    }
+
+    // Log admin action
+    await this.createAdminActionLog({
+      adminId,
+      action: "user_update",
+      targetUserId: id,
+      details: { updates }
+    });
+
+    return updatedUser;
+  }
+
+  async adminDeleteUser(id: number, adminId: number): Promise<void> {
+    const user = await this.getUser(id);
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Don't allow deletion of other admins
+    if (user.role === 'admin' && user.id !== adminId) {
+      throw new Error("Cannot delete other admin users");
+    }
+
+    await db.delete(users).where(eq(users.id, id));
+
+    // Log admin action
+    await this.createAdminActionLog({
+      adminId,
+      action: "user_delete",
+      targetUserId: id,
+      details: { deletedUser: { email: user.email, role: user.role } }
+    });
+  }
+
+  async restrictUser(userId: number, restriction: any, adminId: number): Promise<any> {
+    // Implementation will depend on actual schema, using placeholder for now
+    const log = await this.createAdminActionLog({
+      adminId,
+      action: "user_restrict",
+      targetUserId: userId,
+      details: { restriction }
+    });
+
+    return log;
+  }
+
+  async removeUserRestriction(userId: number, adminId: number): Promise<void> {
+    await this.createAdminActionLog({
+      adminId,
+      action: "user_unrestrict",
+      targetUserId: userId,
+      details: {}
+    });
+  }
+
+  async getUserRestrictions(userId: number): Promise<any[]> {
+    // Placeholder - would implement with actual userRestrictions table
+    return [];
+  }
+
+  async createAdminActionLog(log: any): Promise<any> {
+    // Using audit logs table for now, would use adminActionLogs in production
+    return await this.createAuditLog({
+      userId: log.adminId,
+      action: log.action,
+      details: JSON.stringify({
+        targetUserId: log.targetUserId,
+        ...log.details
+      }),
+      ipAddress: null,
+      userAgent: null
+    });
+  }
+
+  async getAdminActionLogs(limit: number = 50, offset: number = 0): Promise<any[]> {
+    return await this.getAuditLogs(limit, offset);
+  }
+
+  async getSystemMetrics(period?: string): Promise<any[]> {
+    // Placeholder - would implement with actual systemMetrics table
+    return [];
+  }
+
+  async recordSystemMetric(metric: string, value: string, period: string): Promise<any> {
+    // Placeholder - would implement with actual systemMetrics table
+    return {};
+  }
+
+  async getAdminDashboardStats(): Promise<{
+    totalUsers: number;
+    totalTransactions: number;
+    totalAccounts: number;
+    monthlyActiveUsers: number;
+    recentSignups: number;
+    avgTransactionsPerUser: number;
+    totalBalance: string;
+  }> {
+    const [
+      totalUsersResult,
+      totalTransactionsResult,
+      totalAccountsResult,
+      totalBalanceResult,
+      recentSignupsResult
+    ] = await Promise.all([
+      db.select({ count: sql<number>`count(*)` }).from(users),
+      db.select({ count: sql<number>`count(*)` }).from(transactions),
+      db.select({ count: sql<number>`count(*)` }).from(accounts),
+      db.select({ total: sql<string>`sum(balance)` }).from(accounts),
+      db.select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(gte(users.createdAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)))
+    ]);
+
+    const totalUsers = totalUsersResult[0]?.count || 0;
+    const totalTransactions = totalTransactionsResult[0]?.count || 0;
+    const totalAccounts = totalAccountsResult[0]?.count || 0;
+    const totalBalance = totalBalanceResult[0]?.total || "0";
+    const recentSignups = recentSignupsResult[0]?.count || 0;
+
+    // Calculate monthly active users (users with transactions in last 30 days)
+    const monthlyActiveResult = await db
+      .select({ count: sql<number>`count(distinct user_id)` })
+      .from(transactions)
+      .where(gte(transactions.date, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
+    
+    const monthlyActiveUsers = monthlyActiveResult[0]?.count || 0;
+    const avgTransactionsPerUser = totalUsers > 0 ? Math.round(totalTransactions / totalUsers * 100) / 100 : 0;
+
+    return {
+      totalUsers,
+      totalTransactions,
+      totalAccounts,
+      monthlyActiveUsers,
+      recentSignups,
+      avgTransactionsPerUser,
+      totalBalance
+    };
   }
 }
 
