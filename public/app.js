@@ -1379,6 +1379,11 @@ function Dashboard({ user }) {
               key: 'welcome',
               className: 'text-gray-600'
             }, `Welcome, ${user?.firstName || 'User'}`),
+            user?.role === 'admin' && e('button', {
+              key: 'admin',
+              onClick: () => setCurrentView('admin'),
+              className: 'bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors'
+            }, 'Admin Panel'),
             e('button', {
               key: 'account',
               onClick: () => setCurrentView('account'),
@@ -1400,6 +1405,7 @@ function Dashboard({ user }) {
       }, [
         // Render different views based on currentView
         currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
+        currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         e('div', { key: 'dashboard-content' }, [
           // Welcome Section
           e('div', {
@@ -1539,7 +1545,399 @@ function AppRouter() {
   }
 }
 
-// Imisi Chat Head Component
+// Comprehensive Admin Dashboard Component
+function AdminDashboard({ user, onBack }) {
+  const [currentTab, setCurrentTab] = useState('overview');
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState({ role: '', verified: '' });
+  const [loading, setLoading] = useState(false);
+  const [activityLogs, setActivityLogs] = useState([]);
+
+  // Fetch dashboard statistics
+  useEffect(() => {
+    if (currentTab === 'overview') {
+      fetchDashboardStats();
+    } else if (currentTab === 'users') {
+      fetchUsers();
+    } else if (currentTab === 'activity') {
+      fetchActivityLogs();
+    }
+  }, [currentTab, searchQuery, filters]);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/dashboard/stats');
+      if (response.ok) {
+        const stats = await response.json();
+        setDashboardStats(stats);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        limit: '50',
+        offset: '0',
+        ...(searchQuery && { search: searchQuery }),
+        ...(filters.role && { role: filters.role }),
+        ...(filters.verified && { verified: filters.verified })
+      });
+
+      const response = await fetch(`/api/admin/users/advanced?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data.users);
+      }
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchActivityLogs = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/activity-logs');
+      if (response.ok) {
+        const data = await response.json();
+        setActivityLogs(data.logs);
+      }
+    } catch (error) {
+      console.error('Failed to fetch activity logs:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteUser = async (userId) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchUsers();
+        alert('User deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete user');
+      }
+    } catch (error) {
+      alert('Failed to delete user');
+    }
+  };
+
+  const updateUserRole = async (userId, newRole) => {
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        alert(`User role updated to ${newRole}`);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update role');
+      }
+    } catch (error) {
+      alert('Failed to update user role');
+    }
+  };
+
+  const restrictUser = async (userId) => {
+    const reason = prompt('Enter restriction reason:');
+    if (!reason) return;
+
+    const restrictionType = prompt('Enter restriction type (account_suspended, feature_limited, login_restricted, transaction_blocked):');
+    if (!restrictionType) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/restrict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restrictionType, reason })
+      });
+
+      if (response.ok) {
+        alert('User restricted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to restrict user');
+      }
+    } catch (error) {
+      alert('Failed to restrict user');
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    return new Date(dateStr).toLocaleDateString() + ' ' + new Date(dateStr).toLocaleTimeString();
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Header
+    e('div', {
+      key: 'header',
+      className: 'bg-white shadow-sm border-b border-gray-200'
+    }, [
+      e('div', { className: 'flex items-center justify-between px-6 py-4' }, [
+        e('div', { key: 'title-section', className: 'flex items-center gap-3' }, [
+          e('button', {
+            key: 'back-button',
+            onClick: onBack,
+            className: 'text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors'
+          }, '← Back to Dashboard'),
+          e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Admin Panel'),
+          e('span', { key: 'role-badge', className: 'bg-purple-100 text-purple-800 text-xs font-medium px-3 py-1 rounded-full' }, 'Administrator')
+        ]),
+        e('div', { key: 'admin-info', className: 'text-sm text-gray-600' }, `Logged in as ${user.firstName} ${user.lastName}`)
+      ])
+    ]),
+
+    // Tab Navigation
+    e('div', {
+      key: 'tab-nav',
+      className: 'bg-white border-b border-gray-200'
+    }, [
+      e('div', { className: 'container mx-auto px-6' }, [
+        e('nav', { className: 'flex space-x-8' }, [
+          ['overview', 'Overview', '📊'],
+          ['users', 'User Management', '👥'],
+          ['activity', 'Activity Logs', '📋']
+        ].map(([tab, label, icon]) =>
+          e('button', {
+            key: tab,
+            onClick: () => setCurrentTab(tab),
+            className: `flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
+              currentTab === tab 
+                ? 'border-purple-500 text-purple-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } transition-colors`
+          }, [
+            e('span', { key: 'icon' }, icon),
+            label
+          ])
+        ))
+      ])
+    ]),
+
+    // Content Area
+    e('div', {
+      key: 'content',
+      className: 'container mx-auto px-6 py-8'
+    }, [
+      // Overview Tab
+      currentTab === 'overview' && e('div', { key: 'overview-content' }, [
+        e('div', {
+          key: 'stats-grid',
+          className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'
+        }, dashboardStats ? [
+          {
+            title: 'Total Users',
+            value: dashboardStats.totalUsers.toLocaleString(),
+            icon: '👥'
+          },
+          {
+            title: 'Monthly Active',
+            value: dashboardStats.monthlyActiveUsers.toLocaleString(),
+            icon: '📈'
+          },
+          {
+            title: 'Total Transactions',
+            value: dashboardStats.totalTransactions.toLocaleString(),
+            icon: '💳'
+          },
+          {
+            title: 'Total Balance',
+            value: formatCurrency(parseFloat(dashboardStats.totalBalance)),
+            icon: '💰'
+          }
+        ].map((stat, index) =>
+          e('div', {
+            key: index,
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('div', { key: 'header', className: 'flex items-center justify-between' }, [
+              e('div', { key: 'title', className: 'text-sm font-medium text-gray-600' }, stat.title),
+              e('span', { key: 'icon', className: 'text-2xl' }, stat.icon)
+            ]),
+            e('div', { key: 'value', className: 'mt-2 text-3xl font-bold text-gray-900' }, stat.value)
+          ])
+        ) : [
+          e('div', {
+            key: 'loading',
+            className: 'col-span-4 text-center py-8 text-gray-500'
+          }, loading ? 'Loading statistics...' : 'Failed to load statistics')
+        ])
+      ]),
+
+      // Users Management Tab
+      currentTab === 'users' && e('div', { key: 'users-content' }, [
+        // Search and Filter Controls
+        e('div', {
+          key: 'controls',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'
+        }, [
+          e('div', { key: 'search-filters', className: 'flex flex-wrap gap-4' }, [
+            e('input', {
+              key: 'search-input',
+              type: 'text',
+              placeholder: 'Search users...',
+              value: searchQuery,
+              onChange: (e) => setSearchQuery(e.target.value),
+              className: 'flex-1 min-w-64 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500'
+            }),
+            e('select', {
+              key: 'role-filter',
+              value: filters.role,
+              onChange: (e) => setFilters({ ...filters, role: e.target.value }),
+              className: 'px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500'
+            }, [
+              e('option', { key: 'all-roles', value: '' }, 'All Roles'),
+              e('option', { key: 'admin', value: 'admin' }, 'Admin'),
+              e('option', { key: 'customer', value: 'customer' }, 'Customer')
+            ])
+          ])
+        ]),
+
+        // Users Table
+        e('div', {
+          key: 'users-table',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'
+        }, [
+          e('div', { key: 'table-container', className: 'overflow-x-auto' }, [
+            e('table', { key: 'table', className: 'min-w-full divide-y divide-gray-200' }, [
+              // Table Header
+              e('thead', { key: 'thead', className: 'bg-gray-50' }, [
+                e('tr', { key: 'header-row' }, [
+                  e('th', { key: 'name-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'User'),
+                  e('th', { key: 'role-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Role'),
+                  e('th', { key: 'status-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Status'),
+                  e('th', { key: 'created-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Created'),
+                  e('th', { key: 'actions-header', className: 'px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Actions')
+                ])
+              ]),
+
+              // Table Body
+              e('tbody', { key: 'tbody', className: 'bg-white divide-y divide-gray-200' }, 
+                users.length > 0 ? users.map((userItem) =>
+                  e('tr', {
+                    key: userItem.id,
+                    className: 'hover:bg-gray-50'
+                  }, [
+                    e('td', { key: 'user-info', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('div', { key: 'user-details' }, [
+                        e('div', { key: 'name', className: 'text-sm font-medium text-gray-900' }, 
+                          `${userItem.firstName} ${userItem.lastName}`),
+                        e('div', { key: 'email', className: 'text-sm text-gray-500' }, userItem.email)
+                      ])
+                    ]),
+                    e('td', { key: 'role-cell', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('span', {
+                        key: 'role-badge',
+                        className: `inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          userItem.role === 'admin' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`
+                      }, userItem.role)
+                    ]),
+                    e('td', { key: 'status-cell', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('span', {
+                        key: 'status-badge',
+                        className: `inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          userItem.isEmailVerified 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`
+                      }, userItem.isEmailVerified ? 'Verified' : 'Unverified')
+                    ]),
+                    e('td', { key: 'created-cell', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, 
+                      formatDate(userItem.createdAt)),
+                    e('td', { key: 'actions-cell', className: 'px-6 py-4 whitespace-nowrap text-right text-sm font-medium' }, [
+                      e('div', { key: 'action-buttons', className: 'flex items-center justify-end gap-2' }, [
+                        e('button', {
+                          key: 'toggle-role',
+                          onClick: () => updateUserRole(userItem.id, userItem.role === 'admin' ? 'customer' : 'admin'),
+                          className: 'text-blue-600 hover:text-blue-900 text-xs px-2 py-1 rounded hover:bg-blue-50'
+                        }, userItem.role === 'admin' ? 'Make Customer' : 'Make Admin'),
+                        e('button', {
+                          key: 'restrict',
+                          onClick: () => restrictUser(userItem.id),
+                          className: 'text-yellow-600 hover:text-yellow-900 text-xs px-2 py-1 rounded hover:bg-yellow-50'
+                        }, 'Restrict'),
+                        userItem.id !== user.id && e('button', {
+                          key: 'delete',
+                          onClick: () => deleteUser(userItem.id),
+                          className: 'text-red-600 hover:text-red-900 text-xs px-2 py-1 rounded hover:bg-red-50'
+                        }, 'Delete')
+                      ])
+                    ])
+                  ])
+                ) : [
+                  e('tr', { key: 'no-users' }, [
+                    e('td', { key: 'no-users-message', className: 'px-6 py-4 text-center text-gray-500', colspan: '5' }, 
+                      loading ? 'Loading users...' : 'No users found')
+                  ])
+                ]
+              )
+            ])
+          ])
+        ])
+      ]),
+
+      // Activity Logs Tab
+      currentTab === 'activity' && e('div', { key: 'activity-content' }, [
+        e('div', {
+          key: 'activity-logs',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200'
+        }, [
+          e('div', { key: 'activity-header', className: 'px-6 py-4 border-b border-gray-200' }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900' }, 'Admin Activity Logs')
+          ]),
+          e('div', { key: 'activity-list', className: 'divide-y divide-gray-200' }, 
+            activityLogs.length > 0 ? activityLogs.map((log, index) =>
+              e('div', { key: index, className: 'px-6 py-4' }, [
+                e('div', { key: 'log-content', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'log-details' }, [
+                    e('div', { key: 'action', className: 'text-sm font-medium text-gray-900' }, log.action),
+                    e('div', { key: 'details', className: 'text-sm text-gray-600' }, log.details || 'No additional details'),
+                    e('div', { key: 'timestamp', className: 'text-xs text-gray-500' }, formatDate(log.createdAt))
+                  ]),
+                  e('div', { key: 'log-meta', className: 'text-right' }, [
+                    e('div', { key: 'admin', className: 'text-sm text-gray-600' }, `Admin ID: ${log.userId}`)
+                  ])
+                ])
+              ])
+            ) : [
+              e('div', { key: 'no-logs', className: 'px-6 py-8 text-center text-gray-500' }, 
+                loading ? 'Loading activity logs...' : 'No activity logs found')
+            ]
+          )
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Imisi Chat Head Component  
 function ImisiChatHead() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
