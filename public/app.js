@@ -66,7 +66,7 @@ function NavigationHeader() {
             e('button', {
               key: 'get-started',
               onClick: () => navigate('signin'),
-              className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
+              className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
             }, 'Get Started')
           ])
         ]),
@@ -126,7 +126,7 @@ function NavigationHeader() {
             e('button', {
               key: 'mobile-get-started',
               onClick: () => navigate('signin'),
-              className: 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
+              className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
             }, 'Get Started')
           ])
         ])
@@ -138,7 +138,7 @@ function NavigationHeader() {
 // Homepage Hero Section - Based on Reference Design
 function HeroSection() {
   return e('section', { 
-    className: 'relative bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 min-h-screen flex items-center justify-center overflow-hidden'
+    className: 'relative bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 min-h-screen flex items-center justify-center overflow-hidden'
   }, [
     // Navigation Header
     e(NavigationHeader, { key: 'navigation' }),
@@ -1284,12 +1284,12 @@ function AuthComponent() {
           e('button', {
             key: 'get-started',
             onClick: () => navigate('signin'),
-            className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold px-12 py-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1'
+            className: 'bg-blue-600 hover:bg-blue-700 text-white font-bold px-12 py-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1'
           }, 'Get Started Now'),
           e('button', {
             key: 'sign-in',
             onClick: () => navigate('signin'),
-            className: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-semibold px-12 py-4 rounded-xl transition-all duration-300'
+            className: 'border-2 border-white/60 text-white hover:bg-white/10 hover:border-white font-semibold px-12 py-4 rounded-xl transition-all duration-300'
           }, 'Sign In')
         ]),
 
