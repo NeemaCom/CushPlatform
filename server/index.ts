@@ -64,44 +64,11 @@ export async function createServer() {
   // Serve other static files from root
   app.use(express.static('.', { index: false }));
 
-  // Root health check endpoint for deployment platforms (always available)
-  // This must be placed BEFORE the SPA catch-all route
+  // Root endpoint - always serve the web application
+  // Health checks should use dedicated endpoints: /health, /api/health, /ready, /live
   app.get('/', (req, res) => {
-    // Return health check ONLY for known health check user agents or explicit health parameter
-    const userAgent = req.headers['user-agent'] || '';
-    const acceptHeader = req.headers['accept'] || '';
-    
-    // More specific health check detection
-    const isHealthCheck = userAgent.includes('GoogleHC') || 
-                         userAgent.includes('kube-probe') ||
-                         userAgent.includes('HealthCheck') ||
-                         userAgent.includes('ELB-HealthChecker') ||
-                         userAgent.includes('Pingdom') ||
-                         userAgent.includes('UptimeRobot') ||
-                         req.query.health === 'check';
-    
-    // Log requests in production for debugging (temporarily)
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Root request:', {
-        userAgent: userAgent.substring(0, 100),
-        accept: acceptHeader.substring(0, 100),
-        isHealthCheck,
-        forwarded: req.headers['x-forwarded-for'] || 'none'
-      });
-    }
-    
-    if (isHealthCheck) {
-      res.status(200).json({ 
-        status: 'healthy',
-        service: 'Cush Platform API',
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-        environment: process.env.NODE_ENV || 'development'
-      });
-    } else {
-      // Serve the SPA for all regular browser requests
-      res.sendFile(path.join(process.cwd(), 'index.html'));
-    }
+    // Always serve the SPA for all requests to root path
+    res.sendFile(path.join(process.cwd(), 'index.html'));
   });
 
   // Handle SPA routing (serve HTML for non-API paths, excluding root which is handled above)
