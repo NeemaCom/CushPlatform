@@ -50,6 +50,11 @@ function NavigationHeader() {
             className: 'text-white/90 hover:text-white font-medium transition-colors'
           }, 'About Us'),
           e('button', {
+            key: 'mentors-link',
+            onClick: () => navigate('mentors'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, 'Find Mentors'),
+          e('button', {
             key: 'contact-link',
             onClick: () => scrollToSection('contact-section'),
             className: 'text-white/90 hover:text-white font-medium transition-colors'
@@ -161,19 +166,18 @@ function HeroSection() {
         key: 'content',
         className: 'text-center max-w-4xl mx-auto'
       }, [
-        // Logo/Brand
+        // Hero Content
         e('div', {
-          key: 'brand',
+          key: 'hero-content',
           className: 'mb-8'
         }, [
           e('div', {
-            key: 'logo',
-            className: 'w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-3xl flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4 shadow-2xl transform hover:scale-105 transition-transform'
-          }, 'C'),
-          e('h1', {
-            key: 'brand-name',
-            className: 'text-2xl font-bold text-white'
-          }, 'CUSH')
+            key: 'hero-badge',
+            className: 'inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-6'
+          }, [
+            e('span', { key: 'dot', className: 'w-2 h-2 bg-green-400 rounded-full mr-2' }),
+            'Trusted by 50,000+ immigrants worldwide'
+          ])
         ]),
         
         // Main headline
@@ -1539,6 +1543,10 @@ function AppRouter() {
   switch (currentRoute) {
     case 'signin':
       return e(SignInPage, { key: 'signin' });
+    case 'about':
+      return e(AboutUsPage, { key: 'about' });
+    case 'mentors':
+      return e(MentorBookingPage, { key: 'mentors' });
     case 'home':
     default:
       return e(Homepage, { key: 'homepage' });
@@ -2829,6 +2837,761 @@ function UserAccountPage({ user, onBack }) {
               disabled: loading,
               className: 'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 disabled:from-gray-400 disabled:to-gray-500 text-white font-semibold px-8 py-3 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:transform-none'
             }, loading ? 'Changing Password...' : 'Change Password')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// About Us Page Component
+function AboutUsPage() {
+  return e('div', { className: 'min-h-screen bg-white' }, [
+    // Navigation Header
+    e('header', {
+      key: 'nav',
+      className: 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 shadow-lg'
+    }, [
+      e('div', {
+        key: 'nav-container',
+        className: 'container mx-auto px-6 py-4'
+      }, [
+        e('div', {
+          key: 'nav-content',
+          className: 'flex items-center justify-between'
+        }, [
+          e('button', {
+            key: 'logo',
+            onClick: () => navigate('home'),
+            className: 'flex items-center hover:opacity-80 transition-opacity'
+          }, [
+            e('img', {
+              key: 'logo-image',
+              src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+              alt: 'Cush Logo',
+              className: 'h-8 w-auto'
+            })
+          ]),
+          e('button', {
+            key: 'back-home',
+            onClick: () => navigate('home'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, '← Back to Home')
+        ])
+      ])
+    ]),
+
+    // Hero Section
+    e('section', {
+      key: 'hero',
+      className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-20'
+    }, [
+      e('div', {
+        key: 'hero-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'hero-content',
+          className: 'max-w-4xl mx-auto text-center'
+        }, [
+          e('h1', {
+            key: 'title',
+            className: 'text-5xl md:text-6xl font-bold mb-6'
+          }, 'About Us'),
+          e('p', {
+            key: 'subtitle',
+            className: 'text-xl md:text-2xl text-blue-100 leading-relaxed'
+          }, 'Empowering global immigration journeys through innovation, expertise, and unwavering support.')
+        ])
+      ])
+    ]),
+
+    // Our Story Section
+    e('section', {
+      key: 'story',
+      className: 'py-20 bg-white'
+    }, [
+      e('div', {
+        key: 'story-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'story-content',
+          className: 'max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-center'
+        }, [
+          e('div', { key: 'story-text' }, [
+            e('h2', {
+              key: 'story-title',
+              className: 'text-4xl font-bold text-gray-900 mb-6'
+            }, 'Our Story'),
+            e('p', {
+              key: 'story-p1',
+              className: 'text-lg text-gray-600 mb-6 leading-relaxed'
+            }, 'Founded with a vision to democratize global mobility, Cush emerged from the personal experiences of immigrants who understood the challenges of navigating complex immigration systems.'),
+            e('p', {
+              key: 'story-p2',
+              className: 'text-lg text-gray-600 mb-6 leading-relaxed'
+            }, 'What started as a solution to help one family has grown into a comprehensive platform serving thousands of immigrants worldwide, providing the tools, resources, and support needed to turn immigration dreams into reality.'),
+            e('div', {
+              key: 'story-stats',
+              className: 'grid grid-cols-2 gap-6 mt-8'
+            }, [
+              e('div', { key: 'stat1', className: 'text-center' }, [
+                e('div', {
+                  key: 'number1',
+                  className: 'text-3xl font-bold text-blue-600'
+                }, '50,000+'),
+                e('div', {
+                  key: 'label1',
+                  className: 'text-gray-600 font-medium'
+                }, 'Immigrants Served')
+              ]),
+              e('div', { key: 'stat2', className: 'text-center' }, [
+                e('div', {
+                  key: 'number2',
+                  className: 'text-3xl font-bold text-blue-600'
+                }, '95%'),
+                e('div', {
+                  key: 'label2',
+                  className: 'text-gray-600 font-medium'
+                }, 'Success Rate')
+              ])
+            ])
+          ]),
+          e('div', {
+            key: 'story-image',
+            className: 'relative'
+          }, [
+            e('img', {
+              key: 'about-image',
+              src: '/attached_assets/about us_1751499874141.jpg',
+              alt: 'About Us',
+              className: 'w-full h-96 object-cover rounded-2xl shadow-2xl'
+            }),
+            e('div', {
+              key: 'image-overlay',
+              className: 'absolute inset-0 bg-gradient-to-t from-blue-600/20 to-transparent rounded-2xl'
+            })
+          ])
+        ])
+      ])
+    ]),
+
+    // Our Mission Section
+    e('section', {
+      key: 'mission',
+      className: 'py-20 bg-gradient-to-br from-blue-50 to-indigo-50'
+    }, [
+      e('div', {
+        key: 'mission-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'mission-content',
+          className: 'max-w-4xl mx-auto text-center'
+        }, [
+          e('h2', {
+            key: 'mission-title',
+            className: 'text-4xl font-bold text-gray-900 mb-8'
+          }, 'Our Mission'),
+          e('p', {
+            key: 'mission-text',
+            className: 'text-xl text-gray-600 leading-relaxed mb-12'
+          }, 'To transform the immigration experience by providing innovative technology, expert guidance, and comprehensive support that empowers individuals and families to achieve their global mobility goals with confidence and success.'),
+          
+          // Mission pillars
+          e('div', {
+            key: 'pillars',
+            className: 'grid grid-cols-1 md:grid-cols-3 gap-8'
+          }, [
+            e('div', {
+              key: 'pillar1',
+              className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', {
+                key: 'icon1',
+                className: 'w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4'
+              }, '🎯'),
+              e('h3', {
+                key: 'pillar1-title',
+                className: 'text-xl font-bold text-gray-900 mb-3'
+              }, 'Innovation'),
+              e('p', {
+                key: 'pillar1-text',
+                className: 'text-gray-600'
+              }, 'Leveraging cutting-edge technology to simplify complex immigration processes.')
+            ]),
+            e('div', {
+              key: 'pillar2',
+              className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', {
+                key: 'icon2',
+                className: 'w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4'
+              }, '🤝'),
+              e('h3', {
+                key: 'pillar2-title',
+                className: 'text-xl font-bold text-gray-900 mb-3'
+              }, 'Support'),
+              e('p', {
+                key: 'pillar2-text',
+                className: 'text-gray-600'
+              }, 'Providing personalized guidance every step of your immigration journey.')
+            ]),
+            e('div', {
+              key: 'pillar3',
+              className: 'bg-white rounded-xl p-8 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', {
+                key: 'icon3',
+                className: 'w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4'
+              }, '✨'),
+              e('h3', {
+                key: 'pillar3-title',
+                className: 'text-xl font-bold text-gray-900 mb-3'
+              }, 'Excellence'),
+              e('p', {
+                key: 'pillar3-text',
+                className: 'text-gray-600'
+              }, 'Delivering exceptional results through expertise and dedication.')
+            ])
+          ])
+        ])
+      ])
+    ]),
+
+    // Meet Our Team Section
+    e('section', {
+      key: 'team',
+      className: 'py-20 bg-white'
+    }, [
+      e('div', {
+        key: 'team-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'team-header',
+          className: 'text-center mb-16'
+        }, [
+          e('h2', {
+            key: 'team-title',
+            className: 'text-4xl font-bold text-gray-900 mb-4'
+          }, 'Meet Our Team'),
+          e('p', {
+            key: 'team-subtitle',
+            className: 'text-xl text-gray-600'
+          }, 'Dedicated professionals committed to your success')
+        ]),
+        
+        e('div', {
+          key: 'team-grid',
+          className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8'
+        }, [
+          // Team member 1
+          e('div', {
+            key: 'member1',
+            className: 'text-center group'
+          }, [
+            e('div', {
+              key: 'member1-image',
+              className: 'relative mb-4'
+            }, [
+              e('img', {
+                key: 'member1-photo',
+                src: '/attached_assets/guy smiling2_1751497479944.jpg',
+                alt: 'Team Member',
+                className: 'w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-xl transition-shadow'
+              }),
+              e('div', {
+                key: 'member1-overlay',
+                className: 'absolute inset-0 bg-blue-600/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity'
+              })
+            ]),
+            e('h3', {
+              key: 'member1-name',
+              className: 'text-xl font-bold text-gray-900 mb-1'
+            }, 'Michael Chen'),
+            e('p', {
+              key: 'member1-role',
+              className: 'text-blue-600 font-medium mb-2'
+            }, 'CEO & Founder'),
+            e('p', {
+              key: 'member1-bio',
+              className: 'text-sm text-gray-600'
+            }, 'Immigration law expert with 15+ years experience')
+          ]),
+
+          // Team member 2
+          e('div', {
+            key: 'member2',
+            className: 'text-center group'
+          }, [
+            e('div', {
+              key: 'member2-image',
+              className: 'relative mb-4'
+            }, [
+              e('img', {
+                key: 'member2-photo',
+                src: '/attached_assets/lady smiling_1751497479945.jpg',
+                alt: 'Team Member',
+                className: 'w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-xl transition-shadow'
+              }),
+              e('div', {
+                key: 'member2-overlay',
+                className: 'absolute inset-0 bg-blue-600/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity'
+              })
+            ]),
+            e('h3', {
+              key: 'member2-name',
+              className: 'text-xl font-bold text-gray-900 mb-1'
+            }, 'Sarah Williams'),
+            e('p', {
+              key: 'member2-role',
+              className: 'text-blue-600 font-medium mb-2'
+            }, 'Head of Technology'),
+            e('p', {
+              key: 'member2-bio',
+              className: 'text-sm text-gray-600'
+            }, 'AI and platform development specialist')
+          ]),
+
+          // Team member 3
+          e('div', {
+            key: 'member3',
+            className: 'text-center group'
+          }, [
+            e('div', {
+              key: 'member3-image',
+              className: 'relative mb-4'
+            }, [
+              e('img', {
+                key: 'member3-photo',
+                src: '/attached_assets/test22_1751497479947.jpg',
+                alt: 'Team Member',
+                className: 'w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-xl transition-shadow'
+              }),
+              e('div', {
+                key: 'member3-overlay',
+                className: 'absolute inset-0 bg-blue-600/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity'
+              })
+            ]),
+            e('h3', {
+              key: 'member3-name',
+              className: 'text-xl font-bold text-gray-900 mb-1'
+            }, 'David Rodriguez'),
+            e('p', {
+              key: 'member3-role',
+              className: 'text-blue-600 font-medium mb-2'
+            }, 'Immigration Consultant'),
+            e('p', {
+              key: 'member3-bio',
+              className: 'text-sm text-gray-600'
+            }, 'Specializes in skilled worker programs')
+          ]),
+
+          // Team member 4
+          e('div', {
+            key: 'member4',
+            className: 'text-center group'
+          }, [
+            e('div', {
+              key: 'member4-image',
+              className: 'relative mb-4'
+            }, [
+              e('img', {
+                key: 'member4-photo',
+                src: '/attached_assets/test23_1751497479946.jpg',
+                alt: 'Team Member',
+                className: 'w-32 h-32 rounded-full mx-auto object-cover shadow-lg group-hover:shadow-xl transition-shadow'
+              }),
+              e('div', {
+                key: 'member4-overlay',
+                className: 'absolute inset-0 bg-blue-600/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity'
+              })
+            ]),
+            e('h3', {
+              key: 'member4-name',
+              className: 'text-xl font-bold text-gray-900 mb-1'
+            }, 'Lisa Thompson'),
+            e('p', {
+              key: 'member4-role',
+              className: 'text-blue-600 font-medium mb-2'
+            }, 'Customer Success Manager'),
+            e('p', {
+              key: 'member4-bio',
+              className: 'text-sm text-gray-600'
+            }, 'Ensures exceptional client experiences')
+          ])
+        ])
+      ])
+    ]),
+
+    // CTA Section
+    e('section', {
+      key: 'cta',
+      className: 'py-20 bg-gradient-to-r from-blue-600 to-blue-800 text-white'
+    }, [
+      e('div', {
+        key: 'cta-container',
+        className: 'container mx-auto px-6 text-center'
+      }, [
+        e('h2', {
+          key: 'cta-title',
+          className: 'text-4xl font-bold mb-6'
+        }, 'Ready to Start Your Journey?'),
+        e('p', {
+          key: 'cta-text',
+          className: 'text-xl text-blue-100 mb-8 max-w-2xl mx-auto'
+        }, 'Join thousands of successful immigrants who have trusted Cush to guide their path to a new life.'),
+        e('div', {
+          key: 'cta-buttons',
+          className: 'flex flex-col sm:flex-row gap-4 justify-center'
+        }, [
+          e('button', {
+            key: 'get-started',
+            onClick: () => navigate('signin'),
+            className: 'bg-white text-blue-600 hover:bg-gray-100 font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl'
+          }, 'Get Started Today'),
+          e('button', {
+            key: 'find-mentors',
+            onClick: () => navigate('mentors'),
+            className: 'border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl transition-all duration-300'
+          }, 'Find a Mentor')
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Mentor Booking Page Component
+function MentorBookingPage() {
+  const [selectedSpecialty, setSelectedSpecialty] = useState('all');
+  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+
+  const mentors = [
+    {
+      id: 1,
+      name: 'Dr. Emily Carter',
+      specialty: 'Canada Immigration',
+      rating: 4.9,
+      reviews: 127,
+      hourlyRate: '$150',
+      experience: '12 years',
+      languages: ['English', 'French'],
+      bio: 'Specialized in Express Entry, Provincial Nominee Programs, and skilled worker visas for Canada.',
+      image: '/attached_assets/lady smiling_1751497479945.jpg',
+      availableSlots: ['Jan 15, 2:00 PM', 'Jan 16, 10:00 AM', 'Jan 17, 3:00 PM']
+    },
+    {
+      id: 2,
+      name: 'Michael Chen',
+      specialty: 'Australia Immigration',
+      rating: 4.8,
+      reviews: 89,
+      hourlyRate: '$140',
+      experience: '10 years',
+      languages: ['English', 'Mandarin'],
+      bio: 'Expert in Australian skilled migration, business visas, and family reunion programs.',
+      image: '/attached_assets/guy smiling2_1751497479944.jpg',
+      availableSlots: ['Jan 15, 1:00 PM', 'Jan 16, 9:00 AM', 'Jan 18, 2:00 PM']
+    },
+    {
+      id: 3,
+      name: 'Sarah Johnson',
+      specialty: 'UK Immigration',
+      rating: 4.9,
+      reviews: 156,
+      hourlyRate: '$160',
+      experience: '15 years',
+      languages: ['English', 'Spanish'],
+      bio: 'Specializes in UK work visas, investor visas, and British citizenship applications.',
+      image: '/attached_assets/test23_1751497479946.jpg',
+      availableSlots: ['Jan 15, 4:00 PM', 'Jan 17, 11:00 AM', 'Jan 18, 1:00 PM']
+    },
+    {
+      id: 4,
+      name: 'David Rodriguez',
+      specialty: 'US Immigration',
+      rating: 4.7,
+      reviews: 203,
+      hourlyRate: '$170',
+      experience: '18 years',
+      languages: ['English', 'Spanish'],
+      bio: 'Expert in H-1B, EB-5, family-based immigration, and naturalization processes.',
+      image: '/attached_assets/test22_1751497479947.jpg',
+      availableSlots: ['Jan 16, 3:00 PM', 'Jan 17, 9:00 AM', 'Jan 19, 2:00 PM']
+    }
+  ];
+
+  const specialties = ['all', 'Canada Immigration', 'Australia Immigration', 'UK Immigration', 'US Immigration'];
+
+  const filteredMentors = selectedSpecialty === 'all' 
+    ? mentors 
+    : mentors.filter(mentor => mentor.specialty === selectedSpecialty);
+
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Navigation Header
+    e('header', {
+      key: 'nav',
+      className: 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700 shadow-lg'
+    }, [
+      e('div', {
+        key: 'nav-container',
+        className: 'container mx-auto px-6 py-4'
+      }, [
+        e('div', {
+          key: 'nav-content',
+          className: 'flex items-center justify-between'
+        }, [
+          e('button', {
+            key: 'logo',
+            onClick: () => navigate('home'),
+            className: 'flex items-center hover:opacity-80 transition-opacity'
+          }, [
+            e('img', {
+              key: 'logo-image',
+              src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+              alt: 'Cush Logo',
+              className: 'h-8 w-auto'
+            })
+          ]),
+          e('button', {
+            key: 'back-home',
+            onClick: () => navigate('home'),
+            className: 'text-white/90 hover:text-white font-medium transition-colors'
+          }, '← Back to Home')
+        ])
+      ])
+    ]),
+
+    // Hero Section
+    e('section', {
+      key: 'hero',
+      className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800 text-white py-16'
+    }, [
+      e('div', {
+        key: 'hero-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'hero-content',
+          className: 'max-w-4xl mx-auto text-center'
+        }, [
+          e('h1', {
+            key: 'title',
+            className: 'text-4xl md:text-5xl font-bold mb-6'
+          }, 'Expert Immigration Mentors'),
+          e('p', {
+            key: 'subtitle',
+            className: 'text-xl text-blue-100 leading-relaxed'
+          }, 'Connect with certified immigration experts for personalized guidance on your journey.')
+        ])
+      ])
+    ]),
+
+    // Filter Section
+    e('section', {
+      key: 'filters',
+      className: 'py-8 bg-white border-b'
+    }, [
+      e('div', {
+        key: 'filter-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'filter-content',
+          className: 'flex flex-wrap gap-4 justify-center'
+        }, [
+          e('span', {
+            key: 'filter-label',
+            className: 'text-gray-700 font-medium my-2'
+          }, 'Filter by specialty:'),
+          ...specialties.map(specialty =>
+            e('button', {
+              key: specialty,
+              onClick: () => setSelectedSpecialty(specialty),
+              className: `px-4 py-2 rounded-full font-medium transition-all ${
+                selectedSpecialty === specialty
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`
+            }, specialty === 'all' ? 'All Specialties' : specialty)
+          )
+        ])
+      ])
+    ]),
+
+    // Mentors Grid
+    e('section', {
+      key: 'mentors',
+      className: 'py-12'
+    }, [
+      e('div', {
+        key: 'mentors-container',
+        className: 'container mx-auto px-6'
+      }, [
+        e('div', {
+          key: 'mentors-grid',
+          className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8'
+        }, filteredMentors.map(mentor =>
+          e('div', {
+            key: mentor.id,
+            className: 'bg-white rounded-xl shadow-lg hover:shadow-xl transition-shadow p-6'
+          }, [
+            e('div', {
+              key: 'mentor-header',
+              className: 'text-center mb-6'
+            }, [
+              e('img', {
+                key: 'mentor-image',
+                src: mentor.image,
+                alt: mentor.name,
+                className: 'w-24 h-24 rounded-full mx-auto mb-4 object-cover'
+              }),
+              e('h3', {
+                key: 'mentor-name',
+                className: 'text-xl font-bold text-gray-900 mb-1'
+              }, mentor.name),
+              e('p', {
+                key: 'mentor-specialty',
+                className: 'text-blue-600 font-medium mb-2'
+              }, mentor.specialty),
+              e('div', {
+                key: 'mentor-rating',
+                className: 'flex items-center justify-center gap-2 mb-3'
+              }, [
+                e('span', { key: 'stars', className: 'text-yellow-400' }, '★★★★★'),
+                e('span', { key: 'rating', className: 'text-gray-600 text-sm' }, `${mentor.rating} (${mentor.reviews} reviews)`)
+              ])
+            ]),
+
+            e('div', {
+              key: 'mentor-details',
+              className: 'space-y-3 mb-6'
+            }, [
+              e('div', {
+                key: 'experience',
+                className: 'flex justify-between'
+              }, [
+                e('span', { key: 'exp-label', className: 'text-gray-600' }, 'Experience:'),
+                e('span', { key: 'exp-value', className: 'font-medium' }, mentor.experience)
+              ]),
+              e('div', {
+                key: 'rate',
+                className: 'flex justify-between'
+              }, [
+                e('span', { key: 'rate-label', className: 'text-gray-600' }, 'Hourly Rate:'),
+                e('span', { key: 'rate-value', className: 'font-medium text-green-600' }, mentor.hourlyRate)
+              ]),
+              e('div', {
+                key: 'languages',
+                className: 'flex justify-between'
+              }, [
+                e('span', { key: 'lang-label', className: 'text-gray-600' }, 'Languages:'),
+                e('span', { key: 'lang-value', className: 'font-medium' }, mentor.languages.join(', '))
+              ])
+            ]),
+
+            e('p', {
+              key: 'mentor-bio',
+              className: 'text-gray-600 text-sm mb-6 leading-relaxed'
+            }, mentor.bio),
+
+            e('button', {
+              key: 'book-button',
+              onClick: () => {
+                setSelectedMentor(mentor);
+                setShowBookingForm(true);
+              },
+              className: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors'
+            }, 'Book Consultation')
+          ])
+        ))
+      ])
+    ]),
+
+    // Booking Modal
+    showBookingForm && selectedMentor && e('div', {
+      key: 'booking-modal',
+      className: 'fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'
+    }, [
+      e('div', {
+        key: 'modal-content',
+        className: 'bg-white rounded-xl max-w-md w-full p-6'
+      }, [
+        e('div', {
+          key: 'modal-header',
+          className: 'flex justify-between items-center mb-6'
+        }, [
+          e('h3', {
+            key: 'modal-title',
+            className: 'text-xl font-bold text-gray-900'
+          }, `Book with ${selectedMentor.name}`),
+          e('button', {
+            key: 'close-button',
+            onClick: () => setShowBookingForm(false),
+            className: 'text-gray-400 hover:text-gray-600'
+          }, '×')
+        ]),
+
+        e('img', {
+          key: 'modal-image',
+          src: '/attached_assets/clarity session_1751499874142.jpg',
+          alt: 'Consultation booking',
+          className: 'w-full h-32 object-cover rounded-lg mb-4'
+        }),
+
+        e('div', {
+          key: 'booking-form',
+          className: 'space-y-4'
+        }, [
+          e('div', { key: 'date-selection' }, [
+            e('label', {
+              key: 'date-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Select Date & Time:'),
+            e('select', {
+              key: 'date-select',
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            }, [
+              e('option', { key: 'placeholder', value: '' }, 'Choose available slot'),
+              ...selectedMentor.availableSlots.map((slot, index) =>
+                e('option', { key: index, value: slot }, slot)
+              )
+            ])
+          ]),
+
+          e('div', { key: 'topic-selection' }, [
+            e('label', {
+              key: 'topic-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Consultation Topic:'),
+            e('textarea', {
+              key: 'topic-input',
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+              rows: 3,
+              placeholder: 'Briefly describe what you\'d like to discuss...'
+            })
+          ]),
+
+          e('div', {
+            key: 'booking-actions',
+            className: 'flex gap-3 pt-4'
+          }, [
+            e('button', {
+              key: 'cancel',
+              onClick: () => setShowBookingForm(false),
+              className: 'flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors'
+            }, 'Cancel'),
+            e('button', {
+              key: 'confirm',
+              onClick: () => {
+                setShowBookingForm(false);
+                alert('Consultation booked successfully! You will receive a confirmation email shortly.');
+              },
+              className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors'
+            }, 'Book Session')
           ])
         ])
       ])
