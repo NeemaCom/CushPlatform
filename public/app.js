@@ -1378,26 +1378,53 @@ function Dashboard({ user }) {
             }, 'Dashboard')
           ]),
           
-          e('div', { key: 'user-section', className: 'flex items-center gap-4' }, [
-            e('span', { 
-              key: 'welcome',
-              className: 'text-gray-600'
-            }, `Welcome, ${user?.firstName || 'User'}`),
-            user?.role === 'admin' && e('button', {
-              key: 'admin',
-              onClick: () => setCurrentView('admin'),
-              className: 'bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg transition-colors'
-            }, 'Admin Panel'),
-            e('button', {
-              key: 'account',
-              onClick: () => setCurrentView('account'),
-              className: 'bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors'
-            }, 'Account'),
-            e('button', {
-              key: 'logout',
-              onClick: handleLogout,
-              className: 'bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors'
-            }, 'Sign Out')
+          e('div', { key: 'navigation', className: 'flex items-center gap-6' }, [
+            // Navigation Menu
+            e('nav', { key: 'nav-menu', className: 'flex items-center gap-4' }, [
+              e('button', {
+                key: 'dashboard-nav',
+                onClick: () => setCurrentView('dashboard'),
+                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
+              }, 'Dashboard'),
+              e('button', {
+                key: 'community-nav',
+                onClick: () => setCurrentView('community'),
+                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'community' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
+              }, 'Community Hub'),
+              e('button', {
+                key: 'loans-nav',
+                onClick: () => setCurrentView('loans'),
+                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'loans' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
+              }, 'Loans'),
+              e('button', {
+                key: 'imisi-nav',
+                onClick: () => setCurrentView('imisi'),
+                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'imisi' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
+              }, 'Imisi AI')
+            ]),
+            
+            // User Section
+            e('div', { key: 'user-section', className: 'flex items-center gap-4 border-l border-gray-200 pl-6' }, [
+              e('span', { 
+                key: 'welcome',
+                className: 'text-gray-600 text-sm'
+              }, `Welcome, ${user?.firstName || 'User'}`),
+              user?.role === 'admin' && e('button', {
+                key: 'admin',
+                onClick: () => setCurrentView('admin'),
+                className: 'bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
+              }, 'Admin Panel'),
+              e('button', {
+                key: 'account',
+                onClick: () => setCurrentView('account'),
+                className: 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
+              }, 'Account'),
+              e('button', {
+                key: 'logout',
+                onClick: handleLogout,
+                className: 'bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
+              }, 'Sign Out')
+            ])
           ])
         ])
       ]),
@@ -1410,6 +1437,7 @@ function Dashboard({ user }) {
         // Render different views based on currentView
         currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
+        currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         e('div', { key: 'dashboard-content' }, [
           // Welcome Section
           e('div', {
@@ -1446,7 +1474,12 @@ function Dashboard({ user }) {
           ].map((feature, index) =>
             e('div', {
               key: `feature-${index}`,
-              className: 'bg-white rounded-xl p-6 shadow-lg border'
+              className: 'bg-white rounded-xl p-6 shadow-lg border cursor-pointer hover:shadow-xl transition-shadow',
+              onClick: () => {
+                if (feature.title === 'Community Hub') {
+                  setCurrentView('community');
+                }
+              }
             }, [
               e('div', {
                 key: 'icon',
@@ -1459,6 +1492,1048 @@ function Dashboard({ user }) {
         ])
       ])
     ])
+  ]);
+}
+
+// Community Hub Component
+function CommunityHub() {
+  const [activeTab, setActiveTab] = useState('insights');
+  const [insights, setInsights] = useState([]);
+  const [mentors, setMentors] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [selectedMentor, setSelectedMentor] = useState(null);
+  const [showBookingForm, setShowBookingForm] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [selectedInsight, setSelectedInsight] = useState(null);
+
+  // Sample data for insights until backend is connected
+  const sampleInsights = [
+    {
+      id: 1,
+      title: "Complete Guide to Canadian Express Entry",
+      excerpt: "Everything you need to know about Canada's Express Entry immigration system, including CRS scores, documentation, and timeline.",
+      category: "Immigration",
+      readTime: 12,
+      author: "Sarah Chen",
+      authorRole: "Immigration Consultant",
+      publishedAt: "2025-01-15",
+      featuredImage: "/attached_assets/canada-express-entry.jpg",
+      tags: ["Canada", "Express Entry", "Immigration"],
+      content: `
+# Complete Guide to Canadian Express Entry
+
+The Express Entry system is Canada's primary immigration pathway for skilled workers. This comprehensive guide covers everything you need to know.
+
+## Overview
+Express Entry manages applications for three federal economic immigration programs:
+- Federal Skilled Worker Program (FSWP)
+- Canadian Experience Class (CEC)  
+- Federal Skilled Trades Program (FSTP)
+
+## Comprehensive Requirement Score (CRS)
+The CRS is a points-based system used to assess and rank candidates. Maximum points: 1,200
+
+### Core Factors (Maximum 600 points)
+- Age (up to 110 points)
+- Education (up to 150 points)
+- Official language proficiency (up to 160 points)
+- Second official language (up to 30 points)
+- Canadian work experience (up to 80 points)
+- Arranged employment (up to 200 points)
+
+### Additional Factors (Maximum 600 points)
+- Provincial nomination (600 points)
+- French language skills (up to 50 points)
+- Canadian education credential (up to 30 points)
+- Arranged employment (up to 200 points)
+
+## Step-by-Step Application Process
+
+### 1. Prepare Your Documents
+- Language test results (IELTS, CELPIP, TEF, TCF)
+- Educational Credential Assessment (ECA)
+- Work experience letters
+- Passport and travel documents
+- Police certificates
+- Medical exams
+
+### 2. Create Your Express Entry Profile
+- Complete online profile
+- Receive CRS score
+- Enter Express Entry pool
+
+### 3. Improve Your CRS Score
+- Retake language tests for higher scores
+- Gain additional work experience
+- Obtain Provincial Nominee Program (PNP) nomination
+- Learn French as second official language
+- Get Canadian job offer with LMIA
+
+### 4. Receive Invitation to Apply (ITA)
+- ITAs issued during regular draws
+- Usually every 2 weeks
+- 60 days to submit complete application
+
+### 5. Submit Complete Application
+- Upload all required documents
+- Pay processing fees ($1,325 CAD for principal applicant)
+- Submit within 60-day deadline
+
+## Timeline and Processing
+- Express Entry profile: Immediate
+- Wait for ITA: Varies by CRS score and draw frequency
+- Application processing: 6 months after submission
+- Total timeline: 6-12 months typically
+
+## Tips for Success
+1. **Language proficiency**: Aim for CLB 9+ in all four abilities
+2. **Education**: Get your foreign credentials assessed early
+3. **Work experience**: Ensure NOC codes match your duties
+4. **Provincial nomination**: Research PNP programs for additional 600 points
+5. **Documentation**: Start gathering documents early
+
+## Common Mistakes to Avoid
+- Incomplete work experience descriptions
+- Insufficient language test scores
+- Missing police certificates from all countries
+- Incorrect NOC code selection
+- Expired documents at time of submission
+
+## Recent Updates (2025)
+- New category-based selection starting
+- Increased focus on French-speaking candidates
+- Enhanced provincial nomination allocations
+- Streamlined credential recognition process
+
+## Next Steps
+1. Take official language test
+2. Get Educational Credential Assessment
+3. Create Express Entry profile
+4. Research Provincial Nominee Programs
+5. Prepare supporting documents
+
+For personalized guidance, book a consultation with our certified immigration consultants.
+      `
+    },
+    {
+      id: 2,
+      title: "Australian Skilled Migration: Points Test Strategy",
+      excerpt: "Master the Australian Points Test system and increase your chances of receiving an invitation for skilled migration.",
+      category: "Immigration",
+      readTime: 10,
+      author: "Michael Thompson",
+      authorRole: "Migration Agent",
+      publishedAt: "2025-01-10",
+      featuredImage: "/attached_assets/australia-skilled-migration.jpg",
+      tags: ["Australia", "Skilled Migration", "Points Test"],
+      content: `
+# Australian Skilled Migration: Points Test Strategy
+
+Australia's skilled migration program uses a points-based system to select candidates. This guide helps you maximize your points.
+
+## Current Points Test Overview
+Minimum requirement: 65 points
+Competitive scores: 80+ points for most occupations
+
+### Age Points
+- 18-24 years: 25 points
+- 25-32 years: 30 points  
+- 33-39 years: 25 points
+- 40-44 years: 15 points
+- 45-49 years: 0 points
+
+### English Language Points
+- Competent English (IELTS 6.0): 0 points
+- Proficient English (IELTS 7.0): 10 points
+- Superior English (IELTS 8.0): 20 points
+
+### Educational Qualifications
+- Doctorate: 20 points
+- Bachelor or Masters: 15 points
+- Diploma or trade qualification: 10 points
+
+### Work Experience (Outside Australia)
+- 8+ years: 15 points
+- 5-7 years: 10 points
+- 3-4 years: 5 points
+
+### Work Experience (In Australia)
+- 8+ years: 20 points
+- 5-7 years: 15 points
+- 3-4 years: 10 points
+- 1-2 years: 5 points
+
+## Strategies to Increase Points
+
+### 1. Improve English Scores
+- Each band increase can add 10 points
+- Consider multiple test attempts
+- PTE Academic often easier than IELTS
+
+### 2. Gain Australian Work Experience
+- Even 1 year adds 5 points
+- Consider working holiday visa
+- Higher skilled positions preferred
+
+### 3. Study in Australia
+- Australian qualification: 5 points
+- Regional study: additional 5 points
+- STEM qualification: additional 5 points
+
+### 4. Professional Year Programs
+- Accounting, Engineering, IT: 5 points
+- 44-week structured program
+- Combines study and work experience
+
+### 5. State/Territory Nomination
+- Additional 5 points for subclass 190
+- Pathway for lower-scoring candidates
+- Research state-specific requirements
+
+### 6. Partner Skills Assessment
+- Partner has skilled occupation: 10 points
+- Partner has competent English: 5 points
+- Alternative: partner English study points
+
+## Application Process
+
+### Step 1: Skills Assessment
+- Apply to relevant assessing authority
+- Usually takes 6-12 weeks
+- Required before EOI submission
+
+### Step 2: Submit EOI
+- Create SkillSelect profile
+- Updated monthly with draws
+- Valid for 2 years
+
+### Step 3: Receive Invitation
+- Based on points ranking
+- 60 days to submit full application
+- Cannot increase points after invitation
+
+### Step 4: Lodge Visa Application
+- Upload all documents
+- Health and character checks
+- Processing time: 5-9 months
+
+## Recent Changes (2025)
+- New occupation lists updated
+- Increased focus on critical skills
+- Enhanced regional migration incentives
+- Streamlined assessment processes
+
+## Top Tips
+1. **Plan early**: Skills assessment takes time
+2. **Monitor occupation ceilings**: Popular occupations fill quickly
+3. **Consider regional options**: Lower competition, additional points
+4. **Keep improving**: Continue gaining experience and qualifications
+5. **Professional help**: Consider migration agent for complex cases
+
+For detailed occupation-specific advice, consult with our registered migration agents.
+      `
+    },
+    {
+      id: 3,
+      title: "UK Global Talent Visa: Complete Application Guide",
+      excerpt: "Step-by-step guide to applying for the UK Global Talent visa for exceptional talent in tech, arts, sciences, and research.",
+      category: "Immigration",
+      readTime: 8,
+      author: "Emma Williams",
+      authorRole: "UK Immigration Specialist",
+      publishedAt: "2025-01-08",
+      featuredImage: "/attached_assets/uk-global-talent.jpg",
+      tags: ["UK", "Global Talent", "Tech Visa"],
+      content: `
+# UK Global Talent Visa: Complete Application Guide
+
+The Global Talent visa is for exceptional talent or promise in specific fields. This guide covers the complete application process.
+
+## Eligible Fields
+- Digital technology
+- Arts and culture
+- Sciences
+- Engineering
+- Humanities
+- Medicine
+- Social sciences
+
+## Two Application Stages
+
+### Stage 1: Endorsement
+Must be endorsed by one of the approved endorsing bodies:
+
+**Tech Nation** (Digital Technology)
+- Exceptional talent or exceptional promise
+- Evidence of recognition and impact
+- Technical and business skills
+
+**Royal Society** (Sciences)
+- Fellowship or equivalent recognition
+- Outstanding research contributions
+- International recognition
+
+**British Academy** (Humanities and Social Sciences)
+- Leading academic or practitioner
+- Significant publications or contributions
+- International reputation
+
+**Arts Council England** (Arts and Culture)
+- Exceptional talent in arts/culture
+- Recognition by peers
+- Career progression evidence
+
+### Stage 2: Visa Application
+After endorsement approval:
+- Complete visa application
+- Provide biometric information
+- Pay visa fees
+- Await decision
+
+## Application Requirements
+
+### Mandatory Criteria (All Applicants)
+1. Evidence of exceptional talent/promise
+2. Recognition by endorsing body
+3. English language requirement
+4. Financial requirements (£945 maintenance funds)
+
+### Additional Evidence by Field
+
+**Digital Technology**
+- Product leadership evidence
+- Technical expertise demonstration
+- Business/commercial success
+- Innovation and impact examples
+
+**Sciences**
+- Research publications
+- Citations and impact factor
+- Grant funding secured
+- International collaborations
+
+**Arts and Culture**
+- Portfolio of work
+- Awards and recognition
+- Media coverage
+- Career progression
+
+## Documents Checklist
+
+### Personal Documents
+- Valid passport
+- Passport-style photographs
+- English language certificate (if required)
+- Bank statements (maintenance funds)
+
+### Professional Documents
+- CV/resume
+- Letters of recommendation (3-4)
+- Evidence of achievements
+- Portfolio of work
+- Media coverage
+- Academic qualifications
+
+### Supporting Evidence
+- Awards and honors
+- Speaking engagements
+- Board positions
+- Mentoring activities
+- Salary/contract evidence
+
+## Application Timeline
+
+### Endorsement Stage
+- Application preparation: 2-4 weeks
+- Submission to review: 8-10 weeks
+- Additional information requests: 2-4 weeks
+- Total endorsement time: 3-4 months
+
+### Visa Stage
+- Application submission: 1 week
+- Processing time: 3 weeks (standard)
+- Priority service: 1 week (additional fee)
+- Super priority: 1 working day (additional fee)
+
+## Fee Structure
+
+### Endorsement Fees
+- Exceptional talent: £456
+- Exceptional promise: £456
+
+### Visa Fees
+- 3 years: £623
+- 5 years: £1,220
+- Healthcare surcharge: £624 per year
+
+### Priority Services
+- Priority: £500
+- Super priority: £1,000
+
+## Benefits of Global Talent Visa
+
+### Flexibility
+- No job offer required
+- Can work for any employer
+- Can be self-employed
+- Can change jobs freely
+
+### Path to Settlement
+- Eligible for settlement after:
+  - 3 years (exceptional talent)
+  - 5 years (exceptional promise)
+
+### Family Inclusion
+- Spouse/partner can apply
+- Children under 18 included
+- Dependents can work/study
+
+## Top Application Tips
+
+1. **Start early**: Gather evidence systematically
+2. **Get strong endorsements**: 3-4 detailed letters
+3. **Show impact**: Quantify achievements where possible
+4. **Address all criteria**: Cover every requirement thoroughly
+5. **Professional review**: Consider immigration lawyer review
+
+## Common Rejection Reasons
+- Insufficient evidence of recognition
+- Weak letters of recommendation
+- Missing documentation
+- Failing to meet specific field criteria
+- Poor organization of application
+
+## Recent Updates (2025)
+- Expanded digital technology criteria
+- New fast-track options for some applicants
+- Enhanced support for startups
+- Streamlined renewal process
+
+For personalized assessment and application support, book a consultation with our UK immigration specialists.
+      `
+    },
+    {
+      id: 4,
+      title: "US Green Card Options: Family vs Employment Based",
+      excerpt: "Compare family-based and employment-based green card pathways, including processing times, requirements, and strategies.",
+      category: "Immigration",
+      readTime: 15,
+      author: "Robert Martinez",
+      authorRole: "Immigration Attorney",
+      publishedAt: "2025-01-05",
+      featuredImage: "/attached_assets/us-green-card.jpg",
+      tags: ["USA", "Green Card", "Immigration"],
+      content: `
+# US Green Card Options: Family vs Employment Based
+
+Understanding the different pathways to US permanent residence is crucial for planning your immigration strategy.
+
+## Family-Based Green Cards
+
+### Immediate Relatives (No Waiting)
+**US Citizens can sponsor:**
+- Spouse
+- Unmarried children under 21
+- Parents (if USC is 21+)
+
+**Benefits:**
+- No numerical limits
+- Fastest processing
+- Can adjust status in US
+
+### Family Preference Categories (Limited Annual Numbers)
+
+**F1: Unmarried adult children of US citizens**
+- Current wait: 7-15 years
+- Includes children's spouses and children
+
+**F2A: Spouses and unmarried children under 21 of LPRs**
+- Current wait: 2-3 years
+- 77% of F2 category
+
+**F2B: Unmarried adult children of LPRs**
+- Current wait: 5-8 years
+- 23% of F2 category
+
+**F3: Married children of US citizens**
+- Current wait: 12-20 years
+- Includes spouses and children
+
+**F4: Siblings of US citizens**
+- Current wait: 15-25 years
+- USC must be 21+
+
+## Employment-Based Green Cards
+
+### EB-1: Priority Workers (No Labor Certification)
+**EB-1A: Extraordinary Ability**
+- No job offer required
+- Self-petition allowed
+- Evidence of national/international acclaim
+
+**EB-1B: Outstanding Researchers/Professors**
+- Job offer required
+- 3+ years research/teaching experience
+- International recognition
+
+**EB-1C: Multinational Executives/Managers**
+- Must work for qualifying company
+- 1 year foreign management experience
+- Continue in managerial role
+
+### EB-2: Advanced Degree/Exceptional Ability
+**Requirements:**
+- Advanced degree OR bachelor's + 5 years experience
+- Labor certification usually required
+- Job offer required (except NIW)
+
+**EB-2 NIW: National Interest Waiver**
+- No job offer or labor cert required
+- Self-petition allowed
+- Must benefit US national interest
+
+### EB-3: Skilled Workers/Professionals
+**Categories:**
+- Skilled workers (2+ years experience)
+- Professionals (bachelor's degree)
+- Other workers (unskilled)
+
+**Requirements:**
+- Labor certification required
+- Job offer required
+- Employer sponsorship
+
+### EB-4: Special Immigrants
+**Includes:**
+- Religious workers
+- Afghan/Iraqi translators
+- International broadcasters
+- Panama Canal employees
+
+### EB-5: Investor Visas
+**Requirements:**
+- $800K investment (targeted areas)
+- $1.05M investment (other areas)
+- Create/preserve 10 US jobs
+- At-risk investment
+
+## Processing Times Comparison
+
+### Family-Based
+- Immediate relatives: 8-12 months
+- F1: 7-15 years total
+- F2A: 2-3 years total
+- F2B: 5-8 years total
+- F3: 12-20 years total
+- F4: 15-25 years total
+
+### Employment-Based
+- EB-1: 8-12 months (no wait)
+- EB-2: 1-3 years + priority date wait
+- EB-3: 1-2 years + priority date wait
+- EB-4: Varies by category
+- EB-5: 18-24 months
+
+## Strategy Considerations
+
+### Choose Family-Based If:
+- You have qualifying US citizen/LPR relatives
+- Willing to wait for preference categories
+- Don't meet employment requirements
+- Want certainty of approval path
+
+### Choose Employment-Based If:
+- Have specialized skills/education
+- Employer willing to sponsor
+- Want potentially faster processing
+- Don't have qualifying family
+
+### Dual Strategy
+Many applicants pursue both:
+- File family petition for backup
+- Pursue employment options simultaneously
+- Use whichever becomes available first
+
+## Cost Comparison
+
+### Family-Based Costs
+- I-130 petition: $535
+- I-485 adjustment: $1,225
+- Medical exam: $200-500
+- Attorney fees: $2,000-5,000
+
+### Employment-Based Costs
+- Labor certification: $0-10,000
+- I-140 petition: $700
+- I-485 adjustment: $1,225
+- Attorney fees: $5,000-15,000
+
+## Tips for Success
+
+### Family-Based
+1. **Document relationship thoroughly**
+2. **File as soon as eligible**
+3. **Maintain status while waiting**
+4. **Keep contact information updated**
+5. **Prepare for interview**
+
+### Employment-Based
+1. **Build strong qualifications early**
+2. **Choose employer carefully**
+3. **Consider NIW if qualified**
+4. **Maintain H-1B or other status**
+5. **Plan for long process**
+
+## Recent Changes (2025)
+- Updated processing times
+- New premium processing options
+- Enhanced visa bulletin predictions
+- Streamlined family reunification
+
+## Common Mistakes
+- Filing in wrong category
+- Insufficient documentation
+- Missing deadlines
+- Status violations while waiting
+- Poor attorney selection
+
+For personalized immigration strategy, consult with our experienced immigration attorneys.
+      `
+    }
+  ];
+
+  const sampleMentors = [
+    {
+      id: 1,
+      name: "Sarah Chen",
+      specialty: "Canadian Immigration",
+      experience: "8+ years",
+      rating: 4.9,
+      sessions: 150,
+      languages: ["English", "Mandarin"],
+      hourlyRate: "$120",
+      bio: "Certified Immigration Consultant with expertise in Express Entry, PNP programs, and family sponsorship.",
+      availability: {
+        timezone: "EST",
+        weekdays: [
+          { day: "Monday", startTime: "9:00 AM", endTime: "5:00 PM" },
+          { day: "Wednesday", startTime: "9:00 AM", endTime: "5:00 PM" },
+          { day: "Friday", startTime: "9:00 AM", endTime: "3:00 PM" }
+        ]
+      },
+      profileImage: "/attached_assets/mentor1.jpg",
+      certifications: ["RCIC", "CAPIC Member"],
+      specialties: ["Express Entry", "Provincial Nominee Programs", "Family Sponsorship"]
+    },
+    {
+      id: 2,
+      name: "Michael Thompson",
+      specialty: "Australian Migration",
+      experience: "10+ years",
+      rating: 4.8,
+      sessions: 200,
+      languages: ["English"],
+      hourlyRate: "$150",
+      bio: "Registered Migration Agent specializing in skilled migration, business visas, and points optimization.",
+      availability: {
+        timezone: "AEST",
+        weekdays: [
+          { day: "Tuesday", startTime: "10:00 AM", endTime: "6:00 PM" },
+          { day: "Thursday", startTime: "10:00 AM", endTime: "6:00 PM" },
+          { day: "Saturday", startTime: "9:00 AM", endTime: "1:00 PM" }
+        ]
+      },
+      profileImage: "/attached_assets/mentor2.jpg",
+      certifications: ["MARA Registered", "Migration Institute Member"],
+      specialties: ["Skilled Migration", "Business Visas", "Points Test Strategy"]
+    },
+    {
+      id: 3,
+      name: "Emma Williams",
+      specialty: "UK Immigration",
+      experience: "6+ years",
+      rating: 4.9,
+      sessions: 120,
+      languages: ["English", "French"],
+      hourlyRate: "$130",
+      bio: "UK Immigration Specialist with focus on Global Talent, Skilled Worker, and Student visas.",
+      availability: {
+        timezone: "GMT",
+        weekdays: [
+          { day: "Monday", startTime: "8:00 AM", endTime: "4:00 PM" },
+          { day: "Wednesday", startTime: "8:00 AM", endTime: "4:00 PM" },
+          { day: "Friday", startTime: "8:00 AM", endTime: "2:00 PM" }
+        ]
+      },
+      profileImage: "/attached_assets/mentor3.jpg",
+      certifications: ["OISC Level 3", "Immigration Law Practitioner"],
+      specialties: ["Global Talent Visa", "Skilled Worker Visa", "Student Visas"]
+    }
+  ];
+
+  useEffect(() => {
+    // Load data
+    setInsights(sampleInsights);
+    setMentors(sampleMentors);
+    setLoading(false);
+  }, []);
+
+  const renderInsightCard = (insight) => e('div', {
+    key: `insight-${insight.id}`,
+    className: 'bg-white rounded-xl p-6 shadow-lg border hover:shadow-xl transition-shadow cursor-pointer',
+    onClick: () => setSelectedInsight(insight)
+  }, [
+    e('div', {
+      key: 'insight-header',
+      className: 'flex items-start gap-4 mb-4'
+    }, [
+      e('div', {
+        key: 'insight-content',
+        className: 'flex-1'
+      }, [
+        e('h3', {
+          key: 'title',
+          className: 'text-xl font-bold text-gray-900 mb-2'
+        }, insight.title),
+        e('p', {
+          key: 'excerpt',
+          className: 'text-gray-600 leading-relaxed mb-3'
+        }, insight.excerpt),
+        e('div', {
+          key: 'meta',
+          className: 'flex items-center gap-4 text-sm text-gray-500'
+        }, [
+          e('span', { key: 'author' }, `By ${insight.author}`),
+          e('span', { key: 'role' }, insight.authorRole),
+          e('span', { key: 'read-time' }, `${insight.readTime} min read`),
+          e('span', { key: 'date' }, new Date(insight.publishedAt).toLocaleDateString())
+        ])
+      ])
+    ]),
+    e('div', {
+      key: 'tags',
+      className: 'flex flex-wrap gap-2'
+    }, insight.tags.map((tag, index) => 
+      e('span', {
+        key: `tag-${index}`,
+        className: 'px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium'
+      }, tag)
+    ))
+  ]);
+
+  const renderMentorCard = (mentor) => e('div', {
+    key: `mentor-${mentor.id}`,
+    className: 'bg-white rounded-xl p-6 shadow-lg border'
+  }, [
+    e('div', {
+      key: 'mentor-header',
+      className: 'flex items-start gap-4 mb-4'
+    }, [
+      e('div', {
+        key: 'avatar',
+        className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold'
+      }, mentor.name.split(' ').map(n => n[0]).join('')),
+      e('div', {
+        key: 'mentor-info',
+        className: 'flex-1'
+      }, [
+        e('h3', {
+          key: 'name',
+          className: 'text-xl font-bold text-gray-900'
+        }, mentor.name),
+        e('p', {
+          key: 'specialty',
+          className: 'text-blue-600 font-medium'
+        }, mentor.specialty),
+        e('div', {
+          key: 'stats',
+          className: 'flex items-center gap-4 mt-2 text-sm text-gray-600'
+        }, [
+          e('span', { key: 'experience' }, mentor.experience),
+          e('span', { key: 'rating' }, `⭐ ${mentor.rating}`),
+          e('span', { key: 'sessions' }, `${mentor.sessions} sessions`)
+        ])
+      ])
+    ]),
+    e('p', {
+      key: 'bio',
+      className: 'text-gray-600 mb-4'
+    }, mentor.bio),
+    e('div', {
+      key: 'specialties',
+      className: 'flex flex-wrap gap-2 mb-4'
+    }, mentor.specialties.map((spec, index) =>
+      e('span', {
+        key: `spec-${index}`,
+        className: 'px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm'
+      }, spec)
+    )),
+    e('div', {
+      key: 'actions',
+      className: 'flex items-center justify-between'
+    }, [
+      e('span', {
+        key: 'rate',
+        className: 'text-lg font-bold text-gray-900'
+      }, mentor.hourlyRate + '/hour'),
+      e('button', {
+        key: 'book-btn',
+        onClick: () => {
+          setSelectedMentor(mentor);
+          setShowBookingForm(true);
+        },
+        className: 'px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors'
+      }, 'Book Session')
+    ])
+  ]);
+
+  const renderInsightDetail = () => {
+    if (!selectedInsight) return null;
+    
+    return e('div', {
+      key: 'insight-detail',
+      className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+      onClick: (e) => {
+        if (e.target === e.currentTarget) {
+          setSelectedInsight(null);
+        }
+      }
+    }, [
+      e('div', {
+        key: 'modal',
+        className: 'bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-y-auto'
+      }, [
+        e('div', {
+          key: 'header',
+          className: 'p-6 border-b'
+        }, [
+          e('div', {
+            key: 'title-section',
+            className: 'flex justify-between items-start mb-4'
+          }, [
+            e('h1', {
+              key: 'title',
+              className: 'text-3xl font-bold text-gray-900'
+            }, selectedInsight.title),
+            e('button', {
+              key: 'close',
+              onClick: () => setSelectedInsight(null),
+              className: 'text-gray-400 hover:text-gray-600 text-2xl'
+            }, '×')
+          ]),
+          e('div', {
+            key: 'meta',
+            className: 'flex items-center gap-4 text-sm text-gray-600'
+          }, [
+            e('span', { key: 'author' }, `By ${selectedInsight.author}`),
+            e('span', { key: 'role' }, selectedInsight.authorRole),
+            e('span', { key: 'read-time' }, `${selectedInsight.readTime} min read`),
+            e('span', { key: 'date' }, new Date(selectedInsight.publishedAt).toLocaleDateString())
+          ])
+        ]),
+        e('div', {
+          key: 'content',
+          className: 'p-6 prose max-w-none',
+          dangerouslySetInnerHTML: { __html: selectedInsight.content.replace(/\n/g, '<br>').replace(/### /g, '<h3>').replace(/## /g, '<h2>').replace(/# /g, '<h1>') }
+        })
+      ])
+    ]);
+  };
+
+  const renderBookingForm = () => {
+    if (!showBookingForm || !selectedMentor) return null;
+
+    return e('div', {
+      key: 'booking-modal',
+      className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+      onClick: (e) => {
+        if (e.target === e.currentTarget) {
+          setShowBookingForm(false);
+        }
+      }
+    }, [
+      e('div', {
+        key: 'booking-form',
+        className: 'bg-white rounded-xl max-w-lg w-full p-6'
+      }, [
+        e('h2', {
+          key: 'form-title',
+          className: 'text-2xl font-bold text-gray-900 mb-4'
+        }, `Book Session with ${selectedMentor.name}`),
+        
+        e('div', {
+          key: 'form-fields',
+          className: 'space-y-4'
+        }, [
+          e('div', { key: 'date-field' }, [
+            e('label', {
+              key: 'date-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Select Date & Time:'),
+            e('select', {
+              key: 'date-select',
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+            }, [
+              e('option', { key: 'default-option', value: '' }, 'Choose available slot...'),
+              ...selectedMentor.availability.weekdays.map((slot, index) =>
+                e('option', {
+                  key: `slot-${index}`,
+                  value: `${slot.day}-${slot.startTime}`
+                }, `${slot.day} ${slot.startTime} - ${slot.endTime}`)
+              )
+            ])
+          ]),
+
+          e('div', { key: 'topic-field' }, [
+            e('label', {
+              key: 'topic-label',
+              className: 'block text-sm font-medium text-gray-700 mb-2'
+            }, 'Consultation Topic:'),
+            e('textarea', {
+              key: 'topic-input',
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+              rows: 3,
+              placeholder: 'Briefly describe what you\'d like to discuss...'
+            })
+          ]),
+
+          e('div', {
+            key: 'actions',
+            className: 'flex gap-3 pt-4'
+          }, [
+            e('button', {
+              key: 'cancel',
+              onClick: () => setShowBookingForm(false),
+              className: 'flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors'
+            }, 'Cancel'),
+            e('button', {
+              key: 'book',
+              onClick: () => {
+                setShowBookingForm(false);
+                alert('Consultation booked successfully! You will receive a confirmation email shortly.');
+              },
+              className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors'
+            }, 'Book Session')
+          ])
+        ])
+      ])
+    ]);
+  };
+
+  if (loading) {
+    return e('div', {
+      className: 'flex items-center justify-center py-12'
+    }, [
+      e('div', {
+        key: 'spinner',
+        className: 'w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin'
+      })
+    ]);
+  }
+
+  return e('div', {
+    className: 'max-w-7xl mx-auto p-6'
+  }, [
+    // Header
+    e('div', {
+      key: 'header',
+      className: 'mb-8'
+    }, [
+      e('div', {
+        key: 'title-section',
+        className: 'flex items-center gap-4 mb-4'
+      }, [
+        e('h1', {
+          key: 'title',
+          className: 'text-3xl font-bold text-gray-900'
+        }, 'Community Hub'),
+        e('div', {
+          key: 'stats',
+          className: 'flex items-center gap-6 text-sm text-gray-600'
+        }, [
+          e('span', { key: 'insights-count' }, `${insights.length} Expert Insights`),
+          e('span', { key: 'mentors-count' }, `${mentors.length} Certified Mentors`),
+          e('span', { key: 'members-count' }, '2,500+ Community Members')
+        ])
+      ]),
+      e('p', {
+        key: 'description',
+        className: 'text-gray-600 text-lg'
+      }, 'Connect with experts, access curated insights, and join our global immigration community')
+    ]),
+
+    // Tab Navigation
+    e('div', {
+      key: 'tabs',
+      className: 'flex space-x-1 bg-gray-100 p-1 rounded-lg mb-8'
+    }, [
+      ['insights', 'Expert Insights', '📚'],
+      ['mentors', 'Find Mentors', '👥'],
+      ['events', 'Community Events', '📅']
+    ].map(([key, label, icon]) =>
+      e('button', {
+        key: `tab-${key}`,
+        onClick: () => setActiveTab(key),
+        className: `flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md font-medium transition-colors ${
+          activeTab === key
+            ? 'bg-white text-blue-600 shadow-sm'
+            : 'text-gray-600 hover:text-gray-900'
+        }`
+      }, [
+        e('span', { key: 'icon' }, icon),
+        e('span', { key: 'label' }, label)
+      ])
+    )),
+
+    // Content
+    e('div', {
+      key: 'content'
+    }, [
+      // Insights Tab
+      activeTab === 'insights' && e('div', {
+        key: 'insights-content'
+      }, [
+        e('div', {
+          key: 'insights-grid',
+          className: 'grid md:grid-cols-2 gap-6'
+        }, insights.map(renderInsightCard))
+      ]),
+
+      // Mentors Tab
+      activeTab === 'mentors' && e('div', {
+        key: 'mentors-content'
+      }, [
+        e('div', {
+          key: 'mentors-grid',
+          className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-6'
+        }, mentors.map(renderMentorCard))
+      ]),
+
+      // Events Tab
+      activeTab === 'events' && e('div', {
+        key: 'events-content',
+        className: 'text-center py-12'
+      }, [
+        e('div', {
+          key: 'events-placeholder',
+          className: 'text-gray-500'
+        }, [
+          e('div', {
+            key: 'icon',
+            className: 'text-6xl mb-4'
+          }, '📅'),
+          e('h3', {
+            key: 'title',
+            className: 'text-xl font-medium mb-2'
+          }, 'Community Events Coming Soon'),
+          e('p', { key: 'desc' }, 'We\'re preparing exciting community events and webinars for you!')
+        ])
+      ])
+    ]),
+
+    // Modals
+    renderInsightDetail(),
+    renderBookingForm()
   ]);
 }
 
