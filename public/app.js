@@ -1439,6 +1439,7 @@ function Dashboard({ user }) {
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
+        currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         e('div', { key: 'dashboard-content' }, [
           // Welcome Section
           e('div', {
@@ -1459,6 +1460,12 @@ function Dashboard({ user }) {
               description: 'AI-powered financial wellness analysis',
               icon: '💝',
               color: 'from-pink-500 to-rose-500'
+            },
+            {
+              title: 'Health Radar',
+              description: 'Interactive financial wellness dashboard',
+              icon: '📊',
+              color: 'from-indigo-500 to-purple-500'
             },
             {
               title: 'Loan Referrals',
@@ -1485,6 +1492,8 @@ function Dashboard({ user }) {
               onClick: () => {
                 if (feature.title === 'Financial Mood Meter') {
                   setCurrentView('mood-meter');
+                } else if (feature.title === 'Health Radar') {
+                  setCurrentView('health-radar');
                 } else if (feature.title === 'Community Hub') {
                   setCurrentView('community');
                 }
@@ -5339,6 +5348,326 @@ function FinancialMoodMeter({ onBack }) {
           e('span', { key: 'icon' }, '💡'),
           e('span', { key: 'text' }, 'Powered by AI Financial Analysis')
         ])
+      ])
+    ])
+  ]);
+}
+
+// Financial Health Radar Component
+function FinancialHealthRadar({ onBack }) {
+  const [radarData, setRadarData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [hoveredMetric, setHoveredMetric] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/financial-health-radar')
+      .then(res => res.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setRadarData(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message);
+        setLoading(false);
+      });
+  }, []);
+
+  const renderRadarChart = () => {
+    if (!radarData) return null;
+
+    const center = 200;
+    const maxRadius = 120;
+    const metrics = Object.entries(radarData.metrics);
+    const angleStep = (2 * Math.PI) / metrics.length;
+
+    // Calculate points for the radar chart
+    const dataPoints = metrics.map(([key, metric], index) => {
+      const angle = index * angleStep - Math.PI / 2; // Start from top
+      const radius = (metric.score / 10) * maxRadius;
+      const x = center + radius * Math.cos(angle);
+      const y = center + radius * Math.sin(angle);
+      return { x, y, key, metric, angle: index * angleStep };
+    });
+
+    // Create grid circles
+    const gridCircles = [2, 4, 6, 8, 10].map(value => {
+      const radius = (value / 10) * maxRadius;
+      return e('circle', {
+        key: `grid-${value}`,
+        cx: center,
+        cy: center,
+        r: radius,
+        fill: 'none',
+        stroke: '#e5e7eb',
+        strokeWidth: 1,
+        opacity: 0.5
+      });
+    });
+
+    // Create grid lines
+    const gridLines = metrics.map((_, index) => {
+      const angle = index * angleStep - Math.PI / 2;
+      const x2 = center + maxRadius * Math.cos(angle);
+      const y2 = center + maxRadius * Math.sin(angle);
+      return e('line', {
+        key: `line-${index}`,
+        x1: center,
+        y1: center,
+        x2,
+        y2,
+        stroke: '#e5e7eb',
+        strokeWidth: 1,
+        opacity: 0.5
+      });
+    });
+
+    // Create the data polygon
+    const polygonPoints = dataPoints.map(point => `${point.x},${point.y}`).join(' ');
+    const dataPolygon = e('polygon', {
+      key: 'data-polygon',
+      points: polygonPoints,
+      fill: radarData.overallColor,
+      fillOpacity: 0.3,
+      stroke: radarData.overallColor,
+      strokeWidth: 2
+    });
+
+    // Create data points
+    const dataCircles = dataPoints.map((point, index) => {
+      const [key, metric] = metrics[index];
+      return e('circle', {
+        key: `point-${key}`,
+        cx: point.x,
+        cy: point.y,
+        r: 4,
+        fill: metric.color,
+        stroke: 'white',
+        strokeWidth: 2,
+        onMouseEnter: () => setHoveredMetric({ key, metric, x: point.x, y: point.y }),
+        onMouseLeave: () => setHoveredMetric(null),
+        style: { cursor: 'pointer' }
+      });
+    });
+
+    // Create labels
+    const labels = metrics.map(([key, metric], index) => {
+      const angle = index * angleStep - Math.PI / 2;
+      const labelRadius = maxRadius + 30;
+      const x = center + labelRadius * Math.cos(angle);
+      const y = center + labelRadius * Math.sin(angle);
+      
+      const displayName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      
+      return e('text', {
+        key: `label-${key}`,
+        x,
+        y,
+        textAnchor: 'middle',
+        dominantBaseline: 'middle',
+        fontSize: 12,
+        fill: '#374151',
+        fontWeight: '500'
+      }, displayName);
+    });
+
+    return e('svg', {
+      width: 400,
+      height: 400,
+      className: 'mx-auto'
+    }, [
+      ...gridCircles,
+      ...gridLines,
+      dataPolygon,
+      ...dataCircles,
+      ...labels,
+      
+      // Tooltip
+      hoveredMetric && e('g', { key: 'tooltip' }, [
+        e('rect', {
+          x: hoveredMetric.x - 50,
+          y: hoveredMetric.y - 35,
+          width: 100,
+          height: 25,
+          fill: 'rgba(0,0,0,0.8)',
+          rx: 4
+        }),
+        e('text', {
+          x: hoveredMetric.x,
+          y: hoveredMetric.y - 20,
+          textAnchor: 'middle',
+          fill: 'white',
+          fontSize: 12
+        }, `${hoveredMetric.metric.score}/10`)
+      ])
+    ]);
+  };
+
+  if (loading) {
+    return e('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6' }, [
+      e('div', { key: 'loading', className: 'max-w-4xl mx-auto' }, [
+        e('div', { className: 'bg-white rounded-xl p-8 shadow-lg text-center' }, [
+          e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4' }),
+          e('p', { className: 'text-gray-600' }, 'Analyzing your financial health...')
+        ])
+      ])
+    ]);
+  }
+
+  if (error) {
+    return e('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6' }, [
+      e('div', { key: 'error', className: 'max-w-4xl mx-auto' }, [
+        e('div', { className: 'bg-white rounded-xl p-8 shadow-lg text-center' }, [
+          e('div', { className: 'text-red-500 text-4xl mb-4' }, '⚠️'),
+          e('h3', { className: 'text-xl font-bold text-gray-900 mb-2' }, 'Analysis Error'),
+          e('p', { className: 'text-gray-600 mb-4' }, error),
+          e('button', {
+            className: 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700',
+            onClick: onBack
+          }, 'Back to Dashboard')
+        ])
+      ])
+    ]);
+  }
+
+  return e('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-6' }, [
+    // Header
+    e('div', { key: 'header', className: 'max-w-6xl mx-auto mb-8' }, [
+      e('div', { className: 'flex items-center justify-between mb-6' }, [
+        e('div', { key: 'title-section' }, [
+          e('h1', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Financial Health Radar'),
+          e('p', { className: 'text-gray-600' }, 'Interactive visualization of your financial wellness metrics')
+        ]),
+        e('button', {
+          key: 'back-btn',
+          onClick: onBack,
+          className: 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+        }, '← Back to Dashboard')
+      ]),
+
+      // Overall Score Card
+      e('div', { className: 'bg-white rounded-xl p-6 shadow-lg mb-8' }, [
+        e('div', { className: 'text-center' }, [
+          e('div', {
+            className: 'inline-flex items-center justify-center w-24 h-24 rounded-full text-4xl font-bold text-white mb-4',
+            style: { backgroundColor: radarData.overallColor }
+          }, radarData.overallGrade),
+          e('h2', { className: 'text-2xl font-bold text-gray-900 mb-2' }, `Overall Score: ${radarData.overallScore}/10`),
+          e('p', { className: 'text-gray-600' }, 'Your comprehensive financial health assessment')
+        ])
+      ])
+    ]),
+
+    // Main Content
+    e('div', { key: 'main-content', className: 'max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8' }, [
+      // Radar Chart
+      e('div', { key: 'radar-section', className: 'bg-white rounded-xl p-6 shadow-lg' }, [
+        e('h3', { className: 'text-xl font-bold text-gray-900 mb-6 text-center' }, 'Health Radar'),
+        renderRadarChart()
+      ]),
+
+      // Metrics Breakdown
+      e('div', { key: 'metrics-section', className: 'space-y-4' }, [
+        e('h3', { className: 'text-xl font-bold text-gray-900 mb-4' }, 'Metrics Breakdown'),
+        ...Object.entries(radarData.metrics).map(([key, metric]) => {
+          const displayName = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+          return e('div', {
+            key,
+            className: 'bg-white rounded-xl p-4 shadow-lg border-l-4',
+            style: { borderLeftColor: metric.color }
+          }, [
+            e('div', { className: 'flex items-center justify-between mb-2' }, [
+              e('h4', { className: 'font-semibold text-gray-900' }, displayName),
+              e('span', {
+                className: 'px-3 py-1 rounded-full text-sm font-medium text-white',
+                style: { backgroundColor: metric.color }
+              }, `${metric.score}/10`)
+            ]),
+            e('p', { className: 'text-sm text-gray-600 mb-2' }, metric.benchmark),
+            e('div', { className: 'flex items-center gap-2' }, [
+              e('div', { className: 'flex-1 bg-gray-200 rounded-full h-2' }, [
+                e('div', {
+                  className: 'h-2 rounded-full transition-all duration-500',
+                  style: {
+                    width: `${(metric.score / 10) * 100}%`,
+                    backgroundColor: metric.color
+                  }
+                })
+              ]),
+              e('span', { className: 'text-sm font-medium text-gray-600' }, metric.label)
+            ])
+          ]);
+        })
+      ])
+    ]),
+
+    // Insights Section
+    e('div', { key: 'insights', className: 'max-w-6xl mx-auto mt-8 grid grid-cols-1 md:grid-cols-3 gap-6' }, [
+      // Strengths
+      e('div', { key: 'strengths', className: 'bg-white rounded-xl p-6 shadow-lg' }, [
+        e('h3', { className: 'text-lg font-bold text-green-700 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '💪'),
+          e('span', { key: 'text' }, 'Strengths')
+        ]),
+        e('div', { className: 'space-y-2' }, 
+          radarData.strengths.map((strength, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-center gap-2 text-sm text-gray-700'
+            }, [
+              e('span', { key: 'check', className: 'text-green-500' }, '✓'),
+              e('span', { key: 'text' }, strength)
+            ])
+          )
+        )
+      ]),
+
+      // Recommendations
+      e('div', { key: 'recommendations', className: 'bg-white rounded-xl p-6 shadow-lg' }, [
+        e('h3', { className: 'text-lg font-bold text-blue-700 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '💡'),
+          e('span', { key: 'text' }, 'Recommendations')
+        ]),
+        e('div', { className: 'space-y-3' }, 
+          radarData.recommendations.map((rec, index) =>
+            e('div', {
+              key: index,
+              className: 'p-3 bg-blue-50 rounded-lg border-l-2 border-blue-300'
+            }, [
+              e('p', { className: 'text-sm text-gray-700' }, rec)
+            ])
+          )
+        )
+      ]),
+
+      // Areas for Improvement
+      e('div', { key: 'improvements', className: 'bg-white rounded-xl p-6 shadow-lg' }, [
+        e('h3', { className: 'text-lg font-bold text-orange-700 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '🎯'),
+          e('span', { key: 'text' }, 'Focus Areas')
+        ]),
+        e('div', { className: 'space-y-2' }, 
+          radarData.improvements.map((improvement, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-center gap-2 text-sm text-gray-700'
+            }, [
+              e('span', { key: 'arrow', className: 'text-orange-500' }, '→'),
+              e('span', { key: 'text' }, improvement)
+            ])
+          )
+        )
+      ])
+    ]),
+
+    // AI Badge
+    e('div', { key: 'ai-badge', className: 'max-w-6xl mx-auto mt-8 text-center' }, [
+      e('div', {
+        className: 'inline-flex items-center gap-2 px-4 py-2 border border-blue-200 rounded-full text-sm text-blue-700 bg-blue-50'
+      }, [
+        e('span', { key: 'icon' }, '🤖'),
+        e('span', { key: 'text' }, 'Powered by AI Financial Health Analysis')
       ])
     ])
   ]);
