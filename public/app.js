@@ -2637,6 +2637,22 @@ function AdminDashboard({ user, onBack }) {
   const [filters, setFilters] = useState({ role: '', verified: '' });
   const [loading, setLoading] = useState(false);
   const [activityLogs, setActivityLogs] = useState([]);
+  const [mentors, setMentors] = useState([]);
+  const [showAddMentor, setShowAddMentor] = useState(false);
+  const [newMentor, setNewMentor] = useState({
+    name: '',
+    email: '',
+    specialty: '',
+    experience: '',
+    bio: '',
+    hourlyRate: '',
+    languages: '',
+    certifications: '',
+    availability: {
+      timezone: 'EST',
+      weekdays: []
+    }
+  });
 
   // Fetch dashboard statistics
   useEffect(() => {
@@ -2644,6 +2660,8 @@ function AdminDashboard({ user, onBack }) {
       fetchDashboardStats();
     } else if (currentTab === 'users') {
       fetchUsers();
+    } else if (currentTab === 'mentors') {
+      fetchMentors();
     } else if (currentTab === 'activity') {
       fetchActivityLogs();
     }
@@ -2699,6 +2717,103 @@ function AdminDashboard({ user, onBack }) {
       console.error('Failed to fetch activity logs:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchMentors = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/mentors');
+      if (response.ok) {
+        const data = await response.json();
+        setMentors(data.mentors || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch mentors:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const addMentor = async (e) => {
+    e.preventDefault();
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/mentors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newMentor,
+          languages: newMentor.languages.split(',').map(lang => lang.trim()),
+          certifications: newMentor.certifications.split(',').map(cert => cert.trim())
+        })
+      });
+
+      if (response.ok) {
+        fetchMentors();
+        setShowAddMentor(false);
+        setNewMentor({
+          name: '',
+          email: '',
+          specialty: '',
+          experience: '',
+          bio: '',
+          hourlyRate: '',
+          languages: '',
+          certifications: '',
+          availability: {
+            timezone: 'EST',
+            weekdays: []
+          }
+        });
+        alert('Mentor added successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to add mentor');
+      }
+    } catch (error) {
+      alert('Failed to add mentor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteMentor = async (mentorId) => {
+    if (!confirm('Are you sure you want to delete this mentor? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/mentors/${mentorId}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchMentors();
+        alert('Mentor deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete mentor');
+      }
+    } catch (error) {
+      alert('Failed to delete mentor');
+    }
+  };
+
+  const toggleMentorStatus = async (mentorId, isActive) => {
+    try {
+      const response = await fetch(`/api/admin/mentors/${mentorId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !isActive })
+      });
+
+      if (response.ok) {
+        fetchMentors();
+        alert(`Mentor ${!isActive ? 'activated' : 'deactivated'} successfully`);
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to update mentor status');
+      }
+    } catch (error) {
+      alert('Failed to update mentor status');
     }
   };
 
@@ -2803,6 +2918,7 @@ function AdminDashboard({ user, onBack }) {
         e('nav', { className: 'flex space-x-8' }, [
           ['overview', 'Overview', '📊'],
           ['users', 'User Management', '👥'],
+          ['mentors', 'Mentor Management', '👨‍🏫'],
           ['activity', 'Activity Logs', '📋']
         ].map(([tab, label, icon]) =>
           e('button', {
@@ -2981,6 +3097,292 @@ function AdminDashboard({ user, onBack }) {
                   ])
                 ]
               )
+            ])
+          ])
+        ])
+      ]),
+
+      // Mentors Management Tab
+      currentTab === 'mentors' && e('div', { key: 'mentors-content' }, [
+        // Add Mentor Button
+        e('div', {
+          key: 'mentor-actions',
+          className: 'flex justify-between items-center mb-6'
+        }, [
+          e('h2', {
+            key: 'mentors-title',
+            className: 'text-2xl font-bold text-gray-900'
+          }, 'Mentor Management'),
+          e('button', {
+            key: 'add-mentor-btn',
+            onClick: () => setShowAddMentor(true),
+            className: 'bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors'
+          }, '+ Add Mentor')
+        ]),
+
+        // Mentors List
+        e('div', {
+          key: 'mentors-grid',
+          className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-6'
+        }, mentors.length > 0 ? mentors.map((mentor) =>
+          e('div', {
+            key: `mentor-${mentor.id}`,
+            className: 'bg-white rounded-xl p-6 shadow-lg border'
+          }, [
+            e('div', {
+              key: 'mentor-header',
+              className: 'flex items-start gap-4 mb-4'
+            }, [
+              e('div', {
+                key: 'avatar',
+                className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold'
+              }, mentor.name ? mentor.name.split(' ').map(n => n[0]).join('') : 'M'),
+              e('div', {
+                key: 'mentor-info',
+                className: 'flex-1'
+              }, [
+                e('h3', {
+                  key: 'name',
+                  className: 'text-xl font-bold text-gray-900'
+                }, mentor.name),
+                e('p', {
+                  key: 'specialty',
+                  className: 'text-blue-600 font-medium'
+                }, mentor.specialty),
+                e('div', {
+                  key: 'stats',
+                  className: 'flex items-center gap-4 mt-2 text-sm text-gray-600'
+                }, [
+                  e('span', { key: 'experience' }, mentor.experience),
+                  e('span', { key: 'rate' }, mentor.hourlyRate),
+                  e('span', { 
+                    key: 'status',
+                    className: mentor.isActive ? 'text-green-600' : 'text-red-600'
+                  }, mentor.isActive ? 'Active' : 'Inactive')
+                ])
+              ])
+            ]),
+            e('p', {
+              key: 'bio',
+              className: 'text-gray-600 mb-4 line-clamp-3'
+            }, mentor.bio),
+            e('div', {
+              key: 'languages',
+              className: 'flex flex-wrap gap-2 mb-4'
+            }, (mentor.languages || []).map((lang, index) =>
+              e('span', {
+                key: `lang-${index}`,
+                className: 'px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm'
+              }, lang)
+            )),
+            e('div', {
+              key: 'actions',
+              className: 'flex gap-2'
+            }, [
+              e('button', {
+                key: 'toggle-status',
+                onClick: () => toggleMentorStatus(mentor.id, mentor.isActive),
+                className: `flex-1 px-3 py-2 rounded-lg transition-colors ${
+                  mentor.isActive 
+                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                    : 'bg-green-100 text-green-800 hover:bg-green-200'
+                }`
+              }, mentor.isActive ? 'Deactivate' : 'Activate'),
+              e('button', {
+                key: 'delete-mentor',
+                onClick: () => deleteMentor(mentor.id),
+                className: 'px-3 py-2 bg-red-100 text-red-800 hover:bg-red-200 rounded-lg transition-colors'
+              }, 'Delete')
+            ])
+          ])
+        ) : [
+          e('div', {
+            key: 'no-mentors',
+            className: 'col-span-full text-center py-12 text-gray-500'
+          }, loading ? 'Loading mentors...' : 'No mentors found. Add your first mentor!')
+        ])
+      ]),
+
+      // Add Mentor Modal
+      showAddMentor && e('div', {
+        key: 'add-mentor-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowAddMentor(false);
+          }
+        }
+      }, [
+        e('div', {
+          key: 'modal-content',
+          className: 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'modal-header',
+            className: 'p-6 border-b'
+          }, [
+            e('div', {
+              key: 'header-content',
+              className: 'flex justify-between items-center'
+            }, [
+              e('h2', {
+                key: 'modal-title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Add New Mentor'),
+              e('button', {
+                key: 'close-modal',
+                onClick: () => setShowAddMentor(false),
+                className: 'text-gray-400 hover:text-gray-600 text-2xl'
+              }, '×')
+            ])
+          ]),
+          e('form', {
+            key: 'add-mentor-form',
+            onSubmit: addMentor,
+            className: 'p-6 space-y-6'
+          }, [
+            e('div', {
+              key: 'form-grid',
+              className: 'grid md:grid-cols-2 gap-6'
+            }, [
+              e('div', { key: 'name-field' }, [
+                e('label', {
+                  key: 'name-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Full Name'),
+                e('input', {
+                  key: 'name-input',
+                  type: 'text',
+                  required: true,
+                  value: newMentor.name,
+                  onChange: (e) => setNewMentor({ ...newMentor, name: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                })
+              ]),
+              e('div', { key: 'email-field' }, [
+                e('label', {
+                  key: 'email-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Email'),
+                e('input', {
+                  key: 'email-input',
+                  type: 'email',
+                  required: true,
+                  value: newMentor.email,
+                  onChange: (e) => setNewMentor({ ...newMentor, email: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                })
+              ]),
+              e('div', { key: 'specialty-field' }, [
+                e('label', {
+                  key: 'specialty-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Specialty'),
+                e('select', {
+                  key: 'specialty-input',
+                  required: true,
+                  value: newMentor.specialty,
+                  onChange: (e) => setNewMentor({ ...newMentor, specialty: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                }, [
+                  e('option', { key: 'default-specialty', value: '' }, 'Select Specialty'),
+                  e('option', { key: 'canada', value: 'Canadian Immigration' }, 'Canadian Immigration'),
+                  e('option', { key: 'australia', value: 'Australian Migration' }, 'Australian Migration'),
+                  e('option', { key: 'uk', value: 'UK Immigration' }, 'UK Immigration'),
+                  e('option', { key: 'usa', value: 'US Immigration' }, 'US Immigration'),
+                  e('option', { key: 'general', value: 'General Immigration' }, 'General Immigration')
+                ])
+              ]),
+              e('div', { key: 'experience-field' }, [
+                e('label', {
+                  key: 'experience-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Experience'),
+                e('input', {
+                  key: 'experience-input',
+                  type: 'text',
+                  required: true,
+                  placeholder: 'e.g., 5+ years',
+                  value: newMentor.experience,
+                  onChange: (e) => setNewMentor({ ...newMentor, experience: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                })
+              ]),
+              e('div', { key: 'hourly-rate-field' }, [
+                e('label', {
+                  key: 'hourly-rate-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Hourly Rate'),
+                e('input', {
+                  key: 'hourly-rate-input',
+                  type: 'text',
+                  required: true,
+                  placeholder: 'e.g., $120',
+                  value: newMentor.hourlyRate,
+                  onChange: (e) => setNewMentor({ ...newMentor, hourlyRate: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                })
+              ]),
+              e('div', { key: 'languages-field' }, [
+                e('label', {
+                  key: 'languages-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-2'
+                }, 'Languages (comma-separated)'),
+                e('input', {
+                  key: 'languages-input',
+                  type: 'text',
+                  required: true,
+                  placeholder: 'English, Spanish, French',
+                  value: newMentor.languages,
+                  onChange: (e) => setNewMentor({ ...newMentor, languages: e.target.value }),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                })
+              ])
+            ]),
+            e('div', { key: 'bio-field' }, [
+              e('label', {
+                key: 'bio-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Bio'),
+              e('textarea', {
+                key: 'bio-input',
+                required: true,
+                rows: 4,
+                value: newMentor.bio,
+                onChange: (e) => setNewMentor({ ...newMentor, bio: e.target.value }),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              })
+            ]),
+            e('div', { key: 'certifications-field' }, [
+              e('label', {
+                key: 'certifications-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Certifications (comma-separated)'),
+              e('input', {
+                key: 'certifications-input',
+                type: 'text',
+                placeholder: 'RCIC, MARA, OISC Level 3',
+                value: newMentor.certifications,
+                onChange: (e) => setNewMentor({ ...newMentor, certifications: e.target.value }),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              })
+            ]),
+            e('div', {
+              key: 'form-actions',
+              className: 'flex gap-3 pt-4'
+            }, [
+              e('button', {
+                key: 'cancel-btn',
+                type: 'button',
+                onClick: () => setShowAddMentor(false),
+                className: 'flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors'
+              }, 'Cancel'),
+              e('button', {
+                key: 'submit-btn',
+                type: 'submit',
+                disabled: loading,
+                className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors disabled:opacity-50'
+              }, loading ? 'Adding...' : 'Add Mentor')
             ])
           ])
         ])

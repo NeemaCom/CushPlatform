@@ -102,10 +102,12 @@ export interface IStorage {
 
   // Mentor methods
   getMentors(specialty?: string, isActive?: boolean): Promise<Mentor[]>;
+  getAllMentors(): Promise<Mentor[]>;
   getMentorById(id: number): Promise<Mentor | undefined>;
   getMentorByUserId(userId: number): Promise<Mentor | undefined>;
   createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor>;
   updateMentor(id: number, updates: Partial<Mentor>): Promise<Mentor>;
+  deleteMentor(id: number): Promise<void>;
 
   // Community Events methods
   getEvents(limit?: number, category?: string): Promise<CommunityEvent[]>;
@@ -435,10 +437,7 @@ export class DatabaseStorage implements IStorage {
   async createMentor(mentor: InsertMentor & { userId: number }): Promise<Mentor> {
     const [newMentor] = await db
       .insert(mentors)
-      .values({
-        ...mentor,
-        weekdays: mentor.weekdays as { day: string; startTime: string; endTime: string; }[]
-      })
+      .values(mentor)
       .returning();
     return newMentor;
   }
@@ -450,6 +449,14 @@ export class DatabaseStorage implements IStorage {
       .where(eq(mentors.id, id))
       .returning();
     return updatedMentor;
+  }
+
+  async getAllMentors(): Promise<Mentor[]> {
+    return await db.select().from(mentors).orderBy(desc(mentors.createdAt));
+  }
+
+  async deleteMentor(id: number): Promise<void> {
+    await db.delete(mentors).where(eq(mentors.id, id));
   }
 
   // Community Events methods

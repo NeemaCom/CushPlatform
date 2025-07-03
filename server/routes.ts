@@ -3275,6 +3275,134 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Mentor Management Routes
+  app.get('/api/admin/mentors', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const mentors = await storage.getAllMentors();
+      res.json({ mentors });
+    } catch (error: any) {
+      console.error('Admin get mentors error:', error);
+      res.status(500).json({ error: "Failed to fetch mentors" });
+    }
+  });
+
+  app.post('/api/admin/mentors', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { name, email, specialty, experience, bio, hourlyRate, languages, certifications } = req.body;
+      
+      if (!name || !email || !specialty || !experience || !bio || !hourlyRate) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Create user account for mentor
+      const mentorUser = await storage.createUser({
+        username: email.toLowerCase().replace('@', '_').replace('.', '_'),
+        email: email.toLowerCase(),
+        passwordHash: '',
+        role: 'mentor',
+        firstName: name.split(' ')[0] || name,
+        lastName: name.split(' ').slice(1).join(' ') || '',
+        phoneNumber: '',
+        nationality: '',
+        isEmailVerified: true,
+        isPhoneVerified: false,
+        acceptTerms: true,
+        acceptPrivacy: true,
+        marketingConsent: false,
+        mfaEnabled: false
+      });
+
+      // Create mentor profile
+      const mentor = await storage.createMentor({
+        userId: mentorUser.id,
+        specialty,
+        experience,
+        bio,
+        hourlyRate,
+        languages: languages || [],
+        certifications: certifications || [],
+        isActive: true,
+        isVerified: true,
+        availability: {
+          timezone: 'EST',
+          weekdays: [],
+          isActive: true
+        }
+      });
+
+      // Log admin action
+      await storage.logAdminActivity({
+        userId: req.user!.id,
+        action: 'MENTOR_CREATED',
+        details: `Created mentor profile for ${name} (${email})`,
+        ipAddress: req.ip || null,
+        userAgent: req.get('User-Agent') || null,
+        success: true
+      });
+
+      res.json({ mentor, success: true });
+    } catch (error: any) {
+      console.error('Admin create mentor error:', error);
+      res.status(500).json({ error: "Failed to create mentor" });
+    }
+  });
+
+  app.put('/api/admin/mentors/:mentorId', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { mentorId } = req.params;
+      const { isActive, ...updateData } = req.body;
+
+      const mentor = await storage.updateMentor(parseInt(mentorId), {
+        ...updateData,
+        isActive: isActive !== undefined ? isActive : undefined
+      });
+
+      // Log admin action
+      await storage.logAdminActivity({
+        userId: req.user!.id,
+        action: 'MENTOR_UPDATED',
+        details: `Updated mentor profile ID: ${mentorId}`,
+        ipAddress: req.ip || null,
+        userAgent: req.get('User-Agent') || null,
+        success: true
+      });
+
+      res.json({ mentor, success: true });
+    } catch (error: any) {
+      console.error('Admin update mentor error:', error);
+      res.status(500).json({ error: "Failed to update mentor" });
+    }
+  });
+
+  app.delete('/api/admin/mentors/:mentorId', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { mentorId } = req.params;
+
+      // Get mentor details for logging
+      const mentor = await storage.getMentorById(parseInt(mentorId));
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+
+      await storage.deleteMentor(parseInt(mentorId));
+
+      // Log admin action
+      await storage.logAdminActivity({
+        userId: req.user!.id,
+        action: 'MENTOR_DELETED',
+        details: `Deleted mentor profile ID: ${mentorId}`,
+        ipAddress: req.ip || null,
+        userAgent: req.get('User-Agent') || null,
+        success: true
+      });
+
+      res.json({ success: true, message: "Mentor deleted successfully" });
+    } catch (error: any) {
+      console.error('Admin delete mentor error:', error);
+      res.status(500).json({ error: "Failed to delete mentor" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
