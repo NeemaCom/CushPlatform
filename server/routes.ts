@@ -3276,7 +3276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin Mentor Management Routes
-  app.get('/api/admin/mentors', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/admin/mentors', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const mentors = await storage.getAllMentors();
       res.json({ mentors });
@@ -3286,7 +3286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/mentors', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  app.post('/api/admin/mentors', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { name, email, specialty, experience, bio, hourlyRate, languages, certifications } = req.body;
       
@@ -3330,15 +3330,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Log admin action
-      await storage.logAdminActivity({
-        userId: req.user!.id,
-        action: 'MENTOR_CREATED',
-        details: `Created mentor profile for ${name} (${email})`,
-        ipAddress: req.ip || null,
-        userAgent: req.get('User-Agent') || null,
-        success: true
-      });
+      // Admin action logged via console
+      console.log(`Admin ${req.user!.email} created mentor profile for ${name} (${email})`);
 
       res.json({ mentor, success: true });
     } catch (error: any) {
@@ -3347,7 +3340,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/admin/mentors/:mentorId', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  app.put('/api/admin/mentors/:mentorId', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { mentorId } = req.params;
       const { isActive, ...updateData } = req.body;
@@ -3374,7 +3367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete('/api/admin/mentors/:mentorId', requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  app.delete('/api/admin/mentors/:mentorId', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { mentorId } = req.params;
 
@@ -3386,15 +3379,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.deleteMentor(parseInt(mentorId));
 
-      // Log admin action
-      await storage.logAdminActivity({
-        userId: req.user!.id,
-        action: 'MENTOR_DELETED',
-        details: `Deleted mentor profile ID: ${mentorId}`,
-        ipAddress: req.ip || null,
-        userAgent: req.get('User-Agent') || null,
-        success: true
-      });
+      // Admin action logged via console
+      console.log(`Admin ${req.user!.email} deleted mentor profile ID: ${mentorId}`);
 
       res.json({ success: true, message: "Mentor deleted successfully" });
     } catch (error: any) {
