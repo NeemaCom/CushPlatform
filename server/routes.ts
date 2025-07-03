@@ -3294,11 +3294,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
-      // Create user account for mentor
+      // Create user account for mentor with temporary password
+      const tempPassword = Math.random().toString(36).slice(-8);
+      const bcrypt = require('bcrypt');
+      const passwordHash = await bcrypt.hash(tempPassword, 12);
+      
       const mentorUser = await storage.createUser({
         username: email.toLowerCase().replace('@', '_').replace('.', '_'),
         email: email.toLowerCase(),
-        passwordHash: '',
+        passwordHash,
         role: 'mentor',
         firstName: name.split(' ')[0] || name,
         lastName: name.split(' ').slice(1).join(' ') || '',
@@ -3336,7 +3340,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ mentor, success: true });
     } catch (error: any) {
       console.error('Admin create mentor error:', error);
-      res.status(500).json({ error: "Failed to create mentor" });
+      console.error('Error details:', {
+        message: error.message,
+        code: error.code,
+        stack: error.stack
+      });
+      res.status(500).json({ 
+        error: "Failed to create mentor",
+        details: error.message || "Unknown error"
+      });
     }
   });
 
