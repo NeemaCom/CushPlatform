@@ -7,6 +7,7 @@ import { storage } from "./storage";
 import { setupGoogleAuth } from "./google-auth";
 import { aiAnalyticsService } from "./ai-analytics-service";
 import { analyzeFinancialMood, type FinancialMoodData } from './mood-analyzer';
+import { analyzeFinancialHealth, type FinancialHealthData } from './financial-health-analyzer';
 import { loanService } from "./loan-service";
 import { loanPreQualificationSchema, type LoanPreQualificationForm } from "../shared/schema";
 import { 
@@ -3458,6 +3459,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Financial mood analysis error:', error);
       res.status(500).json({ error: "Failed to analyze financial mood" });
+    }
+  });
+
+  // Financial Health Radar API
+  app.get('/api/financial-health-radar', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      
+      // Gather user's financial data
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getTransactionsByUserId(userId);
+      const financialGoals = await storage.getFinancialGoals(userId);
+      
+      // Calculate financial metrics
+      const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0);
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      
+      const monthlyTransactions = transactions.filter(t => {
+        if (!t.date) return false;
+        const transDate = new Date(t.date);
+        return transDate >= monthAgo;
+      });
+      
+      const monthlyIncome = monthlyTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const monthlyExpenses = monthlyTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome * 100) : 0;
+      
+      // Calculate additional metrics for health radar
+      const monthlyDebtPayments = monthlyTransactions
+        .filter(t => t.category?.toLowerCase().includes('debt') || t.category?.toLowerCase().includes('loan'))
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const accountTypes = [...new Set(accounts.map(acc => acc.type || 'checking'))];
+      
+      const goalCompletionRate = financialGoals.length > 0 
+        ? financialGoals.reduce((sum, g) => sum + (g.currentAmount / g.targetAmount * 100), 0) / financialGoals.length
+        : 0;
+      
+      const healthData: FinancialHealthData = {
+        totalBalance,
+        monthlyIncome,
+        monthlyExpenses,
+        savingsRate: Math.max(0, savingsRate),
+        recentTransactions: monthlyTransactions.map(t => ({
+          amount: parseFloat(t.amount),
+          type: t.type,
+          category: t.category || 'Other',
+          date: t.date ? new Date(t.date).toISOString() : new Date().toISOString()
+        })),
+        financialGoals: financialGoals.map((g: any) => ({
+          title: g.name || g.title || 'Goal',
+          progress: g.targetAmount > 0 ? (g.currentAmount / g.targetAmount) * 100 : 0,
+          targetAmount: g.targetAmount || 0,
+          currentAmount: g.currentAmount || 0
+        })),
+        monthlyDebtPayments,
+        accountTypes,
+        goalCompletionRate: Math.min(100, Math.max(0, goalCompletionRate))
+      };
+      
+      const healthRadar = await analyzeFinancialHealth(healthData);
+      res.json(healthRadar);
+      
+    } catch (error: any) {
+      console.error('Financial health radar error:', error);
+      res.status(500).json({ error: "Failed to generate financial health radar" });
     }
   });
 
