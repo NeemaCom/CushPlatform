@@ -12,6 +12,14 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-03**: Fixed Critical Mentor Creation Bug and Authentication Issues
+- ✓ Fixed mentor creation failure caused by missing password hash for user accounts
+- ✓ Added proper bcrypt password hashing for auto-generated mentor user accounts
+- ✓ Added comprehensive error logging to diagnose mentor creation issues
+- ✓ Fixed authentication middleware chain for all mentor management routes
+- ✓ Mentor creation now properly creates both user account and mentor profile
+- ✓ Enhanced error handling with detailed error messages for debugging
+
 **2025-07-02**: Created About Us and Mentor Booking Pages with Enhanced Homepage
 - ✓ Removed C box logo from homepage and added appealing trust badge
 - ✓ Created comprehensive About Us page with story, mission, team profiles, and statistics
