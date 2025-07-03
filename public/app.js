@@ -1438,6 +1438,7 @@ function Dashboard({ user }) {
         currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
+        currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         e('div', { key: 'dashboard-content' }, [
           // Welcome Section
           e('div', {
@@ -1451,8 +1452,14 @@ function Dashboard({ user }) {
           // Feature Cards
           e('div', {
             key: 'feature-cards',
-            className: 'grid md:grid-cols-3 gap-6'
+            className: 'grid md:grid-cols-4 gap-6'
           }, [
+            {
+              title: 'Financial Mood Meter',
+              description: 'AI-powered financial wellness analysis',
+              icon: '💝',
+              color: 'from-pink-500 to-rose-500'
+            },
             {
               title: 'Loan Referrals',
               description: 'Connect with trusted financial institutions',
@@ -1476,7 +1483,9 @@ function Dashboard({ user }) {
               key: `feature-${index}`,
               className: 'bg-white rounded-xl p-6 shadow-lg border cursor-pointer hover:shadow-xl transition-shadow',
               onClick: () => {
-                if (feature.title === 'Community Hub') {
+                if (feature.title === 'Financial Mood Meter') {
+                  setCurrentView('mood-meter');
+                } else if (feature.title === 'Community Hub') {
                   setCurrentView('community');
                 }
               }
@@ -5070,6 +5079,265 @@ function MentorBookingPage() {
               className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors'
             }, 'Book Session')
           ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Financial Mood Meter Component
+function FinancialMoodMeter({ onBack }) {
+  const [moodData, setMoodData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchMoodData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch('/api/financial-mood');
+      if (!response.ok) {
+        throw new Error('Failed to analyze financial mood');
+      }
+      const data = await response.json();
+      setMoodData(data);
+    } catch (error) {
+      console.error('Mood analysis error:', error);
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMoodData();
+  }, []);
+
+  const getMoodEmoji = (score) => {
+    if (score >= 8) return '😊';
+    if (score >= 6) return '🙂';
+    if (score >= 4) return '😐';
+    if (score >= 2) return '😟';
+    return '😰';
+  };
+
+  const getMoodGradient = (color) => {
+    switch (color?.toLowerCase()) {
+      case '#10b981': return 'from-green-400 to-green-600';
+      case '#f59e0b': return 'from-yellow-400 to-yellow-600';
+      case '#ef4444': return 'from-red-400 to-red-600';
+      default: return 'from-blue-400 to-blue-600';
+    }
+  };
+
+  if (loading) {
+    return e('div', { className: 'min-h-screen bg-gray-50 p-6' }, [
+      e('div', { key: 'header', className: 'mb-6' }, [
+        e('button', {
+          key: 'back',
+          onClick: onBack,
+          className: 'flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4'
+        }, [
+          e('span', { key: 'arrow' }, '←'),
+          e('span', { key: 'text' }, 'Back to Dashboard')
+        ]),
+        e('h1', { key: 'title', className: 'text-3xl font-bold text-gray-900' }, 'Financial Mood Meter'),
+        e('p', { key: 'subtitle', className: 'text-gray-600' }, 'AI-powered analysis of your financial wellness')
+      ]),
+      e('div', { key: 'loading', className: 'bg-white rounded-xl p-8 shadow-lg' }, [
+        e('div', { key: 'spinner', className: 'flex items-center justify-center py-12' }, [
+          e('div', { key: 'icon', className: 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600' }),
+          e('span', { key: 'text', className: 'ml-3 text-gray-600' }, 'Analyzing your financial mood...')
+        ])
+      ])
+    ]);
+  }
+
+  if (error) {
+    return e('div', { className: 'min-h-screen bg-gray-50 p-6' }, [
+      e('div', { key: 'header', className: 'mb-6' }, [
+        e('button', {
+          key: 'back',
+          onClick: onBack,
+          className: 'flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4'
+        }, [
+          e('span', { key: 'arrow' }, '←'),
+          e('span', { key: 'text' }, 'Back to Dashboard')
+        ]),
+        e('h1', { key: 'title', className: 'text-3xl font-bold text-gray-900' }, 'Financial Mood Meter')
+      ]),
+      e('div', { key: 'error', className: 'bg-white rounded-xl p-8 shadow-lg text-center' }, [
+        e('div', { key: 'icon', className: 'text-6xl mb-4' }, '⚠️'),
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-2' }, 'Analysis Unavailable'),
+        e('p', { key: 'message', className: 'text-gray-600 mb-4' }, error),
+        e('button', {
+          key: 'retry',
+          onClick: fetchMoodData,
+          className: 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg'
+        }, 'Try Again')
+      ])
+    ]);
+  }
+
+  if (!moodData) return null;
+
+  return e('div', { className: 'min-h-screen bg-gray-50 p-6' }, [
+    e('div', { key: 'header', className: 'mb-6' }, [
+      e('button', {
+        key: 'back',
+        onClick: onBack,
+        className: 'flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-4'
+      }, [
+        e('span', { key: 'arrow' }, '←'),
+        e('span', { key: 'text' }, 'Back to Dashboard')
+      ]),
+      e('div', { key: 'title-section', className: 'flex items-center justify-between' }, [
+        e('div', { key: 'title-text' }, [
+          e('h1', { key: 'title', className: 'text-3xl font-bold text-gray-900' }, 'Financial Mood Meter'),
+          e('p', { key: 'subtitle', className: 'text-gray-600' }, 'AI-powered analysis of your financial wellness')
+        ]),
+        e('button', {
+          key: 'refresh',
+          onClick: fetchMoodData,
+          className: 'bg-blue-100 hover:bg-blue-200 text-blue-600 p-2 rounded-lg'
+        }, '🔄')
+      ])
+    ]),
+
+    e('div', { key: 'content', className: 'max-w-4xl mx-auto' }, [
+      // Mood Score Display
+      e('div', { key: 'mood-score', className: 'bg-white rounded-xl p-8 shadow-lg mb-6 text-center' }, [
+        e('div', {
+          key: 'mood-circle',
+          className: `inline-flex items-center justify-center w-24 h-24 rounded-full bg-gradient-to-br ${getMoodGradient(moodData.moodColor)} shadow-lg mb-4`
+        }, [
+          e('div', { key: 'emoji', className: 'text-3xl' }, getMoodEmoji(moodData.moodScore))
+        ]),
+        e('h2', {
+          key: 'mood-label',
+          className: 'text-3xl font-bold mb-2',
+          style: { color: moodData.moodColor }
+        }, moodData.moodLabel),
+        e('div', { key: 'score-info', className: 'flex items-center justify-center gap-2 mb-4' }, [
+          e('span', { key: 'chart-icon' }, '📊'),
+          e('span', { key: 'score-text', className: 'text-gray-600' }, `Score: ${moodData.moodScore}/10`)
+        ]),
+        e('div', { key: 'progress-bar', className: 'w-32 mx-auto bg-gray-200 rounded-full h-2' }, [
+          e('div', {
+            key: 'progress-fill',
+            className: 'h-2 rounded-full bg-gradient-to-r from-blue-400 to-blue-600',
+            style: { width: `${moodData.moodScore * 10}%` }
+          })
+        ])
+      ]),
+
+      // Main Factors
+      e('div', { key: 'main-factors', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '📈'),
+          e('span', { key: 'text' }, 'Key Factors')
+        ]),
+        e('div', { key: 'factors', className: 'space-y-3' }, 
+          moodData.mainFactors.map((factor, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-start gap-3 p-3 bg-blue-50 rounded-lg'
+            }, [
+              e('div', { key: 'dot', className: 'w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0' }),
+              e('span', { key: 'text', className: 'text-gray-700' }, factor)
+            ])
+          )
+        )
+      ]),
+
+      // Celebration Points
+      moodData.celebrationPoints?.length > 0 && e('div', { key: 'celebration', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '✨'),
+          e('span', { key: 'text' }, 'Celebrate Your Progress')
+        ]),
+        e('div', { key: 'points', className: 'space-y-3' }, 
+          moodData.celebrationPoints.map((point, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-start gap-3 p-3 bg-green-50 rounded-lg'
+            }, [
+              e('span', { key: 'icon', className: 'text-green-500 mt-0.5' }, '✅'),
+              e('span', { key: 'text', className: 'text-gray-700' }, point)
+            ])
+          )
+        )
+      ]),
+
+      // Warning Signals
+      moodData.warningSignals?.length > 0 && e('div', { key: 'warnings', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '⚠️'),
+          e('span', { key: 'text' }, 'Areas for Attention')
+        ]),
+        e('div', { key: 'warnings-list', className: 'space-y-3' }, 
+          moodData.warningSignals.map((warning, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-start gap-3 p-3 bg-orange-50 rounded-lg'
+            }, [
+              e('span', { key: 'icon', className: 'text-orange-500 mt-0.5' }, '📉'),
+              e('span', { key: 'text', className: 'text-gray-700' }, warning)
+            ])
+          )
+        )
+      ]),
+
+      // Motivation Tips
+      e('div', { key: 'motivation', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '💝'),
+          e('span', { key: 'text' }, 'Motivation Boost')
+        ]),
+        e('div', { key: 'tips', className: 'space-y-3' }, 
+          moodData.motivationTips.map((tip, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-start gap-3 p-3 bg-pink-50 rounded-lg'
+            }, [
+              e('span', { key: 'icon', className: 'text-pink-500 mt-0.5' }, '💝'),
+              e('span', { key: 'text', className: 'text-gray-700 italic' }, tip)
+            ])
+          )
+        )
+      ]),
+
+      // Action Steps
+      e('div', { key: 'actions', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-4 flex items-center gap-2' }, [
+          e('span', { key: 'icon' }, '🎯'),
+          e('span', { key: 'text' }, 'Action Steps')
+        ]),
+        e('div', { key: 'steps', className: 'space-y-3' }, 
+          moodData.actionableSteps.map((step, index) =>
+            e('div', {
+              key: index,
+              className: 'flex items-start gap-3 p-3 bg-purple-50 rounded-lg'
+            }, [
+              e('div', {
+                key: 'number',
+                className: 'w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0'
+              }, String(index + 1)),
+              e('span', { key: 'text', className: 'text-gray-700' }, step)
+            ])
+          )
+        )
+      ]),
+
+      // AI Badge
+      e('div', { key: 'ai-badge', className: 'text-center' }, [
+        e('div', {
+          key: 'badge',
+          className: 'inline-flex items-center gap-2 px-4 py-2 border rounded-full text-sm',
+          style: { borderColor: moodData.moodColor, color: moodData.moodColor }
+        }, [
+          e('span', { key: 'icon' }, '💡'),
+          e('span', { key: 'text' }, 'Powered by AI Financial Analysis')
         ])
       ])
     ])

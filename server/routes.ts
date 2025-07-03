@@ -6,6 +6,7 @@ import passport from "passport";
 import { storage } from "./storage";
 import { setupGoogleAuth } from "./google-auth";
 import { aiAnalyticsService } from "./ai-analytics-service";
+import { analyzeFinancialMood, type FinancialMoodData } from './mood-analyzer';
 import { loanService } from "./loan-service";
 import { loanPreQualificationSchema, type LoanPreQualificationForm } from "../shared/schema";
 import { 
@@ -3398,6 +3399,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Admin delete mentor error:', error);
       res.status(500).json({ error: "Failed to delete mentor" });
+    }
+  });
+
+  // Financial Mood Analysis API
+  app.get('/api/financial-mood', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      
+      // Gather user's financial data
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getTransactionsByUserId(userId);
+      const financialGoals = await storage.getFinancialGoals(userId);
+      
+      // Calculate financial metrics
+      const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0);
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      
+      const monthlyTransactions = transactions.filter(t => {
+        if (!t.date) return false;
+        const transDate = new Date(t.date);
+        return transDate >= monthAgo;
+      });
+      
+      const monthlyIncome = monthlyTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const monthlyExpenses = monthlyTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome * 100) : 0;
+      
+      const moodData: FinancialMoodData = {
+        totalBalance,
+        monthlyIncome,
+        monthlyExpenses,
+        savingsRate: Math.max(0, savingsRate),
+        recentTransactions: monthlyTransactions.map(t => ({
+          amount: parseFloat(t.amount),
+          type: t.type,
+          category: t.category || 'Other',
+          date: t.date ? new Date(t.date).toISOString() : new Date().toISOString()
+        })),
+        financialGoals: financialGoals.map((g: any) => ({
+          title: g.name || g.title || 'Goal',
+          progress: g.targetAmount > 0 ? (g.currentAmount / g.targetAmount) * 100 : 0,
+          targetAmount: g.targetAmount || 0,
+          currentAmount: g.currentAmount || 0
+        }))
+      };
+      
+      const moodAnalysis = await analyzeFinancialMood(moodData);
+      res.json(moodAnalysis);
+      
+    } catch (error: any) {
+      console.error('Financial mood analysis error:', error);
+      res.status(500).json({ error: "Failed to analyze financial mood" });
     }
   });
 
