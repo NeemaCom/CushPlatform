@@ -775,11 +775,14 @@ function SignInPage() {
     country: '', 
     phone: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    agreeToTerms: false
   });
   const [loading, setLoading] = useState(false);
   const [testCredentials, setTestCredentials] = useState(null);
   const [showTestAccounts, setShowTestAccounts] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [showTermsModal, setShowTermsModal] = useState(false);
 
   useEffect(() => {
     fetch('/api/test-credentials')
@@ -853,6 +856,14 @@ function SignInPage() {
 
   const useTestAccount = (credentials) => {
     setLoginForm({ email: credentials.email, password: credentials.password });
+  };
+
+  const showPrivacyPolicy = () => {
+    setShowPrivacyModal(true);
+  };
+
+  const showTermsOfService = () => {
+    setShowTermsModal(true);
   };
 
   return e('div', {
@@ -1193,12 +1204,55 @@ function SignInPage() {
               className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
               placeholder: 'Confirm password'
             }),
+
+            // Privacy Policy and Terms of Use Checkbox
+            e('div', {
+              key: 'legal-agreement',
+              className: 'flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200'
+            }, [
+              e('input', {
+                key: 'legal-checkbox',
+                type: 'checkbox',
+                id: 'legal-agreement',
+                checked: signupForm.agreeToTerms || false,
+                onChange: (e) => setSignupForm({ ...signupForm, agreeToTerms: e.target.checked }),
+                required: true,
+                className: 'mt-1 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2'
+              }),
+              e('label', {
+                key: 'legal-label',
+                htmlFor: 'legal-agreement',
+                className: 'text-sm text-gray-700 leading-relaxed'
+              }, [
+                'I agree to the ',
+                e('a', {
+                  key: 'privacy-link',
+                  href: '#',
+                  onClick: (e) => {
+                    e.preventDefault();
+                    showPrivacyPolicy();
+                  },
+                  className: 'text-blue-600 hover:text-blue-800 underline font-medium'
+                }, 'Privacy Policy'),
+                ' and ',
+                e('a', {
+                  key: 'terms-link',
+                  href: '#',
+                  onClick: (e) => {
+                    e.preventDefault();
+                    showTermsOfService();
+                  },
+                  className: 'text-blue-600 hover:text-blue-800 underline font-medium'
+                }, 'Terms of Service'),
+                '. I understand that by creating an account, I consent to the collection and use of my information as described in these documents.'
+              ])
+            ]),
             
             e('button', {
               key: 'submit-button',
               type: 'submit',
-              disabled: loading,
-              className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading ? 'cursor-not-allowed' : ''}`
+              disabled: loading || !signupForm.agreeToTerms,
+              className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading || !signupForm.agreeToTerms ? 'cursor-not-allowed opacity-60' : ''}`
             }, loading ? 'Creating Account...' : 'Create Account'),
 
             e('div', {
@@ -1245,6 +1299,236 @@ function SignInPage() {
               e('div', { key: 'role', className: 'text-gray-600 text-xs mt-1' }, `${account.role} - ${account.description}`)
             ])
           ))
+        ])
+      ]),
+
+      // Privacy Policy Modal
+      showPrivacyModal && e('div', {
+        key: 'privacy-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowPrivacyModal(false);
+          }
+        }
+      }, [
+        e('div', {
+          key: 'privacy-content',
+          className: 'bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'privacy-header',
+            className: 'p-6 border-b border-gray-200'
+          }, [
+            e('div', {
+              key: 'privacy-header-content',
+              className: 'flex justify-between items-center'
+            }, [
+              e('h2', {
+                key: 'privacy-title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Privacy Policy'),
+              e('button', {
+                key: 'close-privacy',
+                onClick: () => setShowPrivacyModal(false),
+                className: 'text-gray-400 hover:text-gray-600 text-2xl font-bold'
+              }, '×')
+            ])
+          ]),
+          e('div', {
+            key: 'privacy-body',
+            className: 'p-6'
+          }, [
+            e('div', {
+              key: 'privacy-content-text',
+              className: 'prose prose-blue max-w-none'
+            }, [
+              e('p', {
+                key: 'effective-date',
+                className: 'text-sm text-gray-600 mb-4'
+              }, 'Effective Date: January 1, 2025'),
+              
+              e('h3', {
+                key: 'section-1-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '1. Information We Collect'),
+              
+              e('p', {
+                key: 'section-1-content',
+                className: 'text-gray-700 mb-4'
+              }, 'We collect information you provide directly to us, such as when you create an account, update your profile, or contact us for support. This may include your name, email address, phone number, address, and other contact information.'),
+              
+              e('h3', {
+                key: 'section-2-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '2. How We Use Your Information'),
+              
+              e('p', {
+                key: 'section-2-content',
+                className: 'text-gray-700 mb-4'
+              }, 'We use the information we collect to provide, maintain, and improve our services, process transactions, send you technical notices and support messages, and communicate with you about products, services, and promotional offers.'),
+              
+              e('h3', {
+                key: 'section-3-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '3. Information Sharing'),
+              
+              e('p', {
+                key: 'section-3-content',
+                className: 'text-gray-700 mb-4'
+              }, 'We do not sell, trade, or otherwise transfer your personal information to third parties without your consent, except as described in this Privacy Policy or as required by law.'),
+              
+              e('h3', {
+                key: 'section-4-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '4. Data Security'),
+              
+              e('p', {
+                key: 'section-4-content',
+                className: 'text-gray-700 mb-4'
+              }, 'We implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction.'),
+              
+              e('h3', {
+                key: 'section-5-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '5. Your Rights'),
+              
+              e('p', {
+                key: 'section-5-content',
+                className: 'text-gray-700 mb-4'
+              }, 'You have the right to access, update, or delete your personal information. You may also opt out of certain communications from us. To exercise these rights, please contact us at privacy@cush.com.'),
+              
+              e('h3', {
+                key: 'section-6-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '6. Contact Us'),
+              
+              e('p', {
+                key: 'section-6-content',
+                className: 'text-gray-700 mb-4'
+              }, 'If you have any questions about this Privacy Policy, please contact us at privacy@cush.com or through our customer support channels.')
+            ])
+          ])
+        ])
+      ]),
+
+      // Terms of Service Modal
+      showTermsModal && e('div', {
+        key: 'terms-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowTermsModal(false);
+          }
+        }
+      }, [
+        e('div', {
+          key: 'terms-content',
+          className: 'bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'terms-header',
+            className: 'p-6 border-b border-gray-200'
+          }, [
+            e('div', {
+              key: 'terms-header-content',
+              className: 'flex justify-between items-center'
+            }, [
+              e('h2', {
+                key: 'terms-title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Terms of Service'),
+              e('button', {
+                key: 'close-terms',
+                onClick: () => setShowTermsModal(false),
+                className: 'text-gray-400 hover:text-gray-600 text-2xl font-bold'
+              }, '×')
+            ])
+          ]),
+          e('div', {
+            key: 'terms-body',
+            className: 'p-6'
+          }, [
+            e('div', {
+              key: 'terms-content-text',
+              className: 'prose prose-blue max-w-none'
+            }, [
+              e('p', {
+                key: 'terms-effective-date',
+                className: 'text-sm text-gray-600 mb-4'
+              }, 'Effective Date: January 1, 2025'),
+              
+              e('h3', {
+                key: 'terms-section-1-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '1. Acceptance of Terms'),
+              
+              e('p', {
+                key: 'terms-section-1-content',
+                className: 'text-gray-700 mb-4'
+              }, 'By accessing and using the Cush platform, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service.'),
+              
+              e('h3', {
+                key: 'terms-section-2-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '2. Description of Service'),
+              
+              e('p', {
+                key: 'terms-section-2-content',
+                className: 'text-gray-700 mb-4'
+              }, 'Cush provides a comprehensive immigration and financial services platform that includes AI-powered migration assistance, community features, financial analytics, and expert consultations.'),
+              
+              e('h3', {
+                key: 'terms-section-3-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '3. User Account'),
+              
+              e('p', {
+                key: 'terms-section-3-content',
+                className: 'text-gray-700 mb-4'
+              }, 'You are responsible for maintaining the confidentiality of your account and password and for restricting access to your computer. You agree to accept responsibility for all activities that occur under your account or password.'),
+              
+              e('h3', {
+                key: 'terms-section-4-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '4. Prohibited Uses'),
+              
+              e('p', {
+                key: 'terms-section-4-content',
+                className: 'text-gray-700 mb-4'
+              }, 'You may not use our service for any illegal or unauthorized purpose nor may you, in the use of the service, violate any laws in your jurisdiction including but not limited to copyright laws.'),
+              
+              e('h3', {
+                key: 'terms-section-5-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '5. Service Modifications'),
+              
+              e('p', {
+                key: 'terms-section-5-content',
+                className: 'text-gray-700 mb-4'
+              }, 'We reserve the right to modify or discontinue, temporarily or permanently, the service (or any part thereof) with or without notice. We shall not be liable to you or to any third party for any modification, suspension, or discontinuance of the service.'),
+              
+              e('h3', {
+                key: 'terms-section-6-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '6. Disclaimer'),
+              
+              e('p', {
+                key: 'terms-section-6-content',
+                className: 'text-gray-700 mb-4'
+              }, 'The information on this platform is provided on an "as is" basis. We disclaim all warranties, express or implied, including but not limited to implied warranties of merchantability and fitness for a particular purpose.'),
+              
+              e('h3', {
+                key: 'terms-section-7-title',
+                className: 'text-lg font-semibold text-gray-900 mb-3'
+              }, '7. Contact Information'),
+              
+              e('p', {
+                key: 'terms-section-7-content',
+                className: 'text-gray-700 mb-4'
+              }, 'Questions about the Terms of Service should be sent to us at legal@cush.com or through our customer support channels.')
+            ])
+          ])
         ])
       ])
     ])
