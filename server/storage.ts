@@ -99,6 +99,12 @@ export interface IStorage {
   createInsight(insight: InsertInsight & { authorId: number }): Promise<Insight>;
   updateInsight(id: number, updates: Partial<Insight>): Promise<Insight>;
   deleteInsight(id: number): Promise<void>;
+  
+  // Admin Article Management methods
+  getInsightArticles(): Promise<Insight[]>;
+  createInsightArticle(article: Omit<InsertInsight, 'id' | 'createdAt' | 'updatedAt'>): Promise<Insight>;
+  updateInsightArticle(id: number, updates: Partial<Insight>): Promise<Insight>;
+  deleteInsightArticle(id: number): Promise<void>;
 
   // Mentor methods
   getMentors(specialty?: string, isActive?: boolean): Promise<Mentor[]>;
@@ -115,6 +121,12 @@ export interface IStorage {
   createEvent(event: InsertCommunityEvent & { organizerId: number }): Promise<CommunityEvent>;
   updateEvent(id: number, updates: Partial<CommunityEvent>): Promise<CommunityEvent>;
   deleteEvent(id: number): Promise<void>;
+  
+  // Admin Community Events Management methods
+  getCommunityEvents(): Promise<CommunityEvent[]>;
+  createCommunityEvent(event: Omit<InsertCommunityEvent, 'id' | 'createdAt' | 'updatedAt'>): Promise<CommunityEvent>;
+  updateCommunityEvent(id: number, updates: Partial<CommunityEvent>): Promise<CommunityEvent>;
+  deleteCommunityEvent(id: number): Promise<void>;
 
   // Event Registrations methods
   getEventRegistrations(eventId: number): Promise<EventRegistration[]>;
@@ -1147,6 +1159,52 @@ export class DatabaseStorage implements IStorage {
       avgTransactionsPerUser,
       totalBalance
     };
+  }
+
+  // Admin Article Management methods
+  async getInsightArticles(): Promise<Insight[]> {
+    return await db.select().from(insights).orderBy(desc(insights.createdAt));
+  }
+
+  async createInsightArticle(article: Omit<InsertInsight, 'id' | 'createdAt' | 'updatedAt'>): Promise<Insight> {
+    const [created] = await db.insert(insights).values(article).returning();
+    return created;
+  }
+
+  async updateInsightArticle(id: number, updates: Partial<Insight>): Promise<Insight> {
+    const [updated] = await db
+      .update(insights)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(insights.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteInsightArticle(id: number): Promise<void> {
+    await db.delete(insights).where(eq(insights.id, id));
+  }
+
+  // Admin Community Events Management methods
+  async getCommunityEvents(): Promise<CommunityEvent[]> {
+    return await db.select().from(communityEvents).orderBy(desc(communityEvents.createdAt));
+  }
+
+  async createCommunityEvent(event: Omit<InsertCommunityEvent, 'id' | 'createdAt' | 'updatedAt'>): Promise<CommunityEvent> {
+    const [created] = await db.insert(communityEvents).values(event).returning();
+    return created;
+  }
+
+  async updateCommunityEvent(id: number, updates: Partial<CommunityEvent>): Promise<CommunityEvent> {
+    const [updated] = await db
+      .update(communityEvents)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(communityEvents.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteCommunityEvent(id: number): Promise<void> {
+    await db.delete(communityEvents).where(eq(communityEvents.id, id));
   }
 }
 

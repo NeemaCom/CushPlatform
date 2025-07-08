@@ -2657,6 +2657,10 @@ function AdminDashboard({ user, onBack }) {
   const [activityLogs, setActivityLogs] = useState([]);
   const [mentors, setMentors] = useState([]);
   const [showAddMentor, setShowAddMentor] = useState(false);
+  const [articles, setArticles] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [showAddArticle, setShowAddArticle] = useState(false);
+  const [showAddEvent, setShowAddEvent] = useState(false);
   const [newMentor, setNewMentor] = useState({
     name: '',
     email: '',
@@ -2680,6 +2684,10 @@ function AdminDashboard({ user, onBack }) {
       fetchUsers();
     } else if (currentTab === 'mentors') {
       fetchMentors();
+    } else if (currentTab === 'articles') {
+      fetchArticles();
+    } else if (currentTab === 'events') {
+      fetchEvents();
     } else if (currentTab === 'activity') {
       fetchActivityLogs();
     }
@@ -2753,6 +2761,36 @@ function AdminDashboard({ user, onBack }) {
     }
   };
 
+  const fetchArticles = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/articles');
+      if (response.ok) {
+        const data = await response.json();
+        setArticles(data.articles || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch articles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/admin/events');
+      if (response.ok) {
+        const data = await response.json();
+        setEvents(data.events || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch events:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const addMentor = async (e) => {
     e.preventDefault();
     try {
@@ -2813,6 +2851,49 @@ function AdminDashboard({ user, onBack }) {
     } catch (error) {
       alert('Failed to delete mentor');
     }
+  };
+
+  const deleteArticle = async (articleId) => {
+    if (!confirm('Are you sure you want to delete this article? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/articles/${articleId}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchArticles();
+        alert('Article deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete article');
+      }
+    } catch (error) {
+      alert('Failed to delete article');
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    if (!confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/events/${eventId}`, { method: 'DELETE' });
+      if (response.ok) {
+        fetchEvents();
+        alert('Event deleted successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to delete event');
+      }
+    } catch (error) {
+      alert('Failed to delete event');
+    }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString();
   };
 
   const toggleMentorStatus = async (mentorId, isActive) => {
@@ -2937,6 +3018,8 @@ function AdminDashboard({ user, onBack }) {
           ['overview', 'Overview', '📊'],
           ['users', 'User Management', '👥'],
           ['mentors', 'Mentor Management', '👨‍🏫'],
+          ['articles', 'Articles', '📝'],
+          ['events', 'Events', '🎯'],
           ['activity', 'Activity Logs', '📋']
         ].map(([tab, label, icon]) =>
           e('button', {
@@ -3403,6 +3486,123 @@ function AdminDashboard({ user, onBack }) {
               }, loading ? 'Adding...' : 'Add Mentor')
             ])
           ])
+        ])
+      ]),
+
+      // Articles Management Tab
+      currentTab === 'articles' && e('div', { key: 'articles-content' }, [
+        e('div', {
+          key: 'articles-header',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'
+        }, [
+          e('div', { key: 'header-row', className: 'flex items-center justify-between' }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900' }, 'Article Management'),
+            e('button', {
+              key: 'add-article',
+              onClick: () => setShowAddArticle(true),
+              className: 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors'
+            }, '📝 Add Article')
+          ])
+        ]),
+
+        // Articles List
+        e('div', {
+          key: 'articles-list',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'
+        }, [
+          articles.length > 0 ? articles.map((article) =>
+            e('div', {
+              key: article.id,
+              className: 'p-6 border-b border-gray-200 hover:bg-gray-50'
+            }, [
+              e('div', { key: 'article-header', className: 'flex items-start justify-between mb-3' }, [
+                e('div', { key: 'article-info' }, [
+                  e('h4', { key: 'title', className: 'text-lg font-semibold text-gray-900' }, article.title),
+                  e('p', { key: 'category', className: 'text-sm text-gray-600 mt-1' }, article.category),
+                  e('p', { key: 'excerpt', className: 'text-sm text-gray-700 mt-2' }, article.excerpt || 'No excerpt available')
+                ]),
+                e('div', { key: 'article-actions', className: 'flex gap-2' }, [
+                  e('button', {
+                    key: 'edit',
+                    onClick: () => console.log('Edit article', article.id),
+                    className: 'text-blue-600 hover:text-blue-900 text-sm px-2 py-1 rounded hover:bg-blue-50'
+                  }, 'Edit'),
+                  e('button', {
+                    key: 'delete',
+                    onClick: () => deleteArticle(article.id),
+                    className: 'text-red-600 hover:text-red-900 text-sm px-2 py-1 rounded hover:bg-red-50'
+                  }, 'Delete')
+                ])
+              ]),
+              e('div', { key: 'article-meta', className: 'flex items-center gap-4 text-sm text-gray-500' }, [
+                e('span', { key: 'author' }, `By: ${article.author || 'Admin'}`),
+                e('span', { key: 'read-time' }, `${article.readTime || 5} min read`),
+                e('span', { key: 'created' }, `Created: ${formatDate(article.createdAt)}`)
+              ])
+            ])
+          ) : e('div', {
+            key: 'no-articles',
+            className: 'p-8 text-center text-gray-500'
+          }, 'No articles found. Create your first article!')
+        ])
+      ]),
+
+      // Events Management Tab
+      currentTab === 'events' && e('div', { key: 'events-content' }, [
+        e('div', {
+          key: 'events-header',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6'
+        }, [
+          e('div', { key: 'header-row', className: 'flex items-center justify-between' }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900' }, 'Event Management'),
+            e('button', {
+              key: 'add-event',
+              onClick: () => setShowAddEvent(true),
+              className: 'bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors'
+            }, '🎯 Add Event')
+          ])
+        ]),
+
+        // Events List
+        e('div', {
+          key: 'events-list',
+          className: 'bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden'
+        }, [
+          events.length > 0 ? events.map((event) =>
+            e('div', {
+              key: event.id,
+              className: 'p-6 border-b border-gray-200 hover:bg-gray-50'
+            }, [
+              e('div', { key: 'event-header', className: 'flex items-start justify-between mb-3' }, [
+                e('div', { key: 'event-info' }, [
+                  e('h4', { key: 'title', className: 'text-lg font-semibold text-gray-900' }, event.title),
+                  e('p', { key: 'type', className: 'text-sm text-gray-600 mt-1' }, event.type || 'Event'),
+                  e('p', { key: 'description', className: 'text-sm text-gray-700 mt-2' }, event.description)
+                ]),
+                e('div', { key: 'event-actions', className: 'flex gap-2' }, [
+                  e('button', {
+                    key: 'edit',
+                    onClick: () => console.log('Edit event', event.id),
+                    className: 'text-blue-600 hover:text-blue-900 text-sm px-2 py-1 rounded hover:bg-blue-50'
+                  }, 'Edit'),
+                  e('button', {
+                    key: 'delete',
+                    onClick: () => deleteEvent(event.id),
+                    className: 'text-red-600 hover:text-red-900 text-sm px-2 py-1 rounded hover:bg-red-50'
+                  }, 'Delete')
+                ])
+              ]),
+              e('div', { key: 'event-meta', className: 'flex items-center gap-4 text-sm text-gray-500' }, [
+                e('span', { key: 'date' }, `Date: ${formatDate(event.date)}`),
+                e('span', { key: 'duration' }, `Duration: ${event.duration || 60} min`),
+                e('span', { key: 'participants' }, `Max: ${event.maxParticipants || 100} people`),
+                e('span', { key: 'location' }, event.location || 'Online')
+              ])
+            ])
+          ) : e('div', {
+            key: 'no-events',
+            className: 'p-8 text-center text-gray-500'
+          }, 'No events found. Create your first event!')
         ])
       ]),
 

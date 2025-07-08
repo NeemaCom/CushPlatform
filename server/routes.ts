@@ -3535,6 +3535,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Insight Articles Management
+  app.get('/api/admin/articles', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const articles = await storage.getInsightArticles();
+      res.json({ articles });
+    } catch (error: any) {
+      console.error('Failed to fetch articles:', error);
+      res.status(500).json({ error: 'Failed to fetch articles' });
+    }
+  });
+
+  app.post('/api/admin/articles', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { title, excerpt, content, category, tags, featuredImage, readTime } = req.body;
+      
+      const articleData = {
+        title,
+        excerpt,
+        content,
+        category,
+        tags: JSON.stringify(tags || []),
+        featuredImage: featuredImage || null,
+        readTime: readTime || 5,
+        author: req.user!.firstName + ' ' + req.user!.lastName,
+        authorRole: 'Immigration Expert',
+        publishedAt: new Date()
+      };
+
+      const article = await storage.createInsightArticle(articleData);
+      res.json({ success: true, article });
+    } catch (error: any) {
+      console.error('Failed to create article:', error);
+      res.status(500).json({ error: 'Failed to create article' });
+    }
+  });
+
+  app.put('/api/admin/articles/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { title, excerpt, content, category, tags, featuredImage, readTime } = req.body;
+      
+      const updateData = {
+        title,
+        excerpt,
+        content,
+        category,
+        tags: JSON.stringify(tags || []),
+        featuredImage: featuredImage || null,
+        readTime: readTime || 5
+      };
+
+      const article = await storage.updateInsightArticle(parseInt(id), updateData);
+      res.json({ success: true, article });
+    } catch (error: any) {
+      console.error('Failed to update article:', error);
+      res.status(500).json({ error: 'Failed to update article' });
+    }
+  });
+
+  app.delete('/api/admin/articles/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteInsightArticle(parseInt(id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete article:', error);
+      res.status(500).json({ error: 'Failed to delete article' });
+    }
+  });
+
+  // Admin Community Events Management
+  app.get('/api/admin/events', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const events = await storage.getCommunityEvents();
+      res.json({ events });
+    } catch (error: any) {
+      console.error('Failed to fetch events:', error);
+      res.status(500).json({ error: 'Failed to fetch events' });
+    }
+  });
+
+  app.post('/api/admin/events', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { title, description, type, date, duration, maxParticipants, location, imageUrl, registrationRequired } = req.body;
+      
+      const eventData = {
+        title,
+        description,
+        type: type || 'webinar',
+        date: new Date(date),
+        duration: duration || 60,
+        maxParticipants: maxParticipants || 100,
+        location: location || 'Online',
+        imageUrl: imageUrl || null,
+        registrationRequired: registrationRequired !== false,
+        createdBy: req.user!.id
+      };
+
+      const event = await storage.createCommunityEvent(eventData);
+      res.json({ success: true, event });
+    } catch (error: any) {
+      console.error('Failed to create event:', error);
+      res.status(500).json({ error: 'Failed to create event' });
+    }
+  });
+
+  app.put('/api/admin/events/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { title, description, type, date, duration, maxParticipants, location, imageUrl, registrationRequired } = req.body;
+      
+      const updateData = {
+        title,
+        description,
+        type,
+        date: new Date(date),
+        duration,
+        maxParticipants,
+        location,
+        imageUrl: imageUrl || null,
+        registrationRequired: registrationRequired !== false
+      };
+
+      const event = await storage.updateCommunityEvent(parseInt(id), updateData);
+      res.json({ success: true, event });
+    } catch (error: any) {
+      console.error('Failed to update event:', error);
+      res.status(500).json({ error: 'Failed to update event' });
+    }
+  });
+
+  app.delete('/api/admin/events/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCommunityEvent(parseInt(id));
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Failed to delete event:', error);
+      res.status(500).json({ error: 'Failed to delete event' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
