@@ -2891,10 +2891,7 @@ function AdminDashboard({ user, onBack }) {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString();
-  };
+
 
   const toggleMentorStatus = async (mentorId, isActive) => {
     try {
@@ -3484,6 +3481,361 @@ function AdminDashboard({ user, onBack }) {
                 disabled: loading,
                 className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors disabled:opacity-50'
               }, loading ? 'Adding...' : 'Add Mentor')
+            ])
+          ])
+        ])
+      ]),
+
+      // Add Article Modal
+      showAddArticle && e('div', {
+        key: 'add-article-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowAddArticle(false);
+          }
+        }
+      }, [
+        e('div', {
+          key: 'modal-content',
+          className: 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'modal-header',
+            className: 'p-6 border-b'
+          }, [
+            e('div', {
+              key: 'header-content',
+              className: 'flex justify-between items-center'
+            }, [
+              e('h2', {
+                key: 'modal-title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Create New Article'),
+              e('button', {
+                key: 'close-modal',
+                onClick: () => setShowAddArticle(false),
+                className: 'text-gray-400 hover:text-gray-600 text-2xl'
+              }, '×')
+            ])
+          ]),
+          e('form', {
+            key: 'add-article-form',
+            onSubmit: async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              
+              const formData = new FormData(e.target);
+              const articleData = {
+                title: formData.get('title'),
+                category: formData.get('category'),
+                content: formData.get('content'),
+                excerpt: formData.get('excerpt'),
+                tags: formData.get('tags').split(',').map(tag => tag.trim()).filter(Boolean),
+                readTime: parseInt(formData.get('readTime')) || 5,
+                isPublic: formData.get('isPublic') === 'on'
+              };
+
+              try {
+                const response = await fetch('/api/admin/articles', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(articleData)
+                });
+
+                if (response.ok) {
+                  setShowAddArticle(false);
+                  fetchArticles();
+                  alert('Article created successfully!');
+                } else {
+                  const error = await response.json();
+                  alert(error.error || 'Failed to create article');
+                }
+              } catch (error) {
+                alert('Failed to create article');
+              } finally {
+                setLoading(false);
+              }
+            },
+            className: 'p-6 space-y-6'
+          }, [
+            e('div', { key: 'title-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Title'),
+              e('input', {
+                type: 'text',
+                name: 'title',
+                required: true,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'category-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Category'),
+              e('select', {
+                name: 'category',
+                required: true,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              }, [
+                e('option', { value: '' }, 'Select a category'),
+                e('option', { value: 'immigration' }, 'Immigration'),
+                e('option', { value: 'financial' }, 'Financial'),
+                e('option', { value: 'career' }, 'Career'),
+                e('option', { value: 'education' }, 'Education'),
+                e('option', { value: 'lifestyle' }, 'Lifestyle')
+              ])
+            ]),
+            e('div', { key: 'excerpt-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Excerpt'),
+              e('textarea', {
+                name: 'excerpt',
+                rows: 3,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'content-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Content'),
+              e('textarea', {
+                name: 'content',
+                required: true,
+                rows: 8,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'tags-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Tags (comma-separated)'),
+              e('input', {
+                type: 'text',
+                name: 'tags',
+                placeholder: 'visa, canada, immigration',
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'read-time-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Read Time (minutes)'),
+              e('input', {
+                type: 'number',
+                name: 'readTime',
+                min: 1,
+                max: 60,
+                defaultValue: 5,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'public-field', className: 'flex items-center gap-2' }, [
+              e('input', {
+                type: 'checkbox',
+                name: 'isPublic',
+                defaultChecked: true,
+                className: 'w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+              }),
+              e('label', { className: 'text-sm font-medium text-gray-700' }, 'Make article public')
+            ]),
+            e('div', { key: 'form-actions', className: 'flex gap-3 pt-4' }, [
+              e('button', {
+                type: 'button',
+                onClick: () => setShowAddArticle(false),
+                className: 'flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg transition-colors'
+              }, 'Cancel'),
+              e('button', {
+                type: 'submit',
+                disabled: loading,
+                className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors disabled:opacity-50'
+              }, loading ? 'Creating...' : 'Create Article')
+            ])
+          ])
+        ])
+      ]),
+
+      // Add Event Modal
+      showAddEvent && e('div', {
+        key: 'add-event-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowAddEvent(false);
+          }
+        }
+      }, [
+        e('div', {
+          key: 'modal-content',
+          className: 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+        }, [
+          e('div', {
+            key: 'modal-header',
+            className: 'p-6 border-b'
+          }, [
+            e('div', {
+              key: 'header-content',
+              className: 'flex justify-between items-center'
+            }, [
+              e('h2', {
+                key: 'modal-title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Create New Event'),
+              e('button', {
+                key: 'close-modal',
+                onClick: () => setShowAddEvent(false),
+                className: 'text-gray-400 hover:text-gray-600 text-2xl'
+              }, '×')
+            ])
+          ]),
+          e('form', {
+            key: 'add-event-form',
+            onSubmit: async (e) => {
+              e.preventDefault();
+              setLoading(true);
+              
+              const formData = new FormData(e.target);
+              const eventData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                date: new Date(formData.get('date')),
+                type: formData.get('type'),
+                location: formData.get('location'),
+                duration: parseInt(formData.get('duration')) || 60,
+                maxParticipants: parseInt(formData.get('maxParticipants')) || 100,
+                category: formData.get('category'),
+                tags: formData.get('tags').split(',').map(tag => tag.trim()).filter(Boolean),
+                isPublic: formData.get('isPublic') === 'on'
+              };
+
+              try {
+                const response = await fetch('/api/admin/events', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(eventData)
+                });
+
+                if (response.ok) {
+                  setShowAddEvent(false);
+                  fetchEvents();
+                  alert('Event created successfully!');
+                } else {
+                  const error = await response.json();
+                  alert(error.error || 'Failed to create event');
+                }
+              } catch (error) {
+                alert('Failed to create event');
+              } finally {
+                setLoading(false);
+              }
+            },
+            className: 'p-6 space-y-6'
+          }, [
+            e('div', { key: 'title-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Event Title'),
+              e('input', {
+                type: 'text',
+                name: 'title',
+                required: true,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'description-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Description'),
+              e('textarea', {
+                name: 'description',
+                required: true,
+                rows: 4,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'date-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Date & Time'),
+              e('input', {
+                type: 'datetime-local',
+                name: 'date',
+                required: true,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'type-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Event Type'),
+              e('select', {
+                name: 'type',
+                defaultValue: 'webinar',
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              }, [
+                e('option', { value: 'webinar' }, 'Webinar'),
+                e('option', { value: 'workshop' }, 'Workshop'),
+                e('option', { value: 'seminar' }, 'Seminar'),
+                e('option', { value: 'networking' }, 'Networking'),
+                e('option', { value: 'consultation' }, 'Consultation')
+              ])
+            ]),
+            e('div', { key: 'location-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Location'),
+              e('input', {
+                type: 'text',
+                name: 'location',
+                defaultValue: 'Online',
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'duration-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Duration (minutes)'),
+              e('input', {
+                type: 'number',
+                name: 'duration',
+                min: 15,
+                max: 480,
+                defaultValue: 60,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'participants-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Max Participants'),
+              e('input', {
+                type: 'number',
+                name: 'maxParticipants',
+                min: 1,
+                max: 1000,
+                defaultValue: 100,
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'category-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Category'),
+              e('select', {
+                name: 'category',
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              }, [
+                e('option', { value: '' }, 'Select a category'),
+                e('option', { value: 'immigration' }, 'Immigration'),
+                e('option', { value: 'financial' }, 'Financial'),
+                e('option', { value: 'career' }, 'Career'),
+                e('option', { value: 'education' }, 'Education'),
+                e('option', { value: 'networking' }, 'Networking')
+              ])
+            ]),
+            e('div', { key: 'tags-field' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Tags (comma-separated)'),
+              e('input', {
+                type: 'text',
+                name: 'tags',
+                placeholder: 'visa, workshop, career',
+                className: 'w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent'
+              })
+            ]),
+            e('div', { key: 'public-field', className: 'flex items-center gap-2' }, [
+              e('input', {
+                type: 'checkbox',
+                name: 'isPublic',
+                defaultChecked: true,
+                className: 'w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500'
+              }),
+              e('label', { className: 'text-sm font-medium text-gray-700' }, 'Make event public')
+            ]),
+            e('div', { key: 'form-actions', className: 'flex gap-3 pt-4' }, [
+              e('button', {
+                type: 'button',
+                onClick: () => setShowAddEvent(false),
+                className: 'flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 rounded-lg transition-colors'
+              }, 'Cancel'),
+              e('button', {
+                type: 'submit',
+                disabled: loading,
+                className: 'flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors disabled:opacity-50'
+              }, loading ? 'Creating...' : 'Create Event')
             ])
           ])
         ])
