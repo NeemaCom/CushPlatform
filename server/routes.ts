@@ -640,6 +640,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(req.user);
   });
 
+  // Profile picture upload endpoint
+  app.post("/api/profile/picture", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { image } = req.body;
+      const userId = req.userId!;
+      
+      if (!image) {
+        return res.status(400).json({ error: "Image data is required" });
+      }
+      
+      // For now, we'll store the base64 image directly. In production, you'd upload to a cloud storage service
+      const profilePictureUrl = image; // This would be replaced with actual cloud storage URL
+      
+      await storage.updateUser(userId, { profilePicture: profilePictureUrl });
+      
+      await SecurityLogger.logAuthEvent(
+        'profile_picture_updated',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json({ 
+        message: "Profile picture updated successfully",
+        profilePicture: profilePictureUrl
+      });
+    } catch (error) {
+      console.error("Profile picture upload error:", error);
+      res.status(500).json({ error: "Failed to update profile picture" });
+    }
+  });
+
   app.put("/api/profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const updates = updateProfileSchema.parse(req.body);

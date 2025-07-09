@@ -13,6 +13,7 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   phoneNumber: text("phone_number"),
   nationality: text("nationality"),
+  profilePicture: text("profile_picture"),
   isEmailVerified: boolean("is_email_verified").default(false),
   isPhoneVerified: boolean("is_phone_verified").default(false),
   acceptTerms: boolean("accept_terms").notNull(),
@@ -774,6 +775,7 @@ export const updateProfileSchema = z.object({
   lastName: z.string().min(1, "Last name is required").optional(),
   phoneNumber: z.string().optional(),
   nationality: z.string().optional(),
+  profilePicture: z.string().optional(),
   marketingConsent: z.boolean().optional(),
 });
 
@@ -797,6 +799,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   phoneNumber: true,
   nationality: true,
+  profilePicture: true,
   acceptTerms: true,
   acceptPrivacy: true,
   marketingConsent: true,
