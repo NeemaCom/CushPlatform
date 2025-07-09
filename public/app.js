@@ -1709,6 +1709,7 @@ function Dashboard({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   
 
 
@@ -1753,19 +1754,102 @@ function Dashboard({ user }) {
     }
   };
 
+  // WebSocket connection for real-time notifications
+  useEffect(() => {
+    if (!user || !user.id) return;
+    
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
+    
+    socket.onopen = () => {
+      console.log('WebSocket connected');
+      setWsConnected(true);
+      
+      // Authenticate with user ID
+      socket.send(JSON.stringify({
+        type: 'authenticate',
+        userId: user.id
+      }));
+    };
+    
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        switch (data.type) {
+          case 'notification':
+            // New notification received
+            setNotifications(prev => [data.data, ...prev]);
+            setUnreadCount(prev => prev + 1);
+            
+            // Show browser notification if permission granted
+            if (Notification.permission === 'granted') {
+              new Notification(data.data.title, {
+                body: data.data.message,
+                icon: '/favicon.ico'
+              });
+            }
+            break;
+            
+          case 'unread_count':
+            // Update unread count
+            setUnreadCount(data.data.count);
+            break;
+            
+          case 'notification_list':
+            // Update full notification list
+            setNotifications(data.data);
+            break;
+            
+          case 'authenticated':
+            console.log('WebSocket authenticated successfully');
+            break;
+            
+          case 'error':
+            console.error('WebSocket error:', data.message);
+            break;
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+      }
+    };
+    
+    socket.onclose = () => {
+      console.log('WebSocket disconnected');
+      setWsConnected(false);
+    };
+    
+    socket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setWsConnected(false);
+    };
+    
+    // Request notification permission
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
+    return () => {
+      socket.close();
+    };
+  }, [user]);
+
   // Load notifications on component mount
   useEffect(() => {
     loadNotifications();
     loadUnreadCount();
     
-    // Refresh notifications every 30 seconds
+    // Refresh notifications every 30 seconds (fallback to polling)
     const interval = setInterval(() => {
-      loadNotifications();
-      loadUnreadCount();
+      if (!wsConnected) {
+        loadNotifications();
+        loadUnreadCount();
+      }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [wsConnected]);
 
   const handleLogout = async () => {
     try {
@@ -2013,7 +2097,13 @@ function Dashboard({ user }) {
                 unreadCount > 0 && e('span', {
                   key: 'notification-badge',
                   className: 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center'
-                }, unreadCount.toString())
+                }, unreadCount.toString()),
+                // WebSocket connection indicator
+                e('div', {
+                  key: 'ws-indicator',
+                  className: `absolute top-0 right-0 w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-gray-400'}`,
+                  title: wsConnected ? 'Real-time updates enabled' : 'Fallback to polling'
+                })
               ]),
               
               // Notifications Panel

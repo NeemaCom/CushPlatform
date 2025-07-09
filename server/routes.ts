@@ -1,5 +1,6 @@
 import type { Express, Response } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import Stripe from "stripe";
 import session from "express-session";
 import passport from "passport";
@@ -4550,6 +4551,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { status, adminNotes } = req.body;
       
       const feedback = await supportService.updateFeedbackStatus(feedbackId, status, adminNotes);
+      
+      // Send real-time notification to feedback submitter
+      const statusMessages = {
+        'submitted': 'Your feedback has been submitted',
+        'reviewed': 'Your feedback has been reviewed by our team',
+        'implemented': 'Your feedback has been implemented! Thank you for your suggestion.'
+      };
+      
+      const statusMessage = statusMessages[status as keyof typeof statusMessages];
+      if (statusMessage) {
+        notificationService.createSupportNotification(
+          feedback.userId,
+          'feedback_response',
+          'Feedback Update',
+          statusMessage,
+          { feedbackId, feedbackTitle: feedback.title, status, adminNotes }
+        );
+        
+        // Send real-time updates
+        notificationService.sendUnreadCountUpdate(feedback.userId);
+        notificationService.sendNotificationListUpdate(feedback.userId);
+      }
+      
       res.json(feedback);
     } catch (error) {
       console.error('Error updating feedback status:', error);
@@ -4605,6 +4629,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const updates = req.body;
       
       const ticket = await supportService.updateSupportTicket(ticketId, updates);
+      
+      // Send real-time notification to ticket creator about status change
+      if (updates.status) {
+        const statusMessages = {
+          'open': 'Your support ticket is now open and being reviewed',
+          'in_progress': 'Your support ticket is being worked on by our team',
+          'resolved': 'Your support ticket has been resolved',
+          'closed': 'Your support ticket has been closed'
+        };
+        
+        const statusMessage = statusMessages[updates.status as keyof typeof statusMessages];
+        if (statusMessage) {
+          notificationService.createSupportNotification(
+            ticket.userId,
+            'ticket_status',
+            'Support Ticket Status Update',
+            statusMessage,
+            { ticketId, ticketNumber: ticket.ticketNumber, status: updates.status }
+          );
+          
+          // Send real-time updates
+          notificationService.sendUnreadCountUpdate(ticket.userId);
+          notificationService.sendNotificationListUpdate(ticket.userId);
+        }
+      }
+      
       res.json(ticket);
     } catch (error) {
       console.error('Error updating support ticket:', error);
@@ -4623,6 +4673,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message,
         isStaff: true
       });
+      
+      // Get the ticket details to find the user
+      const ticket = await supportService.getSupportTicket(ticketId, ticketId);
+      if (ticket) {
+        // Send real-time notification to ticket creator
+        notificationService.createSupportNotification(
+          ticket.userId,
+          'ticket_reply',
+          'Support Ticket Reply',
+          `You have a new reply on your support ticket: "${ticket.subject}"`,
+          { ticketId, ticketNumber: ticket.ticketNumber }
+        );
+        
+        // Send real-time updates
+        notificationService.sendUnreadCountUpdate(ticket.userId);
+        notificationService.sendNotificationListUpdate(ticket.userId);
+      }
+      
       res.status(201).json(reply);
     } catch (error) {
       console.error('Error creating ticket reply:', error);
@@ -4662,5 +4730,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+  
+  // WebSocket server for real-time notifications
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  wss.on('connection', (ws, req) => {
+    console.log('New WebSocket connection');
+    
+    // Extract user ID from session or token
+    let userId: number | null = null;
+    
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        if (data.type === 'authenticate' && data.userId) {
+          userId = data.userId;
+          notificationService.addWebSocketConnection(userId, ws);
+          
+          // Send initial notification count and list
+          notificationService.sendUnreadCountUpdate(userId);
+          notificationService.sendNotificationListUpdate(userId);
+          
+          ws.send(JSON.stringify({
+            type: 'authenticated',
+            success: true
+          }));
+        }
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({
+          type: 'error',
+          message: 'Invalid message format'
+        }));
+      }
+    });
+    
+    ws.on('close', () => {
+      if (userId) {
+        notificationService.removeWebSocketConnection(userId, ws);
+      }
+      console.log('WebSocket connection closed');
+    });
+  });
+
   return httpServer;
 }
