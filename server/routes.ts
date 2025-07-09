@@ -59,6 +59,7 @@ import {
 import { z } from "zod";
 import { geminiService, type UserContext } from "./gemini-service";
 import rateLimit from "express-rate-limit";
+import { notificationService } from "./notification-service";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -1290,6 +1291,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.get('User-Agent'),
         { applicationId: application.id, amount: application.amount, providerId: application.loanProviderId }
       );
+
+      // Create notification for loan application
+      try {
+        const provider = await loanService.getLoanProviderById(application.loanProviderId);
+        if (provider) {
+          notificationService.createLoanNotification(
+            userId,
+            'application',
+            provider.name
+          );
+        }
+      } catch (notificationError) {
+        console.error('Failed to create notification:', notificationError);
+      }
       
       res.json(application);
     } catch (error) {
@@ -1333,6 +1348,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { loanProviderId } = req.body;
       const userId = req.userId!;
       const favorite = await loanService.addToFavorites(userId, loanProviderId);
+      
+      // Create notification for favorite
+      try {
+        const provider = await loanService.getLoanProviderById(loanProviderId);
+        if (provider) {
+          notificationService.createNotification(
+            userId,
+            'loan',
+            'Favorite Added',
+            `${provider.name} has been added to your favorites`
+          );
+        }
+      } catch (notificationError) {
+        console.error('Failed to create favorite notification:', notificationError);
+      }
+      
       res.json(favorite);
     } catch (error) {
       console.error('Add to favorites error:', error);
@@ -2796,6 +2827,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating test users:', error);
       res.status(500).json({ error: "Failed to create test users" });
+    }
+  });
+
+  // ===== NOTIFICATION SYSTEM ENDPOINTS =====
+
+  // Get user notifications
+  app.get('/api/notifications', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const notifications = notificationService.getUserNotifications(userId, limit);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get unread notification count
+  app.get('/api/notifications/unread-count', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const count = notificationService.getUnreadCount(userId);
+      res.json({ count });
+    } catch (error) {
+      console.error('Error fetching unread count:', error);
+      res.status(500).json({ error: "Failed to fetch unread count" });
+    }
+  });
+
+  // Mark notification as read
+  app.put('/api/notifications/:id/read', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notificationId = req.params.id;
+      
+      const success = notificationService.markAsRead(userId, notificationId);
+      if (success) {
+        res.json({ message: "Notification marked as read" });
+      } else {
+        res.status(404).json({ error: "Notification not found" });
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ error: "Failed to mark notification as read" });
+    }
+  });
+
+  // Mark all notifications as read
+  app.put('/api/notifications/mark-all-read', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      notificationService.markAllAsRead(userId);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+      res.status(500).json({ error: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Delete notification
+  app.delete('/api/notifications/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notificationId = req.params.id;
+      
+      const success = notificationService.deleteNotification(userId, notificationId);
+      if (success) {
+        res.json({ message: "Notification deleted" });
+      } else {
+        res.status(404).json({ error: "Notification not found" });
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      res.status(500).json({ error: "Failed to delete notification" });
+    }
+  });
+
+  // Create test notifications (development only)
+  app.post('/api/notifications/test', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    
+    try {
+      const userId = req.userId!;
+      
+      // Create sample notifications
+      notificationService.createLoanNotification(userId, 'application', 'Test Bank');
+      notificationService.createFinancialNotification(userId, 'goal', 'You\'re 80% towards your savings goal!');
+      notificationService.createCommunityNotification(userId, 'event', 'Immigration Workshop this Friday');
+      notificationService.createAchievementNotification(userId, 'First Steps', 'Completed your first loan application');
+      
+      res.json({ message: "Test notifications created" });
+    } catch (error) {
+      console.error('Error creating test notifications:', error);
+      res.status(500).json({ error: "Failed to create test notifications" });
     }
   });
 

@@ -1608,6 +1608,64 @@ function AuthComponent() {
 function Dashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+
+  // Load notifications
+  const loadNotifications = async () => {
+    try {
+      const response = await fetch('/api/notifications');
+      if (response.ok) {
+        const data = await response.json();
+        setNotifications(data);
+      }
+    } catch (error) {
+      console.error('Failed to load notifications:', error);
+    }
+  };
+
+  // Load unread count
+  const loadUnreadCount = async () => {
+    try {
+      const response = await fetch('/api/notifications/unread-count');
+      if (response.ok) {
+        const data = await response.json();
+        setUnreadCount(data.count);
+      }
+    } catch (error) {
+      console.error('Failed to load unread count:', error);
+    }
+  };
+
+  // Mark notification as read
+  const markAsRead = async (notificationId) => {
+    try {
+      const response = await fetch(`/api/notifications/${notificationId}/read`, {
+        method: 'PUT'
+      });
+      if (response.ok) {
+        loadNotifications();
+        loadUnreadCount();
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
+  };
+
+  // Load notifications on component mount
+  useEffect(() => {
+    loadNotifications();
+    loadUnreadCount();
+    
+    // Refresh notifications every 30 seconds
+    const interval = setInterval(() => {
+      loadNotifications();
+      loadUnreadCount();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -1821,6 +1879,75 @@ function Dashboard({ user }) {
                 className: 'absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'
               }, '🔍')
             ]),
+            // Notification Bell
+            e('div', {
+              key: 'notification-container',
+              className: 'relative'
+            }, [
+              e('button', {
+                key: 'notification-btn',
+                onClick: () => setNotificationsPanelOpen(!notificationsPanelOpen),
+                className: 'relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors'
+              }, [
+                e('span', { key: 'bell-icon', className: 'text-xl' }, '🔔'),
+                unreadCount > 0 && e('span', {
+                  key: 'notification-badge',
+                  className: 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center'
+                }, unreadCount.toString())
+              ]),
+              
+              // Notifications Panel
+              notificationsPanelOpen && e('div', {
+                key: 'notifications-panel',
+                className: 'absolute right-0 top-full mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50'
+              }, [
+                e('div', { 
+                  key: 'panel-header',
+                  className: 'px-4 py-3 border-b border-gray-200 flex items-center justify-between'
+                }, [
+                  e('h3', { key: 'panel-title', className: 'font-semibold text-gray-900' }, 'Notifications'),
+                  e('button', {
+                    key: 'close-panel',
+                    onClick: () => setNotificationsPanelOpen(false),
+                    className: 'text-gray-500 hover:text-gray-700'
+                  }, '✕')
+                ]),
+                
+                e('div', { 
+                  key: 'notifications-list',
+                  className: 'max-h-96 overflow-y-auto'
+                }, [
+                  notifications.length === 0 ? 
+                    e('div', { 
+                      key: 'no-notifications',
+                      className: 'p-8 text-center text-gray-500'
+                    }, 'No notifications yet') :
+                    notifications.map((notification, index) =>
+                      e('div', {
+                        key: `notification-${notification.id}-${index}`,
+                        className: `p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`,
+                        onClick: () => markAsRead(notification.id)
+                      }, [
+                        e('div', { key: 'notification-content', className: 'flex items-start gap-3' }, [
+                          e('div', { key: 'notification-icon', className: 'text-xl flex-shrink-0' }, 
+                            notification.type === 'loan' ? '💰' :
+                            notification.type === 'community' ? '🌍' :
+                            notification.type === 'achievement' ? '🏆' :
+                            notification.type === 'financial' ? '📊' : '🔔'
+                          ),
+                          e('div', { key: 'notification-text', className: 'flex-1 min-w-0' }, [
+                            e('h4', { key: 'notification-title', className: 'font-medium text-gray-900 text-sm' }, notification.title),
+                            e('p', { key: 'notification-message', className: 'text-gray-600 text-sm mt-1' }, notification.message),
+                            e('p', { key: 'notification-time', className: 'text-gray-400 text-xs mt-1' }, 
+                              new Date(notification.createdAt).toLocaleString())
+                          ])
+                        ])
+                      ])
+                    )
+                ])
+              ])
+            ]),
+            
             e('button', {
               key: 'account-btn',
               onClick: () => setCurrentView('account'),
@@ -1844,6 +1971,29 @@ function Dashboard({ user }) {
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         // Modern Financial Dashboard
         e('div', { key: 'dashboard-content', className: 'space-y-6' }, [
+          // Test Notification Button (Development Only)
+          process.env.NODE_ENV !== 'production' && e('div', {
+            key: 'test-notifications',
+            className: 'mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg'
+          }, [
+            e('h3', { key: 'test-title', className: 'text-sm font-medium text-yellow-800 mb-2' }, 'Development Test'),
+            e('button', {
+              key: 'test-btn',
+              onClick: async () => {
+                try {
+                  const response = await fetch('/api/notifications/test', { method: 'POST' });
+                  if (response.ok) {
+                    loadNotifications();
+                    loadUnreadCount();
+                  }
+                } catch (error) {
+                  console.error('Failed to create test notifications:', error);
+                }
+              },
+              className: 'bg-yellow-500 text-white px-4 py-2 rounded text-sm hover:bg-yellow-600'
+            }, 'Create Test Notifications')
+          ]),
+
           // Financial Overview Cards
           e('div', {
             key: 'overview-cards',
@@ -7363,9 +7513,9 @@ function LoansPage({ user, onBack }) {
           }, 'Browse Lenders')
         ]) :
         e('div', { key: 'favorites-grid', className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' },
-          favorites.map(provider =>
+          favorites.map((provider, index) =>
             e('div', {
-              key: provider.id,
+              key: `favorite-${provider.id}-${index}`,
               className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
             }, [
               e('div', { className: 'flex items-center gap-4 mb-4' }, [
@@ -7423,9 +7573,9 @@ function LoansPage({ user, onBack }) {
           }, 'Start an Application')
         ]) :
         e('div', { key: 'drafts-grid', className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
-          drafts.map(draft =>
+          drafts.map((draft, index) =>
             e('div', {
-              key: draft.id,
+              key: `draft-${draft.id}-${index}`,
               className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
             }, [
               e('div', { className: 'flex items-center justify-between mb-4' }, [
