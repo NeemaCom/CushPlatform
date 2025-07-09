@@ -4003,18 +4003,48 @@ function Homepage() {
     e(ContactSection, { key: 'contact' }),
     e(AuthComponent, { key: 'auth' }),
     
-    // Footer with Legal Links
+    // Footer with Legal Links and Compliance Information
     e('footer', {
       key: 'footer',
-      className: 'bg-gray-50 border-t border-gray-200 py-8 mt-16'
+      className: 'bg-gray-50 border-t border-gray-200 py-12 mt-16'
     }, [
       e('div', {
         key: 'footer-container',
         className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
       }, [
+        // Compliance Information
+        e('div', {
+          key: 'compliance-section',
+          className: 'mb-8 space-y-6'
+        }, [
+          e('div', {
+            key: 'compliance-text',
+            className: 'bg-white rounded-lg border border-gray-200 p-6 shadow-sm'
+          }, [
+            e('p', {
+              key: 'compliance-para',
+              className: 'text-gray-700 text-sm leading-relaxed mb-4'
+            }, 'Cush simplifies financial transactions and support for global transitions, partnering with licensed financial institutions, money transmitters, and fintechs to ensure regulatory compliance. Our services, including loans and savings, are facilitated through these partnerships and licensed subsidiaries, adhering to all applicable laws. Cush holds key regulatory registrations with FinCEN (US), FINTRAC (Canada), and SCUML (Nigeria), demonstrating our commitment to integrity and combating financial crime globally.')
+          ]),
+          e('div', {
+            key: 'disclaimer-text',
+            className: 'bg-blue-50 rounded-lg border border-blue-200 p-6'
+          }, [
+            e('h3', {
+              key: 'disclaimer-title',
+              className: 'text-sm font-semibold text-blue-900 mb-3'
+            }, 'Disclaimer'),
+            e('p', {
+              key: 'disclaimer-para',
+              className: 'text-blue-800 text-sm leading-relaxed'
+            }, 'Cush and its subsidiaries provide technology-driven solutions and value-added services for general use. We do not offer legal, tax, immigration, or personalized financial advisory services. Users should consult qualified professionals for specific advice. Service availability may vary by jurisdiction due to local regulatory and licensing requirements. Please refer to our Privacy Policy, Terms of Use, and Fee and Refund Agreement for detailed information.')
+          ])
+        ]),
+        
+        // Footer Links
         e('div', {
           key: 'footer-content',
-          className: 'flex flex-col sm:flex-row justify-between items-center gap-4'
+          className: 'flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200'
         }, [
           e('div', {
             key: 'footer-brand',

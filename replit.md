@@ -12,6 +12,15 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-09**: Added Financial Compliance and Regulatory Information to Homepage Footer
+- ✓ Added comprehensive compliance information highlighting partnerships with licensed financial institutions
+- ✓ Included regulatory registrations with FinCEN (US), FINTRAC (Canada), and SCUML (Nigeria)
+- ✓ Added detailed disclaimer about technology-driven solutions and professional consultation requirements
+- ✓ Enhanced footer design with compliance section in white card and disclaimer in blue-tinted card
+- ✓ Maintained professional styling with proper spacing and typography for legal content
+- ✓ Added emphasis on regulatory compliance and anti-financial crime commitment
+- ✓ Included jurisdiction-specific service availability notice for regulatory requirements
+
 **2025-07-09**: Implemented Dedicated Privacy Policy and Terms of Use Pages with Unique URLs
 - ✓ Created dedicated Privacy Policy page accessible at #privacy with comprehensive legal content
 - ✓ Created dedicated Terms of Use page accessible at #terms with detailed service agreement
