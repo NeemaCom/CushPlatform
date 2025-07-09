@@ -173,6 +173,16 @@ export interface IStorage {
   createJobListing(job: InsertJobListing): Promise<JobListing>;
   updateJobListing(id: number, updates: Partial<JobListing>): Promise<JobListing>;
   deleteJobListing(id: number): Promise<void>;
+  
+  // Admin methods for loan partner management
+  getLoanPartnerById(id: number): Promise<LoanPartner | undefined>;
+  getLoanApplications(): Promise<LoanReferral[]>;
+  getLoanApplicationsByUserId(userId: number): Promise<LoanReferral[]>;
+  
+  // Admin user management
+  getAllUsers(limit?: number, offset?: number): Promise<User[]>;
+  getUsersCount(): Promise<number>;
+  searchUsers(query: string): Promise<User[]>;
 
 
   // Admin-specific methods
@@ -905,6 +915,31 @@ export class DatabaseStorage implements IStorage {
 
   async deleteJobListing(id: number): Promise<void> {
     await db.delete(jobListings).where(eq(jobListings.id, id));
+  }
+
+  // Admin methods for loan partner management
+  async getLoanPartnerById(id: number): Promise<LoanPartner | undefined> {
+    const [partner] = await db.select().from(loanPartners).where(eq(loanPartners.id, id));
+    return partner || undefined;
+  }
+
+  async getLoanApplications(): Promise<LoanReferral[]> {
+    return await db.select().from(loanReferrals).orderBy(desc(loanReferrals.createdAt));
+  }
+
+  async getLoanApplicationsByUserId(userId: number): Promise<LoanReferral[]> {
+    return await db.select().from(loanReferrals).where(eq(loanReferrals.userId, userId));
+  }
+
+  async searchUsers(query: string): Promise<User[]> {
+    return await db.select().from(users).where(
+      or(
+        ilike(users.email, `%${query}%`),
+        ilike(users.firstName, `%${query}%`),
+        ilike(users.lastName, `%${query}%`),
+        ilike(users.username, `%${query}%`)
+      )
+    );
   }
 
   // Admin-specific methods implementation

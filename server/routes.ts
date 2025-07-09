@@ -60,6 +60,7 @@ import { z } from "zod";
 import { geminiService, type UserContext } from "./gemini-service";
 import rateLimit from "express-rate-limit";
 import { notificationService } from "./notification-service";
+import { adminService } from "./admin-service";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -2957,6 +2958,186 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ],
       note: 'These are test accounts for development and demo purposes only'
     });
+  });
+
+  // ============= ROBUST ADMIN FUNCTIONALITIES =============
+  
+  // Admin Analytics and Reporting
+  app.get('/api/admin/analytics', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const analytics = await adminService.getApplicationAnalytics(
+        startDate ? new Date(startDate as string) : undefined,
+        endDate ? new Date(endDate as string) : undefined
+      );
+      res.json(analytics);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+  });
+
+  // Partner Performance Metrics
+  app.get('/api/admin/partners/:partnerId/performance', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { period = '30d' } = req.query;
+      const performance = await adminService.getPartnerPerformance(
+        parseInt(partnerId),
+        period as '30d' | '90d' | '1y'
+      );
+      res.json(performance);
+    } catch (error) {
+      console.error('Error fetching partner performance:', error);
+      res.status(500).json({ error: 'Failed to fetch partner performance' });
+    }
+  });
+
+  // Fraud Detection and Prevention
+  app.get('/api/admin/fraud-alerts', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const alerts = await adminService.getFraudAlerts();
+      res.json(alerts);
+    } catch (error) {
+      console.error('Error fetching fraud alerts:', error);
+      res.status(500).json({ error: 'Failed to fetch fraud alerts' });
+    }
+  });
+
+  app.post('/api/admin/fraud-alerts/detect', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { applicationId, userId } = req.body;
+      const alerts = await adminService.detectFraudulentActivity(applicationId, userId);
+      res.json(alerts);
+    } catch (error) {
+      console.error('Error detecting fraud:', error);
+      res.status(500).json({ error: 'Failed to detect fraud' });
+    }
+  });
+
+  app.put('/api/admin/fraud-alerts/:alertId/resolve', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { alertId } = req.params;
+      const { resolution } = req.body;
+      await adminService.resolveFraudAlert(alertId, req.userId!, resolution);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error resolving fraud alert:', error);
+      res.status(500).json({ error: 'Failed to resolve fraud alert' });
+    }
+  });
+
+  // Document Verification
+  app.get('/api/admin/document-verifications', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const verifications = await adminService.getDocumentVerifications();
+      res.json(verifications);
+    } catch (error) {
+      console.error('Error fetching document verifications:', error);
+      res.status(500).json({ error: 'Failed to fetch document verifications' });
+    }
+  });
+
+  app.post('/api/admin/document-verifications/verify', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { applicationId, documentType } = req.body;
+      const verification = await adminService.verifyDocument(applicationId, documentType);
+      res.json(verification);
+    } catch (error) {
+      console.error('Error verifying document:', error);
+      res.status(500).json({ error: 'Failed to verify document' });
+    }
+  });
+
+  app.put('/api/admin/document-verifications/:verificationId/review', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { verificationId } = req.params;
+      const { decision } = req.body;
+      await adminService.reviewDocument(verificationId, req.userId!, decision);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error reviewing document:', error);
+      res.status(500).json({ error: 'Failed to review document' });
+    }
+  });
+
+  // Commission Tracking and Payouts
+  app.get('/api/admin/commissions', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const commissions = await adminService.getCommissionRecords();
+      res.json(commissions);
+    } catch (error) {
+      console.error('Error fetching commissions:', error);
+      res.status(500).json({ error: 'Failed to fetch commissions' });
+    }
+  });
+
+  app.post('/api/admin/commissions/calculate', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { applicationId } = req.body;
+      const commission = await adminService.calculateCommission(applicationId);
+      res.json(commission);
+    } catch (error) {
+      console.error('Error calculating commission:', error);
+      res.status(500).json({ error: 'Failed to calculate commission' });
+    }
+  });
+
+  app.put('/api/admin/commissions/:commissionId/approve', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { commissionId } = req.params;
+      await adminService.approveCommission(commissionId, req.userId!);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error approving commission:', error);
+      res.status(500).json({ error: 'Failed to approve commission' });
+    }
+  });
+
+  app.put('/api/admin/commissions/:commissionId/payout', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { commissionId } = req.params;
+      const { paymentReference } = req.body;
+      await adminService.processCommissionPayout(commissionId, paymentReference);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error processing payout:', error);
+      res.status(500).json({ error: 'Failed to process payout' });
+    }
+  });
+
+  // Enhanced Partner Management
+  app.post('/api/admin/partners/create', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const partner = await adminService.createPartner(req.body);
+      res.json(partner);
+    } catch (error) {
+      console.error('Error creating partner:', error);
+      res.status(500).json({ error: 'Failed to create partner' });
+    }
+  });
+
+  app.put('/api/admin/partners/:partnerId/update', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { partnerId } = req.params;
+      const partner = await adminService.updatePartner(parseInt(partnerId), req.body);
+      res.json(partner);
+    } catch (error) {
+      console.error('Error updating partner:', error);
+      res.status(500).json({ error: 'Failed to update partner' });
+    }
+  });
+
+  app.put('/api/admin/partners/:partnerId/deactivate', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { partnerId } = req.params;
+      const { reason } = req.body;
+      const partner = await adminService.deactivatePartner(parseInt(partnerId), reason);
+      res.json(partner);
+    } catch (error) {
+      console.error('Error deactivating partner:', error);
+      res.status(500).json({ error: 'Failed to deactivate partner' });
+    }
   });
 
   // Enhanced Dashboard Analytics
