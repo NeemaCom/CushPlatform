@@ -1898,7 +1898,7 @@ function Dashboard({ user }) {
     { id: 'settings', label: 'Settings', icon: '⚙️', view: 'account' }
   ];
 
-  return e('div', { className: 'min-h-screen bg-gray-50 flex' }, [
+  return e('div', { className: 'bg-gray-50 flex' }, [
     // Left Sidebar
     e('div', { 
       key: 'sidebar',
@@ -1968,10 +1968,10 @@ function Dashboard({ user }) {
         ])
       ]),
 
-      // Navigation Menu - Fixed height with proper scrolling
+      // Navigation Menu - Allow natural content flow
       e('nav', { 
         key: 'navigation',
-        className: 'flex-1 px-4 py-6 space-y-2 overflow-y-auto min-h-0'
+        className: 'flex-1 px-4 py-6 space-y-2'
       }, [
         sidebarItems.map(item => 
           e('button', {
@@ -2026,7 +2026,7 @@ function Dashboard({ user }) {
     // Main Content Area
     e('div', { 
       key: 'main-content',
-      className: 'flex-1 lg:ml-0 flex flex-col h-screen'
+      className: 'flex-1 lg:ml-0 flex flex-col min-h-screen'
     }, [
       // Top Header Bar
       e('header', {
@@ -2166,7 +2166,7 @@ function Dashboard({ user }) {
       // Dashboard Content
       e('main', {
         key: 'content',
-        className: 'flex-1 p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100'
+        className: 'flex-1 p-6'
       }, [
         // Render different views based on currentView
         currentView === 'account' ? e(SettingsPage, { key: 'settings-page', user, onBack: () => setCurrentView('dashboard') }) : 
@@ -2177,7 +2177,7 @@ function Dashboard({ user }) {
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         // Modern Financial Dashboard
-        e('div', { key: 'dashboard-content', className: 'space-y-6' }, [
+        e('div', { key: 'dashboard-content', className: 'space-y-6 pb-8' }, [
           // Test Notification Button (Development Only)
           e('div', {
             key: 'test-notifications',
@@ -8695,7 +8695,7 @@ function LoansPage({ user, onBack }) {
     ]);
   };
 
-  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+  return e('div', { className: 'bg-gray-50' }, [
     // Header
     e('div', { key: 'header', className: 'bg-white border-b border-gray-200 px-6 py-4' }, [
       e('div', { className: 'flex items-center justify-between' }, [
@@ -8712,7 +8712,7 @@ function LoansPage({ user, onBack }) {
     ]),
 
     // Content
-    e('div', { key: 'content', className: 'p-6' }, [
+    e('div', { key: 'content', className: 'p-6 pb-12' }, [
       currentStep === 'overview' && renderOverview(),
       currentStep === 'prequalify' && renderPrequalification(),
       currentStep === 'providers' && renderProviders(),
@@ -8911,7 +8911,7 @@ function HelpSupport({ user, onBack }) {
     }
   };
 
-  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+  return e('div', { className: 'bg-gray-50' }, [
     // Header
     e('div', { key: 'header', className: 'bg-white shadow-sm border-b' }, [
       e('div', { className: 'max-w-7xl mx-auto px-4 py-6' }, [
@@ -8956,7 +8956,7 @@ function HelpSupport({ user, onBack }) {
     ]),
 
     // Main Content
-    e('div', { key: 'content', className: 'max-w-7xl mx-auto px-4 py-8' }, [
+    e('div', { key: 'content', className: 'max-w-7xl mx-auto px-4 py-8 pb-12' }, [
       // Quick Actions
       e('div', { key: 'quick-actions', className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
         e('div', { key: 'live-chat', className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
