@@ -288,31 +288,69 @@ export class SupportService {
     const [
       totalTickets,
       openTickets,
+      pendingTickets,
       resolvedTickets,
       avgResolutionTime,
       totalFeedback,
-      positiveFeedback
+      positiveFeedback,
+      totalFaqArticles
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(supportTickets),
       db.select({ count: sql<number>`count(*)` }).from(supportTickets).where(eq(supportTickets.status, 'open')),
+      db.select({ count: sql<number>`count(*)` }).from(supportTickets).where(or(
+        eq(supportTickets.status, 'open'),
+        eq(supportTickets.status, 'in_progress')
+      )),
       db.select({ count: sql<number>`count(*)` }).from(supportTickets).where(eq(supportTickets.status, 'resolved')),
       db.select({ 
         avgTime: sql<number>`avg(extract(epoch from (resolved_at - created_at))/3600)` 
       }).from(supportTickets).where(eq(supportTickets.status, 'resolved')),
       db.select({ count: sql<number>`count(*)` }).from(userFeedback),
-      db.select({ count: sql<number>`count(*)` }).from(userFeedback).where(sql`rating >= 4`)
+      db.select({ count: sql<number>`count(*)` }).from(userFeedback).where(sql`rating >= 4`),
+      db.select({ count: sql<number>`count(*)` }).from(faqArticles)
     ]);
 
     return {
       totalTickets: totalTickets[0]?.count || 0,
       openTickets: openTickets[0]?.count || 0,
+      pendingTickets: pendingTickets[0]?.count || 0,
       resolvedTickets: resolvedTickets[0]?.count || 0,
       avgResolutionTime: Math.round(avgResolutionTime[0]?.avgTime || 0),
       totalFeedback: totalFeedback[0]?.count || 0,
       positiveFeedback: positiveFeedback[0]?.count || 0,
+      faqArticles: totalFaqArticles[0]?.count || 0,
       satisfactionRate: totalFeedback[0]?.count > 0 ? 
         Math.round((positiveFeedback[0]?.count / totalFeedback[0]?.count) * 100) : 0
     };
+  }
+
+  // Admin methods for all tickets and feedback
+  async getAllSupportTickets(): Promise<SupportTicket[]> {
+    return await db
+      .select()
+      .from(supportTickets)
+      .orderBy(desc(supportTickets.createdAt));
+  }
+
+  async getAllUserFeedback(): Promise<UserFeedback[]> {
+    return await db
+      .select()
+      .from(userFeedback)
+      .orderBy(desc(userFeedback.createdAt));
+  }
+
+  async updateFeedbackStatus(feedbackId: number, status: string, adminNotes?: string): Promise<UserFeedback> {
+    const [feedback] = await db
+      .update(userFeedback)
+      .set({
+        status,
+        adminNotes,
+        updatedAt: new Date()
+      })
+      .where(eq(userFeedback.id, feedbackId))
+      .returning();
+    
+    return feedback;
   }
 }
 
