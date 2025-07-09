@@ -8595,7 +8595,7 @@ function HelpSupport({ user, onBack }) {
     priority: 'medium'
   });
   const [feedbackFormData, setFeedbackFormData] = React.useState({
-    feedbackType: 'general',
+    feedbackType: 'improvement',
     category: 'general',
     title: '',
     message: '',
@@ -8698,7 +8698,7 @@ function HelpSupport({ user, onBack }) {
       if (response.ok) {
         setShowFeedbackForm(false);
         setFeedbackFormData({
-          feedbackType: 'general',
+          feedbackType: 'improvement',
           category: 'general',
           title: '',
           message: '',
@@ -8945,8 +8945,8 @@ function HelpSupport({ user, onBack }) {
                           e('div', {}, [
                             e('h3', { className: 'font-medium text-gray-900' }, article.title),
                             e('div', { className: 'flex items-center space-x-4 text-sm text-gray-500 mt-1' }, [
-                              e('span', {}, categories.find(c => c.id === article.category)?.name || 'General'),
-                              e('span', { className: 'flex items-center space-x-1' }, [
+                              e('span', { key: 'category' }, categories.find(c => c.id === article.category)?.name || 'General'),
+                              e('span', { key: 'views', className: 'flex items-center space-x-1' }, [
                                 e('span', { key: 'icon' }, '👁️'),
                                 e('span', { key: 'count' }, `${article.views || 0} views`)
                               ])
