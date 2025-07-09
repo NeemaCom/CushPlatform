@@ -108,12 +108,48 @@ All OAuth errors redirect users to the signin page with appropriate error parame
 ✅ User account creation and session management
 ✅ Frontend integration complete
 ✅ Security validations in place
+❌ Google OAuth returning 404 error - requires configuration verification
+
+## Troubleshooting 404 Error
+
+### Current Issue
+Google OAuth is returning a 404 error when redirecting to Google's authorization server. This indicates a configuration mismatch.
+
+### Root Cause Analysis
+1. **Client ID**: Current client ID `397927087684-js33ib9f5b1jebhvna7m2p2on4mk8vj4.apps.googleusercontent.com`
+2. **Redirect URI**: `http://localhost:5000/api/auth/google/callback`
+3. **Error**: Google returns 404 when OAuth URL is accessed
+
+### Required Google Cloud Console Configuration
+
+#### 1. Verify OAuth 2.0 Client ID
+- Go to [Google Cloud Console](https://console.cloud.google.com/)
+- Navigate to "APIs & Services" > "Credentials"
+- Ensure OAuth 2.0 Client ID exists and matches the environment variable
+- If not, create a new OAuth 2.0 Client ID
+
+#### 2. Configure Authorized Redirect URIs
+Add these exact URIs to your OAuth 2.0 Client ID:
+- **Development**: `http://localhost:5000/api/auth/google/callback`
+- **Production**: `https://[your-replit-domain]/api/auth/google/callback`
+
+#### 3. Configure Authorized JavaScript Origins
+Add these origins:
+- **Development**: `http://localhost:5000`
+- **Production**: `https://[your-replit-domain]`
+
+### Resolution Steps
+1. **Verify Client ID exists in Google Cloud Console**
+2. **Check redirect URI configuration matches exactly**
+3. **Ensure OAuth consent screen is configured**
+4. **Verify project is not in restricted mode**
+5. **Update environment variables with correct credentials**
 
 ## Next Steps
-- Verify OAuth credentials are correctly updated
-- Test complete authentication flow
-- Monitor for any OAuth-related errors
-- Update redirect URIs for production deployment
+- Verify Google Cloud Console OAuth 2.0 configuration
+- Update redirect URIs to match deployment environment
+- Test OAuth flow after configuration fixes
+- Monitor for successful authentication
 
 ---
 *Last Updated: July 9, 2025*
