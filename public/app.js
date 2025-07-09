@@ -1709,14 +1709,22 @@ function Dashboard({ user }) {
     { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
     { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
-    { id: 'settings', label: 'Settings', icon: '⚙️', view: 'settings' }
+    { id: 'analytics', label: 'Analytics', icon: '📈', view: 'analytics' },
+    { id: 'transactions', label: 'Transactions', icon: '💳', view: 'transactions' },
+    { id: 'budgets', label: 'Budgets', icon: '💰', view: 'budgets' },
+    { id: 'goals', label: 'Goals', icon: '🎯', view: 'goals' },
+    { id: 'reports', label: 'Reports', icon: '📋', view: 'reports' },
+    { id: 'notifications', label: 'Notifications', icon: '🔔', view: 'notifications' },
+    { id: 'security', label: 'Security', icon: '🔒', view: 'security' },
+    { id: 'help', label: 'Help & Support', icon: '❓', view: 'help' },
+    { id: 'settings', label: 'Settings', icon: '⚙️', view: 'account' }
   ];
 
   return e('div', { className: 'min-h-screen bg-gray-50 flex' }, [
     // Left Sidebar
     e('div', { 
       key: 'sidebar',
-      className: `fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+      className: `fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
     }, [
       // Sidebar Header
       e('div', { 
@@ -1782,10 +1790,10 @@ function Dashboard({ user }) {
         ])
       ]),
 
-      // Navigation Menu
+      // Navigation Menu - Scrollable
       e('nav', { 
         key: 'navigation',
-        className: 'flex-1 px-4 py-6 space-y-2'
+        className: 'flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100'
       }, [
         sidebarItems.map(item => 
           e('button', {
@@ -1803,10 +1811,10 @@ function Dashboard({ user }) {
         )
       ]),
 
-      // Admin Panel & Logout
+      // Admin Panel & Logout - Fixed at bottom
       e('div', {
         key: 'sidebar-footer',
-        className: 'px-4 py-4 border-t border-gray-200 space-y-2'
+        className: 'px-4 py-4 border-t border-gray-200 space-y-2 flex-shrink-0'
       }, [
         // Show admin panel for admin users
         ...(user && user.role === 'admin' ? [
@@ -1840,7 +1848,7 @@ function Dashboard({ user }) {
     // Main Content Area
     e('div', { 
       key: 'main-content',
-      className: 'flex-1 lg:ml-0'
+      className: 'flex-1 lg:ml-0 flex flex-col h-screen overflow-hidden'
     }, [
       // Top Header Bar
       e('header', {
@@ -1974,7 +1982,7 @@ function Dashboard({ user }) {
       // Dashboard Content
       e('main', {
         key: 'content',
-        className: 'p-6'
+        className: 'flex-1 p-6 overflow-y-auto'
       }, [
         // Render different views based on currentView
         currentView === 'account' ? e(SettingsPage, { key: 'settings-page', user, onBack: () => setCurrentView('dashboard') }) : 
