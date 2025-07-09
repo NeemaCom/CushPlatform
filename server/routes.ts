@@ -1325,6 +1325,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === Enhanced Loan UX Features ===
+
+  // Loan Favorites Management
+  app.post('/api/loans/favorites', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { loanProviderId } = req.body;
+      const userId = req.userId!;
+      const favorite = await loanService.addToFavorites(userId, loanProviderId);
+      res.json(favorite);
+    } catch (error) {
+      console.error('Add to favorites error:', error);
+      res.status(500).json({ error: 'Failed to add to favorites' });
+    }
+  });
+
+  app.delete('/api/loans/favorites/:providerId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.providerId);
+      const userId = req.userId!;
+      await loanService.removeFromFavorites(userId, providerId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Remove from favorites error:', error);
+      res.status(500).json({ error: 'Failed to remove from favorites' });
+    }
+  });
+
+  app.get('/api/loans/favorites', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const favorites = await loanService.getUserFavorites(userId);
+      res.json(favorites);
+    } catch (error) {
+      console.error('Get favorites error:', error);
+      res.status(500).json({ error: 'Failed to fetch favorites' });
+    }
+  });
+
+  app.get('/api/loans/favorites/check/:providerId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.providerId);
+      const userId = req.userId!;
+      const isFavorite = await loanService.checkIsFavorite(userId, providerId);
+      res.json({ isFavorite });
+    } catch (error) {
+      console.error('Check favorite error:', error);
+      res.status(500).json({ error: 'Failed to check favorite status' });
+    }
+  });
+
+  // Draft Management for Save/Resume
+  app.post('/api/loans/drafts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { loanProviderId, draftData, stepCompleted } = req.body;
+      const userId = req.userId!;
+      const draft = await loanService.saveDraft(userId, loanProviderId, draftData, stepCompleted);
+      res.json(draft);
+    } catch (error) {
+      console.error('Save draft error:', error);
+      res.status(500).json({ error: 'Failed to save draft' });
+    }
+  });
+
+  app.get('/api/loans/drafts/:providerId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.providerId);
+      const userId = req.userId!;
+      const draft = await loanService.getDraft(userId, providerId);
+      res.json(draft);
+    } catch (error) {
+      console.error('Get draft error:', error);
+      res.status(500).json({ error: 'Failed to fetch draft' });
+    }
+  });
+
+  app.get('/api/loans/drafts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const drafts = await loanService.getUserDrafts(userId);
+      res.json(drafts);
+    } catch (error) {
+      console.error('Get drafts error:', error);
+      res.status(500).json({ error: 'Failed to fetch drafts' });
+    }
+  });
+
+  app.delete('/api/loans/drafts/:providerId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.providerId);
+      const userId = req.userId!;
+      await loanService.deleteDraft(userId, providerId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Delete draft error:', error);
+      res.status(500).json({ error: 'Failed to delete draft' });
+    }
+  });
+
+  // Enhanced Provider Reviews
+  app.post('/api/loans/reviews', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const reviewData = req.body;
+      const userId = req.userId!;
+      const review = await loanService.addProviderReview(userId, reviewData);
+      res.json(review);
+    } catch (error) {
+      console.error('Add review error:', error);
+      res.status(500).json({ error: 'Failed to add review' });
+    }
+  });
+
+  app.get('/api/loans/providers/:id/reviews-enhanced', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.id);
+      const reviews = await loanService.getProviderReviewsEnhanced(providerId);
+      res.json(reviews);
+    } catch (error) {
+      console.error('Get enhanced reviews error:', error);
+      res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+  });
+
+  app.get('/api/loans/my-reviews', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const reviews = await loanService.getUserReviews(userId);
+      res.json(reviews);
+    } catch (error) {
+      console.error('Get user reviews error:', error);
+      res.status(500).json({ error: 'Failed to fetch user reviews' });
+    }
+  });
+
+  // Enhanced Providers with Favorites
+  app.get('/api/loans/providers-enhanced', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const country = req.query.country as string;
+      const userId = req.userId!;
+      const providers = await loanService.getProvidersWithFavoriteStatus(userId, country);
+      res.json(providers);
+    } catch (error) {
+      console.error('Get enhanced providers error:', error);
+      res.status(500).json({ error: 'Failed to fetch providers' });
+    }
+  });
+
   // Seed loan providers (development only)
   if (process.env.NODE_ENV === 'development') {
     app.post("/api/loans/seed", requireAdmin, async (req: AuthenticatedRequest, res) => {

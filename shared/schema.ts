@@ -195,6 +195,38 @@ export const loanReviews = pgTable("loan_reviews", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Loan Favorites for user wishlist
+export const loanFavorites = pgTable("loan_favorites", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  loanProviderId: integer("loan_provider_id").notNull().references(() => loanProviders.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Loan Application Drafts for save/resume functionality
+export const loanApplicationDrafts = pgTable("loan_application_drafts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  loanProviderId: integer("loan_provider_id").notNull().references(() => loanProviders.id),
+  draftData: json("draft_data").$type<Record<string, any>>().notNull(),
+  stepCompleted: integer("step_completed").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Enhanced Loan Provider Reviews
+export const loanProviderReviews = pgTable("loan_provider_reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  loanProviderId: integer("loan_provider_id").notNull().references(() => loanProviders.id),
+  rating: integer("rating").notNull(),
+  reviewText: text("review_text"),
+  loanApplicationId: integer("loan_application_id").references(() => loanApplications.id),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Community Insights table
 export const insights = pgTable("insights", {
   id: serial("id").primaryKey(),
@@ -623,6 +655,43 @@ export const loanReviewsRelations = relations(loanReviews, ({ one }) => ({
   }),
 }));
 
+export const loanFavoritesRelations = relations(loanFavorites, ({ one }) => ({
+  user: one(users, {
+    fields: [loanFavorites.userId],
+    references: [users.id],
+  }),
+  provider: one(loanProviders, {
+    fields: [loanFavorites.loanProviderId],
+    references: [loanProviders.id],
+  }),
+}));
+
+export const loanApplicationDraftsRelations = relations(loanApplicationDrafts, ({ one }) => ({
+  user: one(users, {
+    fields: [loanApplicationDrafts.userId],
+    references: [users.id],
+  }),
+  provider: one(loanProviders, {
+    fields: [loanApplicationDrafts.loanProviderId],
+    references: [loanProviders.id],
+  }),
+}));
+
+export const loanProviderReviewsRelations = relations(loanProviderReviews, ({ one }) => ({
+  user: one(users, {
+    fields: [loanProviderReviews.userId],
+    references: [users.id],
+  }),
+  provider: one(loanProviders, {
+    fields: [loanProviderReviews.loanProviderId],
+    references: [loanProviders.id],
+  }),
+  application: one(loanApplications, {
+    fields: [loanProviderReviews.loanApplicationId],
+    references: [loanApplications.id],
+  }),
+}));
+
 export const financialGoalsRelations = relations(financialGoals, ({ one, many }) => ({
   user: one(users, {
     fields: [financialGoals.userId],
@@ -762,6 +831,23 @@ export const loanReviewSchema = createInsertSchema(loanReviews).omit({
   updatedAt: true,
 });
 
+export const loanFavoriteSchema = createInsertSchema(loanFavorites).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const loanApplicationDraftSchema = createInsertSchema(loanApplicationDrafts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const loanProviderReviewSchema = createInsertSchema(loanProviderReviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -769,6 +855,12 @@ export type LoanPrequalification = typeof loanPrequalifications.$inferSelect;
 export type InsertLoanPrequalification = z.infer<typeof loanPrequalificationSchema>;
 export type LoanApplication = typeof loanApplications.$inferSelect;
 export type InsertLoanApplication = z.infer<typeof loanApplicationSchema>;
+export type LoanFavorite = typeof loanFavorites.$inferSelect;
+export type InsertLoanFavorite = z.infer<typeof loanFavoriteSchema>;
+export type LoanApplicationDraft = typeof loanApplicationDrafts.$inferSelect;
+export type InsertLoanApplicationDraft = z.infer<typeof loanApplicationDraftSchema>;
+export type LoanProviderReview = typeof loanProviderReviews.$inferSelect;
+export type InsertLoanProviderReview = z.infer<typeof loanProviderReviewSchema>;
 export type LoanProvider = typeof loanProviders.$inferSelect;
 export type InsertLoanProvider = z.infer<typeof loanProviderSchema>;
 export type LoanReview = typeof loanReviews.$inferSelect;
