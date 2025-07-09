@@ -2,6 +2,104 @@
 const { useState, useEffect, createElement: e } = React;
 const { createRoot } = ReactDOM;
 
+// Chart.js Configuration
+Chart.register(
+  Chart.ArcElement,
+  Chart.BarElement,
+  Chart.CategoryScale,
+  Chart.LinearScale,
+  Chart.PointElement,
+  Chart.LineElement,
+  Chart.Title,
+  Chart.Tooltip,
+  Chart.Legend,
+  Chart.Filler
+);
+
+// Interactive Chart Component
+function InteractiveChart({ type = 'line', data, options = {}, className = '' }) {
+  const chartRef = React.useRef(null);
+  const chartInstance = React.useRef(null);
+
+  useEffect(() => {
+    if (!chartRef.current || !data) return;
+
+    const ctx = chartRef.current.getContext('2d');
+    
+    // Destroy existing chart
+    if (chartInstance.current) {
+      chartInstance.current.destroy();
+    }
+
+    // Default options
+    const defaultOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top'
+        },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#fff',
+          bodyColor: '#fff',
+          borderColor: '#3b82f6',
+          borderWidth: 1
+        }
+      },
+      scales: type !== 'doughnut' && type !== 'pie' ? {
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          }
+        },
+        x: {
+          grid: {
+            color: 'rgba(0, 0, 0, 0.1)'
+          }
+        }
+      } : undefined,
+      animation: {
+        duration: 800,
+        easing: 'easeInOutQuart'
+      },
+      interaction: {
+        mode: 'nearest',
+        axis: 'x',
+        intersect: false
+      }
+    };
+
+    // Create new chart
+    chartInstance.current = new Chart(ctx, {
+      type,
+      data,
+      options: { ...defaultOptions, ...options }
+    });
+
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy();
+      }
+    };
+  }, [data, type, options]);
+
+  return e('div', {
+    className: `relative ${className}`,
+    style: { height: '400px' }
+  }, [
+    e('canvas', {
+      key: 'chart-canvas',
+      ref: chartRef,
+      className: 'w-full h-full'
+    })
+  ]);
+}
+
 // Navigation Header Component
 function NavigationHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -3846,6 +3944,150 @@ function AdminDashboard({ user, onBack }) {
                 e('span', { key: 'text' }, `${dashboardStats.avgTransactionsPerUser} avg transactions per user`)
               ])
             ])
+          ])
+        ]),
+
+        // Interactive Data Visualizations
+        dashboardStats && dashboardStats.chartData && e('div', {
+          key: 'data-visualizations',
+          className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'
+        }, [
+          // User Growth Chart
+          e('div', {
+            key: 'user-growth-chart',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'User Growth Trend'),
+            e(InteractiveChart, {
+              key: 'chart',
+              type: 'line',
+              data: {
+                labels: dashboardStats.chartData.userGrowth.map(d => d.month),
+                datasets: [{
+                  label: 'New Users',
+                  data: dashboardStats.chartData.userGrowth.map(d => d.users),
+                  borderColor: 'rgb(59, 130, 246)',
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  fill: true,
+                  tension: 0.4
+                }]
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Monthly User Registrations'
+                  }
+                }
+              }
+            })
+          ]),
+
+          // Transaction Volume Chart
+          e('div', {
+            key: 'transaction-volume-chart',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Transaction Volume'),
+            e(InteractiveChart, {
+              key: 'chart',
+              type: 'bar',
+              data: {
+                labels: dashboardStats.chartData.transactionVolume.map(d => d.month),
+                datasets: [{
+                  label: 'Transaction Count',
+                  data: dashboardStats.chartData.transactionVolume.map(d => d.count),
+                  backgroundColor: 'rgba(16, 185, 129, 0.8)',
+                  borderColor: 'rgb(16, 185, 129)',
+                  borderWidth: 1
+                }]
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Monthly Transaction Activity'
+                  }
+                }
+              }
+            })
+          ]),
+
+          // Role Distribution Chart
+          e('div', {
+            key: 'role-distribution-chart',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'User Role Distribution'),
+            e(InteractiveChart, {
+              key: 'chart',
+              type: 'doughnut',
+              data: {
+                labels: dashboardStats.chartData.roleDistribution.map(d => d.role.charAt(0).toUpperCase() + d.role.slice(1)),
+                datasets: [{
+                  data: dashboardStats.chartData.roleDistribution.map(d => d.count),
+                  backgroundColor: [
+                    'rgba(147, 51, 234, 0.8)',
+                    'rgba(59, 130, 246, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)'
+                  ],
+                  borderColor: [
+                    'rgb(147, 51, 234)',
+                    'rgb(59, 130, 246)',
+                    'rgb(16, 185, 129)',
+                    'rgb(245, 158, 11)'
+                  ],
+                  borderWidth: 2
+                }]
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Platform User Types'
+                  }
+                }
+              }
+            })
+          ]),
+
+          // Daily Activity Chart
+          e('div', {
+            key: 'daily-activity-chart',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Daily Activity Trends'),
+            e(InteractiveChart, {
+              key: 'chart',
+              type: 'line',
+              data: {
+                labels: dashboardStats.chartData.activityTrends.map(d => d.day),
+                datasets: [{
+                  label: 'Daily Logins',
+                  data: dashboardStats.chartData.activityTrends.map(d => d.logins),
+                  borderColor: 'rgb(245, 158, 11)',
+                  backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                  fill: true,
+                  tension: 0.4
+                }, {
+                  label: 'Daily Transactions',
+                  data: dashboardStats.chartData.activityTrends.map(d => d.transactions),
+                  borderColor: 'rgb(239, 68, 68)',
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  fill: true,
+                  tension: 0.4
+                }]
+              },
+              options: {
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Last 7 Days Activity'
+                  }
+                }
+              }
+            })
           ])
         ]),
 
