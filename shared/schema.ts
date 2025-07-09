@@ -95,6 +95,106 @@ export const userAuditLogs = pgTable("user_audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Loan Applications table
+export const loanApplications = pgTable("loan_applications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  loanProviderId: integer("loan_provider_id").references(() => loanProviders.id),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").default("GBP"),
+  purpose: text("purpose").notNull(),
+  status: text("status").default("pending"), // pending, approved, rejected, under_review
+  applicationData: json("application_data").$type<Record<string, any>>(),
+  prequalificationScore: integer("prequalification_score"),
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }),
+  termMonths: integer("term_months"),
+  monthlyPayment: decimal("monthly_payment", { precision: 10, scale: 2 }),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+  approvedAt: timestamp("approved_at"),
+  rejectedAt: timestamp("rejected_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loan Providers table
+export const loanProviders = pgTable("loan_providers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  country: text("country").notNull(), // UK, Nigeria
+  type: text("type").notNull(), // bank, fintech, microfinance, peer_to_peer
+  description: text("description"),
+  website: text("website"),
+  phoneNumber: text("phone_number"),
+  email: text("email"),
+  logoUrl: text("logo_url"),
+  minAmount: decimal("min_amount", { precision: 15, scale: 2 }),
+  maxAmount: decimal("max_amount", { precision: 15, scale: 2 }),
+  minInterestRate: decimal("min_interest_rate", { precision: 5, scale: 2 }),
+  maxInterestRate: decimal("max_interest_rate", { precision: 5, scale: 2 }),
+  minTermMonths: integer("min_term_months"),
+  maxTermMonths: integer("max_term_months"),
+  currencies: text("currencies").array(),
+  eligibilityCriteria: json("eligibility_criteria").$type<Record<string, any>>(),
+  requiredDocuments: text("required_documents").array(),
+  processingTime: text("processing_time"),
+  features: text("features").array(),
+  rating: decimal("rating", { precision: 2, scale: 1 }),
+  totalReviews: integer("total_reviews").default(0),
+  isActive: boolean("is_active").default(true),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loan Prequalification table
+export const loanPrequalifications = pgTable("loan_prequalifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  employmentStatus: text("employment_status").notNull(),
+  monthlyIncome: decimal("monthly_income", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").default("GBP"),
+  employmentType: text("employment_type"), // full_time, part_time, contract, self_employed
+  companyName: text("company_name"),
+  workExperience: integer("work_experience_months"),
+  creditScore: integer("credit_score"),
+  existingDebts: decimal("existing_debts", { precision: 15, scale: 2 }),
+  monthlyExpenses: decimal("monthly_expenses", { precision: 15, scale: 2 }),
+  residenceStatus: text("residence_status"), // citizen, permanent_resident, visa_holder
+  residenceCountry: text("residence_country"),
+  bankStatementMonths: integer("bank_statement_months"),
+  collateralValue: decimal("collateral_value", { precision: 15, scale: 2 }),
+  guarantorAvailable: boolean("guarantor_available").default(false),
+  loanPurpose: text("loan_purpose"),
+  preferredAmount: decimal("preferred_amount", { precision: 15, scale: 2 }),
+  preferredTermMonths: integer("preferred_term_months"),
+  prequalificationScore: integer("prequalification_score"),
+  matchedProviders: json("matched_providers").$type<number[]>(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Loan Reviews table
+export const loanReviews = pgTable("loan_reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  loanProviderId: integer("loan_provider_id").references(() => loanProviders.id),
+  rating: integer("rating").notNull(), // 1-5 stars
+  title: text("title"),
+  review: text("review"),
+  pros: text("pros").array(),
+  cons: text("cons").array(),
+  approvalTime: text("approval_time"),
+  customerService: integer("customer_service_rating"), // 1-5
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }),
+  isRecommended: boolean("is_recommended"),
+  isVerified: boolean("is_verified").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Community Insights table
 export const insights = pgTable("insights", {
   id: serial("id").primaryKey(),
@@ -373,6 +473,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   eventRegistrations: many(eventRegistrations),
   mentorSessions: many(mentorSessions),
   loanPreQualifications: many(loanPreQualifications),
+  loanApplications: many(loanApplications),
+  loanReviews: many(loanReviews),
   financialGoals: many(financialGoals),
   userAchievements: many(userAchievements),
   achievementProgress: many(achievementProgress),
@@ -486,6 +588,41 @@ export const loanReferralsRelations = relations(loanReferrals, ({ one }) => ({
   }),
 }));
 
+// Loan Relations
+export const loanProvidersRelations = relations(loanProviders, ({ many }) => ({
+  applications: many(loanApplications),
+  reviews: many(loanReviews),
+}));
+
+export const loanApplicationsRelations = relations(loanApplications, ({ one }) => ({
+  user: one(users, {
+    fields: [loanApplications.userId],
+    references: [users.id],
+  }),
+  provider: one(loanProviders, {
+    fields: [loanApplications.loanProviderId],
+    references: [loanProviders.id],
+  }),
+}));
+
+export const loanPrequalificationsRelations = relations(loanPrequalifications, ({ one }) => ({
+  user: one(users, {
+    fields: [loanPrequalifications.userId],
+    references: [users.id],
+  }),
+}));
+
+export const loanReviewsRelations = relations(loanReviews, ({ one }) => ({
+  user: one(users, {
+    fields: [loanReviews.userId],
+    references: [users.id],
+  }),
+  provider: one(loanProviders, {
+    fields: [loanReviews.loanProviderId],
+    references: [loanProviders.id],
+  }),
+}));
+
 export const financialGoalsRelations = relations(financialGoals, ({ one, many }) => ({
   user: one(users, {
     fields: [financialGoals.userId],
@@ -595,6 +732,47 @@ export const insertUserSchema = createInsertSchema(users).pick({
   acceptPrivacy: true,
   marketingConsent: true,
 });
+
+// Loan Schemas
+export const loanPrequalificationSchema = createInsertSchema(loanPrequalifications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const loanApplicationSchema = createInsertSchema(loanApplications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  submittedAt: true,
+  processedAt: true,
+  approvedAt: true,
+  rejectedAt: true,
+});
+
+export const loanProviderSchema = createInsertSchema(loanProviders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const loanReviewSchema = createInsertSchema(loanReviews).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type LoanPrequalification = typeof loanPrequalifications.$inferSelect;
+export type InsertLoanPrequalification = z.infer<typeof loanPrequalificationSchema>;
+export type LoanApplication = typeof loanApplications.$inferSelect;
+export type InsertLoanApplication = z.infer<typeof loanApplicationSchema>;
+export type LoanProvider = typeof loanProviders.$inferSelect;
+export type InsertLoanProvider = z.infer<typeof loanProviderSchema>;
+export type LoanReview = typeof loanReviews.$inferSelect;
+export type InsertLoanReview = z.infer<typeof loanReviewSchema>;
 
 export const insertAccountSchema = createInsertSchema(accounts).pick({
   name: true,

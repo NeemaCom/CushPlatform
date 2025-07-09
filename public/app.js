@@ -1839,6 +1839,7 @@ function Dashboard({ user }) {
         currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
+        currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         // Modern Financial Dashboard
@@ -6729,6 +6730,511 @@ function FinancialHealthRadar({ onBack }) {
         e('span', { key: 'icon' }, '🤖'),
         e('span', { key: 'text' }, 'Powered by AI Financial Health Analysis')
       ])
+    ])
+  ]);
+}
+
+// Loans Page Component
+function LoansPage({ user, onBack }) {
+  const [currentStep, setCurrentStep] = React.useState('overview'); // overview, prequalify, providers, apply
+  const [prequalData, setPrequalData] = React.useState(null);
+  const [loanProviders, setLoanProviders] = React.useState([]);
+  const [selectedProvider, setSelectedProvider] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState('');
+  const [selectedCountry, setSelectedCountry] = React.useState('UK');
+  const [prequalificationForm, setPrequalificationForm] = React.useState({
+    employmentStatus: '',
+    monthlyIncome: '',
+    currency: 'GBP',
+    employmentType: '',
+    companyName: '',
+    workExperience: '',
+    creditScore: '',
+    existingDebts: '',
+    monthlyExpenses: '',
+    residenceStatus: '',
+    residenceCountry: 'UK',
+    bankStatementMonths: '',
+    collateralValue: '',
+    guarantorAvailable: false,
+    loanPurpose: '',
+    preferredAmount: '',
+    preferredTermMonths: ''
+  });
+
+  // Load loan providers
+  React.useEffect(() => {
+    if (currentStep === 'providers' || currentStep === 'overview') {
+      fetchLoanProviders();
+    }
+  }, [currentStep, selectedCountry]);
+
+  const fetchLoanProviders = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/loans/providers?country=${selectedCountry}`);
+      if (response.ok) {
+        const providers = await response.json();
+        setLoanProviders(providers);
+      }
+    } catch (err) {
+      setError('Failed to load loan providers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrequalification = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/loans/prequalify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(prequalificationForm),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setPrequalData(result);
+        setCurrentStep('providers');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Prequalification failed');
+      }
+    } catch (err) {
+      setError('Failed to process prequalification');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoanApplication = async (provider) => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const applicationData = {
+        loanProviderId: provider.id,
+        amount: prequalificationForm.preferredAmount,
+        currency: prequalificationForm.currency,
+        purpose: prequalificationForm.loanPurpose,
+        applicationData: {
+          prequalificationId: prequalData?.prequalification?.id,
+          employmentInfo: {
+            status: prequalificationForm.employmentStatus,
+            type: prequalificationForm.employmentType,
+            company: prequalificationForm.companyName,
+            experience: prequalificationForm.workExperience,
+            income: prequalificationForm.monthlyIncome
+          }
+        }
+      };
+
+      const response = await fetch('/api/loans/apply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(applicationData),
+      });
+
+      if (response.ok) {
+        const application = await response.json();
+        alert('Loan application submitted successfully!');
+        setCurrentStep('overview');
+      } else {
+        const errorData = await response.json();
+        setError(errorData.error || 'Application failed');
+      }
+    } catch (err) {
+      setError('Failed to submit application');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderOverview = () => {
+    return e('div', { key: 'overview', className: 'space-y-6' }, [
+      // Header
+      e('div', { key: 'header', className: 'text-center mb-8' }, [
+        e('h1', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Loan Services'),
+        e('p', { className: 'text-lg text-gray-600' }, 'Find the perfect loan for your needs with our AI-powered matching system')
+      ]),
+
+      // Country Selection
+      e('div', { key: 'country-selection', className: 'bg-white rounded-xl p-6 shadow-lg mb-6' }, [
+        e('h3', { className: 'text-xl font-semibold mb-4' }, 'Select Your Country'),
+        e('div', { className: 'flex gap-4' }, [
+          e('button', {
+            key: 'uk',
+            onClick: () => setSelectedCountry('UK'),
+            className: `px-6 py-3 rounded-lg font-medium transition-colors ${
+              selectedCountry === 'UK' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`
+          }, '🇬🇧 United Kingdom'),
+          e('button', {
+            key: 'nigeria',
+            onClick: () => setSelectedCountry('Nigeria'),
+            className: `px-6 py-3 rounded-lg font-medium transition-colors ${
+              selectedCountry === 'Nigeria' 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`
+          }, '🇳🇬 Nigeria')
+        ])
+      ]),
+
+      // Quick Stats
+      e('div', { key: 'stats', className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
+        e('div', { key: 'stat-1', className: 'bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6 rounded-xl' }, [
+          e('div', { className: 'text-2xl font-bold mb-2' }, loanProviders.length.toString()),
+          e('div', { className: 'text-blue-100' }, 'Verified Lenders')
+        ]),
+        e('div', { key: 'stat-2', className: 'bg-gradient-to-r from-green-500 to-green-600 text-white p-6 rounded-xl' }, [
+          e('div', { className: 'text-2xl font-bold mb-2' }, '95%'),
+          e('div', { className: 'text-green-100' }, 'Approval Rate')
+        ]),
+        e('div', { key: 'stat-3', className: 'bg-gradient-to-r from-purple-500 to-purple-600 text-white p-6 rounded-xl' }, [
+          e('div', { className: 'text-2xl font-bold mb-2' }, '24h'),
+          e('div', { className: 'text-purple-100' }, 'Average Processing')
+        ])
+      ]),
+
+      // Action Buttons
+      e('div', { key: 'actions', className: 'flex flex-col md:flex-row gap-4 justify-center' }, [
+        e('button', {
+          key: 'prequalify',
+          onClick: () => setCurrentStep('prequalify'),
+          className: 'bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-xl font-semibold text-lg transition-colors flex items-center justify-center gap-2'
+        }, [
+          e('span', { key: 'icon' }, '✨'),
+          e('span', { key: 'text' }, 'Start Prequalification')
+        ]),
+        e('button', {
+          key: 'browse',
+          onClick: () => setCurrentStep('providers'),
+          className: 'bg-gray-100 hover:bg-gray-200 text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg transition-colors flex items-center justify-center gap-2'
+        }, [
+          e('span', { key: 'icon' }, '🔍'),
+          e('span', { key: 'text' }, 'Browse Lenders')
+        ])
+      ]),
+
+      // Featured Providers
+      loanProviders.length > 0 && e('div', { key: 'featured', className: 'mt-8' }, [
+        e('h3', { className: 'text-2xl font-bold mb-6' }, 'Featured Lenders'),
+        e('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' },
+          loanProviders.slice(0, 3).map(provider =>
+            e('div', {
+              key: provider.id,
+              className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', { className: 'flex items-center gap-4 mb-4' }, [
+                e('div', { className: 'w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center' }, [
+                  e('span', { className: 'text-blue-600 font-bold' }, provider.name.charAt(0))
+                ]),
+                e('div', {}, [
+                  e('h4', { className: 'font-semibold text-lg' }, provider.name),
+                  e('p', { className: 'text-sm text-gray-600' }, provider.type)
+                ])
+              ]),
+              e('div', { className: 'space-y-2 mb-4' }, [
+                e('div', { className: 'flex justify-between text-sm' }, [
+                  e('span', { className: 'text-gray-600' }, 'Interest Rate:'),
+                  e('span', { className: 'font-medium' }, `${provider.minInterestRate}% - ${provider.maxInterestRate}%`)
+                ]),
+                e('div', { className: 'flex justify-between text-sm' }, [
+                  e('span', { className: 'text-gray-600' }, 'Amount Range:'),
+                  e('span', { className: 'font-medium' }, `${provider.currency || 'GBP'} ${provider.minAmount} - ${provider.maxAmount}`)
+                ])
+              ]),
+              e('div', { className: 'flex items-center gap-2 text-sm text-gray-600' }, [
+                e('span', {}, '⭐'.repeat(Math.floor(Number(provider.rating)))),
+                e('span', {}, `${provider.rating} (${provider.totalReviews} reviews)`)
+              ])
+            ])
+          )
+        )
+      ])
+    ]);
+  };
+
+  const renderPrequalification = () => {
+    return e('div', { key: 'prequalification', className: 'max-w-4xl mx-auto' }, [
+      e('div', { key: 'header', className: 'text-center mb-8' }, [
+        e('h2', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Loan Prequalification'),
+        e('p', { className: 'text-lg text-gray-600' }, 'Tell us about your financial situation to get matched with the best lenders')
+      ]),
+
+      error && e('div', { key: 'error', className: 'bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6' }, error),
+
+      e('form', { key: 'form', onSubmit: handlePrequalification, className: 'bg-white rounded-xl p-8 shadow-lg' }, [
+        // Employment Information
+        e('div', { key: 'employment', className: 'mb-8' }, [
+          e('h3', { className: 'text-xl font-semibold mb-4 text-gray-900' }, 'Employment Information'),
+          e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' }, [
+            e('div', { key: 'employment-status' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Employment Status'),
+              e('select', {
+                value: prequalificationForm.employmentStatus,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, employmentStatus: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                required: true
+              }, [
+                e('option', { value: '' }, 'Select employment status'),
+                e('option', { value: 'employed' }, 'Employed'),
+                e('option', { value: 'self_employed' }, 'Self-Employed'),
+                e('option', { value: 'unemployed' }, 'Unemployed'),
+                e('option', { value: 'retired' }, 'Retired'),
+                e('option', { value: 'student' }, 'Student')
+              ])
+            ]),
+            e('div', { key: 'employment-type' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Employment Type'),
+              e('select', {
+                value: prequalificationForm.employmentType,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, employmentType: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              }, [
+                e('option', { value: '' }, 'Select employment type'),
+                e('option', { value: 'full_time' }, 'Full-time'),
+                e('option', { value: 'part_time' }, 'Part-time'),
+                e('option', { value: 'contract' }, 'Contract'),
+                e('option', { value: 'self_employed' }, 'Self-employed')
+              ])
+            ])
+          ])
+        ]),
+
+        // Financial Information
+        e('div', { key: 'financial', className: 'mb-8' }, [
+          e('h3', { className: 'text-xl font-semibold mb-4 text-gray-900' }, 'Financial Information'),
+          e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' }, [
+            e('div', { key: 'monthly-income' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Monthly Income'),
+              e('input', {
+                type: 'number',
+                value: prequalificationForm.monthlyIncome,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, monthlyIncome: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                placeholder: selectedCountry === 'UK' ? '3000' : '200000',
+                required: true
+              })
+            ]),
+            e('div', { key: 'currency' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Currency'),
+              e('select', {
+                value: prequalificationForm.currency,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, currency: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              }, [
+                e('option', { value: 'GBP' }, 'GBP (£)'),
+                e('option', { value: 'NGN' }, 'NGN (₦)'),
+                e('option', { value: 'USD' }, 'USD ($)')
+              ])
+            ])
+          ])
+        ]),
+
+        // Loan Requirements
+        e('div', { key: 'loan-requirements', className: 'mb-8' }, [
+          e('h3', { className: 'text-xl font-semibold mb-4 text-gray-900' }, 'Loan Requirements'),
+          e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' }, [
+            e('div', { key: 'preferred-amount' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Preferred Loan Amount'),
+              e('input', {
+                type: 'number',
+                value: prequalificationForm.preferredAmount,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, preferredAmount: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                placeholder: selectedCountry === 'UK' ? '10000' : '500000',
+                required: true
+              })
+            ]),
+            e('div', { key: 'loan-purpose' }, [
+              e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Loan Purpose'),
+              e('select', {
+                value: prequalificationForm.loanPurpose,
+                onChange: (e) => setPrequalificationForm({...prequalificationForm, loanPurpose: e.target.value}),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                required: true
+              }, [
+                e('option', { value: '' }, 'Select loan purpose'),
+                e('option', { value: 'business' }, 'Business'),
+                e('option', { value: 'personal' }, 'Personal'),
+                e('option', { value: 'education' }, 'Education'),
+                e('option', { value: 'home' }, 'Home Purchase'),
+                e('option', { value: 'debt_consolidation' }, 'Debt Consolidation'),
+                e('option', { value: 'medical' }, 'Medical'),
+                e('option', { value: 'emergency' }, 'Emergency')
+              ])
+            ])
+          ])
+        ]),
+
+        // Buttons
+        e('div', { key: 'buttons', className: 'flex gap-4 justify-end' }, [
+          e('button', {
+            key: 'back',
+            type: 'button',
+            onClick: () => setCurrentStep('overview'),
+            className: 'px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors'
+          }, 'Back'),
+          e('button', {
+            key: 'submit',
+            type: 'submit',
+            disabled: loading,
+            className: 'px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors'
+          }, loading ? 'Processing...' : 'Find Matching Lenders')
+        ])
+      ])
+    ]);
+  };
+
+  const renderProviders = () => {
+    const matchedProviders = prequalData?.matchedProviders || loanProviders;
+    const score = prequalData?.score;
+
+    return e('div', { key: 'providers', className: 'max-w-6xl mx-auto' }, [
+      e('div', { key: 'header', className: 'text-center mb-8' }, [
+        e('h2', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Matched Lenders'),
+        score && e('div', { className: 'inline-flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-full' }, [
+          e('span', { key: 'icon' }, '✅'),
+          e('span', { key: 'text' }, `Your qualification score: ${score}/100`)
+        ])
+      ]),
+
+      error && e('div', { key: 'error', className: 'bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded mb-6' }, error),
+
+      e('div', { key: 'controls', className: 'flex justify-between items-center mb-6' }, [
+        e('div', { className: 'flex items-center gap-4' }, [
+          e('span', { className: 'text-gray-700 font-medium' }, `${matchedProviders.length} lenders found`),
+          e('select', {
+            value: selectedCountry,
+            onChange: (e) => setSelectedCountry(e.target.value),
+            className: 'px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+          }, [
+            e('option', { value: 'UK' }, 'United Kingdom'),
+            e('option', { value: 'Nigeria' }, 'Nigeria')
+          ])
+        ]),
+        e('button', {
+          key: 'back',
+          onClick: () => setCurrentStep('overview'),
+          className: 'px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors'
+        }, '← Back to Overview')
+      ]),
+
+      loading ? e('div', { key: 'loading', className: 'text-center py-12' }, [
+        e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4' }),
+        e('p', { className: 'text-gray-600' }, 'Loading lenders...')
+      ]) : e('div', { key: 'providers-grid', className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' },
+        matchedProviders.map(provider =>
+          e('div', {
+            key: provider.id,
+            className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
+          }, [
+            // Provider Header
+            e('div', { className: 'flex items-center gap-4 mb-4' }, [
+              e('div', { className: 'w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center' }, [
+                e('span', { className: 'text-blue-600 font-bold text-lg' }, provider.name.charAt(0))
+              ]),
+              e('div', {}, [
+                e('h4', { className: 'font-semibold text-lg' }, provider.name),
+                e('p', { className: 'text-sm text-gray-600' }, provider.type),
+                provider.isVerified && e('span', { className: 'inline-flex items-center gap-1 px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full' }, [
+                  e('span', { key: 'icon' }, '✓'),
+                  e('span', { key: 'text' }, 'Verified')
+                ])
+              ])
+            ]),
+
+            // Provider Details
+            e('div', { className: 'space-y-3 mb-4' }, [
+              e('div', { className: 'flex justify-between text-sm' }, [
+                e('span', { className: 'text-gray-600' }, 'Interest Rate:'),
+                e('span', { className: 'font-medium text-green-600' }, `${provider.minInterestRate}% - ${provider.maxInterestRate}%`)
+              ]),
+              e('div', { className: 'flex justify-between text-sm' }, [
+                e('span', { className: 'text-gray-600' }, 'Amount Range:'),
+                e('span', { className: 'font-medium' }, `${provider.currencies?.[0] || 'GBP'} ${Number(provider.minAmount).toLocaleString()} - ${Number(provider.maxAmount).toLocaleString()}`)
+              ]),
+              e('div', { className: 'flex justify-between text-sm' }, [
+                e('span', { className: 'text-gray-600' }, 'Processing Time:'),
+                e('span', { className: 'font-medium text-blue-600' }, provider.processingTime)
+              ])
+            ]),
+
+            // Rating
+            e('div', { className: 'flex items-center gap-2 mb-4' }, [
+              e('div', { className: 'flex items-center' }, [
+                e('span', { className: 'text-yellow-400' }, '⭐'.repeat(Math.floor(Number(provider.rating)))),
+                e('span', { className: 'text-gray-400' }, '⭐'.repeat(5 - Math.floor(Number(provider.rating))))
+              ]),
+              e('span', { className: 'text-sm text-gray-600' }, `${provider.rating} (${provider.totalReviews} reviews)`)
+            ]),
+
+            // Features
+            provider.features && e('div', { className: 'mb-4' }, [
+              e('div', { className: 'flex flex-wrap gap-2' },
+                provider.features.slice(0, 3).map((feature, index) =>
+                  e('span', {
+                    key: index,
+                    className: 'px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full'
+                  }, feature)
+                )
+              )
+            ]),
+
+            // Action Buttons
+            e('div', { className: 'flex gap-2' }, [
+              e('button', {
+                key: 'learn-more',
+                onClick: () => setSelectedProvider(provider),
+                className: 'flex-1 px-4 py-2 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors text-sm'
+              }, 'Learn More'),
+              prequalData && e('button', {
+                key: 'apply',
+                onClick: () => handleLoanApplication(provider),
+                disabled: loading,
+                className: 'flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-colors text-sm'
+              }, loading ? 'Applying...' : 'Apply Now')
+            ])
+          ])
+        )
+      )
+    ]);
+  };
+
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Header
+    e('div', { key: 'header', className: 'bg-white border-b border-gray-200 px-6 py-4' }, [
+      e('div', { className: 'flex items-center justify-between' }, [
+        e('button', {
+          key: 'back',
+          onClick: onBack,
+          className: 'flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors'
+        }, [
+          e('span', { key: 'icon' }, '←'),
+          e('span', { key: 'text' }, 'Back to Dashboard')
+        ]),
+        e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Loan Services')
+      ])
+    ]),
+
+    // Content
+    e('div', { key: 'content', className: 'p-6' }, [
+      currentStep === 'overview' && renderOverview(),
+      currentStep === 'prequalify' && renderPrequalification(),
+      currentStep === 'providers' && renderProviders()
     ])
   ]);
 }
