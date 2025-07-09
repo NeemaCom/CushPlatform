@@ -9,7 +9,13 @@ import { aiAnalyticsService } from "./ai-analytics-service";
 import { analyzeFinancialMood, type FinancialMoodData } from './mood-analyzer';
 import { analyzeFinancialHealth, type FinancialHealthData } from './financial-health-analyzer';
 import { loanService } from "./loan-service";
-import { loanPreQualificationSchema, type LoanPreQualificationForm } from "../shared/schema";
+import { seedLoanProviders } from "./seed-loan-data";
+import { 
+  loanPrequalificationSchema, 
+  loanApplicationSchema,
+  type InsertLoanPrequalification,
+  type InsertLoanApplication 
+} from "../shared/schema";
 import { 
   registerSchema, 
   loginSchema, 
@@ -1191,6 +1197,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ error: "Failed to save AI context" });
     }
   });
+
+  // Loan API Routes
+  
+  // Get loan providers
+  app.get("/api/loans/providers", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const country = req.query.country as string;
+      const type = req.query.type as string;
+      
+      const providers = await loanService.getLoanProviders(country, type);
+      res.json(providers);
+    } catch (error) {
+      console.error("Get loan providers error:", error);
+      res.status(500).json({ error: "Failed to fetch loan providers" });
+    }
+  });
+
+  // Get loan provider by ID
+  app.get("/api/loans/providers/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.id);
+      const provider = await loanService.getLoanProviderById(providerId);
+      
+      if (!provider) {
+        return res.status(404).json({ error: "Loan provider not found" });
+      }
+      
+      res.json(provider);
+    } catch (error) {
+      console.error("Get loan provider error:", error);
+      res.status(500).json({ error: "Failed to fetch loan provider" });
+    }
+  });
+
+  // Submit loan prequalification
+  app.post("/api/loans/prequalify", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const prequalData = loanPrequalificationSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const result = await loanService.savePrequalification(prequalData);
+      
+      // Get matched providers
+      const matchedProviders = await loanService.matchLoanProviders(prequalData);
+      
+      res.json({
+        prequalification: result,
+        matchedProviders,
+        score: result.prequalificationScore
+      });
+    } catch (error) {
+      console.error("Loan prequalification error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid prequalification data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to process prequalification" });
+    }
+  });
+
+  // Get user's prequalifications
+  app.get("/api/loans/prequalifications", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const prequalifications = await loanService.getUserPrequalifications(userId);
+      res.json(prequalifications);
+    } catch (error) {
+      console.error("Get prequalifications error:", error);
+      res.status(500).json({ error: "Failed to fetch prequalifications" });
+    }
+  });
+
+  // Submit loan application
+  app.post("/api/loans/apply", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const applicationData = loanApplicationSchema.parse({
+        ...req.body,
+        userId
+      });
+      
+      const application = await loanService.submitLoanApplication(applicationData);
+      
+      await SecurityLogger.logAuthEvent(
+        'loan_application_submitted',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { applicationId: application.id, amount: application.amount, providerId: application.loanProviderId }
+      );
+      
+      res.json(application);
+    } catch (error) {
+      console.error("Loan application error:", error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid application data", details: error.errors });
+      }
+      res.status(500).json({ error: "Failed to submit loan application" });
+    }
+  });
+
+  // Get user's loan applications
+  app.get("/api/loans/applications", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const applications = await loanService.getUserLoanApplications(userId);
+      res.json(applications);
+    } catch (error) {
+      console.error("Get loan applications error:", error);
+      res.status(500).json({ error: "Failed to fetch loan applications" });
+    }
+  });
+
+  // Get loan provider reviews
+  app.get("/api/loans/providers/:id/reviews", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const providerId = parseInt(req.params.id);
+      const reviews = await loanService.getProviderReviews(providerId);
+      res.json(reviews);
+    } catch (error) {
+      console.error("Get provider reviews error:", error);
+      res.status(500).json({ error: "Failed to fetch provider reviews" });
+    }
+  });
+
+  // Seed loan providers (development only)
+  if (process.env.NODE_ENV === 'development') {
+    app.post("/api/loans/seed", requireAdmin, async (req: AuthenticatedRequest, res) => {
+      try {
+        await seedLoanProviders();
+        res.json({ message: "Loan providers seeded successfully" });
+      } catch (error) {
+        console.error("Seed loan providers error:", error);
+        res.status(500).json({ error: "Failed to seed loan providers" });
+      }
+    });
+  }
 
   // Stripe subscription endpoints for Imisi Premium
   app.post('/api/create-subscription', isAuthenticated, async (req: AuthenticatedRequest, res) => {
