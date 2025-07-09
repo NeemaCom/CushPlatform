@@ -344,29 +344,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/logout", async (req: AuthenticatedRequest, res) => {
     const userId = req.session.userId;
     
-    req.session.destroy((err) => {
-      if (err) {
-        SecurityLogger.logAuthEvent(
-          'logout_error',
-          userId || null,
-          false,
-          req.ip,
-          req.get('User-Agent'),
-          { error: err.message }
-        );
-        return res.status(500).json({ error: "Logout failed" });
-      }
+    try {
+      // Clear session data manually first
+      req.session.userId = undefined;
+      req.session.role = undefined;
+      req.session.lastActivity = undefined;
       
+      // Clear session cookie
+      res.clearCookie('connect.sid', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict'
+      });
+      
+      // Destroy the session
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destroy error:', err);
+          SecurityLogger.logAuthEvent(
+            'logout_error',
+            userId || null,
+            false,
+            req.ip,
+            req.get('User-Agent'),
+            { error: err.message }
+          );
+          // Still return success to avoid blocking logout
+          return res.json({ message: "Logged out successfully" });
+        }
+        
+        SecurityLogger.logAuthEvent(
+          'logout_success',
+          userId || null,
+          true,
+          req.ip,
+          req.get('User-Agent')
+        );
+        
+        res.json({ message: "Logged out successfully" });
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
       SecurityLogger.logAuthEvent(
-        'logout_success',
+        'logout_error',
         userId || null,
-        true,
+        false,
         req.ip,
-        req.get('User-Agent')
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
       );
       
+      // Always return success to avoid blocking logout
       res.json({ message: "Logged out successfully" });
-    });
+    }
   });
 
   // Get current user endpoint

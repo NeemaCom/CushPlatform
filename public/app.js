@@ -1669,7 +1669,20 @@ function Dashboard({ user }) {
 
   const handleLogout = async () => {
     try {
-      const response = await fetch('/api/auth/logout', { 
+      // Clear storage first
+      localStorage.clear();
+      sessionStorage.clear();
+      
+      // Clear any cached data
+      if (typeof window !== 'undefined') {
+        // Clear all cookies
+        document.cookie.split(";").forEach(function(c) { 
+          document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
+      }
+      
+      // Call logout endpoint
+      await fetch('/api/auth/logout', { 
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -1677,16 +1690,12 @@ function Dashboard({ user }) {
         }
       });
       
-      if (response.ok) {
-        localStorage.clear();
-        sessionStorage.clear();
-        window.location.href = '/';
-      } else {
-        console.error('Logout failed with status:', response.status);
-        window.location.href = '/';
-      }
+      // Force redirect regardless of response
+      window.location.href = '/';
+      
     } catch (error) {
-      console.error('Logout failed:', error);
+      console.error('Logout error:', error);
+      // Force redirect even on error
       window.location.href = '/';
     }
   };
