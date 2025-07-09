@@ -1893,11 +1893,7 @@ function Dashboard({ user }) {
     { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
     { id: 'analytics', label: 'Analytics', icon: '📈', view: 'analytics' },
     { id: 'transactions', label: 'Transactions', icon: '💳', view: 'transactions' },
-    { id: 'budgets', label: 'Budgets', icon: '💰', view: 'budgets' },
-    { id: 'goals', label: 'Goals', icon: '🎯', view: 'goals' },
     { id: 'reports', label: 'Reports', icon: '📋', view: 'reports' },
-    { id: 'notifications', label: 'Notifications', icon: '🔔', view: 'notifications' },
-    { id: 'security', label: 'Security', icon: '🔒', view: 'security' },
     { id: 'help', label: 'Help & Support', icon: '❓', view: 'help' },
     { id: 'settings', label: 'Settings', icon: '⚙️', view: 'account' }
   ];
@@ -1972,10 +1968,10 @@ function Dashboard({ user }) {
         ])
       ]),
 
-      // Navigation Menu - Scrollable
+      // Navigation Menu - Fixed height with proper scrolling
       e('nav', { 
         key: 'navigation',
-        className: 'flex-1 px-4 py-6 space-y-2 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100'
+        className: 'flex-1 px-4 py-6 space-y-2 overflow-y-auto min-h-0'
       }, [
         sidebarItems.map(item => 
           e('button', {
@@ -2030,7 +2026,7 @@ function Dashboard({ user }) {
     // Main Content Area
     e('div', { 
       key: 'main-content',
-      className: 'flex-1 lg:ml-0 flex flex-col h-screen overflow-hidden'
+      className: 'flex-1 lg:ml-0 flex flex-col h-screen'
     }, [
       // Top Header Bar
       e('header', {
@@ -2170,7 +2166,7 @@ function Dashboard({ user }) {
       // Dashboard Content
       e('main', {
         key: 'content',
-        className: 'flex-1 p-6 overflow-y-auto'
+        className: 'flex-1 p-6 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100'
       }, [
         // Render different views based on currentView
         currentView === 'account' ? e(SettingsPage, { key: 'settings-page', user, onBack: () => setCurrentView('dashboard') }) : 
@@ -8928,17 +8924,18 @@ function HelpSupport({ user, onBack }) {
             e('span', { key: 'icon' }, '←'),
             e('span', { key: 'text' }, 'Back to Dashboard')
           ]),
-          e('div', { className: 'flex items-center space-x-3' }, [
-            e('div', { className: 'p-2 bg-blue-100 rounded-lg' }, [
-              e('span', { className: 'text-2xl' }, '❓')
+          e('div', { key: 'title-section', className: 'flex items-center space-x-3' }, [
+            e('div', { key: 'icon', className: 'p-2 bg-blue-100 rounded-lg' }, [
+              e('span', { key: 'emoji', className: 'text-2xl' }, '❓')
             ]),
-            e('div', {}, [
-              e('h1', { className: 'text-2xl font-bold text-gray-900' }, 'Help & Support'),
-              e('p', { className: 'text-gray-600' }, 'Get help with your account and platform features')
+            e('div', { key: 'text', className: '' }, [
+              e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Help & Support'),
+              e('p', { key: 'subtitle', className: 'text-gray-600' }, 'Get help with your account and platform features')
             ])
           ]),
-          e('div', { className: 'flex items-center space-x-3' }, [
+          e('div', { key: 'action-buttons', className: 'flex items-center space-x-3' }, [
             e('button', {
+              key: 'create-ticket',
               onClick: () => setShowTicketForm(true),
               className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2'
             }, [
@@ -8946,6 +8943,7 @@ function HelpSupport({ user, onBack }) {
               e('span', { key: 'text' }, 'Create Ticket')
             ]),
             e('button', {
+              key: 'send-feedback',
               onClick: () => setShowFeedbackForm(true),
               className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2'
             }, [
@@ -8960,37 +8958,37 @@ function HelpSupport({ user, onBack }) {
     // Main Content
     e('div', { key: 'content', className: 'max-w-7xl mx-auto px-4 py-8' }, [
       // Quick Actions
-      e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
-        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
-          e('div', { className: 'flex items-center space-x-4' }, [
-            e('div', { className: 'p-3 bg-blue-100 rounded-lg' }, [
-              e('span', { className: 'text-2xl' }, '💬')
+      e('div', { key: 'quick-actions', className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
+        e('div', { key: 'live-chat', className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { key: 'chat-content', className: 'flex items-center space-x-4' }, [
+            e('div', { key: 'chat-icon', className: 'p-3 bg-blue-100 rounded-lg' }, [
+              e('span', { key: 'emoji', className: 'text-2xl' }, '💬')
             ]),
-            e('div', {}, [
-              e('h3', { className: 'font-semibold text-gray-900' }, 'Live Chat'),
-              e('p', { className: 'text-sm text-gray-600' }, 'Get instant help from our support team')
+            e('div', { key: 'chat-text' }, [
+              e('h3', { key: 'title', className: 'font-semibold text-gray-900' }, 'Live Chat'),
+              e('p', { key: 'desc', className: 'text-sm text-gray-600' }, 'Get instant help from our support team')
             ])
           ])
         ]),
-        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
-          e('div', { className: 'flex items-center space-x-4' }, [
-            e('div', { className: 'p-3 bg-green-100 rounded-lg' }, [
-              e('span', { className: 'text-2xl' }, '📧')
+        e('div', { key: 'email-support', className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { key: 'email-content', className: 'flex items-center space-x-4' }, [
+            e('div', { key: 'email-icon', className: 'p-3 bg-green-100 rounded-lg' }, [
+              e('span', { key: 'emoji', className: 'text-2xl' }, '📧')
             ]),
-            e('div', {}, [
-              e('h3', { className: 'font-semibold text-gray-900' }, 'Email Support'),
-              e('p', { className: 'text-sm text-gray-600' }, 'Send us an email for detailed assistance')
+            e('div', { key: 'email-text' }, [
+              e('h3', { key: 'title', className: 'font-semibold text-gray-900' }, 'Email Support'),
+              e('p', { key: 'desc', className: 'text-sm text-gray-600' }, 'Send us an email for detailed assistance')
             ])
           ])
         ]),
-        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
-          e('div', { className: 'flex items-center space-x-4' }, [
-            e('div', { className: 'p-3 bg-purple-100 rounded-lg' }, [
-              e('span', { className: 'text-2xl' }, '📞')
+        e('div', { key: 'phone-support', className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { key: 'phone-content', className: 'flex items-center space-x-4' }, [
+            e('div', { key: 'phone-icon', className: 'p-3 bg-purple-100 rounded-lg' }, [
+              e('span', { key: 'emoji', className: 'text-2xl' }, '📞')
             ]),
-            e('div', {}, [
-              e('h3', { className: 'font-semibold text-gray-900' }, 'Phone Support'),
-              e('p', { className: 'text-sm text-gray-600' }, 'Call us at +1 (555) 123-4567')
+            e('div', { key: 'phone-text' }, [
+              e('h3', { key: 'title', className: 'font-semibold text-gray-900' }, 'Phone Support'),
+              e('p', { key: 'desc', className: 'text-sm text-gray-600' }, 'Call us at +1 (555) 123-4567')
             ])
           ])
         ])
