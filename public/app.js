@@ -1616,6 +1616,10 @@ function Dashboard({ user }) {
   console.log('Dashboard component user:', user);
   console.log('User role:', user?.role);
   console.log('Is admin?', user?.role === 'admin');
+  
+  // Check if admin button should be rendered
+  const shouldShowAdminButton = user && user.role === 'admin';
+  console.log('Should show admin button:', shouldShowAdminButton);
 
   // Load notifications
   const loadNotifications = async () => {
@@ -1812,14 +1816,16 @@ function Dashboard({ user }) {
         className: 'px-4 py-4 border-t border-gray-200 space-y-2'
       }, [
         // Show admin panel for admin users
-        user && user.role === 'admin' ? e('button', {
-          key: 'admin-panel',
-          onClick: () => setCurrentView('admin'),
-          className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors font-medium'
-        }, [
-          e('span', { key: 'admin-icon', className: 'text-lg' }, '🛡️'),
-          e('span', { key: 'admin-label', className: 'font-medium' }, 'Admin Panel')
-        ]) : null,
+        ...(user && user.role === 'admin' ? [
+          e('button', {
+            key: 'admin-panel',
+            onClick: () => setCurrentView('admin'),
+            className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors font-medium'
+          }, [
+            e('span', { key: 'admin-icon', className: 'text-lg' }, '🛡️'),
+            e('span', { key: 'admin-label', className: 'font-medium' }, 'Admin Panel')
+          ])
+        ] : []),
         e('button', {
           key: 'logout-btn',
           onClick: handleLogout,
