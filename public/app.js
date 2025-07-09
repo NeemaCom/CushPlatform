@@ -2083,6 +2083,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
     { id: 'dashboard', label: 'Dashboard', icon: '📊', view: 'dashboard' },
     { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
     { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
+    { id: 'credit-passport', label: 'Credit Passport', icon: '🛂', view: 'credit-passport' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
     { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
     { id: 'analytics', label: 'Analytics', icon: '📈', view: 'analytics' },
@@ -2253,6 +2254,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             }, currentView === 'dashboard' ? 'Dashboard' : 
                currentView === 'community' ? 'Community Hub' :
                currentView === 'loans' ? 'Loans' :
+               currentView === 'credit-passport' ? 'Credit Passport' :
                currentView === 'imisi' ? 'Imisi AI Assistant' :
                currentView === 'jobs' ? 'Local Jobs' :
                currentView === 'admin' ? 'Admin Panel' :
@@ -2383,6 +2385,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
+        currentView === 'credit-passport' ? e(CreditPassportPage, { key: 'credit-passport-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'help' ? e(HelpSupport, { key: 'help-support', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
@@ -2723,6 +2726,281 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
     ])
   ]);
 }
+
+// Credit Passport Component
+const CreditPassportPage = ({ user, onBack }) => {
+  const [creditStatus, setCreditStatus] = useState(null);
+  const [creditProfile, setCreditProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [isNovaCreditLoading, setIsNovaCreditLoading] = useState(false);
+  const [isAlternativeScoreLoading, setIsAlternativeScoreLoading] = useState(false);
+
+  // Fetch credit passport status
+  const fetchCreditStatus = async () => {
+    try {
+      const response = await fetch('/api/credit-passport/status', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to fetch credit status');
+      const data = await response.json();
+      setCreditStatus(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Fetch comprehensive credit profile
+  const fetchCreditProfile = async () => {
+    try {
+      const response = await fetch('/api/credit-passport/profile', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to fetch credit profile');
+      const data = await response.json();
+      setCreditProfile(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Initiate Nova Credit process
+  const initiateNovaCreditProcess = async () => {
+    setIsNovaCreditLoading(true);
+    try {
+      const response = await fetch('/api/credit-passport/nova-credit/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to initiate Nova Credit process');
+      const data = await response.json();
+      
+      // Open Nova Credit redirect URL in new window
+      window.open(data.redirectUrl, '_blank');
+      
+      // Refresh status after a short delay
+      setTimeout(() => {
+        fetchCreditStatus();
+        fetchCreditProfile();
+      }, 2000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsNovaCreditLoading(false);
+    }
+  };
+
+  // Calculate alternative data score
+  const calculateAlternativeScore = async () => {
+    setIsAlternativeScoreLoading(true);
+    try {
+      const response = await fetch('/api/credit-passport/lenddo-efl/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (!response.ok) throw new Error('Failed to calculate alternative score');
+      const data = await response.json();
+      
+      // Refresh status and profile
+      await fetchCreditStatus();
+      await fetchCreditProfile();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsAlternativeScoreLoading(false);
+    }
+  };
+
+  // Initialize data on component mount
+  useEffect(() => {
+    const initializeData = async () => {
+      setIsLoading(true);
+      await Promise.all([fetchCreditStatus(), fetchCreditProfile()]);
+      setIsLoading(false);
+    };
+    initializeData();
+  }, []);
+
+  if (isLoading) {
+    return e('div', { className: 'flex items-center justify-center min-h-screen' }, [
+      e('div', { className: 'text-center' }, [
+        e('div', { className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4' }),
+        e('p', { className: 'text-gray-600' }, 'Loading your Credit Passport...')
+      ])
+    ]);
+  }
+
+  if (error) {
+    return e('div', { className: 'p-6 bg-red-50 border border-red-200 rounded-lg' }, [
+      e('h3', { className: 'text-red-800 font-semibold mb-2' }, 'Error'),
+      e('p', { className: 'text-red-600' }, error),
+      e('button', {
+        className: 'mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition',
+        onClick: () => window.location.reload()
+      }, 'Retry')
+    ]);
+  }
+
+  const cushScore = creditProfile?.cushCreditScore?.cushCreditScore || 0;
+  const scoreColor = cushScore >= 700 ? 'text-green-600' : 
+                    cushScore >= 600 ? 'text-yellow-600' : 'text-red-600';
+
+  return e('div', { className: 'space-y-6' }, [
+    // Header Section
+    e('div', { key: 'header', className: 'bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-lg' }, [
+      e('h1', { className: 'text-2xl font-bold mb-2' }, 'Cush Credit Passport'),
+      e('p', { className: 'text-blue-100' }, 'Your comprehensive credit profile combining cross-border credit history, alternative data, and migration-specific factors.')
+    ]),
+
+    // Credit Score Overview
+    e('div', { key: 'score-overview', className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+      e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6' }, [
+        // Cush Credit Score
+        e('div', { className: 'text-center' }, [
+          e('h3', { className: 'text-lg font-semibold text-gray-800 mb-2' }, 'Cush Credit Score'),
+          e('div', { className: `text-4xl font-bold ${scoreColor} mb-2` }, cushScore || 'N/A'),
+          e('p', { className: 'text-sm text-gray-600' }, 'Range: 300-850')
+        ]),
+        
+        // Nova Credit Score
+        e('div', { className: 'text-center' }, [
+          e('h3', { className: 'text-lg font-semibold text-gray-800 mb-2' }, 'Nova Credit Score'),
+          e('div', { className: 'text-2xl font-bold text-gray-700 mb-2' }, creditStatus?.novaCreditScore || 'N/A'),
+          e('p', { className: 'text-sm text-gray-600' }, 'Cross-border credit history')
+        ]),
+        
+        // Alternative Data Score
+        e('div', { className: 'text-center' }, [
+          e('h3', { className: 'text-lg font-semibold text-gray-800 mb-2' }, 'Alternative Data Score'),
+          e('div', { className: 'text-2xl font-bold text-gray-700 mb-2' }, creditStatus?.alternativeDataScore || 'N/A'),
+          e('p', { className: 'text-sm text-gray-600' }, 'Employment & behavioral data')
+        ])
+      ])
+    ]),
+
+    // Action Cards
+    e('div', { key: 'action-cards', className: 'grid grid-cols-1 md:grid-cols-2 gap-6' }, [
+      // Nova Credit Card
+      e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+        e('div', { className: 'flex items-center mb-4' }, [
+          e('div', { className: 'bg-blue-100 p-3 rounded-full mr-4' }, [
+            e('span', { className: 'text-2xl' }, '🌍')
+          ]),
+          e('div', {}, [
+            e('h3', { className: 'text-lg font-semibold text-gray-800' }, 'Nova Credit Verification'),
+            e('p', { className: 'text-sm text-gray-600' }, 'Access your international credit history')
+          ])
+        ]),
+        creditStatus?.status === 'not_started' ? 
+          e('button', {
+            className: 'w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition disabled:opacity-50',
+            onClick: initiateNovaCreditProcess,
+            disabled: isNovaCreditLoading
+          }, isNovaCreditLoading ? 'Initiating...' : 'Start Nova Credit Verification') :
+          e('div', { className: 'text-center' }, [
+            e('div', { className: 'text-green-600 font-semibold mb-2' }, `Status: ${creditStatus?.status || 'Unknown'}`),
+            e('p', { className: 'text-sm text-gray-600' }, 'Verification completed')
+          ])
+      ]),
+
+      // Alternative Data Card
+      e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+        e('div', { className: 'flex items-center mb-4' }, [
+          e('div', { className: 'bg-green-100 p-3 rounded-full mr-4' }, [
+            e('span', { className: 'text-2xl' }, '📊')
+          ]),
+          e('div', {}, [
+            e('h3', { className: 'text-lg font-semibold text-gray-800' }, 'Alternative Data Scoring'),
+            e('p', { className: 'text-sm text-gray-600' }, 'Employment and behavioral analysis')
+          ])
+        ]),
+        creditStatus?.hasAlternativeData ? 
+          e('div', { className: 'text-center' }, [
+            e('div', { className: 'text-green-600 font-semibold mb-2' }, `Score: ${creditStatus?.alternativeDataScore || 'N/A'}`),
+            e('p', { className: 'text-sm text-gray-600' }, 'Alternative data analyzed')
+          ]) :
+          e('button', {
+            className: 'w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition disabled:opacity-50',
+            onClick: calculateAlternativeScore,
+            disabled: isAlternativeScoreLoading
+          }, isAlternativeScoreLoading ? 'Calculating...' : 'Calculate Alternative Score')
+      ])
+    ]),
+
+    // Score Breakdown
+    creditProfile?.cushCreditScore && e('div', { key: 'score-breakdown', className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+      e('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Score Breakdown'),
+      e('div', { className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' }, [
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-blue-600' }, creditProfile.cushCreditScore.scoreBreakdown.crossBorderCreditHistory),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Cross-border Credit')
+        ]),
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-green-600' }, creditProfile.cushCreditScore.scoreBreakdown.alternativeData),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Alternative Data')
+        ]),
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-purple-600' }, creditProfile.cushCreditScore.scoreBreakdown.employmentStability),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Employment')
+        ]),
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-yellow-600' }, creditProfile.cushCreditScore.scoreBreakdown.financialBehavior),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Financial Behavior')
+        ]),
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-indigo-600' }, creditProfile.cushCreditScore.scoreBreakdown.migrationProfile),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Migration Profile')
+        ]),
+        e('div', { className: 'text-center p-4 bg-gray-50 rounded-lg' }, [
+          e('div', { className: 'text-2xl font-bold text-pink-600' }, creditProfile.cushCreditScore.scoreBreakdown.platformEngagement),
+          e('p', { className: 'text-sm text-gray-600 mt-1' }, 'Platform Engagement')
+        ])
+      ])
+    ]),
+
+    // Recommendations
+    creditProfile?.cushCreditScore?.recommendations && e('div', { key: 'recommendations', className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+      e('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Recommendations'),
+      e('div', { className: 'space-y-3' }, creditProfile.cushCreditScore.recommendations.map((rec, index) =>
+        e('div', { key: index, className: 'flex items-start' }, [
+          e('div', { className: 'flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5 mr-3' }, [
+            e('span', { className: 'text-blue-600 text-sm font-semibold' }, (index + 1).toString())
+          ]),
+          e('p', { className: 'text-gray-700' }, rec)
+        ])
+      ))
+    ]),
+
+    // Risk & Strength Factors
+    creditProfile?.cushCreditScore && e('div', { key: 'factors', className: 'grid grid-cols-1 md:grid-cols-2 gap-6' }, [
+      // Risk Factors
+      e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+        e('h3', { className: 'text-lg font-semibold text-red-600 mb-4' }, 'Risk Factors'),
+        creditProfile.cushCreditScore.riskFactors.length > 0 ? 
+          e('ul', { className: 'space-y-2' }, creditProfile.cushCreditScore.riskFactors.map((risk, index) =>
+            e('li', { key: index, className: 'flex items-start' }, [
+              e('span', { className: 'text-red-500 mr-2' }, '⚠️'),
+              e('span', { className: 'text-gray-700' }, risk)
+            ])
+          )) :
+          e('p', { className: 'text-gray-500 italic' }, 'No significant risk factors identified.')
+      ]),
+
+      // Strength Factors
+      e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
+        e('h3', { className: 'text-lg font-semibold text-green-600 mb-4' }, 'Strength Factors'),
+        creditProfile.cushCreditScore.strengthFactors.length > 0 ? 
+          e('ul', { className: 'space-y-2' }, creditProfile.cushCreditScore.strengthFactors.map((strength, index) =>
+            e('li', { key: index, className: 'flex items-start' }, [
+              e('span', { className: 'text-green-500 mr-2' }, '✅'),
+              e('span', { className: 'text-gray-700' }, strength)
+            ])
+          )) :
+          e('p', { className: 'text-gray-500 italic' }, 'Building your credit strengths...')
+      ])
+    ])
+  ]);
+};
 
 // Community Hub Component
 function CommunityHub() {
