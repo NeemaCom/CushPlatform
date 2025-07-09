@@ -1612,14 +1612,7 @@ function Dashboard({ user }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   
-  // Debug log to check user object
-  console.log('Dashboard component user:', user);
-  console.log('User role:', user?.role);
-  console.log('Is admin?', user?.role === 'admin');
-  
-  // Check if admin button should be rendered
-  const shouldShowAdminButton = user && user.role === 'admin';
-  console.log('Should show admin button:', shouldShowAdminButton);
+
 
   // Load notifications
   const loadNotifications = async () => {
@@ -4941,8 +4934,14 @@ function ImisiChatHead() {
         onClick: toggleChat,
         className: `relative w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center group overflow-hidden ${
           isOpen ? 'scale-110' : 'hover:scale-105'
-        } ${hasNewSuggestion ? 'animate-bounce' : ''}`
+        } ${hasNewSuggestion ? 'animate-bounce' : ''} shadow-blue-500/50 hover:shadow-blue-500/70`
       }, [
+        // Glowing Ring Effect
+        e('div', {
+          key: 'glow-ring',
+          className: 'absolute inset-0 rounded-full bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 opacity-75 animate-pulse scale-110 blur-sm'
+        }),
+        
         // Animated Background
         e('div', {
           key: 'bg',
@@ -4957,13 +4956,12 @@ function ImisiChatHead() {
           isOpen ? 
             e('span', { key: 'close', className: 'text-white text-2xl' }, '✕') :
             e('div', { key: 'chat-icon', className: 'flex items-center justify-center' }, [
-              e('span', { key: 'message', className: 'text-white text-2xl' }, '💬'),
-              e('div', {
-                key: 'ai-badge',
-                className: 'absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center'
-              }, [
-                e('span', { key: 'brain', className: 'text-xs' }, '🧠')
-              ])
+              e('img', {
+                key: 'avatar',
+                src: '/attached_assets/vecteezy_young-afro-man_14070616-removebg-preview_1752023632708.png',
+                alt: 'Imisi AI Assistant',
+                className: 'w-12 h-12 rounded-full object-cover border-2 border-white/20'
+              })
             ])
         ]),
         
@@ -4976,7 +4974,7 @@ function ImisiChatHead() {
         // Online Indicator
         e('div', {
           key: 'online',
-          className: 'absolute -top-1 -right-1 w-5 h-5 bg-green-400 rounded-full border-2 border-white flex items-center justify-center'
+          className: 'absolute -top-1 -right-1 w-5 h-5 bg-green-400 rounded-full border-2 border-white flex items-center justify-center shadow-lg'
         }, [
           e('div', {
             key: 'pulse-dot',
@@ -5000,9 +4998,9 @@ function ImisiChatHead() {
     // Chat Interface
     isOpen && e('div', {
       key: 'chat-interface',
-      className: `fixed bottom-24 right-6 z-40 w-96 bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col transition-all duration-300 ${
-        isMinimized ? 'h-12' : 'h-[600px]'
-      }`
+      className: `fixed bottom-24 right-6 z-40 w-96 max-w-[calc(100vw-3rem)] bg-white rounded-xl shadow-2xl border border-gray-200 flex flex-col transition-all duration-300 ${
+        isMinimized ? 'h-12' : 'h-[min(600px,calc(100vh-8rem))]'
+      } sm:w-96 w-[calc(100vw-3rem)]`
     }, [
       // Header
       e('div', {
@@ -5015,9 +5013,14 @@ function ImisiChatHead() {
         }, [
           e('div', {
             key: 'avatar',
-            className: 'w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm'
+            className: 'w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm border-2 border-white/30'
           }, [
-            e('span', { key: 'robot', className: 'text-lg' }, '🤖')
+            e('img', {
+              key: 'avatar-img',
+              src: '/attached_assets/vecteezy_young-afro-man_14070616-removebg-preview_1752023632708.png',
+              alt: 'Imisi AI Assistant',
+              className: 'w-8 h-8 rounded-full object-cover'
+            })
           ]),
           e('div', { key: 'info', className: 'flex-1' }, [
             e('h3', {
@@ -5080,25 +5083,45 @@ function ImisiChatHead() {
             className: 'text-center text-gray-500 py-8'
           }, [
             e('div', {
-              key: 'bot-icon',
-              className: 'text-4xl mb-3'
-            }, '🤖'),
+              key: 'bot-avatar',
+              className: 'w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-blue-200'
+            }, [
+              e('img', {
+                key: 'avatar-img',
+                src: '/attached_assets/vecteezy_young-afro-man_14070616-removebg-preview_1752023632708.png',
+                alt: 'Imisi AI Assistant',
+                className: 'w-12 h-12 rounded-full object-cover'
+              })
+            ]),
             e('p', {
               key: 'ready-text',
-              className: 'text-sm mb-2'
+              className: 'text-sm mb-2 font-medium'
             }, "Ready to help with your migration journey!"),
             e('p', {
               key: 'tap-text',
               className: 'text-xs'
-            }, 'Tap the chat button to start')
+            }, 'Start a conversation to get personalized guidance')
           ]),
           
           // Message list
           ...messages.map(message => 
             e('div', {
               key: message.id,
-              className: `flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`
+              className: `flex ${message.sender === 'user' ? 'justify-end' : 'justify-start items-start gap-2'}`
             }, [
+              // AI Avatar for AI messages
+              message.sender === 'ai' && e('div', {
+                key: 'ai-avatar',
+                className: 'w-6 h-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border border-blue-200 flex-shrink-0 mt-1'
+              }, [
+                e('img', {
+                  key: 'ai-avatar-img',
+                  src: '/attached_assets/vecteezy_young-afro-man_14070616-removebg-preview_1752023632708.png',
+                  alt: 'Imisi AI',
+                  className: 'w-4 h-4 rounded-full object-cover'
+                })
+              ]),
+              
               e('div', {
                 key: 'message-bubble',
                 className: `max-w-[80%] rounded-lg px-3 py-2 ${
@@ -5148,8 +5171,19 @@ function ImisiChatHead() {
           // Typing indicator
           isTyping && e('div', {
             key: 'typing',
-            className: 'flex justify-start'
+            className: 'flex justify-start items-start gap-2'
           }, [
+            e('div', {
+              key: 'typing-avatar',
+              className: 'w-6 h-6 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border border-blue-200 flex-shrink-0 mt-1'
+            }, [
+              e('img', {
+                key: 'typing-avatar-img',
+                src: '/attached_assets/vecteezy_young-afro-man_14070616-removebg-preview_1752023632708.png',
+                alt: 'Imisi AI',
+                className: 'w-4 h-4 rounded-full object-cover'
+              })
+            ]),
             e('div', {
               key: 'typing-bubble',
               className: 'bg-gray-100 rounded-lg px-3 py-2'
