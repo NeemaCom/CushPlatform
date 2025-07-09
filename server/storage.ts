@@ -1147,34 +1147,70 @@ export class DatabaseStorage implements IStorage {
 
   async getAdminDashboardStats(): Promise<{
     totalUsers: number;
+    totalAdministrators: number;
+    totalMentors: number;
     totalTransactions: number;
     totalAccounts: number;
+    totalInsights: number;
+    totalEvents: number;
     monthlyActiveUsers: number;
     recentSignups: number;
     avgTransactionsPerUser: number;
     totalBalance: string;
+    lastSignedInUsers: any[];
+    platformHealth: {
+      userGrowth: number;
+      transactionVolume: number;
+      engagementRate: number;
+    };
   }> {
     const [
       totalUsersResult,
+      totalAdministratorsResult,
+      totalMentorsResult,
       totalTransactionsResult,
       totalAccountsResult,
+      totalInsightsResult,
+      totalEventsResult,
       totalBalanceResult,
-      recentSignupsResult
+      recentSignupsResult,
+      lastSignedInResult
     ] = await Promise.all([
       db.select({ count: sql<number>`count(*)` }).from(users),
+      db.select({ count: sql<number>`count(*)` }).from(users).where(eq(users.role, 'admin')),
+      db.select({ count: sql<number>`count(*)` }).from(mentors),
       db.select({ count: sql<number>`count(*)` }).from(transactions),
       db.select({ count: sql<number>`count(*)` }).from(accounts),
+      db.select({ count: sql<number>`count(*)` }).from(insights),
+      db.select({ count: sql<number>`count(*)` }).from(communityEvents),
       db.select({ total: sql<string>`sum(balance)` }).from(accounts),
       db.select({ count: sql<number>`count(*)` })
         .from(users)
-        .where(gte(users.createdAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)))
+        .where(gte(users.createdAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))),
+      db.select({
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        role: users.role,
+        lastLoginAt: users.lastLoginAt
+      })
+        .from(users)
+        .where(sql`${users.lastLoginAt} IS NOT NULL`)
+        .orderBy(desc(users.lastLoginAt))
+        .limit(10)
     ]);
 
     const totalUsers = totalUsersResult[0]?.count || 0;
+    const totalAdministrators = totalAdministratorsResult[0]?.count || 0;
+    const totalMentors = totalMentorsResult[0]?.count || 0;
     const totalTransactions = totalTransactionsResult[0]?.count || 0;
     const totalAccounts = totalAccountsResult[0]?.count || 0;
+    const totalInsights = totalInsightsResult[0]?.count || 0;
+    const totalEvents = totalEventsResult[0]?.count || 0;
     const totalBalance = totalBalanceResult[0]?.total || "0";
     const recentSignups = recentSignupsResult[0]?.count || 0;
+    const lastSignedInUsers = lastSignedInResult || [];
 
     // Calculate monthly active users (users with transactions in last 30 days)
     const monthlyActiveResult = await db
@@ -1185,14 +1221,38 @@ export class DatabaseStorage implements IStorage {
     const monthlyActiveUsers = monthlyActiveResult[0]?.count || 0;
     const avgTransactionsPerUser = totalUsers > 0 ? Math.round(totalTransactions / totalUsers * 100) / 100 : 0;
 
+    // Calculate platform health metrics
+    const lastMonthSignups = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(users)
+      .where(gte(users.createdAt, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)));
+    
+    const userGrowth = lastMonthSignups[0]?.count || 0;
+    const transactionVolume = await db
+      .select({ volume: sql<string>`sum(amount)` })
+      .from(transactions)
+      .where(gte(transactions.date, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)));
+    
+    const engagementRate = totalUsers > 0 ? Math.round((monthlyActiveUsers / totalUsers) * 100) : 0;
+
     return {
       totalUsers,
+      totalAdministrators,
+      totalMentors,
       totalTransactions,
       totalAccounts,
+      totalInsights,
+      totalEvents,
       monthlyActiveUsers,
       recentSignups,
       avgTransactionsPerUser,
-      totalBalance
+      totalBalance,
+      lastSignedInUsers,
+      platformHealth: {
+        userGrowth: userGrowth - recentSignups,
+        transactionVolume: parseFloat(transactionVolume[0]?.volume || "0"),
+        engagementRate
+      }
     };
   }
 
