@@ -4598,6 +4598,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin Support Ticket Management
+  app.put('/api/admin/support/tickets/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const updates = req.body;
+      
+      const ticket = await supportService.updateSupportTicket(ticketId, updates);
+      res.json(ticket);
+    } catch (error) {
+      console.error('Error updating support ticket:', error);
+      res.status(500).json({ error: "Failed to update support ticket" });
+    }
+  });
+
+  app.post('/api/admin/support/tickets/:id/reply', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const userId = req.userId!;
+      const { message } = req.body;
+      
+      const reply = await supportService.createSupportTicketMessage(userId, {
+        ticketId,
+        message,
+        isStaff: true
+      });
+      res.status(201).json(reply);
+    } catch (error) {
+      console.error('Error creating ticket reply:', error);
+      res.status(500).json({ error: "Failed to create ticket reply" });
+    }
+  });
+
+  app.get('/api/admin/support/tickets/:id/messages', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const messages = await supportService.getSupportTicketMessages(ticketId);
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching ticket messages:', error);
+      res.status(500).json({ error: "Failed to fetch ticket messages" });
+    }
+  });
+
+  app.get('/api/admin/support/statistics', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const statistics = await supportService.getSupportStatistics();
+      res.json(statistics);
+    } catch (error) {
+      console.error('Error fetching support statistics:', error);
+      res.status(500).json({ error: "Failed to fetch support statistics" });
+    }
+  });
+
   app.get('/api/admin/support/statistics', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
     try {
       const statistics = await supportService.getSupportStatistics();
