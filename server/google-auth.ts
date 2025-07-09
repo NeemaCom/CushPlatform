@@ -32,16 +32,17 @@ export function setupGoogleAuth(app: Express) {
   // Google OAuth callback
   app.get("/api/auth/google/callback", async (req, res) => {
     try {
-      const { code, error } = req.query;
+      const { code, error, error_description } = req.query;
       
       if (error) {
-        console.error("Google OAuth error:", error);
-        return res.redirect(`/register?error=oauth_failed&details=${error}`);
+        console.error("Google OAuth error:", error, error_description);
+        const errorMessage = error_description || error;
+        return res.redirect(`/signin?error=oauth_failed&details=${encodeURIComponent(errorMessage)}`);
       }
       
       if (!code) {
         console.error("No authorization code received");
-        return res.redirect("/register?error=oauth_failed");
+        return res.redirect("/signin?error=oauth_failed&details=No authorization code received");
       }
 
       // Exchange code for access token
@@ -67,7 +68,7 @@ export function setupGoogleAuth(app: Express) {
       
       if (!tokenData.access_token) {
         console.error("Google OAuth token exchange failed:", tokenData);
-        return res.redirect("/register?error=oauth_failed");
+        return res.redirect("/signin?error=oauth_failed&details=Token exchange failed");
       }
 
       // Get user profile
@@ -102,7 +103,7 @@ export function setupGoogleAuth(app: Express) {
       res.redirect("/dashboard");
     } catch (error) {
       console.error("Google OAuth error:", error);
-      res.redirect("/register?error=oauth_failed");
+      res.redirect("/signin?error=oauth_failed&details=Internal server error");
     }
   });
 }

@@ -881,8 +881,21 @@ function SignInPage() {
   const [showTestAccounts, setShowTestAccounts] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [oauthError, setOauthError] = useState(null);
 
   useEffect(() => {
+    // Check for OAuth errors in URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const error = urlParams.get('error');
+    const details = urlParams.get('details');
+    
+    if (error === 'oauth_failed') {
+      setOauthError(details || 'Google sign-in failed. Please try again.');
+      // Clear the error from URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+    
     fetch('/api/test-credentials')
       .then(res => res.ok ? res.json() : null)
       .then(data => setTestCredentials(data))
@@ -1119,6 +1132,44 @@ function SignInPage() {
             ? 'Input your details and let\'s help you unlock your global potential.'
             : 'Sign in to continue your immigration journey'
           )
+        ]),
+
+        // OAuth Error Alert
+        oauthError && e('div', {
+          key: 'oauth-error',
+          className: 'mb-6 p-4 bg-red-50 border border-red-200 rounded-xl'
+        }, [
+          e('div', {
+            key: 'error-content',
+            className: 'flex items-start gap-3'
+          }, [
+            e('div', {
+              key: 'error-icon',
+              className: 'w-5 h-5 text-red-500 mt-0.5'
+            }, '⚠️'),
+            e('div', {
+              key: 'error-message',
+              className: 'flex-1'
+            }, [
+              e('h3', {
+                key: 'error-title',
+                className: 'text-sm font-semibold text-red-800 mb-1'
+              }, 'Google Sign-in Failed'),
+              e('p', {
+                key: 'error-text',
+                className: 'text-sm text-red-600'
+              }, oauthError),
+              e('p', {
+                key: 'error-help',
+                className: 'text-xs text-red-500 mt-1'
+              }, 'Please try again or use email/password login.')
+            ]),
+            e('button', {
+              key: 'dismiss-error',
+              onClick: () => setOauthError(null),
+              className: 'text-red-400 hover:text-red-600 transition-colors'
+            }, '×')
+          ])
         ]),
 
         // Auth Form
