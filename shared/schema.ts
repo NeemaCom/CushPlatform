@@ -493,6 +493,51 @@ export const achievementProgress = pgTable("achievement_progress", {
   isCompleted: boolean("is_completed").default(false),
 });
 
+// Cush Credit Passport - Cross-border credit profiles
+export const creditProfiles = pgTable("credit_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  novaCreditReportId: text("nova_credit_report_id"),
+  novaCreditScore: integer("nova_credit_score"),
+  lenddoEFLScore: integer("lenddo_efl_score"),
+  cushCreditScore: integer("cush_credit_score"),
+  status: text("status").default("pending"), // pending, complete, error
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  consentGiven: boolean("consent_given").default(false),
+  consentDate: timestamp("consent_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Credit Report Data - Encrypted storage of provider data
+export const creditReportData = pgTable("credit_report_data", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  creditProfileId: integer("credit_profile_id").notNull().references(() => creditProfiles.id, { onDelete: "cascade" }),
+  provider: text("provider").notNull(), // nova_credit, lenddo_efl
+  rawData: json("raw_data").$type<Record<string, any>>(), // Encrypted at application level
+  processedData: json("processed_data").$type<Record<string, any>>(), // Encrypted at application level
+  reportType: text("report_type"), // credit_report, alternative_score, employment_verification
+  reportStatus: text("report_status").default("processing"), // processing, complete, error
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Credit Profile Audit Log - Track all access and modifications
+export const creditProfileAuditLog = pgTable("credit_profile_audit_log", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  creditProfileId: integer("credit_profile_id").references(() => creditProfiles.id),
+  action: text("action").notNull(), // consent_given, report_requested, score_calculated, data_accessed
+  provider: text("provider"), // nova_credit, lenddo_efl, cush_internal
+  success: boolean("success").default(true),
+  errorMessage: text("error_message"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -511,6 +556,9 @@ export const usersRelations = relations(users, ({ many }) => ({
   financialGoals: many(financialGoals),
   userAchievements: many(userAchievements),
   achievementProgress: many(achievementProgress),
+  creditProfiles: many(creditProfiles),
+  creditReportData: many(creditReportData),
+  creditProfileAuditLog: many(creditProfileAuditLog),
 }));
 
 export const accountsRelations = relations(accounts, ({ one, many }) => ({
@@ -543,6 +591,36 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   user: one(users, {
     fields: [chatMessages.userId],
     references: [users.id],
+  }),
+}));
+
+export const creditProfilesRelations = relations(creditProfiles, ({ one, many }) => ({
+  user: one(users, {
+    fields: [creditProfiles.userId],
+    references: [users.id],
+  }),
+  creditReportData: many(creditReportData),
+}));
+
+export const creditReportDataRelations = relations(creditReportData, ({ one }) => ({
+  user: one(users, {
+    fields: [creditReportData.userId],
+    references: [users.id],
+  }),
+  creditProfile: one(creditProfiles, {
+    fields: [creditReportData.creditProfileId],
+    references: [creditProfiles.id],
+  }),
+}));
+
+export const creditProfileAuditLogRelations = relations(creditProfileAuditLog, ({ one }) => ({
+  user: one(users, {
+    fields: [creditProfileAuditLog.userId],
+    references: [users.id],
+  }),
+  creditProfile: one(creditProfiles, {
+    fields: [creditProfileAuditLog.creditProfileId],
+    references: [creditProfiles.id],
   }),
 }));
 

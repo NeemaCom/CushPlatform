@@ -4141,6 +4141,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // =============================================================================
+  // CREDIT PASSPORT API ROUTES
+  // =============================================================================
+
+  // Initiate Nova Credit process
+  app.post('/api/credit-passport/nova-credit/initiate', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { novaCreditService } = await import('./nova-credit-service');
+      
+      const response = await novaCreditService.initiateNovaCreditProcess(
+        userId,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json(response);
+    } catch (error: any) {
+      console.error('Nova Credit initiation error:', error);
+      res.status(500).json({ error: "Failed to initiate Nova Credit process" });
+    }
+  });
+
+  // Nova Credit webhook handler
+  app.post('/api/credit-passport/nova-credit/webhook', async (req: Request, res: Response) => {
+    try {
+      const { novaCreditService } = await import('./nova-credit-service');
+      
+      await novaCreditService.handleNovaCreditWebhook(req.body);
+      
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error('Nova Credit webhook error:', error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Get Nova Credit report (admin/internal)
+  app.get('/api/credit-passport/nova-credit/report/:userId', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { userId } = req.params;
+      const { novaCreditService } = await import('./nova-credit-service');
+      
+      const report = await novaCreditService.getCreditProfile(parseInt(userId));
+      
+      res.json(report);
+    } catch (error: any) {
+      console.error('Nova Credit report error:', error);
+      res.status(500).json({ error: "Failed to fetch credit report" });
+    }
+  });
+
+  // Get user's credit profile status
+  app.get('/api/credit-passport/status', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { novaCreditService } = await import('./nova-credit-service');
+      const { lenddoEFLService } = await import('./lenddo-efl-service');
+      
+      const novaCreditStatus = await novaCreditService.getCreditProfileStatus(userId);
+      const alternativeData = await lenddoEFLService.getAlternativeDataScore(userId);
+      
+      res.json({
+        ...novaCreditStatus,
+        hasAlternativeData: !!alternativeData,
+        alternativeDataScore: alternativeData?.score || null,
+      });
+    } catch (error: any) {
+      console.error('Credit profile status error:', error);
+      res.status(500).json({ error: "Failed to fetch credit profile status" });
+    }
+  });
+
+  // Get comprehensive credit profile
+  app.get('/api/credit-passport/profile', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { novaCreditService } = await import('./nova-credit-service');
+      const { lenddoEFLService } = await import('./lenddo-efl-service');
+      const { creditScoreCalculator } = await import('./credit-score-calculator');
+      
+      const creditProfile = await novaCreditService.getCreditProfile(userId);
+      const alternativeData = await lenddoEFLService.getAlternativeDataScore(userId);
+      
+      // Get user's financial data for comprehensive scoring
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getRecentTransactions(userId, 50);
+      const financialGoals = await storage.getFinancialGoals(userId);
+      
+      // Calculate total balance and financial metrics
+      const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || '0'), 0);
+      const monthlyIncome = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const monthlyExpenses = transactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Math.abs(parseFloat(t.amount)), 0);
+      
+      // Calculate comprehensive Cush Credit Score
+      const scoreResult = creditScoreCalculator.calculateCushCreditScore({
+        novaCreditScore: creditProfile?.novaCreditScore || undefined,
+        lenddoEFLScore: alternativeData?.score || undefined,
+        employmentHistory: {
+          currentEmployment: true, // Assume employed for now
+          monthlyIncome: monthlyIncome || 0,
+          employmentLengthMonths: 12, // Default value
+          jobStability: 7, // Default value
+        },
+        financialData: {
+          totalBalance,
+          savingsRate: monthlyIncome > 0 ? Math.max(0, (monthlyIncome - monthlyExpenses) / monthlyIncome) : 0,
+          monthlySpending: monthlyExpenses,
+          debtToIncomeRatio: 0.2, // Default value
+        },
+        migrationProfile: {
+          timeInCountry: 24, // Default 2 years
+          visaStatus: 'work_visa',
+          educationLevel: 'bachelors',
+          languageProficiency: 8,
+        },
+        behavioralData: {
+          appEngagement: 8,
+          financialGoalsCompleted: financialGoals.filter((g: any) => g.isCompleted).length,
+          communityParticipation: 6,
+        },
+      });
+      
+      res.json({
+        creditProfile,
+        alternativeData,
+        cushCreditScore: scoreResult,
+        lastUpdated: creditProfile?.lastUpdated || new Date(),
+      });
+    } catch (error: any) {
+      console.error('Credit profile error:', error);
+      res.status(500).json({ error: "Failed to fetch credit profile" });
+    }
+  });
+
+  // Calculate alternative data score
+  app.post('/api/credit-passport/lenddo-efl/score', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { lenddoEFLService } = await import('./lenddo-efl-service');
+      
+      // Get user's data for scoring
+      const accounts = await storage.getAccountsByUserId(userId);
+      const transactions = await storage.getRecentTransactions(userId, 50);
+      const financialGoals = await storage.getFinancialGoals(userId);
+      
+      const monthlyIncome = transactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      const scoreRequest = {
+        userId,
+        employmentData: {
+          currentEmployment: true,
+          monthlyIncome: monthlyIncome || 0,
+          employmentHistory: [],
+          jobTitle: 'Professional',
+          companyName: 'Various',
+        },
+        behavioralData: {
+          appUsagePatterns: {},
+          financialGoals: financialGoals,
+          communityEngagement: 6,
+        },
+      };
+      
+      const score = await lenddoEFLService.calculateAlternativeDataScore(scoreRequest);
+      
+      res.json(score);
+    } catch (error: any) {
+      console.error('Alternative data scoring error:', error);
+      res.status(500).json({ error: "Failed to calculate alternative data score" });
+    }
+  });
+
   // Financial Health Radar API
   app.get('/api/financial-health-radar', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
     try {

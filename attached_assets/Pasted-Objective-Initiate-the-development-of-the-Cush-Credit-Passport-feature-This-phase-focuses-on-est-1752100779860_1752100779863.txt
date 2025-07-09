@@ -1,0 +1,86 @@
+Objective: Initiate the development of the "Cush Credit Passport" feature. This phase focuses on establishing the initial API connection with Nova Credit to begin building comprehensive cross-border credit profiles for migrants and "thin file" individuals. LenddoEFL integration will be a secondary consideration within this MVP or a subsequent phase.
+
+Feature Goal (Cush Credit Passport):
+To securely link and analyze users' financial data (primarily cross-border credit history via Nova Credit, supplemented by employment and alternative data in later stages) to generate an internationally understood "Cush Credit Score." This score will help users access financial products from partner lenders.
+
+Core Requirements for Initial Provider Connection (Nova Credit Primary Focus):
+Data Models & Schema Expansion:
+
+Expand existing Drizzle ORM schemas (or create new ones) to accommodate data relevant to credit assessment and provider integration.
+
+CreditProfile: userId (FK), novaCreditReportId (string), novaCreditScore (number, optional), cushCreditScore (number, calculated), lastUpdated, status ('pending' | 'complete' | 'error').
+
+CreditReportData (conceptual, for storing raw/processed data from providers): userId (FK), provider ('nova_credit'), rawData (JSONB, encrypted), processedData (JSONB, encrypted), createdAt.
+
+(LenddoEFL specific fields like lenddoEFLScore can be added in a later sub-phase or full Phase 2)
+
+Nova Credit Integration (Cross-Border Credit History - PRIMARY):
+
+Backend Service: Create a dedicated backend service (src/services/novaCreditService.ts) to handle API calls to Nova Credit.
+
+API Endpoints:
+
+POST /api/credit-passport/nova-credit/initiate: Initiates the Nova Credit process (e.g., generating a secure link for the user to connect their foreign credit bureau). This will typically involve a redirect or iframe flow.
+
+POST /api/credit-passport/nova-credit/webhook: Endpoint to receive webhooks from Nova Credit when a report is ready. This is critical for asynchronous updates.
+
+GET /api/credit-passport/nova-credit/report/:userId: (Admin/Internal) Fetches the processed credit report from Nova Credit for a given user.
+
+Data Handling: Securely receive and store (encrypted) the credit report data from Nova Credit.
+
+User Flow (Conceptual): The user will be redirected to Nova Credit's secure portal to link their foreign credit history, then redirected back to Cush.
+
+LenddoEFL Integration (Alternative Data Scoring - Secondary/Future Consideration for MVP):
+
+While Nova Credit is the primary focus, the backend service (src/services/lenddoEFLService.ts) and conceptual API endpoints can be stubbed out or planned for future development if time permits within the MVP.
+
+For MVP, actual data exchange and scoring with LenddoEFL might be deferred. The prompt acknowledges its relevance but prioritizes Nova Credit for initial implementation.
+
+If implemented in MVP, it should leverage already available data like employment history (if parsed from Imisi's document intelligence) and basic financial patterns from bank accounts (if Open Banking is integrated in parallel).
+
+"Cush Credit Score" Calculation (Initial Logic):
+
+Implement a basic function (calculateCushCreditScore) that primarily uses inputs from Nova Credit to generate a preliminary "Cush Credit Score."
+
+Initial Logic: This can be a simple mapping or a rule-based system based on the Nova Credit score.
+
+Store the calculated cushCreditScore in the CreditProfile.
+
+User Consent & Security:
+
+Consent: Ensure explicit user consent is obtained before sending any data to Nova Credit. This will be a UI element in the frontend.
+
+Encryption: All sensitive data exchanged with Nova Credit and stored in Cush's database must be encrypted at rest and in transit.
+
+Audit Logging: Log all successful and failed attempts to connect with Nova Credit and any data transfers.
+
+Frontend (Basic Integration Points):
+
+A placeholder section in the user's dashboard (e.g., /credit-passport) where they can initiate the credit passport process.
+
+A clear button/link to trigger the Nova Credit connection process.
+
+Display a basic status of the credit passport (e.g., "Nova Credit Pending," "Nova Credit Complete," "Error").
+
+No complex UI for displaying detailed reports in this phase.
+
+Expected Deliverables:
+backend/src/db/schema.ts: Updated Drizzle schemas for CreditProfile and CreditReportData, with emphasis on Nova Credit fields.
+
+backend/src/types/index.ts: New TypeScript interfaces for CreditProfile, CreditReportData, and Nova Credit-specific data structures.
+
+backend/src/services/novaCreditService.ts: Service file with functions for Nova Credit API interactions.
+
+backend/src/services/lenddoEFLService.ts: (Optional/Stubbed) Service file for LenddoEFL API interactions, if included in MVP.
+
+backend/src/utils/creditScoreCalculator.ts: Function for calculateCushCreditScore primarily using Nova Credit data.
+
+backend/src/routes/creditPassport.ts (new file): API endpoints for initiating Nova Credit connection and fetching basic status/scores.
+
+Frontend (Conceptual): Notes on React Native components for:
+
+A "Credit Passport" section on the user dashboard.
+
+A prominent button to initiate the Nova Credit process.
+
+Displaying the CreditProfile status and cushCreditScore.
