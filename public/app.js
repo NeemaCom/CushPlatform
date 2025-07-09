@@ -1876,7 +1876,7 @@ function AuthComponent() {
 }
 
 // Simple Dashboard Component to avoid syntax errors
-function Dashboard({ user }) {
+function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [notifications, setNotifications] = useState([]);
@@ -2257,6 +2257,16 @@ function Dashboard({ user }) {
                 key: 'search-icon',
                 className: 'absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'
               }, '🔍')
+            ]),
+            // PWA Install Button
+            (!isInstalled && (deferredPrompt || !window.matchMedia('(display-mode: standalone)').matches)) && e('button', {
+              key: 'pwa-install',
+              onClick: installPWA,
+              className: 'hidden sm:flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors',
+              title: 'Install Cush App'
+            }, [
+              e('span', { key: 'install-icon' }, '📱'),
+              e('span', { key: 'install-text' }, 'Install')
             ]),
             // Notification Bell
             e('div', {
@@ -3813,66 +3823,78 @@ function App() {
     if (window.matchMedia('(display-mode: standalone)').matches || 
         window.navigator.standalone === true) {
       setIsInstalled(true);
+      return;
     }
 
     // Listen for beforeinstallprompt event
     const handleBeforeInstallPrompt = (e) => {
+      console.log('Before install prompt triggered');
       e.preventDefault();
       setDeferredPrompt(e);
       
-      // Show install prompt after user has been on the site for 10 seconds (reduced from 30)
+      // Show install prompt immediately for testing, then after 3 seconds for users
       setTimeout(() => {
         if (!isInstalled && !showInstallPrompt) {
+          console.log('Showing install prompt');
           setShowInstallPrompt(true);
         }
-      }, 10000);
+      }, 3000);
     };
 
     // Listen for appinstalled event
     const handleAppInstalled = () => {
+      console.log('App installed');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
     };
 
-    // For mobile browsers that don't support beforeinstallprompt
-    const showFallbackPrompt = () => {
-      if (!isInstalled && !deferredPrompt && !showInstallPrompt) {
-        // Show fallback prompt for mobile Safari and other browsers
-        setTimeout(() => {
-          if (!isInstalled) {
-            setShowInstallPrompt(true);
-          }
-        }, 15000);
-      }
+    // For browsers that support PWA but don't fire beforeinstallprompt immediately
+    const checkInstallability = () => {
+      setTimeout(() => {
+        if (!isInstalled && !deferredPrompt && !showInstallPrompt) {
+          // Show fallback prompt for browsers that support PWA but don't fire the event
+          console.log('Showing fallback install prompt');
+          setShowInstallPrompt(true);
+        }
+      }, 5000);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
     
-    // Show fallback prompt for browsers that don't support beforeinstallprompt
-    showFallbackPrompt();
+    // Check for installability after a delay
+    checkInstallability();
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, [isInstalled, deferredPrompt, showInstallPrompt]);
+  }, []);
 
   // Install PWA function
   const installPWA = async () => {
     if (deferredPrompt) {
+      console.log('Triggering PWA install prompt');
       deferredPrompt.prompt();
       const choiceResult = await deferredPrompt.userChoice;
       
       if (choiceResult.outcome === 'accepted') {
         console.log('User accepted the install prompt');
         setShowInstallPrompt(false);
+        setIsInstalled(true);
       } else {
         console.log('User dismissed the install prompt');
       }
       
       setDeferredPrompt(null);
+    } else {
+      console.log('No deferred prompt available');
+      // For browsers that don't support beforeinstallprompt
+      alert('To install this app:\n\n' +
+            'Chrome/Edge: Click the menu button (⋮) then "Install Cush"\n' +
+            'Firefox: Click the address bar install icon\n' +
+            'Safari: Click Share button then "Add to Home Screen"');
     }
   };
 
@@ -3909,7 +3931,7 @@ function App() {
 
   return user ? 
     e('div', { key: 'app-container' }, [
-      e(Dashboard, { key: 'dashboard', user }),
+      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }),
       e(ImisiChatHead, { key: 'imisi-chat' }),
       
       // PWA Install Prompt
