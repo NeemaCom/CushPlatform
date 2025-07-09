@@ -1977,7 +1977,7 @@ function Dashboard({ user }) {
         className: 'p-6'
       }, [
         // Render different views based on currentView
-        currentView === 'account' ? e(UserAccountPage, { key: 'account-page', user, onBack: () => setCurrentView('dashboard') }) : 
+        currentView === 'account' ? e(SettingsPage, { key: 'settings-page', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
@@ -2119,7 +2119,7 @@ function Dashboard({ user }) {
                 e('button', {
                   key: 'settings-btn',
                   className: 'p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left',
-                  onClick: () => setCurrentView('settings')
+                  onClick: () => setCurrentView('account')
                 }, [
                   e('div', { key: 'settings-icon', className: 'w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center mb-2' }, '⚙️'),
                   e('div', { key: 'settings-text', className: 'text-sm font-medium text-gray-900' }, 'Settings')
@@ -5251,15 +5251,16 @@ function ImisiChatHead() {
   ]);
 }
 
-// User Account Page Component
-function UserAccountPage({ user, onBack }) {
+// Enhanced Settings Page Component
+function SettingsPage({ user, onBack }) {
   const [activeTab, setActiveTab] = useState('profile');
   const [profileForm, setProfileForm] = useState({
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     email: user?.email || '',
     phoneNumber: user?.phoneNumber || '',
-    nationality: user?.nationality || ''
+    nationality: user?.nationality || '',
+    profilePicture: user?.profilePicture || ''
   });
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
@@ -5267,11 +5268,63 @@ function UserAccountPage({ user, onBack }) {
     confirmPassword: ''
   });
   const [loading, setLoading] = useState(false);
+  const [uploadingPicture, setUploadingPicture] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   const showMessage = (type, text) => {
     setMessage({ type, text });
     setTimeout(() => setMessage({ type: '', text: '' }), 5000);
+  };
+
+  const handleProfilePictureUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showMessage('error', 'File size must be less than 5MB');
+      return;
+    }
+    
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      showMessage('error', 'Please select an image file');
+      return;
+    }
+    
+    setUploadingPicture(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        
+        const response = await fetch('/api/profile/picture', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({ image: base64Data })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setProfileForm(prev => ({ ...prev, profilePicture: data.profilePicture }));
+          showMessage('success', 'Profile picture updated successfully!');
+        } else {
+          showMessage('error', data.error || 'Failed to update profile picture');
+        }
+        
+        setUploadingPicture(false);
+      };
+      
+      reader.readAsDataURL(file);
+    } catch (error) {
+      showMessage('error', 'Error uploading profile picture');
+      setUploadingPicture(false);
+    }
   };
 
   const handleProfileUpdate = async (e) => {
@@ -5350,7 +5403,7 @@ function UserAccountPage({ user, onBack }) {
     }
   };
 
-  return e('div', { className: 'max-w-4xl mx-auto' }, [
+  return e('div', { className: 'max-w-5xl mx-auto' }, [
     // Header
     e('div', {
       key: 'header',
@@ -5365,11 +5418,11 @@ function UserAccountPage({ user, onBack }) {
         e('h1', {
           key: 'title',
           className: 'text-3xl font-bold text-gray-900'
-        }, 'Account Settings'),
+        }, 'Settings'),
         e('p', {
           key: 'subtitle',
           className: 'text-gray-600 mt-2'
-        }, 'Manage your account information and security settings')
+        }, 'Manage your account, security, and preferences')
       ])
     ]),
 
@@ -5435,6 +5488,70 @@ function UserAccountPage({ user, onBack }) {
               key: 'form-desc',
               className: 'text-gray-600 mt-1'
             }, 'Update your personal details and contact information')
+          ]),
+
+          // Profile Picture Section
+          e('div', {
+            key: 'profile-picture-section',
+            className: 'space-y-4'
+          }, [
+            e('h3', {
+              key: 'picture-title',
+              className: 'text-lg font-medium text-gray-900'
+            }, 'Profile Picture'),
+            e('div', {
+              key: 'picture-upload',
+              className: 'flex items-center space-x-6'
+            }, [
+              e('div', {
+                key: 'current-picture',
+                className: 'w-24 h-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center'
+              }, [
+                profileForm.profilePicture ? 
+                  e('img', {
+                    key: 'profile-img',
+                    src: profileForm.profilePicture,
+                    alt: 'Profile Picture',
+                    className: 'w-full h-full object-cover'
+                  }) :
+                  e('svg', {
+                    key: 'default-avatar',
+                    className: 'w-12 h-12 text-gray-400',
+                    fill: 'currentColor',
+                    viewBox: '0 0 24 24'
+                  }, [
+                    e('path', {
+                      key: 'avatar-path',
+                      d: 'M24 20.993V24H0v-2.996A14.977 14.977 0 0112.004 15c4.904 0 9.26 2.354 11.996 5.993zM16.002 8.999a4 4 0 11-8 0 4 4 0 018 0z'
+                    })
+                  ])
+              ]),
+              e('div', {
+                key: 'upload-actions',
+                className: 'flex flex-col space-y-2'
+              }, [
+                e('label', {
+                  key: 'upload-label',
+                  className: 'bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg cursor-pointer transition-colors inline-flex items-center gap-2'
+                }, [
+                  uploadingPicture ? 
+                    e('span', { key: 'uploading' }, 'Uploading...') :
+                    e('span', { key: 'upload-text' }, 'Upload New Picture'),
+                  e('input', {
+                    key: 'file-input',
+                    type: 'file',
+                    accept: 'image/*',
+                    onChange: handleProfilePictureUpload,
+                    className: 'hidden',
+                    disabled: uploadingPicture
+                  })
+                ]),
+                e('p', {
+                  key: 'upload-info',
+                  className: 'text-sm text-gray-500'
+                }, 'JPG, PNG up to 5MB')
+              ])
+            ])
           ]),
 
           e('div', {
