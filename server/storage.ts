@@ -1235,6 +1235,9 @@ export class DatabaseStorage implements IStorage {
     
     const engagementRate = totalUsers > 0 ? Math.round((monthlyActiveUsers / totalUsers) * 100) : 0;
 
+    // Generate chart data for visualizations
+    const chartData = await this.generateChartData();
+
     return {
       totalUsers,
       totalAdministrators,
@@ -1252,7 +1255,110 @@ export class DatabaseStorage implements IStorage {
         userGrowth: userGrowth - recentSignups,
         transactionVolume: parseFloat(transactionVolume[0]?.volume || "0"),
         engagementRate
-      }
+      },
+      chartData
+    };
+  }
+
+  // Generate chart data for admin dashboard
+  async generateChartData() {
+    // User growth over last 6 months
+    const monthlyUserGrowth = [];
+    const transactionVolumeData = [];
+    
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+      
+      const monthlySignups = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(and(
+          gte(users.createdAt, startOfMonth),
+          lte(users.createdAt, endOfMonth)
+        ));
+      
+      const monthlyTransactions = await db
+        .select({ 
+          count: sql<number>`count(*)`,
+          volume: sql<string>`sum(amount)`
+        })
+        .from(transactions)
+        .where(and(
+          gte(transactions.date, startOfMonth),
+          lte(transactions.date, endOfMonth)
+        ));
+      
+      monthlyUserGrowth.push({
+        month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        users: monthlySignups[0]?.count || 0
+      });
+      
+      transactionVolumeData.push({
+        month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        count: monthlyTransactions[0]?.count || 0,
+        volume: parseFloat(monthlyTransactions[0]?.volume || "0")
+      });
+    }
+    
+    // User role distribution
+    const roleDistribution = await db
+      .select({
+        role: users.role,
+        count: sql<number>`count(*)`
+      })
+      .from(users)
+      .groupBy(users.role);
+    
+    // Platform activity trends (last 7 days)
+    const dailyActivity = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+      
+      const dailyTransactions = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(transactions)
+        .where(and(
+          gte(transactions.date, startOfDay),
+          lte(transactions.date, endOfDay)
+        ));
+      
+      const dailyLogins = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(users)
+        .where(and(
+          sql`${users.lastLoginAt} IS NOT NULL`,
+          gte(users.lastLoginAt, startOfDay),
+          lte(users.lastLoginAt, endOfDay)
+        ));
+      
+      dailyActivity.push({
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        transactions: dailyTransactions[0]?.count || 0,
+        logins: dailyLogins[0]?.count || 0
+      });
+    }
+    
+    // Platform status distribution
+    const statusDistribution = await db
+      .select({
+        verified: users.isEmailVerified,
+        count: sql<number>`count(*)`
+      })
+      .from(users)
+      .groupBy(users.isEmailVerified);
+    
+    return {
+      userGrowth: monthlyUserGrowth,
+      transactionVolume: transactionVolumeData,
+      roleDistribution: roleDistribution,
+      activityTrends: dailyActivity,
+      statusDistribution: statusDistribution
     };
   }
 
