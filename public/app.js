@@ -1620,95 +1620,212 @@ function Dashboard({ user }) {
       });
       
       if (response.ok) {
-        // Clear any local storage/session storage if needed
         localStorage.clear();
         sessionStorage.clear();
-        // Force reload to ensure clean state
         window.location.href = '/';
       } else {
         console.error('Logout failed with status:', response.status);
-        // Force redirect anyway for security
         window.location.href = '/';
       }
     } catch (error) {
       console.error('Logout failed:', error);
-      // Force redirect anyway for security
       window.location.href = '/';
     }
   };
 
+  // Modern Sidebar Navigation Items
+  const sidebarItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: '📊', view: 'dashboard' },
+    { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
+    { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
+    { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
+    { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
+    { id: 'settings', label: 'Settings', icon: '⚙️', view: 'settings' }
+  ];
+
   return e('div', { className: 'min-h-screen bg-gray-50 flex' }, [
-    // Main Content
-    e('div', { key: 'main', className: 'flex-1' }, [
-      // Top Header
-      e('header', {
-        key: 'header',
-        className: 'bg-white/80 backdrop-blur-lg shadow-sm border-b border-gray-100'
+    // Left Sidebar
+    e('div', { 
+      key: 'sidebar',
+      className: `fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+    }, [
+      // Sidebar Header
+      e('div', { 
+        key: 'sidebar-header',
+        className: 'flex items-center justify-between px-6 py-4 border-b border-gray-200'
       }, [
-        e('div', { className: 'flex items-center justify-between px-6 py-4' }, [
+        e('div', {
+          key: 'logo-section',
+          className: 'flex items-center gap-3'
+        }, [
           e('div', {
-            key: 'logo-title',
-            className: 'flex items-center gap-3'
+            key: 'logo-circle',
+            className: 'w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center'
+          }, [
+            e('span', {
+              key: 'logo-text',
+              className: 'text-white font-bold text-sm'
+            }, 'C')
+          ]),
+          e('span', {
+            key: 'brand-name',
+            className: 'font-bold text-lg text-gray-900'
+          }, 'Cush')
+        ]),
+        // Mobile close button
+        e('button', {
+          key: 'close-sidebar',
+          onClick: () => setSidebarOpen(false),
+          className: 'lg:hidden text-gray-500 hover:text-gray-700'
+        }, '✕')
+      ]),
+
+      // User Profile Section
+      e('div', {
+        key: 'user-profile',
+        className: 'px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+      }, [
+        e('div', { 
+          key: 'user-avatar',
+          className: 'flex items-center gap-3'
+        }, [
+          e('div', {
+            key: 'avatar-circle',
+            className: 'w-12 h-12 bg-white/20 rounded-full flex items-center justify-center'
           }, [
             e('img', {
-              key: 'dashboard-logo',
-              src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
-              alt: 'Cush Logo',
-              className: 'h-8 w-auto'
-            }),
-            e('span', {
-              key: 'dashboard-text',
-              className: 'text-xl font-medium text-gray-700'
-            }, 'Dashboard')
+              key: 'user-image',
+              src: '/attached_assets/guy smiling2_1751497479944.jpg',
+              alt: 'User Avatar',
+              className: 'w-10 h-10 rounded-full object-cover'
+            })
+          ]),
+          e('div', { key: 'user-info' }, [
+            e('div', {
+              key: 'user-name',
+              className: 'font-medium text-sm'
+            }, `${user?.firstName || 'User'} ${user?.lastName || ''}`),
+            e('div', {
+              key: 'user-status',
+              className: 'text-xs text-blue-100'
+            }, 'Welcome back!')
+          ])
+        ])
+      ]),
+
+      // Navigation Menu
+      e('nav', { 
+        key: 'navigation',
+        className: 'flex-1 px-4 py-6 space-y-2'
+      }, [
+        sidebarItems.map(item => 
+          e('button', {
+            key: item.id,
+            onClick: () => setCurrentView(item.view),
+            className: `w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+              currentView === item.view 
+                ? 'bg-blue-50 text-blue-600 border-r-3 border-blue-600' 
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`
+          }, [
+            e('span', { key: 'icon', className: 'text-lg' }, item.icon),
+            e('span', { key: 'label', className: 'font-medium' }, item.label)
+          ])
+        )
+      ]),
+
+      // Admin Panel & Logout
+      e('div', {
+        key: 'sidebar-footer',
+        className: 'px-4 py-4 border-t border-gray-200 space-y-2'
+      }, [
+        user?.role === 'admin' && e('button', {
+          key: 'admin-panel',
+          onClick: () => setCurrentView('admin'),
+          className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors'
+        }, [
+          e('span', { key: 'admin-icon', className: 'text-lg' }, '🛡️'),
+          e('span', { key: 'admin-label', className: 'font-medium' }, 'Admin Panel')
+        ]),
+        e('button', {
+          key: 'logout-btn',
+          onClick: handleLogout,
+          className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors'
+        }, [
+          e('span', { key: 'logout-icon', className: 'text-lg' }, '🚪'),
+          e('span', { key: 'logout-label', className: 'font-medium' }, 'Sign Out')
+        ])
+      ])
+    ]),
+
+    // Mobile Sidebar Overlay
+    sidebarOpen && e('div', {
+      key: 'sidebar-overlay',
+      className: 'fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden',
+      onClick: () => setSidebarOpen(false)
+    }),
+
+    // Main Content Area
+    e('div', { 
+      key: 'main-content',
+      className: 'flex-1 lg:ml-0'
+    }, [
+      // Top Header Bar
+      e('header', {
+        key: 'header',
+        className: 'bg-white shadow-sm border-b border-gray-200'
+      }, [
+        e('div', { 
+          key: 'header-content',
+          className: 'flex items-center justify-between px-6 py-4'
+        }, [
+          e('div', {
+            key: 'header-left',
+            className: 'flex items-center gap-4'
+          }, [
+            // Mobile hamburger menu
+            e('button', {
+              key: 'mobile-menu',
+              onClick: () => setSidebarOpen(!sidebarOpen),
+              className: 'lg:hidden text-gray-500 hover:text-gray-700'
+            }, '☰'),
+            e('h1', {
+              key: 'page-title',
+              className: 'text-2xl font-bold text-gray-900'
+            }, currentView === 'dashboard' ? 'Dashboard' : 
+               currentView === 'community' ? 'Community Hub' :
+               currentView === 'loans' ? 'Loans' :
+               currentView === 'imisi' ? 'Imisi AI Assistant' :
+               currentView === 'jobs' ? 'Local Jobs' :
+               currentView === 'admin' ? 'Admin Panel' :
+               currentView === 'account' ? 'Account Settings' : 'Dashboard')
           ]),
           
-          e('div', { key: 'navigation', className: 'flex items-center gap-6' }, [
-            // Navigation Menu
-            e('nav', { key: 'nav-menu', className: 'flex items-center gap-4' }, [
-              e('button', {
-                key: 'dashboard-nav',
-                onClick: () => setCurrentView('dashboard'),
-                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'dashboard' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
-              }, 'Dashboard'),
-              e('button', {
-                key: 'community-nav',
-                onClick: () => setCurrentView('community'),
-                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'community' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
-              }, 'Community Hub'),
-              e('button', {
-                key: 'loans-nav',
-                onClick: () => setCurrentView('loans'),
-                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'loans' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
-              }, 'Loans'),
-              e('button', {
-                key: 'imisi-nav',
-                onClick: () => setCurrentView('imisi'),
-                className: `px-4 py-2 rounded-lg transition-colors ${currentView === 'imisi' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900'}`
-              }, 'Imisi AI')
+          // Header Actions
+          e('div', {
+            key: 'header-actions',
+            className: 'flex items-center gap-4'
+          }, [
+            e('div', {
+              key: 'search-box',
+              className: 'relative hidden md:block'
+            }, [
+              e('input', {
+                key: 'search-input',
+                type: 'text',
+                placeholder: 'Search...',
+                className: 'pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64'
+              }),
+              e('span', {
+                key: 'search-icon',
+                className: 'absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'
+              }, '🔍')
             ]),
-            
-            // User Section
-            e('div', { key: 'user-section', className: 'flex items-center gap-4 border-l border-gray-200 pl-6' }, [
-              e('span', { 
-                key: 'welcome',
-                className: 'text-gray-600 text-sm'
-              }, `Welcome, ${user?.firstName || 'User'}`),
-              user?.role === 'admin' && e('button', {
-                key: 'admin',
-                onClick: () => setCurrentView('admin'),
-                className: 'bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
-              }, 'Admin Panel'),
-              e('button', {
-                key: 'account',
-                onClick: () => setCurrentView('account'),
-                className: 'bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
-              }, 'Account'),
-              e('button', {
-                key: 'logout',
-                onClick: handleLogout,
-                className: 'bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg transition-colors text-sm'
-              }, 'Sign Out')
-            ])
+            e('button', {
+              key: 'account-btn',
+              onClick: () => setCurrentView('account'),
+              className: 'bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors'
+            }, 'Account')
           ])
         ])
       ]),
@@ -1724,73 +1841,180 @@ function Dashboard({ user }) {
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
-        e('div', { key: 'dashboard-content' }, [
-          // Welcome Section
+        // Modern Financial Dashboard
+        e('div', { key: 'dashboard-content', className: 'space-y-6' }, [
+          // Financial Overview Cards
           e('div', {
-            key: 'welcome-section',
-            className: 'bg-gradient-to-br from-blue-600 via-blue-700 to-purple-700 rounded-2xl p-8 text-white mb-8 shadow-2xl'
+            key: 'overview-cards',
+            className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'
           }, [
-            e('h2', { key: 'welcome-title', className: 'text-3xl font-bold mb-4' }, 'Welcome to Cush Platform'),
-            e('p', { key: 'welcome-desc', className: 'text-blue-100 text-lg' }, 'Your comprehensive immigration and financial services platform')
+            // Total Balance Card
+            e('div', {
+              key: 'total-balance',
+              className: 'bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl text-white shadow-lg'
+            }, [
+              e('div', { key: 'balance-header', className: 'flex items-center justify-between mb-4' }, [
+                e('h3', { key: 'balance-title', className: 'text-blue-100 text-sm font-medium' }, 'Total Balance'),
+                e('div', { key: 'balance-icon', className: 'w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center' }, '💰')
+              ]),
+              e('div', { key: 'balance-amount', className: 'text-3xl font-bold mb-2' }, '£1,320.00'),
+              e('div', { key: 'balance-change', className: 'text-blue-100 text-sm' }, '+2.5% from last month')
+            ]),
+            
+            // Loans Card
+            e('div', {
+              key: 'loans-card',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('div', { key: 'loans-header', className: 'flex items-center justify-between mb-4' }, [
+                e('h3', { key: 'loans-title', className: 'text-gray-600 text-sm font-medium' }, 'Loans'),
+                e('div', { key: 'loans-icon', className: 'w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center' }, '📊')
+              ]),
+              e('div', { key: 'loans-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£25,200.00'),
+              e('div', { key: 'loans-status', className: 'text-green-600 text-sm' }, 'On track')
+            ]),
+            
+            // Savings Card
+            e('div', {
+              key: 'savings-card',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('div', { key: 'savings-header', className: 'flex items-center justify-between mb-4' }, [
+                e('h3', { key: 'savings-title', className: 'text-gray-600 text-sm font-medium' }, 'Savings'),
+                e('div', { key: 'savings-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '💸')
+              ]),
+              e('div', { key: 'savings-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£3,280.00'),
+              e('div', { key: 'savings-target', className: 'text-gray-500 text-sm' }, 'Target: £5,000')
+            ]),
+            
+            // Investments Card
+            e('div', {
+              key: 'investments-card',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('div', { key: 'investments-header', className: 'flex items-center justify-between mb-4' }, [
+                e('h3', { key: 'investments-title', className: 'text-gray-600 text-sm font-medium' }, 'Investments'),
+                e('div', { key: 'investments-icon', className: 'w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center' }, '📈')
+              ]),
+              e('div', { key: 'investments-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£8,450.00'),
+              e('div', { key: 'investments-change', className: 'text-green-600 text-sm' }, '+12.3% this year')
+            ])
           ]),
 
-          // Feature Cards
+          // Charts and Transactions Section
           e('div', {
-            key: 'feature-cards',
-            className: 'grid md:grid-cols-4 gap-6'
+            key: 'charts-section',
+            className: 'grid grid-cols-1 lg:grid-cols-2 gap-6'
           }, [
-            {
-              title: 'Financial Mood Meter',
-              description: 'AI-powered financial wellness analysis',
-              icon: '💝',
-              color: 'from-pink-500 to-rose-500'
-            },
-            {
-              title: 'Health Radar',
-              description: 'Interactive financial wellness dashboard',
-              icon: '📊',
-              color: 'from-indigo-500 to-purple-500'
-            },
-            {
-              title: 'Loan Referrals',
-              description: 'Connect with trusted financial institutions',
-              icon: '💳',
-              color: 'from-green-500 to-emerald-500'
-            },
-            {
-              title: 'Community Hub',
-              description: 'Join our global immigrant community',
-              icon: '🌍',
-              color: 'from-blue-500 to-cyan-500'
-            },
-            {
-              title: 'Imisi 2.0 AI',
-              description: 'Get instant immigration assistance',
-              icon: '🤖',
-              color: 'from-purple-500 to-pink-500'
-            }
-          ].map((feature, index) =>
+            // Balance Chart
             e('div', {
-              key: `feature-${index}`,
-              className: 'bg-white rounded-xl p-6 shadow-lg border cursor-pointer hover:shadow-xl transition-shadow',
-              onClick: () => {
-                if (feature.title === 'Financial Mood Meter') {
-                  setCurrentView('mood-meter');
-                } else if (feature.title === 'Health Radar') {
-                  setCurrentView('health-radar');
-                } else if (feature.title === 'Community Hub') {
-                  setCurrentView('community');
-                }
-              }
+              key: 'balance-chart',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
             }, [
-              e('div', {
-                key: 'icon',
-                className: `w-12 h-12 bg-gradient-to-r ${feature.color} rounded-xl flex items-center justify-center text-2xl mb-4`
-              }, feature.icon),
-              e('h3', { key: 'title', className: 'text-xl font-bold text-gray-900 mb-2' }, feature.title),
-              e('p', { key: 'desc', className: 'text-gray-600' }, feature.description)
+              e('h3', { key: 'chart-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Balance Overview'),
+              e('div', { key: 'chart-placeholder', className: 'h-64 bg-gray-50 rounded-lg flex items-center justify-center' }, [
+                e('div', { key: 'chart-content', className: 'text-center' }, [
+                  e('div', { key: 'chart-icon', className: 'w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4' }, '📊'),
+                  e('p', { key: 'chart-text', className: 'text-gray-600' }, 'Interactive balance chart would display here')
+                ])
+              ])
+            ]),
+            
+            // Quick Actions
+            e('div', {
+              key: 'quick-actions',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('h3', { key: 'actions-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Quick Actions'),
+              e('div', { key: 'actions-grid', className: 'grid grid-cols-2 gap-4' }, [
+                e('button', {
+                  key: 'transfer-btn',
+                  className: 'p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left',
+                  onClick: () => setCurrentView('loans')
+                }, [
+                  e('div', { key: 'transfer-icon', className: 'w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mb-2' }, '💳'),
+                  e('div', { key: 'transfer-text', className: 'text-sm font-medium text-gray-900' }, 'Apply for Loan')
+                ]),
+                e('button', {
+                  key: 'community-btn',
+                  className: 'p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left',
+                  onClick: () => setCurrentView('community')
+                }, [
+                  e('div', { key: 'community-icon', className: 'w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mb-2' }, '🌍'),
+                  e('div', { key: 'community-text', className: 'text-sm font-medium text-gray-900' }, 'Community Hub')
+                ]),
+                e('button', {
+                  key: 'imisi-btn',
+                  className: 'p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-left',
+                  onClick: () => setCurrentView('imisi')
+                }, [
+                  e('div', { key: 'imisi-icon', className: 'w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mb-2' }, '🤖'),
+                  e('div', { key: 'imisi-text', className: 'text-sm font-medium text-gray-900' }, 'Imisi AI Assistant')
+                ]),
+                e('button', {
+                  key: 'settings-btn',
+                  className: 'p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left',
+                  onClick: () => setCurrentView('settings')
+                }, [
+                  e('div', { key: 'settings-icon', className: 'w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center mb-2' }, '⚙️'),
+                  e('div', { key: 'settings-text', className: 'text-sm font-medium text-gray-900' }, 'Settings')
+                ])
+              ])
             ])
-          ))
+          ]),
+
+          // Recent Transactions Table
+          e('div', {
+            key: 'transactions-table',
+            className: 'bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden'
+          }, [
+            e('div', { key: 'table-header', className: 'px-6 py-4 border-b border-gray-200' }, [
+              e('h3', { key: 'table-title', className: 'text-lg font-semibold text-gray-900' }, 'Recent Transactions')
+            ]),
+            e('div', { key: 'table-content', className: 'overflow-x-auto' }, [
+              e('table', { key: 'transactions-table-element', className: 'w-full' }, [
+                e('thead', { key: 'table-head', className: 'bg-gray-50' }, [
+                  e('tr', { key: 'header-row' }, [
+                    e('th', { key: 'date-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Date'),
+                    e('th', { key: 'desc-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Description'),
+                    e('th', { key: 'amount-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Amount'),
+                    e('th', { key: 'type-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Type'),
+                    e('th', { key: 'status-header', className: 'px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Status')
+                  ])
+                ]),
+                e('tbody', { key: 'table-body', className: 'bg-white divide-y divide-gray-200' }, [
+                  // Sample transaction rows
+                  e('tr', { key: 'trans-1', className: 'hover:bg-gray-50' }, [
+                    e('td', { key: 'date-1', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, '2025-01-15'),
+                    e('td', { key: 'desc-1', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, 'Salary Deposit'),
+                    e('td', { key: 'amount-1', className: 'px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600' }, '+£2,500.00'),
+                    e('td', { key: 'type-1', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, 'Income'),
+                    e('td', { key: 'status-1', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('span', { key: 'status-badge-1', className: 'inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800' }, 'Completed')
+                    ])
+                  ]),
+                  e('tr', { key: 'trans-2', className: 'hover:bg-gray-50' }, [
+                    e('td', { key: 'date-2', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, '2025-01-14'),
+                    e('td', { key: 'desc-2', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, 'Grocery Shopping'),
+                    e('td', { key: 'amount-2', className: 'px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600' }, '-£125.50'),
+                    e('td', { key: 'type-2', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, 'Expense'),
+                    e('td', { key: 'status-2', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('span', { key: 'status-badge-2', className: 'inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800' }, 'Completed')
+                    ])
+                  ]),
+                  e('tr', { key: 'trans-3', className: 'hover:bg-gray-50' }, [
+                    e('td', { key: 'date-3', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, '2025-01-13'),
+                    e('td', { key: 'desc-3', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-900' }, 'Rent Payment'),
+                    e('td', { key: 'amount-3', className: 'px-6 py-4 whitespace-nowrap text-sm font-medium text-red-600' }, '-£850.00'),
+                    e('td', { key: 'type-3', className: 'px-6 py-4 whitespace-nowrap text-sm text-gray-500' }, 'Expense'),
+                    e('td', { key: 'status-3', className: 'px-6 py-4 whitespace-nowrap' }, [
+                      e('span', { key: 'status-badge-3', className: 'inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800' }, 'Pending')
+                    ])
+                  ])
+                ])
+              ])
+            ])
+          ])
         ])
       ])
     ])
