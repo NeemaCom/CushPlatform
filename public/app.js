@@ -1885,8 +1885,26 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
   
 
+
+  // Load dashboard data
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/dashboard');
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load notifications
   const loadNotifications = async () => {
@@ -2010,8 +2028,9 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
     };
   }, [user]);
 
-  // Load notifications on component mount
+  // Load dashboard data and notifications on component mount
   useEffect(() => {
+    loadDashboardData();
     loadNotifications();
     loadUnreadCount();
     
@@ -2415,10 +2434,13 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                     e('h3', { key: 'balance-title', className: 'text-blue-100 text-sm font-medium' }, 'Total Balance'),
                     e('div', { key: 'balance-icon', className: 'w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center' }, '💰')
                   ]),
-                  e('div', { key: 'balance-amount', className: 'text-2xl sm:text-3xl font-bold mb-2' }, '£1,320.00'),
+                  e('div', { key: 'balance-amount', className: 'text-2xl sm:text-3xl font-bold mb-2' }, 
+                    loading ? 'Loading...' : 
+                    dashboardData ? `£${dashboardData.accounts.total.toFixed(2)}` : '£0.00'
+                  ),
                   e('div', { key: 'balance-change', className: 'flex items-center text-blue-100 text-sm' }, [
-                    e('span', { key: 'trend-icon', className: 'mr-1' }, '↗'),
-                    e('span', { key: 'trend-text' }, '+2.5% from last month')
+                    e('span', { key: 'trend-icon', className: 'mr-1' }, '→'),
+                    e('span', { key: 'trend-text' }, 'Start tracking your finances')
                   ]),
                   e('div', { key: 'balance-chart', className: 'mt-4' }, [
                     e('div', { key: 'mini-chart', className: 'h-2 bg-white/20 rounded-full overflow-hidden' }, [
@@ -2437,14 +2459,16 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                     e('h3', { key: 'loans-title', className: 'text-gray-600 text-sm font-medium' }, 'Active Loans'),
                     e('div', { key: 'loans-icon', className: 'w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center' }, '💳')
                   ]),
-                  e('div', { key: 'loans-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, '£25,200.00'),
-                  e('div', { key: 'loans-payment', className: 'text-sm text-gray-500 mb-3' }, 'Monthly payment: £456'),
+                  e('div', { key: 'loans-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, 
+                    loading ? 'Loading...' : '£0.00'
+                  ),
+                  e('div', { key: 'loans-status', className: 'text-sm text-gray-500 mb-3' }, 'No active loans'),
                   e('div', { key: 'loan-progress', className: 'w-full bg-gray-200 rounded-full h-2 mb-2' }, [
-                    e('div', { key: 'progress-bar', className: 'bg-orange-500 h-2 rounded-full transition-all duration-700', style: { width: '68%' } })
+                    e('div', { key: 'progress-bar', className: 'bg-orange-500 h-2 rounded-full transition-all duration-700', style: { width: '0%' } })
                   ]),
                   e('div', { key: 'progress-text', className: 'flex justify-between text-xs text-gray-500' }, [
-                    e('span', { key: 'progress-left' }, '68% paid'),
-                    e('span', { key: 'progress-right' }, '£8,064 remaining')
+                    e('span', { key: 'progress-left' }, '0% paid'),
+                    e('span', { key: 'progress-right' }, 'Apply for a loan')
                   ])
                 ]),
                 
@@ -2457,14 +2481,17 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                     e('h3', { key: 'savings-title', className: 'text-gray-600 text-sm font-medium' }, 'Savings Goal'),
                     e('div', { key: 'savings-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '🎯')
                   ]),
-                  e('div', { key: 'savings-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, '£3,280.00'),
-                  e('div', { key: 'savings-target', className: 'text-sm text-gray-500 mb-3' }, 'Target: £5,000'),
+                  e('div', { key: 'savings-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, 
+                    loading ? 'Loading...' : 
+                    dashboardData ? `£${dashboardData.accounts.savings.toFixed(2)}` : '£0.00'
+                  ),
+                  e('div', { key: 'savings-target', className: 'text-sm text-gray-500 mb-3' }, 'Set a savings goal'),
                   e('div', { key: 'savings-progress', className: 'w-full bg-gray-200 rounded-full h-2 mb-2' }, [
-                    e('div', { key: 'progress-bar', className: 'bg-green-500 h-2 rounded-full transition-all duration-700', style: { width: '66%' } })
+                    e('div', { key: 'progress-bar', className: 'bg-green-500 h-2 rounded-full transition-all duration-700', style: { width: '0%' } })
                   ]),
                   e('div', { key: 'progress-text', className: 'flex justify-between text-xs text-gray-500' }, [
-                    e('span', { key: 'progress-left' }, '66% achieved'),
-                    e('span', { key: 'progress-right' }, '£1,720 to go')
+                    e('span', { key: 'progress-left' }, 'No goal set'),
+                    e('span', { key: 'progress-right' }, 'Create your first goal')
                   ])
                 ]),
                 
@@ -2477,10 +2504,13 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                     e('h3', { key: 'investments-title', className: 'text-gray-600 text-sm font-medium' }, 'Investments'),
                     e('div', { key: 'investments-icon', className: 'w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center' }, '📈')
                   ]),
-                  e('div', { key: 'investments-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, '£8,450.00'),
-                  e('div', { key: 'investments-change', className: 'flex items-center text-green-600 text-sm mb-2' }, [
-                    e('span', { key: 'trend-icon', className: 'mr-1' }, '↗'),
-                    e('span', { key: 'trend-text' }, '+12.3% this year')
+                  e('div', { key: 'investments-amount', className: 'text-xl sm:text-2xl font-bold text-gray-900 mb-2' }, 
+                    loading ? 'Loading...' : 
+                    dashboardData ? `£${dashboardData.accounts.investment.toFixed(2)}` : '£0.00'
+                  ),
+                  e('div', { key: 'investments-change', className: 'flex items-center text-gray-600 text-sm mb-2' }, [
+                    e('span', { key: 'trend-icon', className: 'mr-1' }, '→'),
+                    e('span', { key: 'trend-text' }, 'Start investing')
                   ]),
                   e('div', { key: 'investment-chart', className: 'h-8 bg-gradient-to-r from-purple-200 to-purple-400 rounded-full flex items-center justify-end px-2' }, [
                     e('span', { key: 'chart-value', className: 'text-xs text-purple-800 font-medium' }, '+£924')
@@ -2609,8 +2639,8 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             ])
           ]),
 
-          // Financial Goals Section
-          e('div', {
+          // Financial Goals Section - Show only if user has goals
+          dashboardData && dashboardData.financialGoals && dashboardData.financialGoals.length > 0 && e('div', {
             key: 'financial-goals',
             className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200 mb-6 sm:mb-8'
           }, [
@@ -2621,50 +2651,23 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                 className: 'text-blue-600 hover:text-blue-800 text-sm font-medium'
               }, 'Add Goal →')
             ]),
-            e('div', { key: 'goals-list', className: 'space-y-4' }, [
-              // Goal 1 - Emergency Fund
-              e('div', { key: 'goal-1', className: 'p-4 bg-blue-50 rounded-lg' }, [
-                e('div', { key: 'goal-1-header', className: 'flex items-center justify-between mb-2' }, [
-                  e('h4', { key: 'goal-1-title', className: 'text-sm font-medium text-blue-900' }, 'Emergency Fund'),
-                  e('span', { key: 'goal-1-progress', className: 'text-xs text-blue-700' }, '66% Complete')
-                ]),
-                e('div', { key: 'goal-1-amounts', className: 'flex items-center justify-between text-sm text-blue-800 mb-2' }, [
-                  e('span', { key: 'goal-1-current' }, '£3,280'),
-                  e('span', { key: 'goal-1-target' }, '£5,000')
-                ]),
-                e('div', { key: 'goal-1-bar', className: 'w-full bg-blue-200 rounded-full h-2' }, [
-                  e('div', { key: 'goal-1-fill', className: 'bg-blue-600 h-2 rounded-full transition-all duration-700', style: { width: '66%' } })
+            e('div', { key: 'goals-list', className: 'space-y-4' }, 
+              dashboardData.financialGoals.map((goal, index) =>
+                e('div', { key: `goal-${index}`, className: 'p-4 bg-blue-50 rounded-lg' }, [
+                  e('div', { key: 'goal-header', className: 'flex items-center justify-between mb-2' }, [
+                    e('h4', { key: 'goal-title', className: 'text-sm font-medium text-blue-900' }, goal.title),
+                    e('span', { key: 'goal-progress', className: 'text-xs text-blue-700' }, `${goal.progress}% Complete`)
+                  ]),
+                  e('div', { key: 'goal-amounts', className: 'flex items-center justify-between text-sm text-blue-800 mb-2' }, [
+                    e('span', { key: 'goal-current' }, `£${goal.currentAmount.toFixed(2)}`),
+                    e('span', { key: 'goal-target' }, `£${goal.targetAmount.toFixed(2)}`)
+                  ]),
+                  e('div', { key: 'goal-bar', className: 'w-full bg-blue-200 rounded-full h-2' }, [
+                    e('div', { key: 'goal-fill', className: 'bg-blue-600 h-2 rounded-full transition-all duration-700', style: { width: `${goal.progress}%` } })
+                  ])
                 ])
-              ]),
-              // Goal 2 - Vacation Fund
-              e('div', { key: 'goal-2', className: 'p-4 bg-green-50 rounded-lg' }, [
-                e('div', { key: 'goal-2-header', className: 'flex items-center justify-between mb-2' }, [
-                  e('h4', { key: 'goal-2-title', className: 'text-sm font-medium text-green-900' }, 'Vacation Fund'),
-                  e('span', { key: 'goal-2-progress', className: 'text-xs text-green-700' }, '42% Complete')
-                ]),
-                e('div', { key: 'goal-2-amounts', className: 'flex items-center justify-between text-sm text-green-800 mb-2' }, [
-                  e('span', { key: 'goal-2-current' }, '£1,260'),
-                  e('span', { key: 'goal-2-target' }, '£3,000')
-                ]),
-                e('div', { key: 'goal-2-bar', className: 'w-full bg-green-200 rounded-full h-2' }, [
-                  e('div', { key: 'goal-2-fill', className: 'bg-green-600 h-2 rounded-full transition-all duration-700', style: { width: '42%' } })
-                ])
-              ]),
-              // Goal 3 - House Deposit
-              e('div', { key: 'goal-3', className: 'p-4 bg-purple-50 rounded-lg' }, [
-                e('div', { key: 'goal-3-header', className: 'flex items-center justify-between mb-2' }, [
-                  e('h4', { key: 'goal-3-title', className: 'text-sm font-medium text-purple-900' }, 'House Deposit'),
-                  e('span', { key: 'goal-3-progress', className: 'text-xs text-purple-700' }, '8% Complete')
-                ]),
-                e('div', { key: 'goal-3-amounts', className: 'flex items-center justify-between text-sm text-purple-800 mb-2' }, [
-                  e('span', { key: 'goal-3-current' }, '£4,800'),
-                  e('span', { key: 'goal-3-target' }, '£60,000')
-                ]),
-                e('div', { key: 'goal-3-bar', className: 'w-full bg-purple-200 rounded-full h-2' }, [
-                  e('div', { key: 'goal-3-fill', className: 'bg-purple-600 h-2 rounded-full transition-all duration-700', style: { width: '8%' } })
-                ])
-              ])
-            ])
+              )
+            )
           ]),
             
           // Recent Transactions Section
@@ -2679,64 +2682,41 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                 className: 'text-blue-600 hover:text-blue-800 text-sm font-medium'
               }, 'View All →')
             ]),
-            e('div', { key: 'transactions-list', className: 'space-y-3' }, [
-              // Transaction 1
-              e('div', { key: 'trans-1', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
-                e('div', { key: 'trans-1-left', className: 'flex items-center gap-3' }, [
-                  e('div', { key: 'trans-1-icon', className: 'w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center' }, '🍕'),
-                  e('div', { key: 'trans-1-info' }, [
-                    e('p', { key: 'trans-1-desc', className: 'text-sm font-medium text-gray-900' }, 'Domino\'s Pizza'),
-                    e('p', { key: 'trans-1-time', className: 'text-xs text-gray-500' }, '2 hours ago')
-                  ])
-                ]),
-                e('div', { key: 'trans-1-right', className: 'text-right' }, [
-                  e('p', { key: 'trans-1-amount', className: 'text-sm font-medium text-red-600' }, '-£15.99'),
-                  e('p', { key: 'trans-1-category', className: 'text-xs text-gray-500' }, 'Food & Dining')
-                ])
-              ]),
-              // Transaction 2
-              e('div', { key: 'trans-2', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
-                e('div', { key: 'trans-2-left', className: 'flex items-center gap-3' }, [
-                  e('div', { key: 'trans-2-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '💰'),
-                  e('div', { key: 'trans-2-info' }, [
-                      e('p', { key: 'trans-2-desc', className: 'text-sm font-medium text-gray-900' }, 'Salary Deposit'),
-                      e('p', { key: 'trans-2-time', className: 'text-xs text-gray-500' }, '1 day ago')
+            e('div', { key: 'transactions-list', className: 'space-y-3' }, 
+              !loading && dashboardData && dashboardData.recentTransactions && dashboardData.recentTransactions.length > 0 ?
+                dashboardData.recentTransactions.map((transaction, index) => {
+                  const isPositive = transaction.amount > 0;
+                  const icon = transaction.category === 'income' ? '💰' : 
+                              transaction.category === 'food' ? '🍕' :
+                              transaction.category === 'transport' ? '🚌' :
+                              transaction.category === 'shopping' ? '🛍️' : '💳';
+                  
+                  return e('div', { 
+                    key: `trans-${index}`, 
+                    className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' 
+                  }, [
+                    e('div', { key: 'trans-left', className: 'flex items-center gap-3' }, [
+                      e('div', { key: 'trans-icon', className: `w-8 h-8 ${isPositive ? 'bg-green-100' : 'bg-red-100'} rounded-lg flex items-center justify-center` }, icon),
+                      e('div', { key: 'trans-info' }, [
+                        e('p', { key: 'trans-desc', className: 'text-sm font-medium text-gray-900' }, transaction.description),
+                        e('p', { key: 'trans-time', className: 'text-xs text-gray-500' }, 
+                          new Date(transaction.date).toLocaleDateString())
+                      ])
+                    ]),
+                    e('div', { key: 'trans-right', className: 'text-right' }, [
+                      e('p', { key: 'trans-amount', className: `text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}` }, 
+                        `${isPositive ? '+' : ''}£${Math.abs(transaction.amount).toFixed(2)}`),
+                      e('p', { key: 'trans-category', className: 'text-xs text-gray-500' }, transaction.category)
                     ])
-                ]),
-                e('div', { key: 'trans-2-right', className: 'text-right' }, [
-                    e('p', { key: 'trans-2-amount', className: 'text-sm font-medium text-green-600' }, '+£2,800.00'),
-                    e('p', { key: 'trans-2-category', className: 'text-xs text-gray-500' }, 'Income')
+                  ]);
+                }) : [
+                  e('div', { key: 'no-transactions', className: 'text-center py-8' }, [
+                    e('div', { key: 'no-trans-icon', className: 'text-4xl mb-4' }, '📊'),
+                    e('p', { key: 'no-trans-text', className: 'text-gray-500' }, 'No transactions yet'),
+                    e('p', { key: 'no-trans-subtitle', className: 'text-sm text-gray-400' }, 'Your transaction history will appear here')
                   ])
-              ]),
-              // Transaction 3
-              e('div', { key: 'trans-3', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
-                e('div', { key: 'trans-3-left', className: 'flex items-center gap-3' }, [
-                  e('div', { key: 'trans-3-icon', className: 'w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center' }, '🚌'),
-                  e('div', { key: 'trans-3-info' }, [
-                    e('p', { key: 'trans-3-desc', className: 'text-sm font-medium text-gray-900' }, 'TfL Travel'),
-                    e('p', { key: 'trans-3-time', className: 'text-xs text-gray-500' }, '2 days ago')
-                  ])
-                ]),
-                e('div', { key: 'trans-3-right', className: 'text-right' }, [
-                  e('p', { key: 'trans-3-amount', className: 'text-sm font-medium text-red-600' }, '-£12.50'),
-                  e('p', { key: 'trans-3-category', className: 'text-xs text-gray-500' }, 'Transport')
-                ])
-              ]),
-              // Transaction 4
-              e('div', { key: 'trans-4', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
-                e('div', { key: 'trans-4-left', className: 'flex items-center gap-3' }, [
-                  e('div', { key: 'trans-4-icon', className: 'w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center' }, '🛍️'),
-                  e('div', { key: 'trans-4-info' }, [
-                    e('p', { key: 'trans-4-desc', className: 'text-sm font-medium text-gray-900' }, 'Amazon Purchase'),
-                    e('p', { key: 'trans-4-time', className: 'text-xs text-gray-500' }, '3 days ago')
-                  ])
-                ]),
-                e('div', { key: 'trans-4-right', className: 'text-right' }, [
-                  e('p', { key: 'trans-4-amount', className: 'text-sm font-medium text-red-600' }, '-£67.99'),
-                  e('p', { key: 'trans-4-category', className: 'text-xs text-gray-500' }, 'Shopping')
-                ])
-              ])
-            ])
+                ]
+            )
           ])
         ])
       ])
