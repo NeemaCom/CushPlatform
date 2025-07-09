@@ -1,11 +1,12 @@
 import { db } from './db';
 import { users } from '@shared/schema';
 import { eq } from 'drizzle-orm';
+import { WebSocket } from 'ws';
 
 export interface Notification {
   id: string;
   userId: number;
-  type: 'loan' | 'community' | 'system' | 'achievement' | 'financial';
+  type: 'loan' | 'community' | 'system' | 'achievement' | 'financial' | 'support' | 'account';
   title: string;
   message: string;
   data?: Record<string, any>;
@@ -17,6 +18,47 @@ export interface Notification {
 export class NotificationService {
   private notifications: Map<number, Notification[]> = new Map();
   private notificationId = 1;
+  private wsConnections: Map<number, WebSocket[]> = new Map(); // userId -> WebSocket connections
+
+  // WebSocket connection management
+  addWebSocketConnection(userId: number, ws: WebSocket): void {
+    const userConnections = this.wsConnections.get(userId) || [];
+    userConnections.push(ws);
+    this.wsConnections.set(userId, userConnections);
+
+    // Clean up on close
+    ws.on('close', () => {
+      this.removeWebSocketConnection(userId, ws);
+    });
+  }
+
+  removeWebSocketConnection(userId: number, ws: WebSocket): void {
+    const userConnections = this.wsConnections.get(userId) || [];
+    const index = userConnections.indexOf(ws);
+    if (index > -1) {
+      userConnections.splice(index, 1);
+      if (userConnections.length === 0) {
+        this.wsConnections.delete(userId);
+      } else {
+        this.wsConnections.set(userId, userConnections);
+      }
+    }
+  }
+
+  // Send real-time notification to connected WebSocket clients
+  private sendRealtimeNotification(userId: number, notification: Notification): void {
+    const userConnections = this.wsConnections.get(userId) || [];
+    const message = JSON.stringify({
+      type: 'notification',
+      data: notification
+    });
+
+    userConnections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(message);
+      }
+    });
+  }
 
   // Create a new notification
   createNotification(
@@ -42,6 +84,9 @@ export class NotificationService {
     const userNotifications = this.notifications.get(userId) || [];
     userNotifications.unshift(notification);
     this.notifications.set(userId, userNotifications);
+
+    // Send real-time notification
+    this.sendRealtimeNotification(userId, notification);
 
     return notification;
   }
@@ -155,6 +200,64 @@ export class NotificationService {
       `Achievement Unlocked: ${achievementName}`,
       description
     );
+  }
+
+  // Create support-related notifications
+  createSupportNotification(userId: number, type: string, title: string, message: string, metadata: any) {
+    return this.createNotification(
+      userId,
+      'support',
+      title,
+      message,
+      metadata
+    );
+  }
+
+  // Create support notifications
+  createSupportNotification(userId: number, type: 'ticket_reply' | 'ticket_status' | 'feedback_response', title: string, message: string, data?: Record<string, any>) {
+    return this.createNotification(userId, 'support', title, message, { supportType: type, ...data });
+  }
+
+  // Create account notifications
+  createAccountNotification(userId: number, type: 'security' | 'profile' | 'login' | 'verification', title: string, message: string) {
+    return this.createNotification(userId, 'account', title, message, { accountType: type });
+  }
+
+  // Create system notifications
+  createSystemNotification(userId: number, title: string, message: string) {
+    return this.createNotification(userId, 'system', title, message);
+  }
+
+  // Send real-time update to user about unread count
+  sendUnreadCountUpdate(userId: number): void {
+    const userConnections = this.wsConnections.get(userId) || [];
+    const unreadCount = this.getUnreadCount(userId);
+    const message = JSON.stringify({
+      type: 'unread_count',
+      data: { count: unreadCount }
+    });
+
+    userConnections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(message);
+      }
+    });
+  }
+
+  // Send real-time notification list update
+  sendNotificationListUpdate(userId: number): void {
+    const userConnections = this.wsConnections.get(userId) || [];
+    const notifications = this.getUserNotifications(userId);
+    const message = JSON.stringify({
+      type: 'notification_list',
+      data: notifications
+    });
+
+    userConnections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(message);
+      }
+    });
   }
 
   // Clean up expired notifications
