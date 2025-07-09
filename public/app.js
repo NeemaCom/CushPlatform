@@ -2081,15 +2081,18 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   // Modern Sidebar Navigation Items
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', view: 'dashboard' },
-    { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
     { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
     { id: 'credit-passport', label: 'Credit Passport', icon: '🛂', view: 'credit-passport' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
+    { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
     { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
     { id: 'analytics', label: 'Analytics', icon: '📈', view: 'analytics' },
-    { id: 'transactions', label: 'Transactions', icon: '💳', view: 'transactions' },
     { id: 'reports', label: 'Reports', icon: '📋', view: 'reports' },
-    { id: 'help', label: 'Help & Support', icon: '❓', view: 'help' },
+    { id: 'help', label: 'Help & Support', icon: '❓', view: 'help' }
+  ];
+
+  // Account section items
+  const accountItems = [
     { id: 'settings', label: 'Settings', icon: '⚙️', view: 'account' }
   ];
 
@@ -2168,6 +2171,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         key: 'navigation',
         className: 'flex-1 px-3 sm:px-4 py-4 sm:py-6 space-y-1 sm:space-y-2 overflow-y-auto'
       }, [
+        // Main navigation items
         sidebarItems.map(item => 
           e('button', {
             key: item.id,
@@ -2184,7 +2188,31 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             e('span', { key: 'icon', className: 'text-lg flex-shrink-0' }, item.icon),
             e('span', { key: 'label', className: 'font-medium text-sm sm:text-base' }, item.label)
           ])
-        )
+        ),
+        
+        // Account section
+        e('div', { key: 'account-section', className: 'mt-6 pt-4 border-t border-gray-200' }, [
+          e('div', { key: 'account-header', className: 'px-3 sm:px-4 pb-2' }, [
+            e('span', { className: 'text-xs font-semibold text-gray-500 uppercase tracking-wide' }, 'Account')
+          ]),
+          accountItems.map(item => 
+            e('button', {
+              key: item.id,
+              onClick: () => {
+                setCurrentView(item.view);
+                setSidebarOpen(false); // Close sidebar on mobile after selection
+              },
+              className: `w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg transition-colors text-left ${
+                currentView === item.view 
+                  ? 'bg-blue-50 text-blue-600 border-r-3 border-blue-600' 
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`
+            }, [
+              e('span', { key: 'icon', className: 'text-lg flex-shrink-0' }, item.icon),
+              e('span', { key: 'label', className: 'font-medium text-sm sm:text-base' }, item.label)
+            ])
+          )
+        ])
       ]),
 
       // Admin Panel & Logout - Fixed at bottom
@@ -2962,7 +2990,7 @@ const CreditPassportPage = ({ user, onBack }) => {
     creditProfile?.cushCreditScore?.recommendations && e('div', { key: 'recommendations', className: 'bg-white p-6 rounded-lg shadow-sm border' }, [
       e('h3', { className: 'text-lg font-semibold text-gray-800 mb-4' }, 'Recommendations'),
       e('div', { className: 'space-y-3' }, creditProfile.cushCreditScore.recommendations.map((rec, index) =>
-        e('div', { key: index, className: 'flex items-start' }, [
+        e('div', { key: `rec-${index}`, className: 'flex items-start' }, [
           e('div', { className: 'flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center mt-0.5 mr-3' }, [
             e('span', { className: 'text-blue-600 text-sm font-semibold' }, (index + 1).toString())
           ]),
@@ -2978,7 +3006,7 @@ const CreditPassportPage = ({ user, onBack }) => {
         e('h3', { className: 'text-lg font-semibold text-red-600 mb-4' }, 'Risk Factors'),
         creditProfile.cushCreditScore.riskFactors.length > 0 ? 
           e('ul', { className: 'space-y-2' }, creditProfile.cushCreditScore.riskFactors.map((risk, index) =>
-            e('li', { key: index, className: 'flex items-start' }, [
+            e('li', { key: `risk-${index}`, className: 'flex items-start' }, [
               e('span', { className: 'text-red-500 mr-2' }, '⚠️'),
               e('span', { className: 'text-gray-700' }, risk)
             ])
@@ -2991,7 +3019,7 @@ const CreditPassportPage = ({ user, onBack }) => {
         e('h3', { className: 'text-lg font-semibold text-green-600 mb-4' }, 'Strength Factors'),
         creditProfile.cushCreditScore.strengthFactors.length > 0 ? 
           e('ul', { className: 'space-y-2' }, creditProfile.cushCreditScore.strengthFactors.map((strength, index) =>
-            e('li', { key: index, className: 'flex items-start' }, [
+            e('li', { key: `strength-${index}`, className: 'flex items-start' }, [
               e('span', { className: 'text-green-500 mr-2' }, '✅'),
               e('span', { className: 'text-gray-700' }, strength)
             ])
