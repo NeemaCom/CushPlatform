@@ -38,7 +38,19 @@ import {
   searchJobsSchema,
   insertJobListingSchema,
   type SearchJobsQuery,
-  type InsertJobListing
+  type InsertJobListing,
+  createSupportTicketSchema,
+  updateSupportTicketSchema,
+  createSupportTicketMessageSchema,
+  createUserFeedbackSchema,
+  createFaqArticleSchema,
+  updateFaqArticleSchema,
+  type CreateSupportTicket,
+  type UpdateSupportTicket,
+  type CreateSupportTicketMessage,
+  type CreateUserFeedback,
+  type CreateFaqArticle,
+  type UpdateFaqArticle
 } from "@shared/schema";
 import { 
   EncryptionService, 
@@ -61,6 +73,7 @@ import { geminiService, type UserContext } from "./gemini-service";
 import rateLimit from "express-rate-limit";
 import { notificationService } from "./notification-service";
 import { adminService } from "./admin-service";
+import { supportService } from "./support-service";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -4337,6 +4350,261 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Failed to delete event:', error);
       res.status(500).json({ error: 'Failed to delete event' });
+    }
+  });
+
+  // ===== SUPPORT SYSTEM ENDPOINTS =====
+
+  // Support Tickets
+  app.post('/api/support/tickets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createSupportTicketSchema.parse(req.body);
+      
+      const ticket = await supportService.createSupportTicket(userId, validatedData);
+      res.status(201).json(ticket);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid ticket data", details: error.errors });
+      }
+      console.error('Error creating support ticket:', error);
+      res.status(500).json({ error: "Failed to create support ticket" });
+    }
+  });
+
+  app.get('/api/support/tickets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const tickets = await supportService.getSupportTickets(userId);
+      res.json(tickets);
+    } catch (error) {
+      console.error('Error fetching support tickets:', error);
+      res.status(500).json({ error: "Failed to fetch support tickets" });
+    }
+  });
+
+  app.get('/api/support/tickets/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const ticketId = parseInt(req.params.id);
+      
+      const ticket = await supportService.getSupportTicket(userId, ticketId);
+      if (!ticket) {
+        return res.status(404).json({ error: "Support ticket not found" });
+      }
+      
+      res.json(ticket);
+    } catch (error) {
+      console.error('Error fetching support ticket:', error);
+      res.status(500).json({ error: "Failed to fetch support ticket" });
+    }
+  });
+
+  app.put('/api/support/tickets/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const validatedData = updateSupportTicketSchema.parse(req.body);
+      
+      const ticket = await supportService.updateSupportTicket(ticketId, validatedData);
+      res.json(ticket);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid update data", details: error.errors });
+      }
+      console.error('Error updating support ticket:', error);
+      res.status(500).json({ error: "Failed to update support ticket" });
+    }
+  });
+
+  // Support Ticket Messages
+  app.post('/api/support/tickets/:id/messages', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const ticketId = parseInt(req.params.id);
+      const validatedData = createSupportTicketMessageSchema.parse({
+        ...req.body,
+        ticketId
+      });
+      
+      const message = await supportService.createSupportTicketMessage(userId, validatedData);
+      res.status(201).json(message);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid message data", details: error.errors });
+      }
+      console.error('Error creating support ticket message:', error);
+      res.status(500).json({ error: "Failed to create support ticket message" });
+    }
+  });
+
+  app.get('/api/support/tickets/:id/messages', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ticketId = parseInt(req.params.id);
+      const messages = await supportService.getSupportTicketMessages(ticketId);
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching support ticket messages:', error);
+      res.status(500).json({ error: "Failed to fetch support ticket messages" });
+    }
+  });
+
+  // User Feedback
+  app.post('/api/support/feedback', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = createUserFeedbackSchema.parse({
+        ...req.body,
+        userAgent: req.get('User-Agent')
+      });
+      
+      const feedback = await supportService.createUserFeedback(userId, validatedData);
+      res.status(201).json(feedback);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid feedback data", details: error.errors });
+      }
+      console.error('Error creating user feedback:', error);
+      res.status(500).json({ error: "Failed to create user feedback" });
+    }
+  });
+
+  app.get('/api/support/feedback', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const feedback = await supportService.getUserFeedback(userId);
+      res.json(feedback);
+    } catch (error) {
+      console.error('Error fetching user feedback:', error);
+      res.status(500).json({ error: "Failed to fetch user feedback" });
+    }
+  });
+
+  // FAQ Articles
+  app.get('/api/support/faq', async (req, res) => {
+    try {
+      const category = req.query.category as string;
+      const search = req.query.search as string;
+      
+      let articles;
+      if (search) {
+        articles = await supportService.searchFaqArticles(search);
+      } else {
+        articles = await supportService.getFaqArticles(category);
+      }
+      
+      res.json(articles);
+    } catch (error) {
+      console.error('Error fetching FAQ articles:', error);
+      res.status(500).json({ error: "Failed to fetch FAQ articles" });
+    }
+  });
+
+  app.put('/api/support/faq/:id/view', async (req, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      await supportService.incrementFaqView(articleId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error incrementing FAQ view:', error);
+      res.status(500).json({ error: "Failed to increment FAQ view" });
+    }
+  });
+
+  app.post('/api/support/faq/:id/rate', async (req, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      const { isHelpful } = req.body;
+      
+      await supportService.rateFaqArticle(articleId, isHelpful);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error rating FAQ article:', error);
+      res.status(500).json({ error: "Failed to rate FAQ article" });
+    }
+  });
+
+  // Admin Support Management
+  app.get('/api/admin/support/tickets', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const tickets = await supportService.getAllSupportTickets();
+      res.json(tickets);
+    } catch (error) {
+      console.error('Error fetching all support tickets:', error);
+      res.status(500).json({ error: "Failed to fetch all support tickets" });
+    }
+  });
+
+  app.get('/api/admin/support/feedback', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const feedback = await supportService.getAllUserFeedback();
+      res.json(feedback);
+    } catch (error) {
+      console.error('Error fetching all user feedback:', error);
+      res.status(500).json({ error: "Failed to fetch all user feedback" });
+    }
+  });
+
+  app.put('/api/admin/support/feedback/:id/status', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const feedbackId = parseInt(req.params.id);
+      const { status, adminNotes } = req.body;
+      
+      const feedback = await supportService.updateFeedbackStatus(feedbackId, status, adminNotes);
+      res.json(feedback);
+    } catch (error) {
+      console.error('Error updating feedback status:', error);
+      res.status(500).json({ error: "Failed to update feedback status" });
+    }
+  });
+
+  app.post('/api/admin/support/faq', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const validatedData = createFaqArticleSchema.parse(req.body);
+      const article = await supportService.createFaqArticle(validatedData);
+      res.status(201).json(article);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid FAQ data", details: error.errors });
+      }
+      console.error('Error creating FAQ article:', error);
+      res.status(500).json({ error: "Failed to create FAQ article" });
+    }
+  });
+
+  app.put('/api/admin/support/faq/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      const validatedData = updateFaqArticleSchema.parse(req.body);
+      
+      const article = await supportService.updateFaqArticle(articleId, validatedData);
+      res.json(article);
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid FAQ update data", details: error.errors });
+      }
+      console.error('Error updating FAQ article:', error);
+      res.status(500).json({ error: "Failed to update FAQ article" });
+    }
+  });
+
+  app.delete('/api/admin/support/faq/:id', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const articleId = parseInt(req.params.id);
+      await supportService.deleteFaqArticle(articleId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting FAQ article:', error);
+      res.status(500).json({ error: "Failed to delete FAQ article" });
+    }
+  });
+
+  app.get('/api/admin/support/statistics', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const statistics = await supportService.getSupportStatistics();
+      res.json(statistics);
+    } catch (error) {
+      console.error('Error fetching support statistics:', error);
+      res.status(500).json({ error: "Failed to fetch support statistics" });
     }
   });
 

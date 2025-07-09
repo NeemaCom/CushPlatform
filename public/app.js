@@ -2087,6 +2087,7 @@ function Dashboard({ user }) {
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
+        currentView === 'help' ? e(HelpSupport, { key: 'help-support', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         // Modern Financial Dashboard
@@ -8201,6 +8202,670 @@ function LoansPage({ user, onBack }) {
       currentStep === 'providers' && renderProviders(),
       currentStep === 'favorites' && renderFavorites(),
       currentStep === 'drafts' && renderDrafts()
+    ])
+  ]);
+}
+
+// Help & Support Page Component
+function HelpSupport({ user, onBack }) {
+  const [activeTab, setActiveTab] = React.useState('faq');
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedCategory, setSelectedCategory] = React.useState('');
+  const [showTicketForm, setShowTicketForm] = React.useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = React.useState(false);
+  const [expandedFaq, setExpandedFaq] = React.useState(null);
+  const [faqData, setFaqData] = React.useState([]);
+  const [ticketsData, setTicketsData] = React.useState([]);
+  const [feedbackData, setFeedbackData] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [ticketFormData, setTicketFormData] = React.useState({
+    title: '',
+    description: '',
+    category: '',
+    priority: 'medium'
+  });
+  const [feedbackFormData, setFeedbackFormData] = React.useState({
+    type: 'general',
+    title: '',
+    description: '',
+    rating: 5,
+    browserInfo: '',
+    featureArea: ''
+  });
+
+  // Load data on component mount
+  React.useEffect(() => {
+    loadFaqData();
+    loadTicketsData();
+    loadFeedbackData();
+  }, []);
+
+  // Load data when search/filter changes
+  React.useEffect(() => {
+    if (activeTab === 'faq') {
+      loadFaqData();
+    }
+  }, [searchTerm, selectedCategory, activeTab]);
+
+  const loadFaqData = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (selectedCategory) params.append('category', selectedCategory);
+      if (searchTerm) params.append('search', searchTerm);
+      
+      const response = await fetch(`/api/support/faq?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setFaqData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load FAQ data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadTicketsData = async () => {
+    try {
+      const response = await fetch('/api/support/tickets');
+      if (response.ok) {
+        const data = await response.json();
+        setTicketsData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load tickets data:', error);
+    }
+  };
+
+  const loadFeedbackData = async () => {
+    try {
+      const response = await fetch('/api/support/feedback');
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbackData(data);
+      }
+    } catch (error) {
+      console.error('Failed to load feedback data:', error);
+    }
+  };
+
+  const handleTicketSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/support/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ticketFormData)
+      });
+      if (response.ok) {
+        setShowTicketForm(false);
+        setTicketFormData({
+          title: '',
+          description: '',
+          category: '',
+          priority: 'medium'
+        });
+        loadTicketsData();
+      }
+    } catch (error) {
+      console.error('Failed to create ticket:', error);
+    }
+  };
+
+  const handleFeedbackSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/support/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...feedbackFormData,
+          browserInfo: navigator.userAgent
+        })
+      });
+      if (response.ok) {
+        setShowFeedbackForm(false);
+        setFeedbackFormData({
+          type: 'general',
+          title: '',
+          description: '',
+          rating: 5,
+          browserInfo: '',
+          featureArea: ''
+        });
+        loadFeedbackData();
+      }
+    } catch (error) {
+      console.error('Failed to create feedback:', error);
+    }
+  };
+
+  const handleFaqClick = async (article) => {
+    setExpandedFaq(expandedFaq === article.id ? null : article.id);
+    if (expandedFaq !== article.id) {
+      try {
+        await fetch(`/api/support/faq/${article.id}/view`, { method: 'PUT' });
+      } catch (error) {
+        console.error('Failed to increment view:', error);
+      }
+    }
+  };
+
+  const rateFaqArticle = async (articleId, isHelpful) => {
+    try {
+      await fetch(`/api/support/faq/${articleId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isHelpful })
+      });
+      loadFaqData();
+    } catch (error) {
+      console.error('Failed to rate article:', error);
+    }
+  };
+
+  const categories = [
+    { id: 'account', name: 'Account Management', icon: '👤' },
+    { id: 'loans', name: 'Loans & Applications', icon: '📋' },
+    { id: 'payments', name: 'Payments & Billing', icon: '💳' },
+    { id: 'community', name: 'Community Features', icon: '🌍' },
+    { id: 'technical', name: 'Technical Issues', icon: '⚙️' },
+    { id: 'security', name: 'Security & Privacy', icon: '🔒' }
+  ];
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'bg-red-100 text-red-700';
+      case 'medium': return 'bg-yellow-100 text-yellow-700';
+      case 'low': return 'bg-green-100 text-green-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open': return 'bg-blue-100 text-blue-700';
+      case 'in_progress': return 'bg-yellow-100 text-yellow-700';
+      case 'resolved': return 'bg-green-100 text-green-700';
+      case 'closed': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Header
+    e('div', { key: 'header', className: 'bg-white shadow-sm border-b' }, [
+      e('div', { className: 'max-w-7xl mx-auto px-4 py-6' }, [
+        e('div', { className: 'flex items-center justify-between' }, [
+          e('button', {
+            key: 'back',
+            onClick: onBack,
+            className: 'flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors'
+          }, [
+            e('span', { key: 'icon' }, '←'),
+            e('span', { key: 'text' }, 'Back to Dashboard')
+          ]),
+          e('div', { className: 'flex items-center space-x-3' }, [
+            e('div', { className: 'p-2 bg-blue-100 rounded-lg' }, [
+              e('span', { className: 'text-2xl' }, '❓')
+            ]),
+            e('div', {}, [
+              e('h1', { className: 'text-2xl font-bold text-gray-900' }, 'Help & Support'),
+              e('p', { className: 'text-gray-600' }, 'Get help with your account and platform features')
+            ])
+          ]),
+          e('div', { className: 'flex items-center space-x-3' }, [
+            e('button', {
+              onClick: () => setShowTicketForm(true),
+              className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2'
+            }, [
+              e('span', { key: 'icon' }, '➕'),
+              e('span', { key: 'text' }, 'Create Ticket')
+            ]),
+            e('button', {
+              onClick: () => setShowFeedbackForm(true),
+              className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2'
+            }, [
+              e('span', { key: 'icon' }, '💬'),
+              e('span', { key: 'text' }, 'Send Feedback')
+            ])
+          ])
+        ])
+      ])
+    ]),
+
+    // Main Content
+    e('div', { key: 'content', className: 'max-w-7xl mx-auto px-4 py-8' }, [
+      // Quick Actions
+      e('div', { className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8' }, [
+        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { className: 'flex items-center space-x-4' }, [
+            e('div', { className: 'p-3 bg-blue-100 rounded-lg' }, [
+              e('span', { className: 'text-2xl' }, '💬')
+            ]),
+            e('div', {}, [
+              e('h3', { className: 'font-semibold text-gray-900' }, 'Live Chat'),
+              e('p', { className: 'text-sm text-gray-600' }, 'Get instant help from our support team')
+            ])
+          ])
+        ]),
+        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { className: 'flex items-center space-x-4' }, [
+            e('div', { className: 'p-3 bg-green-100 rounded-lg' }, [
+              e('span', { className: 'text-2xl' }, '📧')
+            ]),
+            e('div', {}, [
+              e('h3', { className: 'font-semibold text-gray-900' }, 'Email Support'),
+              e('p', { className: 'text-sm text-gray-600' }, 'Send us an email for detailed assistance')
+            ])
+          ])
+        ]),
+        e('div', { className: 'bg-white p-6 rounded-lg shadow-sm border hover:shadow-md transition-shadow cursor-pointer' }, [
+          e('div', { className: 'flex items-center space-x-4' }, [
+            e('div', { className: 'p-3 bg-purple-100 rounded-lg' }, [
+              e('span', { className: 'text-2xl' }, '📞')
+            ]),
+            e('div', {}, [
+              e('h3', { className: 'font-semibold text-gray-900' }, 'Phone Support'),
+              e('p', { className: 'text-sm text-gray-600' }, 'Call us at +1 (555) 123-4567')
+            ])
+          ])
+        ])
+      ]),
+
+      // Tabs
+      e('div', { className: 'bg-white rounded-lg shadow-sm border' }, [
+        e('div', { className: 'border-b' }, [
+          e('nav', { className: 'flex space-x-8 px-6' }, [
+            e('button', {
+              onClick: () => setActiveTab('faq'),
+              className: `py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'faq'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }, [
+              e('div', { className: 'flex items-center space-x-2' }, [
+                e('span', { key: 'icon' }, '📚'),
+                e('span', { key: 'text' }, 'FAQ')
+              ])
+            ]),
+            e('button', {
+              onClick: () => setActiveTab('tickets'),
+              className: `py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'tickets'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }, [
+              e('div', { className: 'flex items-center space-x-2' }, [
+                e('span', { key: 'icon' }, '📋'),
+                e('span', { key: 'text' }, 'My Tickets'),
+                ticketsData.length > 0 && e('span', { 
+                  className: 'bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs' 
+                }, ticketsData.length)
+              ])
+            ]),
+            e('button', {
+              onClick: () => setActiveTab('feedback'),
+              className: `py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'feedback'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`
+            }, [
+              e('div', { className: 'flex items-center space-x-2' }, [
+                e('span', { key: 'icon' }, '❤️'),
+                e('span', { key: 'text' }, 'My Feedback')
+              ])
+            ])
+          ])
+        ]),
+
+        e('div', { className: 'p-6' }, [
+          // FAQ Tab
+          activeTab === 'faq' && e('div', { className: 'space-y-6' }, [
+            // Search and Filter
+            e('div', { className: 'flex flex-col md:flex-row gap-4' }, [
+              e('div', { className: 'relative flex-1' }, [
+                e('span', { className: 'absolute left-3 top-3 text-gray-400' }, '🔍'),
+                e('input', {
+                  type: 'text',
+                  placeholder: 'Search FAQ articles...',
+                  value: searchTerm,
+                  onChange: (e) => setSearchTerm(e.target.value),
+                  className: 'w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                })
+              ]),
+              e('select', {
+                value: selectedCategory,
+                onChange: (e) => setSelectedCategory(e.target.value),
+                className: 'px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+              }, [
+                e('option', { value: '' }, 'All Categories'),
+                ...categories.map(category => 
+                  e('option', { key: category.id, value: category.id }, category.name)
+                )
+              ])
+            ]),
+
+            // FAQ Articles
+            e('div', { className: 'space-y-4' }, [
+              loading ? 
+                e('div', { className: 'flex items-center justify-center py-8' }, [
+                  e('div', { className: 'animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600' })
+                ]) :
+                faqData.length > 0 ?
+                  faqData.map((article) =>
+                    e('div', { key: article.id, className: 'border border-gray-200 rounded-lg' }, [
+                      e('button', {
+                        onClick: () => handleFaqClick(article),
+                        className: 'w-full px-6 py-4 text-left hover:bg-gray-50 transition-colors flex items-center justify-between'
+                      }, [
+                        e('div', { className: 'flex items-center space-x-3' }, [
+                          e('div', { className: 'p-2 bg-blue-100 rounded-lg' }, [
+                            e('span', { key: 'icon' }, 
+                              categories.find(c => c.id === article.category)?.icon || '❓'
+                            )
+                          ]),
+                          e('div', {}, [
+                            e('h3', { className: 'font-medium text-gray-900' }, article.title),
+                            e('div', { className: 'flex items-center space-x-4 text-sm text-gray-500 mt-1' }, [
+                              e('span', {}, categories.find(c => c.id === article.category)?.name || 'General'),
+                              e('span', { className: 'flex items-center space-x-1' }, [
+                                e('span', { key: 'icon' }, '👁️'),
+                                e('span', { key: 'count' }, `${article.views || 0} views`)
+                              ])
+                            ])
+                          ])
+                        ]),
+                        e('span', { className: 'text-gray-400' }, 
+                          expandedFaq === article.id ? '▲' : '▼'
+                        )
+                      ]),
+                      
+                      expandedFaq === article.id && e('div', { className: 'px-6 pb-4 border-t bg-gray-50' }, [
+                        e('div', { className: 'py-4' }, [
+                          e('div', { className: 'prose max-w-none text-gray-700' }, [
+                            article.content
+                          ]),
+                          
+                          e('div', { className: 'flex items-center justify-between mt-6 pt-4 border-t' }, [
+                            e('div', { className: 'text-sm text-gray-500' }, 'Was this article helpful?'),
+                            e('div', { className: 'flex items-center space-x-2' }, [
+                              e('button', {
+                                onClick: () => rateFaqArticle(article.id, true),
+                                className: 'flex items-center space-x-1 px-3 py-1 rounded-lg hover:bg-green-50 text-green-600 transition-colors'
+                              }, [
+                                e('span', { key: 'icon' }, '👍'),
+                                e('span', { key: 'text' }, 'Yes')
+                              ]),
+                              e('button', {
+                                onClick: () => rateFaqArticle(article.id, false),
+                                className: 'flex items-center space-x-1 px-3 py-1 rounded-lg hover:bg-red-50 text-red-600 transition-colors'
+                              }, [
+                                e('span', { key: 'icon' }, '👎'),
+                                e('span', { key: 'text' }, 'No')
+                              ])
+                            ])
+                          ])
+                        ])
+                      ])
+                    ])
+                  ) :
+                  e('div', { className: 'text-center py-8 text-gray-500' }, [
+                    e('span', { className: 'text-4xl mb-4 block' }, '❓'),
+                    e('p', {}, 'No FAQ articles found'),
+                    searchTerm && e('p', { className: 'text-sm mt-2' }, 'Try adjusting your search or browse all categories')
+                  ])
+            ])
+          ]),
+
+          // Tickets Tab
+          activeTab === 'tickets' && e('div', { className: 'space-y-6' }, [
+            ticketsData.length > 0 ?
+              e('div', { className: 'space-y-4' }, 
+                ticketsData.map((ticket) =>
+                  e('div', { key: ticket.id, className: 'bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow' }, [
+                    e('div', { className: 'flex items-start justify-between' }, [
+                      e('div', { className: 'flex-1' }, [
+                        e('div', { className: 'flex items-center space-x-3 mb-2' }, [
+                          e('h3', { className: 'font-semibold text-gray-900' }, ticket.title),
+                          e('span', { className: `px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(ticket.status)}` }, 
+                            ticket.status?.replace('_', ' ').toUpperCase()
+                          ),
+                          e('span', { className: `px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(ticket.priority)}` }, 
+                            ticket.priority?.toUpperCase()
+                          )
+                        ]),
+                        e('p', { className: 'text-gray-600 mb-3' }, ticket.description),
+                        e('div', { className: 'flex items-center space-x-4 text-sm text-gray-500' }, [
+                          e('span', {}, `#${ticket.ticketNumber}`),
+                          e('span', { className: 'flex items-center space-x-1' }, [
+                            e('span', { key: 'icon' }, '⏰'),
+                            e('span', { key: 'date' }, new Date(ticket.createdAt).toLocaleDateString())
+                          ]),
+                          e('span', {}, categories.find(c => c.id === ticket.category)?.name || ticket.category)
+                        ])
+                      ])
+                    ])
+                  ])
+                )
+              ) :
+              e('div', { className: 'text-center py-8 text-gray-500' }, [
+                e('span', { className: 'text-4xl mb-4 block' }, '📋'),
+                e('p', {}, 'No support tickets yet'),
+                e('p', { className: 'text-sm mt-2' }, 'Create your first support ticket to get help'),
+                e('button', {
+                  onClick: () => setShowTicketForm(true),
+                  className: 'mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors'
+                }, 'Create Ticket')
+              ])
+          ]),
+
+          // Feedback Tab
+          activeTab === 'feedback' && e('div', { className: 'space-y-6' }, [
+            feedbackData.length > 0 ?
+              e('div', { className: 'space-y-4' }, 
+                feedbackData.map((feedback) =>
+                  e('div', { key: feedback.id, className: 'bg-white border border-gray-200 rounded-lg p-6' }, [
+                    e('div', { className: 'flex items-start justify-between mb-4' }, [
+                      e('div', { className: 'flex-1' }, [
+                        e('div', { className: 'flex items-center space-x-3 mb-2' }, [
+                          e('h3', { className: 'font-semibold text-gray-900' }, feedback.title),
+                          e('span', { className: `px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(feedback.status)}` }, 
+                            feedback.status?.replace('_', ' ').toUpperCase()
+                          )
+                        ]),
+                        e('p', { className: 'text-gray-600 mb-3' }, feedback.description),
+                        e('div', { className: 'flex items-center space-x-4 text-sm text-gray-500' }, [
+                          e('span', { className: 'flex items-center space-x-1' }, [
+                            e('span', { key: 'icon' }, '⭐'),
+                            e('span', { key: 'rating' }, `${feedback.rating}/5`)
+                          ]),
+                          e('span', { className: 'flex items-center space-x-1' }, [
+                            e('span', { key: 'icon' }, '⏰'),
+                            e('span', { key: 'date' }, new Date(feedback.createdAt).toLocaleDateString())
+                          ]),
+                          e('span', {}, feedback.type?.replace('_', ' ').toUpperCase())
+                        ])
+                      ])
+                    ]),
+                    feedback.adminNotes && e('div', { className: 'bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4' }, [
+                      e('h4', { className: 'font-medium text-blue-900 mb-2' }, 'Admin Response'),
+                      e('p', { className: 'text-blue-800' }, feedback.adminNotes)
+                    ])
+                  ])
+                )
+              ) :
+              e('div', { className: 'text-center py-8 text-gray-500' }, [
+                e('span', { className: 'text-4xl mb-4 block' }, '❤️'),
+                e('p', {}, 'No feedback submitted yet'),
+                e('p', { className: 'text-sm mt-2' }, 'Share your thoughts to help us improve'),
+                e('button', {
+                  onClick: () => setShowFeedbackForm(true),
+                  className: 'mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors'
+                }, 'Send Feedback')
+              ])
+          ])
+        ])
+      ])
+    ]),
+
+    // Create Ticket Modal
+    showTicketForm && e('div', { className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50' }, [
+      e('div', { className: 'bg-white rounded-lg shadow-xl w-full max-w-md' }, [
+        e('div', { className: 'flex items-center justify-between p-6 border-b' }, [
+          e('h2', { className: 'text-lg font-semibold' }, 'Create Support Ticket'),
+          e('button', {
+            onClick: () => setShowTicketForm(false),
+            className: 'text-gray-400 hover:text-gray-600'
+          }, '✕')
+        ]),
+        
+        e('form', { onSubmit: handleTicketSubmit, className: 'p-6 space-y-4' }, [
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Title'),
+            e('input', {
+              type: 'text',
+              value: ticketFormData.title,
+              onChange: (e) => setTicketFormData({ ...ticketFormData, title: e.target.value }),
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+              required: true
+            })
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Category'),
+            e('select', {
+              value: ticketFormData.category,
+              onChange: (e) => setTicketFormData({ ...ticketFormData, category: e.target.value }),
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+              required: true
+            }, [
+              e('option', { value: '' }, 'Select a category'),
+              ...categories.map(category => 
+                e('option', { key: category.id, value: category.id }, category.name)
+              )
+            ])
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Priority'),
+            e('select', {
+              value: ticketFormData.priority,
+              onChange: (e) => setTicketFormData({ ...ticketFormData, priority: e.target.value }),
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+            }, [
+              e('option', { value: 'low' }, 'Low'),
+              e('option', { value: 'medium' }, 'Medium'),
+              e('option', { value: 'high' }, 'High')
+            ])
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Description'),
+            e('textarea', {
+              value: ticketFormData.description,
+              onChange: (e) => setTicketFormData({ ...ticketFormData, description: e.target.value }),
+              rows: 4,
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+              required: true
+            })
+          ]),
+          
+          e('div', { className: 'flex space-x-3 pt-4' }, [
+            e('button', {
+              type: 'button',
+              onClick: () => setShowTicketForm(false),
+              className: 'flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors'
+            }, 'Cancel'),
+            e('button', {
+              type: 'submit',
+              className: 'flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+            }, 'Create Ticket')
+          ])
+        ])
+      ])
+    ]),
+
+    // Send Feedback Modal
+    showFeedbackForm && e('div', { className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50' }, [
+      e('div', { className: 'bg-white rounded-lg shadow-xl w-full max-w-md' }, [
+        e('div', { className: 'flex items-center justify-between p-6 border-b' }, [
+          e('h2', { className: 'text-lg font-semibold' }, 'Send Feedback'),
+          e('button', {
+            onClick: () => setShowFeedbackForm(false),
+            className: 'text-gray-400 hover:text-gray-600'
+          }, '✕')
+        ]),
+        
+        e('form', { onSubmit: handleFeedbackSubmit, className: 'p-6 space-y-4' }, [
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Feedback Type'),
+            e('select', {
+              value: feedbackFormData.type,
+              onChange: (e) => setFeedbackFormData({ ...feedbackFormData, type: e.target.value }),
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent'
+            }, [
+              e('option', { value: 'general' }, 'General Feedback'),
+              e('option', { value: 'bug_report' }, 'Bug Report'),
+              e('option', { value: 'feature_request' }, 'Feature Request'),
+              e('option', { value: 'improvement' }, 'Improvement Suggestion')
+            ])
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Title'),
+            e('input', {
+              type: 'text',
+              value: feedbackFormData.title,
+              onChange: (e) => setFeedbackFormData({ ...feedbackFormData, title: e.target.value }),
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent',
+              required: true
+            })
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Rating'),
+            e('div', { className: 'flex items-center space-x-2' }, [
+              ...[1, 2, 3, 4, 5].map((rating) =>
+                e('button', {
+                  key: rating,
+                  type: 'button',
+                  onClick: () => setFeedbackFormData({ ...feedbackFormData, rating }),
+                  className: `p-1 ${rating <= feedbackFormData.rating ? 'text-yellow-400' : 'text-gray-300'}`
+                }, '⭐')
+              ),
+              e('span', { className: 'text-sm text-gray-600 ml-2' }, `${feedbackFormData.rating}/5`)
+            ])
+          ]),
+          
+          e('div', {}, [
+            e('label', { className: 'block text-sm font-medium text-gray-700 mb-2' }, 'Description'),
+            e('textarea', {
+              value: feedbackFormData.description,
+              onChange: (e) => setFeedbackFormData({ ...feedbackFormData, description: e.target.value }),
+              rows: 4,
+              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent',
+              required: true
+            })
+          ]),
+          
+          e('div', { className: 'flex space-x-3 pt-4' }, [
+            e('button', {
+              type: 'button',
+              onClick: () => setShowFeedbackForm(false),
+              className: 'flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors'
+            }, 'Cancel'),
+            e('button', {
+              type: 'submit',
+              className: 'flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
+            }, 'Send Feedback')
+          ])
+        ])
+      ])
     ])
   ]);
 }

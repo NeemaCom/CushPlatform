@@ -1024,6 +1024,104 @@ export type InsertLoanPreQualification = z.infer<typeof insertLoanPreQualificati
 export type InsertLoanReferral = z.infer<typeof insertLoanReferralSchema>;
 export type LoanPreQualificationForm = z.infer<typeof loanPreQualificationSchema>;
 
+// ===== SUPPORT SYSTEM =====
+
+// Support Tickets
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  ticketNumber: text("ticket_number").notNull().unique(),
+  category: text("category").notNull(), // "technical", "billing", "account", "feature_request", "bug_report", "general"
+  priority: text("priority").notNull().default("medium"), // "low", "medium", "high", "urgent"
+  status: text("status").notNull().default("open"), // "open", "in_progress", "resolved", "closed"
+  subject: text("subject").notNull(),
+  description: text("description").notNull(),
+  attachments: text("attachments").array(),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  resolution: text("resolution"),
+  resolvedAt: timestamp("resolved_at"),
+  closedAt: timestamp("closed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Support Ticket Messages
+export const supportTicketMessages = pgTable("support_ticket_messages", {
+  id: serial("id").primaryKey(),
+  ticketId: integer("ticket_id").references(() => supportTickets.id),
+  senderId: integer("sender_id").references(() => users.id),
+  message: text("message").notNull(),
+  isInternal: boolean("is_internal").default(false),
+  attachments: text("attachments").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// User Feedback
+export const userFeedback = pgTable("user_feedback", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  feedbackType: text("feedback_type").notNull(), // "feature_request", "bug_report", "improvement", "compliment", "complaint"
+  category: text("category").notNull(), // "ui_ux", "performance", "security", "functionality", "content", "general"
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  rating: integer("rating"), // 1-5 star rating
+  pageUrl: text("page_url"),
+  userAgent: text("user_agent"),
+  attachments: text("attachments").array(),
+  status: text("status").notNull().default("pending"), // "pending", "reviewed", "implemented", "rejected"
+  adminNotes: text("admin_notes"),
+  implementedAt: timestamp("implemented_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// FAQ Articles
+export const faqArticles = pgTable("faq_articles", {
+  id: serial("id").primaryKey(),
+  category: text("category").notNull(),
+  question: text("question").notNull(),
+  answer: text("answer").notNull(),
+  tags: text("tags").array(),
+  viewCount: integer("view_count").default(0),
+  isHelpful: integer("is_helpful").default(0),
+  notHelpful: integer("not_helpful").default(0),
+  isPublic: boolean("is_public").default(true),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Support Relations
+export const supportTicketsRelations = relations(supportTickets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [supportTickets.userId],
+    references: [users.id],
+  }),
+  assignedUser: one(users, {
+    fields: [supportTickets.assignedTo],
+    references: [users.id],
+  }),
+  messages: many(supportTicketMessages),
+}));
+
+export const supportTicketMessagesRelations = relations(supportTicketMessages, ({ one }) => ({
+  ticket: one(supportTickets, {
+    fields: [supportTicketMessages.ticketId],
+    references: [supportTickets.id],
+  }),
+  sender: one(users, {
+    fields: [supportTicketMessages.senderId],
+    references: [users.id],
+  }),
+}));
+
+export const userFeedbackRelations = relations(userFeedback, ({ one }) => ({
+  user: one(users, {
+    fields: [userFeedback.userId],
+    references: [users.id],
+  }),
+}));
+
 // ===== FINANCIAL GOALS SYSTEM =====
 
 // Financial Goals schemas
@@ -1045,6 +1143,62 @@ export const createFinancialGoalSchema = z.object({
 });
 
 export const updateFinancialGoalSchema = createFinancialGoalSchema.partial();
+
+// Support System Schemas
+export const createSupportTicketSchema = z.object({
+  category: z.enum(["technical", "billing", "account", "feature_request", "bug_report", "general"]),
+  priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
+  subject: z.string().min(1, "Subject is required").max(200),
+  description: z.string().min(1, "Description is required").max(5000),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const updateSupportTicketSchema = z.object({
+  status: z.enum(["open", "in_progress", "resolved", "closed"]).optional(),
+  priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  assignedTo: z.number().optional(),
+  resolution: z.string().optional(),
+});
+
+export const createSupportTicketMessageSchema = z.object({
+  ticketId: z.number(),
+  message: z.string().min(1, "Message is required").max(5000),
+  isInternal: z.boolean().default(false),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const createUserFeedbackSchema = z.object({
+  feedbackType: z.enum(["feature_request", "bug_report", "improvement", "compliment", "complaint"]),
+  category: z.enum(["ui_ux", "performance", "security", "functionality", "content", "general"]),
+  title: z.string().min(1, "Title is required").max(200),
+  message: z.string().min(1, "Message is required").max(5000),
+  rating: z.number().min(1).max(5).optional(),
+  pageUrl: z.string().optional(),
+  attachments: z.array(z.string()).optional(),
+});
+
+export const createFaqArticleSchema = z.object({
+  category: z.string().min(1, "Category is required"),
+  question: z.string().min(1, "Question is required"),
+  answer: z.string().min(1, "Answer is required"),
+  tags: z.array(z.string()).optional(),
+  isPublic: z.boolean().default(true),
+  sortOrder: z.number().default(0),
+});
+
+export const updateFaqArticleSchema = createFaqArticleSchema.partial();
+
+// Support System Type Exports
+export type SupportTicket = typeof supportTickets.$inferSelect;
+export type SupportTicketMessage = typeof supportTicketMessages.$inferSelect;
+export type UserFeedback = typeof userFeedback.$inferSelect;
+export type FaqArticle = typeof faqArticles.$inferSelect;
+export type CreateSupportTicket = z.infer<typeof createSupportTicketSchema>;
+export type UpdateSupportTicket = z.infer<typeof updateSupportTicketSchema>;
+export type CreateSupportTicketMessage = z.infer<typeof createSupportTicketMessageSchema>;
+export type CreateUserFeedback = z.infer<typeof createUserFeedbackSchema>;
+export type CreateFaqArticle = z.infer<typeof createFaqArticleSchema>;
+export type UpdateFaqArticle = z.infer<typeof updateFaqArticleSchema>;
 
 export const insertFinancialGoalSchema = createInsertSchema(financialGoals).pick({
   title: true,
