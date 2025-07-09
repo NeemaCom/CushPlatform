@@ -2374,83 +2374,300 @@ function Dashboard({ user }) {
             }, 'Create Test Notifications')
           ]),
 
-          // Financial Overview Cards
+          // Enhanced Financial Overview Cards with Animation
           e('div', {
             key: 'overview-cards',
-            className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6'
+            className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'
           }, [
-            // Total Balance Card
+            // Total Balance Card with Trend
             e('div', {
               key: 'total-balance',
-              className: 'bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl text-white shadow-lg'
+              className: 'bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-xl text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105'
             }, [
               e('div', { key: 'balance-header', className: 'flex items-center justify-between mb-4' }, [
                 e('h3', { key: 'balance-title', className: 'text-blue-100 text-sm font-medium' }, 'Total Balance'),
                 e('div', { key: 'balance-icon', className: 'w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center' }, '💰')
               ]),
               e('div', { key: 'balance-amount', className: 'text-3xl font-bold mb-2' }, '£1,320.00'),
-              e('div', { key: 'balance-change', className: 'text-blue-100 text-sm' }, '+2.5% from last month')
+              e('div', { key: 'balance-change', className: 'flex items-center text-blue-100 text-sm' }, [
+                e('span', { key: 'trend-icon', className: 'mr-1' }, '↗'),
+                e('span', { key: 'trend-text' }, '+2.5% from last month')
+              ]),
+              e('div', { key: 'balance-chart', className: 'mt-4' }, [
+                e('div', { key: 'mini-chart', className: 'h-2 bg-white/20 rounded-full overflow-hidden' }, [
+                  e('div', { key: 'progress', className: 'h-full bg-white/40 rounded-full', style: { width: '65%' } })
+                ])
+              ])
             ]),
             
-            // Loans Card
+            // Enhanced Loans Card with Progress
             e('div', {
               key: 'loans-card',
-              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 transform hover:scale-105 cursor-pointer',
+              onClick: () => setCurrentView('loans')
             }, [
               e('div', { key: 'loans-header', className: 'flex items-center justify-between mb-4' }, [
-                e('h3', { key: 'loans-title', className: 'text-gray-600 text-sm font-medium' }, 'Loans'),
-                e('div', { key: 'loans-icon', className: 'w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center' }, '📊')
+                e('h3', { key: 'loans-title', className: 'text-gray-600 text-sm font-medium' }, 'Active Loans'),
+                e('div', { key: 'loans-icon', className: 'w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center' }, '💳')
               ]),
               e('div', { key: 'loans-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£25,200.00'),
-              e('div', { key: 'loans-status', className: 'text-green-600 text-sm' }, 'On track')
+              e('div', { key: 'loans-payment', className: 'text-sm text-gray-500 mb-3' }, 'Monthly payment: £456'),
+              e('div', { key: 'loan-progress', className: 'w-full bg-gray-200 rounded-full h-2 mb-2' }, [
+                e('div', { key: 'progress-bar', className: 'bg-orange-500 h-2 rounded-full transition-all duration-700', style: { width: '68%' } })
+              ]),
+              e('div', { key: 'progress-text', className: 'flex justify-between text-xs text-gray-500' }, [
+                e('span', { key: 'progress-left' }, '68% paid'),
+                e('span', { key: 'progress-right' }, '£8,064 remaining')
+              ])
             ]),
             
-            // Savings Card
+            // Enhanced Savings Card with Goal Progress
             e('div', {
               key: 'savings-card',
-              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 transform hover:scale-105'
             }, [
               e('div', { key: 'savings-header', className: 'flex items-center justify-between mb-4' }, [
-                e('h3', { key: 'savings-title', className: 'text-gray-600 text-sm font-medium' }, 'Savings'),
-                e('div', { key: 'savings-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '💸')
+                e('h3', { key: 'savings-title', className: 'text-gray-600 text-sm font-medium' }, 'Savings Goal'),
+                e('div', { key: 'savings-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '🎯')
               ]),
               e('div', { key: 'savings-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£3,280.00'),
-              e('div', { key: 'savings-target', className: 'text-gray-500 text-sm' }, 'Target: £5,000')
+              e('div', { key: 'savings-target', className: 'text-sm text-gray-500 mb-3' }, 'Target: £5,000'),
+              e('div', { key: 'savings-progress', className: 'w-full bg-gray-200 rounded-full h-2 mb-2' }, [
+                e('div', { key: 'progress-bar', className: 'bg-green-500 h-2 rounded-full transition-all duration-700', style: { width: '66%' } })
+              ]),
+              e('div', { key: 'progress-text', className: 'flex justify-between text-xs text-gray-500' }, [
+                e('span', { key: 'progress-left' }, '66% achieved'),
+                e('span', { key: 'progress-right' }, '£1,720 to go')
+              ])
             ]),
             
-            // Investments Card
+            // Enhanced Investments Card with Performance
             e('div', {
               key: 'investments-card',
-              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200 hover:shadow-xl transition-all duration-300 transform hover:scale-105'
             }, [
               e('div', { key: 'investments-header', className: 'flex items-center justify-between mb-4' }, [
                 e('h3', { key: 'investments-title', className: 'text-gray-600 text-sm font-medium' }, 'Investments'),
                 e('div', { key: 'investments-icon', className: 'w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center' }, '📈')
               ]),
               e('div', { key: 'investments-amount', className: 'text-2xl font-bold text-gray-900 mb-2' }, '£8,450.00'),
-              e('div', { key: 'investments-change', className: 'text-green-600 text-sm' }, '+12.3% this year')
+              e('div', { key: 'investments-change', className: 'flex items-center text-green-600 text-sm mb-2' }, [
+                e('span', { key: 'trend-icon', className: 'mr-1' }, '↗'),
+                e('span', { key: 'trend-text' }, '+12.3% this year')
+              ]),
+              e('div', { key: 'investment-chart', className: 'h-8 bg-gradient-to-r from-purple-200 to-purple-400 rounded-full flex items-center justify-end px-2' }, [
+                e('span', { key: 'chart-value', className: 'text-xs text-purple-800 font-medium' }, '+£924')
+              ])
             ])
           ]),
 
-          // Charts and Transactions Section
+          // Advanced Analytics Section
+          e('div', {
+            key: 'analytics-section',
+            className: 'grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6'
+          }, [
+            // Financial Health Score
+            e('div', {
+              key: 'health-score',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('h3', { key: 'health-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Financial Health Score'),
+              e('div', { key: 'score-display', className: 'text-center' }, [
+                e('div', { key: 'score-circle', className: 'relative w-24 h-24 mx-auto mb-4' }, [
+                  e('div', { key: 'circle-bg', className: 'w-24 h-24 rounded-full border-8 border-gray-200' }),
+                  e('div', { key: 'circle-fill', className: 'absolute top-0 left-0 w-24 h-24 rounded-full border-8 border-green-500 border-t-transparent', style: { transform: 'rotate(252deg)' } }),
+                  e('div', { key: 'score-text', className: 'absolute inset-0 flex items-center justify-center' }, [
+                    e('span', { key: 'score-number', className: 'text-2xl font-bold text-gray-900' }, '78')
+                  ])
+                ]),
+                e('p', { key: 'score-label', className: 'text-sm text-gray-600 mb-2' }, 'Good Financial Health'),
+                e('button', {
+                  key: 'view-details',
+                  className: 'text-blue-600 hover:text-blue-800 text-xs font-medium',
+                  onClick: () => setCurrentView('health-radar')
+                }, 'View Detailed Analysis →')
+              ])
+            ]),
+
+            // Spending Analysis
+            e('div', {
+              key: 'spending-analysis',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('h3', { key: 'spending-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Spending Analysis'),
+              e('div', { key: 'spending-categories', className: 'space-y-3' }, [
+                e('div', { key: 'food-spending', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'food-info', className: 'flex items-center gap-2' }, [
+                    e('span', { key: 'food-icon', className: 'w-3 h-3 bg-blue-500 rounded-full' }),
+                    e('span', { key: 'food-label', className: 'text-sm text-gray-600' }, 'Food & Dining')
+                  ]),
+                  e('span', { key: 'food-amount', className: 'text-sm font-medium text-gray-900' }, '£342')
+                ]),
+                e('div', { key: 'transport-spending', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'transport-info', className: 'flex items-center gap-2' }, [
+                    e('span', { key: 'transport-icon', className: 'w-3 h-3 bg-green-500 rounded-full' }),
+                    e('span', { key: 'transport-label', className: 'text-sm text-gray-600' }, 'Transport')
+                  ]),
+                  e('span', { key: 'transport-amount', className: 'text-sm font-medium text-gray-900' }, '£156')
+                ]),
+                e('div', { key: 'shopping-spending', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'shopping-info', className: 'flex items-center gap-2' }, [
+                    e('span', { key: 'shopping-icon', className: 'w-3 h-3 bg-purple-500 rounded-full' }),
+                    e('span', { key: 'shopping-label', className: 'text-sm text-gray-600' }, 'Shopping')
+                  ]),
+                  e('span', { key: 'shopping-amount', className: 'text-sm font-medium text-gray-900' }, '£289')
+                ]),
+                e('div', { key: 'utilities-spending', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'utilities-info', className: 'flex items-center gap-2' }, [
+                    e('span', { key: 'utilities-icon', className: 'w-3 h-3 bg-yellow-500 rounded-full' }),
+                    e('span', { key: 'utilities-label', className: 'text-sm text-gray-600' }, 'Utilities')
+                  ]),
+                  e('span', { key: 'utilities-amount', className: 'text-sm font-medium text-gray-900' }, '£123')
+                ])
+              ])
+            ]),
+
+            // Smart Recommendations
+            e('div', {
+              key: 'smart-recommendations',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('h3', { key: 'recommendations-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Smart Recommendations'),
+              e('div', { key: 'recommendations-list', className: 'space-y-3' }, [
+                e('div', { key: 'rec-1', className: 'p-3 bg-blue-50 rounded-lg' }, [
+                  e('div', { key: 'rec-1-header', className: 'flex items-center gap-2 mb-1' }, [
+                    e('span', { key: 'rec-1-icon', className: 'text-blue-600' }, '💡'),
+                    e('span', { key: 'rec-1-title', className: 'text-sm font-medium text-blue-900' }, 'Reduce Food Spending')
+                  ]),
+                  e('p', { key: 'rec-1-text', className: 'text-xs text-blue-700' }, 'You could save £85/month by cooking at home more often')
+                ]),
+                e('div', { key: 'rec-2', className: 'p-3 bg-green-50 rounded-lg' }, [
+                  e('div', { key: 'rec-2-header', className: 'flex items-center gap-2 mb-1' }, [
+                    e('span', { key: 'rec-2-icon', className: 'text-green-600' }, '🎯'),
+                    e('span', { key: 'rec-2-title', className: 'text-sm font-medium text-green-900' }, 'Increase Savings')
+                  ]),
+                  e('p', { key: 'rec-2-text', className: 'text-xs text-green-700' }, 'Set up automatic £200 monthly transfer to savings')
+                ]),
+                e('div', { key: 'rec-3', className: 'p-3 bg-purple-50 rounded-lg' }, [
+                  e('div', { key: 'rec-3-header', className: 'flex items-center gap-2 mb-1' }, [
+                    e('span', { key: 'rec-3-icon', className: 'text-purple-600' }, '📈'),
+                    e('span', { key: 'rec-3-title', className: 'text-sm font-medium text-purple-900' }, 'Investment Opportunity')
+                  ]),
+                  e('p', { key: 'rec-3-text', className: 'text-xs text-purple-700' }, 'Consider diversifying with index funds')
+                ])
+              ])
+            ])
+          ]),
+
+          // Enhanced Charts Section
           e('div', {
             key: 'charts-section',
             className: 'grid grid-cols-1 lg:grid-cols-2 gap-6'
           }, [
-            // Balance Chart
+            // Balance Trend Chart
             e('div', {
               key: 'balance-chart',
               className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
             }, [
-              e('h3', { key: 'chart-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Balance Overview'),
-              e('div', { key: 'chart-placeholder', className: 'h-64 bg-gray-50 rounded-lg flex items-center justify-center' }, [
-                e('div', { key: 'chart-content', className: 'text-center' }, [
-                  e('div', { key: 'chart-icon', className: 'w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4' }, '📊'),
-                  e('p', { key: 'chart-text', className: 'text-gray-600' }, 'Interactive balance chart would display here')
+              e('h3', { key: 'chart-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Balance Trend'),
+              e('div', { key: 'chart-content', className: 'h-64 relative' }, [
+                e('div', { key: 'chart-placeholder', className: 'h-full bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg flex items-center justify-center' }, [
+                  e('div', { key: 'chart-visual', className: 'w-full h-full relative' }, [
+                    // Simulated chart with SVG-like elements
+                    e('div', { key: 'chart-line', className: 'absolute bottom-12 left-4 right-4 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full' }),
+                    e('div', { key: 'chart-point-1', className: 'absolute bottom-8 left-8 w-3 h-3 bg-blue-500 rounded-full' }),
+                    e('div', { key: 'chart-point-2', className: 'absolute bottom-16 left-1/3 w-3 h-3 bg-blue-500 rounded-full' }),
+                    e('div', { key: 'chart-point-3', className: 'absolute bottom-20 left-2/3 w-3 h-3 bg-purple-500 rounded-full' }),
+                    e('div', { key: 'chart-point-4', className: 'absolute bottom-12 right-8 w-3 h-3 bg-purple-500 rounded-full' }),
+                    e('div', { key: 'chart-labels', className: 'absolute bottom-2 left-0 right-0 flex justify-between text-xs text-gray-500' }, [
+                      e('span', { key: 'label-1' }, 'Jan'),
+                      e('span', { key: 'label-2' }, 'Feb'),
+                      e('span', { key: 'label-3' }, 'Mar'),
+                      e('span', { key: 'label-4' }, 'Apr')
+                    ])
+                  ])
                 ])
               ])
             ]),
             
+            // Recent Transactions with Enhanced Analytics
+            e('div', {
+              key: 'recent-transactions',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('div', { key: 'transactions-header', className: 'flex items-center justify-between mb-4' }, [
+                e('h3', { key: 'transactions-title', className: 'text-lg font-semibold text-gray-900' }, 'Recent Transactions'),
+                e('button', {
+                  key: 'view-all',
+                  className: 'text-blue-600 hover:text-blue-800 text-sm font-medium'
+                }, 'View All →')
+              ]),
+              e('div', { key: 'transactions-list', className: 'space-y-3' }, [
+                // Transaction 1
+                e('div', { key: 'trans-1', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
+                  e('div', { key: 'trans-1-left', className: 'flex items-center gap-3' }, [
+                    e('div', { key: 'trans-1-icon', className: 'w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center' }, '🍕'),
+                    e('div', { key: 'trans-1-info' }, [
+                      e('p', { key: 'trans-1-desc', className: 'text-sm font-medium text-gray-900' }, 'Domino\'s Pizza'),
+                      e('p', { key: 'trans-1-time', className: 'text-xs text-gray-500' }, '2 hours ago')
+                    ])
+                  ]),
+                  e('div', { key: 'trans-1-right', className: 'text-right' }, [
+                    e('p', { key: 'trans-1-amount', className: 'text-sm font-medium text-red-600' }, '-£15.99'),
+                    e('p', { key: 'trans-1-category', className: 'text-xs text-gray-500' }, 'Food & Dining')
+                  ])
+                ]),
+                // Transaction 2
+                e('div', { key: 'trans-2', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
+                  e('div', { key: 'trans-2-left', className: 'flex items-center gap-3' }, [
+                    e('div', { key: 'trans-2-icon', className: 'w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center' }, '💰'),
+                    e('div', { key: 'trans-2-info' }, [
+                      e('p', { key: 'trans-2-desc', className: 'text-sm font-medium text-gray-900' }, 'Salary Deposit'),
+                      e('p', { key: 'trans-2-time', className: 'text-xs text-gray-500' }, '1 day ago')
+                    ])
+                  ]),
+                  e('div', { key: 'trans-2-right', className: 'text-right' }, [
+                    e('p', { key: 'trans-2-amount', className: 'text-sm font-medium text-green-600' }, '+£2,800.00'),
+                    e('p', { key: 'trans-2-category', className: 'text-xs text-gray-500' }, 'Income')
+                  ])
+                ]),
+                // Transaction 3
+                e('div', { key: 'trans-3', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
+                  e('div', { key: 'trans-3-left', className: 'flex items-center gap-3' }, [
+                    e('div', { key: 'trans-3-icon', className: 'w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center' }, '🚌'),
+                    e('div', { key: 'trans-3-info' }, [
+                      e('p', { key: 'trans-3-desc', className: 'text-sm font-medium text-gray-900' }, 'TfL Travel'),
+                      e('p', { key: 'trans-3-time', className: 'text-xs text-gray-500' }, '2 days ago')
+                    ])
+                  ]),
+                  e('div', { key: 'trans-3-right', className: 'text-right' }, [
+                    e('p', { key: 'trans-3-amount', className: 'text-sm font-medium text-red-600' }, '-£12.50'),
+                    e('p', { key: 'trans-3-category', className: 'text-xs text-gray-500' }, 'Transport')
+                  ])
+                ]),
+                // Transaction 4
+                e('div', { key: 'trans-4', className: 'flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors' }, [
+                  e('div', { key: 'trans-4-left', className: 'flex items-center gap-3' }, [
+                    e('div', { key: 'trans-4-icon', className: 'w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center' }, '🛍️'),
+                    e('div', { key: 'trans-4-info' }, [
+                      e('p', { key: 'trans-4-desc', className: 'text-sm font-medium text-gray-900' }, 'Amazon Purchase'),
+                      e('p', { key: 'trans-4-time', className: 'text-xs text-gray-500' }, '3 days ago')
+                    ])
+                  ]),
+                  e('div', { key: 'trans-4-right', className: 'text-right' }, [
+                    e('p', { key: 'trans-4-amount', className: 'text-sm font-medium text-red-600' }, '-£67.99'),
+                    e('p', { key: 'trans-4-category', className: 'text-xs text-gray-500' }, 'Shopping')
+                  ])
+                ])
+              ])
+            ])
+          ]),
+
+          // Enhanced Quick Actions Section
+          e('div', {
+            key: 'quick-actions-section',
+            className: 'grid grid-cols-1 lg:grid-cols-2 gap-6'
+          }, [
             // Quick Actions
             e('div', {
               key: 'quick-actions',
@@ -2460,7 +2677,7 @@ function Dashboard({ user }) {
               e('div', { key: 'actions-grid', className: 'grid grid-cols-2 gap-4' }, [
                 e('button', {
                   key: 'transfer-btn',
-                  className: 'p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-left',
+                  className: 'p-4 bg-blue-50 rounded-lg hover:bg-blue-100 transition-all duration-200 transform hover:scale-105 text-left',
                   onClick: () => setCurrentView('loans')
                 }, [
                   e('div', { key: 'transfer-icon', className: 'w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center mb-2' }, '💳'),
@@ -2468,7 +2685,7 @@ function Dashboard({ user }) {
                 ]),
                 e('button', {
                   key: 'community-btn',
-                  className: 'p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-left',
+                  className: 'p-4 bg-green-50 rounded-lg hover:bg-green-100 transition-all duration-200 transform hover:scale-105 text-left',
                   onClick: () => setCurrentView('community')
                 }, [
                   e('div', { key: 'community-icon', className: 'w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center mb-2' }, '🌍'),
@@ -2476,7 +2693,7 @@ function Dashboard({ user }) {
                 ]),
                 e('button', {
                   key: 'imisi-btn',
-                  className: 'p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-left',
+                  className: 'p-4 bg-purple-50 rounded-lg hover:bg-purple-100 transition-all duration-200 transform hover:scale-105 text-left',
                   onClick: () => setCurrentView('imisi')
                 }, [
                   e('div', { key: 'imisi-icon', className: 'w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center mb-2' }, '🤖'),
@@ -2484,11 +2701,63 @@ function Dashboard({ user }) {
                 ]),
                 e('button', {
                   key: 'settings-btn',
-                  className: 'p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left',
+                  className: 'p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-all duration-200 transform hover:scale-105 text-left',
                   onClick: () => setCurrentView('account')
                 }, [
                   e('div', { key: 'settings-icon', className: 'w-8 h-8 bg-gray-500 rounded-lg flex items-center justify-center mb-2' }, '⚙️'),
                   e('div', { key: 'settings-text', className: 'text-sm font-medium text-gray-900' }, 'Settings')
+                ])
+              ])
+            ]),
+
+            // Financial Goals Progress
+            e('div', {
+              key: 'goals-progress',
+              className: 'bg-white p-6 rounded-xl shadow-lg border border-gray-200'
+            }, [
+              e('h3', { key: 'goals-title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Financial Goals'),
+              e('div', { key: 'goals-list', className: 'space-y-4' }, [
+                // Goal 1: Emergency Fund
+                e('div', { key: 'goal-1' }, [
+                  e('div', { key: 'goal-1-header', className: 'flex items-center justify-between mb-2' }, [
+                    e('span', { key: 'goal-1-name', className: 'text-sm font-medium text-gray-900' }, 'Emergency Fund'),
+                    e('span', { key: 'goal-1-percentage', className: 'text-xs text-gray-500' }, '76%')
+                  ]),
+                  e('div', { key: 'goal-1-progress', className: 'w-full bg-gray-200 rounded-full h-2' }, [
+                    e('div', { key: 'goal-1-bar', className: 'bg-blue-500 h-2 rounded-full transition-all duration-700', style: { width: '76%' } })
+                  ]),
+                  e('div', { key: 'goal-1-info', className: 'flex justify-between text-xs text-gray-500 mt-1' }, [
+                    e('span', { key: 'goal-1-current' }, '£3,800'),
+                    e('span', { key: 'goal-1-target' }, '£5,000')
+                  ])
+                ]),
+                // Goal 2: House Deposit
+                e('div', { key: 'goal-2' }, [
+                  e('div', { key: 'goal-2-header', className: 'flex items-center justify-between mb-2' }, [
+                    e('span', { key: 'goal-2-name', className: 'text-sm font-medium text-gray-900' }, 'House Deposit'),
+                    e('span', { key: 'goal-2-percentage', className: 'text-xs text-gray-500' }, '23%')
+                  ]),
+                  e('div', { key: 'goal-2-progress', className: 'w-full bg-gray-200 rounded-full h-2' }, [
+                    e('div', { key: 'goal-2-bar', className: 'bg-green-500 h-2 rounded-full transition-all duration-700', style: { width: '23%' } })
+                  ]),
+                  e('div', { key: 'goal-2-info', className: 'flex justify-between text-xs text-gray-500 mt-1' }, [
+                    e('span', { key: 'goal-2-current' }, '£11,500'),
+                    e('span', { key: 'goal-2-target' }, '£50,000')
+                  ])
+                ]),
+                // Goal 3: Vacation Fund
+                e('div', { key: 'goal-3' }, [
+                  e('div', { key: 'goal-3-header', className: 'flex items-center justify-between mb-2' }, [
+                    e('span', { key: 'goal-3-name', className: 'text-sm font-medium text-gray-900' }, 'Vacation Fund'),
+                    e('span', { key: 'goal-3-percentage', className: 'text-xs text-gray-500' }, '89%')
+                  ]),
+                  e('div', { key: 'goal-3-progress', className: 'w-full bg-gray-200 rounded-full h-2' }, [
+                    e('div', { key: 'goal-3-bar', className: 'bg-purple-500 h-2 rounded-full transition-all duration-700', style: { width: '89%' } })
+                  ]),
+                  e('div', { key: 'goal-3-info', className: 'flex justify-between text-xs text-gray-500 mt-1' }, [
+                    e('span', { key: 'goal-3-current' }, '£1,780'),
+                    e('span', { key: 'goal-3-target' }, '£2,000')
+                  ])
                 ])
               ])
             ])
