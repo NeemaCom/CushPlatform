@@ -3698,7 +3698,67 @@ function AdminDashboard({ user, onBack }) {
   };
 
   const editFaqArticle = (articleId) => {
-    alert('FAQ editing functionality will be implemented soon!');
+    const article = faqArticles.find(a => a.id === articleId);
+    if (!article) return;
+    
+    const newTitle = prompt('Edit FAQ Title:', article.title || article.question);
+    if (!newTitle) return;
+    
+    const newContent = prompt('Edit FAQ Content:', article.content || article.answer);
+    if (!newContent) return;
+    
+    const category = prompt('Edit FAQ Category:', article.category || 'General');
+    if (!category) return;
+    
+    updateFaqArticle(articleId, { title: newTitle, content: newContent, category });
+  };
+
+  const updateFaqArticle = async (articleId, data) => {
+    try {
+      const response = await fetch(`/api/support/faq/${articleId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      if (response.ok) {
+        alert('FAQ article updated successfully!');
+        fetchSupportData();
+      } else {
+        alert('Failed to update FAQ article');
+      }
+    } catch (error) {
+      alert('Failed to update FAQ article');
+    }
+  };
+
+  const addFaqArticle = async () => {
+    const title = prompt('Enter FAQ Title:');
+    if (!title) return;
+    
+    const content = prompt('Enter FAQ Content:');
+    if (!content) return;
+    
+    const category = prompt('Enter FAQ Category:', 'General');
+    if (!category) return;
+    
+    try {
+      const response = await fetch('/api/support/faq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content, category })
+      });
+      
+      if (response.ok) {
+        alert('FAQ article added successfully!');
+        fetchSupportData();
+        setShowAddFaq(false);
+      } else {
+        alert('Failed to add FAQ article');
+      }
+    } catch (error) {
+      alert('Failed to add FAQ article');
+    }
   };
 
   const deleteFaqArticle = async (articleId) => {
@@ -4679,7 +4739,7 @@ function AdminDashboard({ user, onBack }) {
               e('div', { className: 'flex justify-between items-center mb-6' }, [
                 e('h3', { className: 'text-lg font-semibold text-gray-900' }, 'FAQ Articles'),
                 e('button', {
-                  onClick: () => setShowAddFaq(true),
+                  onClick: () => addFaqArticle(),
                   className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700'
                 }, 'Add FAQ Article')
               ]),
@@ -8945,8 +9005,8 @@ function HelpSupport({ user, onBack }) {
                           e('div', {}, [
                             e('h3', { className: 'font-medium text-gray-900' }, article.title),
                             e('div', { className: 'flex items-center space-x-4 text-sm text-gray-500 mt-1' }, [
-                              e('span', { key: 'category' }, categories.find(c => c.id === article.category)?.name || 'General'),
-                              e('span', { key: 'views', className: 'flex items-center space-x-1' }, [
+                              e('span', { key: `category-${article.id}` }, categories.find(c => c.id === article.category)?.name || 'General'),
+                              e('span', { key: `views-${article.id}`, className: 'flex items-center space-x-1' }, [
                                 e('span', { key: 'icon' }, '👁️'),
                                 e('span', { key: 'count' }, `${article.views || 0} views`)
                               ])
@@ -8960,7 +9020,7 @@ function HelpSupport({ user, onBack }) {
                       
                       expandedFaq === article.id && e('div', { className: 'px-6 pb-4 border-t bg-gray-50' }, [
                         e('div', { className: 'py-4' }, [
-                          e('div', { className: 'prose max-w-none text-gray-700' }, [
+                          e('div', { key: `content-${article.id}`, className: 'prose max-w-none text-gray-700' }, [
                             article.content
                           ]),
                           
