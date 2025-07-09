@@ -4692,7 +4692,7 @@ function ImisiChatHead() {
             type: 'welcome',
             suggestions: ['Skilled Worker Visa', 'Student Visa', 'Family Reunification', 'Investment Migration']
           });
-        }, 500);
+        }, 800);
       }
     }
   };
@@ -4706,6 +4706,14 @@ function ImisiChatHead() {
       metadata
     };
     setMessages(prev => [...prev, newMessage]);
+    
+    // Auto-scroll to bottom after adding message
+    setTimeout(() => {
+      const messagesContainer = document.querySelector('[data-messages-container]');
+      if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+    }, 150);
   };
 
   const processAIResponse = async (userMessage) => {
@@ -4727,6 +4735,14 @@ function ImisiChatHead() {
         }
         
         setIsTyping(false);
+        
+        // Extra scroll after AI response for better conversation flow
+        setTimeout(() => {
+          const messagesContainer = document.querySelector('[data-messages-container]');
+          if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+        }, 200);
       }, 1000 + Math.random() * 1500); // Realistic response time
       
     } catch (error) {
@@ -5074,17 +5090,18 @@ function ImisiChatHead() {
         // Messages Area
         e('div', {
           key: 'messages',
-          className: 'flex-1 p-4 overflow-y-auto space-y-4',
-          style: { maxHeight: '400px' }
+          className: 'flex-1 p-4 overflow-y-auto scroll-smooth',
+          style: { maxHeight: '400px' },
+          'data-messages-container': true
         }, [
           // Empty state
           messages.length === 0 && e('div', {
             key: 'empty-state',
-            className: 'text-center text-gray-500 py-8'
+            className: 'text-center text-gray-500 py-8 animate-fade-in'
           }, [
             e('div', {
               key: 'bot-avatar',
-              className: 'w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-blue-200'
+              className: 'w-16 h-16 mx-auto mb-3 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center border-2 border-blue-200 hover:scale-105 transition-transform duration-300'
             }, [
               e('img', {
                 key: 'avatar-img',
@@ -5095,19 +5112,19 @@ function ImisiChatHead() {
             ]),
             e('p', {
               key: 'ready-text',
-              className: 'text-sm mb-2 font-medium'
+              className: 'text-sm mb-2 font-medium text-gray-700'
             }, "Ready to help with your migration journey!"),
             e('p', {
               key: 'tap-text',
-              className: 'text-xs'
+              className: 'text-xs text-gray-500'
             }, 'Start a conversation to get personalized guidance')
           ]),
           
           // Message list
-          ...messages.map(message => 
+          ...messages.map((message, index) => 
             e('div', {
               key: message.id,
-              className: `flex ${message.sender === 'user' ? 'justify-end' : 'justify-start items-start gap-2'}`
+              className: `flex ${message.sender === 'user' ? 'justify-end' : 'justify-start items-start gap-2'} mb-4`
             }, [
               // AI Avatar for AI messages
               message.sender === 'ai' && e('div', {
@@ -5124,20 +5141,20 @@ function ImisiChatHead() {
               
               e('div', {
                 key: 'message-bubble',
-                className: `max-w-[80%] rounded-lg px-3 py-2 ${
+                className: `max-w-[75%] rounded-lg px-4 py-3 ${
                   message.sender === 'user' 
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white' 
-                    : 'bg-gray-100 text-gray-900'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-br-sm' 
+                    : 'bg-gray-100 text-gray-900 rounded-bl-sm'
                 }`
               }, [
                 e('p', {
                   key: 'content',
-                  className: 'text-sm leading-relaxed'
+                  className: 'text-sm leading-relaxed whitespace-pre-wrap'
                 }, message.content),
                 
                 e('div', {
                   key: 'timestamp',
-                  className: `text-xs mt-1 ${
+                  className: `text-xs mt-2 ${
                     message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
                   }`
                 }, message.timestamp),
@@ -5171,7 +5188,7 @@ function ImisiChatHead() {
           // Typing indicator
           isTyping && e('div', {
             key: 'typing',
-            className: 'flex justify-start items-start gap-2'
+            className: 'flex justify-start items-start gap-2 mb-4'
           }, [
             e('div', {
               key: 'typing-avatar',
@@ -5186,7 +5203,7 @@ function ImisiChatHead() {
             ]),
             e('div', {
               key: 'typing-bubble',
-              className: 'bg-gray-100 rounded-lg px-3 py-2'
+              className: 'bg-gray-100 rounded-lg rounded-bl-sm px-4 py-3'
             }, [
               e('div', {
                 key: 'typing-animation',
@@ -5203,11 +5220,11 @@ function ImisiChatHead() {
         // Input Area
         e('div', {
           key: 'input-area',
-          className: 'border-t p-4'
+          className: 'border-t bg-gray-50 p-4'
         }, [
           e('div', {
             key: 'input-form',
-            className: 'flex gap-2'
+            className: 'flex gap-3'
           }, [
             e('input', {
               key: 'message-input',
@@ -5217,15 +5234,15 @@ function ImisiChatHead() {
               onKeyPress: (e) => e.key === 'Enter' && handleSendMessage(),
               placeholder: 'Ask about visas, budgets, timelines...',
               disabled: isTyping,
-              className: 'flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50'
+              className: 'flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 bg-white shadow-sm'
             }),
             e('button', {
               key: 'send-btn',
               onClick: handleSendMessage,
               disabled: !inputMessage.trim() || isTyping,
-              className: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-4 py-2 rounded-lg transition-all duration-200 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed'
+              className: 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-500 text-white px-5 py-3 rounded-lg transition-all duration-200 hover:scale-105 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg'
             }, [
-              e('span', { key: 'send-icon', className: 'text-sm' }, isTyping ? '⏳' : '→')
+              e('span', { key: 'send-icon', className: 'text-sm font-medium' }, isTyping ? '⏳' : '→')
             ])
           ])
         ])
