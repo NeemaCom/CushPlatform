@@ -50,6 +50,9 @@ app.use((req, res, next) => {
 
 // Export server creation function for Vercel and Cloud Run
 export async function createServer() {
+  // Debug environment variables
+  log(`Google OAuth Environment Check: CLIENT_ID=${process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 15) + '...' : 'MISSING'}, CLIENT_SECRET=${process.env.GOOGLE_CLIENT_SECRET ? 'PRESENT' : 'MISSING'}`);
+  
   const httpServer = await registerRoutes(app);
 
   // Serve static files from public directory first
