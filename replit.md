@@ -12,6 +12,14 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-09**: Fixed User Registration Endpoint Mismatch and Authentication Issues
+- ✓ Fixed registration endpoint mismatch: frontend was calling /api/auth/register but backend expected /api/auth/signup
+- ✓ Updated frontend registration form to use correct /api/auth/signup endpoint
+- ✓ Fixed missing acceptTerms and acceptPrivacy fields in registration payload
+- ✓ Validated registration flow with successful test user creation
+- ✓ Enhanced error handling for missing required fields in registration schema
+- ✓ User registration now working correctly with proper field validation and account creation
+
 **2025-07-09**: Added Financial Compliance and Regulatory Information to Homepage Footer
 - ✓ Added comprehensive compliance information highlighting partnerships with licensed financial institutions
 - ✓ Included regulatory registrations with FinCEN (US), FINTRAC (Canada), and SCUML (Nigeria)
