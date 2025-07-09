@@ -1611,6 +1611,11 @@ function Dashboard({ user }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsPanelOpen, setNotificationsPanelOpen] = useState(false);
+  
+  // Debug log to check user object
+  console.log('Dashboard component user:', user);
+  console.log('User role:', user?.role);
+  console.log('Is admin?', user?.role === 'admin');
 
   // Load notifications
   const loadNotifications = async () => {
@@ -1806,14 +1811,15 @@ function Dashboard({ user }) {
         key: 'sidebar-footer',
         className: 'px-4 py-4 border-t border-gray-200 space-y-2'
       }, [
-        user?.role === 'admin' && e('button', {
+        // Show admin panel for admin users
+        user && user.role === 'admin' ? e('button', {
           key: 'admin-panel',
           onClick: () => setCurrentView('admin'),
-          className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors'
+          className: 'w-full flex items-center gap-3 px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors font-medium'
         }, [
           e('span', { key: 'admin-icon', className: 'text-lg' }, '🛡️'),
           e('span', { key: 'admin-label', className: 'font-medium' }, 'Admin Panel')
-        ]),
+        ]) : null,
         e('button', {
           key: 'logout-btn',
           onClick: handleLogout,
