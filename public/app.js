@@ -9994,5 +9994,12 @@ function HelpSupport({ user, onBack }) {
 }
 
 // Mount the application
-const root = createRoot(document.getElementById('root'));
-root.render(e(App));
+document.addEventListener('DOMContentLoaded', function() {
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    const root = createRoot(rootElement);
+    root.render(e(App));
+  } else {
+    console.error('Root element not found');
+  }
+});
