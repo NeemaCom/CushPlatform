@@ -4027,7 +4027,7 @@ function AdminDashboard({ user, onBack }) {
           }
         ].map((stat, index) =>
           e('div', {
-            key: `stat-${index}`,
+            key: `stat-${stat.title}-${index}`,
             className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow'
           }, [
             e('div', { key: 'header', className: 'flex items-center justify-between' }, [
