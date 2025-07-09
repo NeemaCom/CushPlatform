@@ -881,6 +881,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { name: "Transportation", amount: 320, color: "#ca8a04" },
           { name: "Entertainment", amount: 180, color: "#dc2626" },
         ],
+        recentTransactions: recentTransactions || [],
+        financialGoals: [], // Empty for now - will be populated from database when user creates goals
       };
 
       res.json(dashboardData);
