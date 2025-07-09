@@ -6736,13 +6736,17 @@ function FinancialHealthRadar({ onBack }) {
 
 // Loans Page Component
 function LoansPage({ user, onBack }) {
-  const [currentStep, setCurrentStep] = React.useState('overview'); // overview, prequalify, providers, apply
+  const [currentStep, setCurrentStep] = React.useState('overview'); // overview, prequalify, providers, apply, favorites, drafts
   const [prequalData, setPrequalData] = React.useState(null);
   const [loanProviders, setLoanProviders] = React.useState([]);
   const [selectedProvider, setSelectedProvider] = React.useState(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState('');
   const [selectedCountry, setSelectedCountry] = React.useState('UK');
+  const [favorites, setFavorites] = React.useState([]);
+  const [drafts, setDrafts] = React.useState([]);
+  const [showReviewModal, setShowReviewModal] = React.useState(false);
+  const [reviewProvider, setReviewProvider] = React.useState(null);
   const [prequalificationForm, setPrequalificationForm] = React.useState({
     employmentStatus: '',
     monthlyIncome: '',
@@ -6763,17 +6767,23 @@ function LoansPage({ user, onBack }) {
     preferredTermMonths: ''
   });
 
-  // Load loan providers
+  // Load loan providers and user data
   React.useEffect(() => {
     if (currentStep === 'providers' || currentStep === 'overview') {
       fetchLoanProviders();
+    }
+    if (currentStep === 'favorites') {
+      loadFavorites();
+    }
+    if (currentStep === 'drafts') {
+      loadDrafts();
     }
   }, [currentStep, selectedCountry]);
 
   const fetchLoanProviders = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/loans/providers?country=${selectedCountry}`);
+      const response = await fetch(`/api/loans/providers-enhanced?country=${selectedCountry}`);
       if (response.ok) {
         const providers = await response.json();
         setLoanProviders(providers);
@@ -6782,6 +6792,117 @@ function LoansPage({ user, onBack }) {
       setError('Failed to load loan providers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load favorites
+  const loadFavorites = async () => {
+    try {
+      const response = await fetch('/api/loans/favorites');
+      if (response.ok) {
+        const favoritesData = await response.json();
+        setFavorites(favoritesData);
+      }
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
+  // Load drafts
+  const loadDrafts = async () => {
+    try {
+      const response = await fetch('/api/loans/drafts');
+      if (response.ok) {
+        const draftsData = await response.json();
+        setDrafts(draftsData);
+      }
+    } catch (error) {
+      console.error('Error loading drafts:', error);
+    }
+  };
+
+  // Add to favorites
+  const addToFavorites = async (providerId) => {
+    try {
+      const response = await fetch('/api/loans/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanProviderId: providerId })
+      });
+      if (response.ok) {
+        // Update providers list
+        setLoanProviders(prev => prev.map(p => 
+          p.id === providerId ? { ...p, isFavorite: true } : p
+        ));
+        loadFavorites();
+      }
+    } catch (error) {
+      console.error('Error adding to favorites:', error);
+    }
+  };
+
+  // Remove from favorites
+  const removeFromFavorites = async (providerId) => {
+    try {
+      const response = await fetch(`/api/loans/favorites/${providerId}`, {
+        method: 'DELETE'
+      });
+      if (response.ok) {
+        // Update providers list
+        setLoanProviders(prev => prev.map(p => 
+          p.id === providerId ? { ...p, isFavorite: false } : p
+        ));
+        loadFavorites();
+      }
+    } catch (error) {
+      console.error('Error removing from favorites:', error);
+    }
+  };
+
+  // Save draft
+  const saveDraft = async (providerId, draftData, stepCompleted) => {
+    try {
+      const response = await fetch('/api/loans/drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loanProviderId: providerId, draftData, stepCompleted })
+      });
+      if (response.ok) {
+        loadDrafts();
+      }
+    } catch (error) {
+      console.error('Error saving draft:', error);
+    }
+  };
+
+  // Load draft
+  const loadDraft = async (providerId) => {
+    try {
+      const response = await fetch(`/api/loans/drafts/${providerId}`);
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading draft:', error);
+      return null;
+    }
+  };
+
+  // Submit review
+  const submitReview = async (reviewData) => {
+    try {
+      const response = await fetch('/api/loans/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewData)
+      });
+      if (response.ok) {
+        setShowReviewModal(false);
+        setReviewProvider(null);
+      }
+    } catch (error) {
+      console.error('Error submitting review:', error);
     }
   };
 
@@ -7201,6 +7322,15 @@ function LoansPage({ user, onBack }) {
                 onClick: () => setSelectedProvider(provider),
                 className: 'flex-1 px-4 py-2 border border-blue-500 text-blue-500 rounded-lg hover:bg-blue-50 transition-colors text-sm'
               }, 'Learn More'),
+              e('button', {
+                key: 'favorite',
+                onClick: () => provider.isFavorite ? removeFromFavorites(provider.id) : addToFavorites(provider.id),
+                className: `px-4 py-2 border rounded-lg transition-colors text-sm ${
+                  provider.isFavorite 
+                    ? 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100' 
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`
+              }, provider.isFavorite ? '💔' : '❤️'),
               prequalData && e('button', {
                 key: 'apply',
                 onClick: () => handleLoanApplication(provider),
@@ -7211,6 +7341,128 @@ function LoansPage({ user, onBack }) {
           ])
         )
       )
+    ]);
+  };
+
+  // Render favorites
+  const renderFavorites = () => {
+    return e('div', { key: 'favorites', className: 'max-w-6xl mx-auto' }, [
+      e('div', { key: 'header', className: 'text-center mb-8' }, [
+        e('h2', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Your Favorite Lenders'),
+        e('p', { className: 'text-gray-600' }, 'Quickly access your saved lenders')
+      ]),
+
+      favorites.length === 0 ? 
+        e('div', { key: 'empty', className: 'text-center py-12' }, [
+          e('div', { className: 'text-gray-400 text-6xl mb-4' }, '❤️'),
+          e('h3', { className: 'text-xl font-semibold text-gray-900 mb-2' }, 'No Favorites Yet'),
+          e('p', { className: 'text-gray-600 mb-6' }, 'Start adding lenders to your favorites for quick access'),
+          e('button', {
+            onClick: () => setCurrentStep('providers'),
+            className: 'px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
+          }, 'Browse Lenders')
+        ]) :
+        e('div', { key: 'favorites-grid', className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' },
+          favorites.map(provider =>
+            e('div', {
+              key: provider.id,
+              className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', { className: 'flex items-center gap-4 mb-4' }, [
+                e('div', { className: 'w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center' }, [
+                  e('span', { className: 'text-blue-600 font-bold text-lg' }, provider.name.charAt(0))
+                ]),
+                e('div', {}, [
+                  e('h4', { className: 'font-semibold text-lg' }, provider.name),
+                  e('p', { className: 'text-sm text-gray-600' }, provider.type)
+                ])
+              ]),
+              e('div', { className: 'space-y-2 mb-4' }, [
+                e('div', { className: 'flex justify-between text-sm' }, [
+                  e('span', { className: 'text-gray-600' }, 'Interest Rate:'),
+                  e('span', { className: 'font-medium text-green-600' }, `${provider.minInterestRate}% - ${provider.maxInterestRate}%`)
+                ])
+              ]),
+              e('div', { className: 'flex gap-2' }, [
+                e('button', {
+                  key: 'apply',
+                  onClick: () => {
+                    setSelectedProvider(provider);
+                    setCurrentStep('apply');
+                  },
+                  className: 'flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium'
+                }, 'Apply Now'),
+                e('button', {
+                  key: 'remove',
+                  onClick: () => removeFromFavorites(provider.id),
+                  className: 'px-4 py-2 bg-red-50 border border-red-300 text-red-700 rounded-lg hover:bg-red-100 transition-colors'
+                }, '💔')
+              ])
+            ])
+          )
+        )
+    ]);
+  };
+
+  // Render drafts
+  const renderDrafts = () => {
+    return e('div', { key: 'drafts', className: 'max-w-6xl mx-auto' }, [
+      e('div', { key: 'header', className: 'text-center mb-8' }, [
+        e('h2', { className: 'text-3xl font-bold text-gray-900 mb-2' }, 'Your Application Drafts'),
+        e('p', { className: 'text-gray-600' }, 'Continue where you left off')
+      ]),
+
+      drafts.length === 0 ? 
+        e('div', { key: 'empty', className: 'text-center py-12' }, [
+          e('div', { className: 'text-gray-400 text-6xl mb-4' }, '📝'),
+          e('h3', { className: 'text-xl font-semibold text-gray-900 mb-2' }, 'No Drafts Yet'),
+          e('p', { className: 'text-gray-600 mb-6' }, 'Your saved applications will appear here'),
+          e('button', {
+            onClick: () => setCurrentStep('providers'),
+            className: 'px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
+          }, 'Start an Application')
+        ]) :
+        e('div', { key: 'drafts-grid', className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
+          drafts.map(draft =>
+            e('div', {
+              key: draft.id,
+              className: 'bg-white rounded-xl p-6 shadow-lg hover:shadow-xl transition-shadow'
+            }, [
+              e('div', { className: 'flex items-center justify-between mb-4' }, [
+                e('h4', { className: 'font-semibold text-lg' }, `Draft Application`),
+                e('span', { className: 'text-sm text-gray-500' }, `Step ${draft.stepCompleted}/4`)
+              ]),
+              e('div', { className: 'space-y-2 mb-4' }, [
+                e('p', { className: 'text-sm text-gray-600' }, `Last updated: ${new Date(draft.updatedAt).toLocaleDateString()}`),
+                e('div', { className: 'w-full bg-gray-200 rounded-full h-2' }, [
+                  e('div', { 
+                    className: 'bg-blue-500 h-2 rounded-full transition-all duration-300',
+                    style: { width: `${(draft.stepCompleted / 4) * 100}%` }
+                  })
+                ])
+              ]),
+              e('div', { className: 'flex gap-2' }, [
+                e('button', {
+                  key: 'continue',
+                  onClick: () => {
+                    setCurrentStep('apply');
+                  },
+                  className: 'flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium'
+                }, 'Continue'),
+                e('button', {
+                  key: 'delete',
+                  onClick: () => {
+                    if (confirm('Are you sure you want to delete this draft?')) {
+                      fetch(`/api/loans/drafts/${draft.loanProviderId}`, { method: 'DELETE' })
+                        .then(() => loadDrafts());
+                    }
+                  },
+                  className: 'px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors'
+                }, 'Delete')
+              ])
+            ])
+          )
+        )
     ]);
   };
 
@@ -7234,7 +7486,9 @@ function LoansPage({ user, onBack }) {
     e('div', { key: 'content', className: 'p-6' }, [
       currentStep === 'overview' && renderOverview(),
       currentStep === 'prequalify' && renderPrequalification(),
-      currentStep === 'providers' && renderProviders()
+      currentStep === 'providers' && renderProviders(),
+      currentStep === 'favorites' && renderFavorites(),
+      currentStep === 'drafts' && renderDrafts()
     ])
   ]);
 }
