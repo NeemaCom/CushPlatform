@@ -3601,12 +3601,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getAdminDashboardStats();
       
       await SecurityLogger.logSecurityEvent(
-        'admin_dashboard_accessed',
-        req.userId!,
-        true,
-        req.ip,
-        req.get('User-Agent'),
-        {}
+        'Admin dashboard accessed',
+        'info',
+        { userId: req.userId, ip: req.ip, userAgent: req.get('User-Agent') }
       );
 
       res.json(stats);

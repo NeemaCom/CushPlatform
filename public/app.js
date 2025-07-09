@@ -3723,46 +3723,169 @@ function AdminDashboard({ user, onBack }) {
     }, [
       // Overview Tab
       currentTab === 'overview' && e('div', { key: 'overview-content' }, [
+        // Platform Vital Signs
         e('div', {
-          key: 'stats-grid',
+          key: 'vital-stats',
           className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8'
         }, dashboardStats ? [
           {
             title: 'Total Users',
             value: dashboardStats.totalUsers.toLocaleString(),
-            icon: '👥'
+            icon: '👥',
+            color: 'blue'
+          },
+          {
+            title: 'Administrators',
+            value: dashboardStats.totalAdministrators.toLocaleString(),
+            icon: '👨‍💼',
+            color: 'purple'
+          },
+          {
+            title: 'Mentors',
+            value: dashboardStats.totalMentors.toLocaleString(),
+            icon: '👨‍🏫',
+            color: 'green'
           },
           {
             title: 'Monthly Active',
             value: dashboardStats.monthlyActiveUsers.toLocaleString(),
-            icon: '📈'
+            icon: '📈',
+            color: 'orange'
           },
           {
             title: 'Total Transactions',
             value: dashboardStats.totalTransactions.toLocaleString(),
-            icon: '💳'
+            icon: '💳',
+            color: 'indigo'
           },
           {
-            title: 'Total Balance',
+            title: 'Articles',
+            value: dashboardStats.totalInsights.toLocaleString(),
+            icon: '📝',
+            color: 'teal'
+          },
+          {
+            title: 'Events',
+            value: dashboardStats.totalEvents.toLocaleString(),
+            icon: '🎯',
+            color: 'pink'
+          },
+          {
+            title: 'Platform Balance',
             value: formatCurrency(parseFloat(dashboardStats.totalBalance)),
-            icon: '💰'
+            icon: '💰',
+            color: 'yellow'
           }
         ].map((stat, index) =>
           e('div', {
-            key: index,
-            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+            key: `stat-${index}`,
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200 hover:shadow-md transition-shadow'
           }, [
             e('div', { key: 'header', className: 'flex items-center justify-between' }, [
               e('div', { key: 'title', className: 'text-sm font-medium text-gray-600' }, stat.title),
               e('span', { key: 'icon', className: 'text-2xl' }, stat.icon)
             ]),
-            e('div', { key: 'value', className: 'mt-2 text-3xl font-bold text-gray-900' }, stat.value)
+            e('div', { key: 'value', className: 'mt-2 text-3xl font-bold text-gray-900' }, stat.value),
+            e('div', { 
+              key: 'indicator', 
+              className: `mt-1 h-1 w-full rounded-full bg-${stat.color}-200`
+            })
           ])
         ) : [
           e('div', {
             key: 'loading',
             className: 'col-span-4 text-center py-8 text-gray-500'
           }, loading ? 'Loading statistics...' : 'Failed to load statistics')
+        ]),
+
+        // Platform Health & Performance
+        dashboardStats && e('div', {
+          key: 'platform-health',
+          className: 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8'
+        }, [
+          // Platform Health Metrics
+          e('div', {
+            key: 'health-metrics',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Platform Health'),
+            e('div', { key: 'health-stats', className: 'space-y-4' }, [
+              e('div', { key: 'engagement', className: 'flex items-center justify-between' }, [
+                e('span', { key: 'label', className: 'text-sm font-medium text-gray-600' }, 'Engagement Rate'),
+                e('span', { key: 'value', className: 'text-sm font-bold text-green-600' }, `${dashboardStats.platformHealth.engagementRate}%`)
+              ]),
+              e('div', { key: 'growth', className: 'flex items-center justify-between' }, [
+                e('span', { key: 'label', className: 'text-sm font-medium text-gray-600' }, 'User Growth (30d)'),
+                e('span', { key: 'value', className: 'text-sm font-bold text-blue-600' }, `+${dashboardStats.recentSignups}`)
+              ]),
+              e('div', { key: 'volume', className: 'flex items-center justify-between' }, [
+                e('span', { key: 'label', className: 'text-sm font-medium text-gray-600' }, 'Transaction Volume'),
+                e('span', { key: 'value', className: 'text-sm font-bold text-purple-600' }, 
+                  formatCurrency(dashboardStats.platformHealth.transactionVolume))
+              ])
+            ])
+          ]),
+
+          // Recent Activity
+          e('div', {
+            key: 'recent-activity',
+            className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+          }, [
+            e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Recent Activity'),
+            e('div', { key: 'activity-list', className: 'space-y-3' }, [
+              e('div', { key: 'recent-signups', className: 'flex items-center text-sm' }, [
+                e('span', { key: 'icon', className: 'text-green-500 mr-2' }, '•'),
+                e('span', { key: 'text' }, `${dashboardStats.recentSignups} new users in the last 30 days`)
+              ]),
+              e('div', { key: 'active-users', className: 'flex items-center text-sm' }, [
+                e('span', { key: 'icon', className: 'text-blue-500 mr-2' }, '•'),
+                e('span', { key: 'text' }, `${dashboardStats.monthlyActiveUsers} active users this month`)
+              ]),
+              e('div', { key: 'avg-transactions', className: 'flex items-center text-sm' }, [
+                e('span', { key: 'icon', className: 'text-purple-500 mr-2' }, '•'),
+                e('span', { key: 'text' }, `${dashboardStats.avgTransactionsPerUser} avg transactions per user`)
+              ])
+            ])
+          ])
+        ]),
+
+        // Last Signed In Users
+        dashboardStats && dashboardStats.lastSignedInUsers && dashboardStats.lastSignedInUsers.length > 0 && e('div', {
+          key: 'last-signed-in',
+          className: 'bg-white rounded-lg p-6 shadow-sm border border-gray-200'
+        }, [
+          e('h3', { key: 'title', className: 'text-lg font-semibold text-gray-900 mb-4' }, 'Recently Signed In Users'),
+          e('div', { key: 'users-list', className: 'overflow-x-auto' }, [
+            e('table', { key: 'table', className: 'min-w-full divide-y divide-gray-200' }, [
+              e('thead', { key: 'thead', className: 'bg-gray-50' }, [
+                e('tr', { key: 'header-row' }, [
+                  e('th', { key: 'name', className: 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Name'),
+                  e('th', { key: 'email', className: 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Email'),
+                  e('th', { key: 'role', className: 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Role'),
+                  e('th', { key: 'last-login', className: 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider' }, 'Last Login')
+                ])
+              ]),
+              e('tbody', { key: 'tbody', className: 'bg-white divide-y divide-gray-200' }, 
+                dashboardStats.lastSignedInUsers.map((user, index) =>
+                  e('tr', { key: `user-${user.id}`, className: 'hover:bg-gray-50' }, [
+                    e('td', { key: 'name-cell', className: 'px-4 py-4 text-sm font-medium text-gray-900' }, 
+                      `${user.firstName} ${user.lastName}`),
+                    e('td', { key: 'email-cell', className: 'px-4 py-4 text-sm text-gray-500' }, user.email),
+                    e('td', { key: 'role-cell', className: 'px-4 py-4' }, [
+                      e('span', {
+                        key: 'role-badge',
+                        className: `inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                        }`
+                      }, user.role)
+                    ]),
+                    e('td', { key: 'login-cell', className: 'px-4 py-4 text-sm text-gray-500' }, 
+                      user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Never')
+                  ])
+                )
+              )
+            ])
+          ])
         ])
       ]),
 
@@ -3871,7 +3994,7 @@ function AdminDashboard({ user, onBack }) {
                   ])
                 ) : [
                   e('tr', { key: 'no-users' }, [
-                    e('td', { key: 'no-users-message', className: 'px-6 py-4 text-center text-gray-500', colspan: '5' }, 
+                    e('td', { key: 'no-users-message', className: 'px-6 py-4 text-center text-gray-500', colSpan: '5' }, 
                       loading ? 'Loading users...' : 'No users found')
                   ])
                 ]
