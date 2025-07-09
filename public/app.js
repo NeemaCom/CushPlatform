@@ -1972,7 +1972,7 @@ function Dashboard({ user }) {
         // Modern Financial Dashboard
         e('div', { key: 'dashboard-content', className: 'space-y-6' }, [
           // Test Notification Button (Development Only)
-          process.env.NODE_ENV !== 'production' && e('div', {
+          e('div', {
             key: 'test-notifications',
             className: 'mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg'
           }, [
