@@ -1440,7 +1440,7 @@ function SignInPage() {
                   href: '#',
                   onClick: (e) => {
                     e.preventDefault();
-                    showPrivacyPolicy();
+                    window.navigate('privacy');
                   },
                   className: 'text-blue-600 hover:text-blue-800 underline font-medium'
                 }, 'Privacy Policy'),
@@ -1450,7 +1450,7 @@ function SignInPage() {
                   href: '#',
                   onClick: (e) => {
                     e.preventDefault();
-                    showTermsOfService();
+                    window.navigate('terms');
                   },
                   className: 'text-blue-600 hover:text-blue-800 underline font-medium'
                 }, 'Terms of Service'),
@@ -4001,7 +4001,489 @@ function Homepage() {
     e(TestimonialsSection, { key: 'testimonials' }),
     e(AboutUsSection, { key: 'about' }),
     e(ContactSection, { key: 'contact' }),
-    e(AuthComponent, { key: 'auth' })
+    e(AuthComponent, { key: 'auth' }),
+    
+    // Footer with Legal Links
+    e('footer', {
+      key: 'footer',
+      className: 'bg-gray-50 border-t border-gray-200 py-8 mt-16'
+    }, [
+      e('div', {
+        key: 'footer-container',
+        className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+      }, [
+        e('div', {
+          key: 'footer-content',
+          className: 'flex flex-col sm:flex-row justify-between items-center gap-4'
+        }, [
+          e('div', {
+            key: 'footer-brand',
+            className: 'text-gray-600 text-sm'
+          }, '© 2025 Cush. All rights reserved.'),
+          e('div', {
+            key: 'footer-links',
+            className: 'flex items-center gap-6'
+          }, [
+            e('a', {
+              key: 'privacy-footer-link',
+              href: '#',
+              onClick: (e) => {
+                e.preventDefault();
+                window.navigate('privacy');
+              },
+              className: 'text-gray-600 hover:text-blue-600 text-sm transition-colors'
+            }, 'Privacy Policy'),
+            e('a', {
+              key: 'terms-footer-link',
+              href: '#',
+              onClick: (e) => {
+                e.preventDefault();
+                window.navigate('terms');
+              },
+              className: 'text-gray-600 hover:text-blue-600 text-sm transition-colors'
+            }, 'Terms of Use'),
+            e('a', {
+              key: 'contact-footer-link',
+              href: '#contact',
+              className: 'text-gray-600 hover:text-blue-600 text-sm transition-colors'
+            }, 'Contact Us')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Privacy Policy Page Component
+function PrivacyPolicyPage() {
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Navigation Header
+    e('nav', {
+      key: 'nav',
+      className: 'bg-white shadow-sm border-b border-gray-200'
+    }, [
+      e('div', {
+        key: 'nav-container',
+        className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+      }, [
+        e('div', {
+          key: 'nav-content',
+          className: 'flex items-center justify-between h-16'
+        }, [
+          e('div', {
+            key: 'nav-left',
+            className: 'flex items-center gap-4'
+          }, [
+            e('button', {
+              key: 'back-btn',
+              onClick: () => window.navigate('home'),
+              className: 'text-gray-500 hover:text-gray-700 text-sm font-medium flex items-center gap-2'
+            }, ['← Back to Home']),
+            e('h1', {
+              key: 'page-title',
+              className: 'text-xl font-semibold text-gray-900'
+            }, 'Privacy Policy')
+          ])
+        ])
+      ])
+    ]),
+
+    // Main Content
+    e('main', {
+      key: 'main',
+      className: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'
+    }, [
+      e('div', {
+        key: 'content',
+        className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 md:p-8'
+      }, [
+        e('div', {
+          key: 'header',
+          className: 'text-center mb-8'
+        }, [
+          e('h1', {
+            key: 'title',
+            className: 'text-3xl font-bold text-gray-900 mb-2'
+          }, 'Privacy Policy'),
+          e('p', {
+            key: 'subtitle',
+            className: 'text-gray-600'
+          }, 'Last updated: July 9, 2025')
+        ]),
+
+        e('div', {
+          key: 'sections',
+          className: 'prose prose-gray max-w-none'
+        }, [
+          e('section', {
+            key: 'intro',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'intro-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Introduction'),
+            e('p', {
+              key: 'intro-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'At Cush, we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our immigration services platform.'),
+            e('p', {
+              key: 'intro-text2',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'By using our services, you agree to the collection and use of information in accordance with this policy.')
+          ]),
+
+          e('section', {
+            key: 'information',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'info-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Information We Collect'),
+            e('h3', {
+              key: 'personal-title',
+              className: 'text-xl font-medium text-gray-900 mb-3'
+            }, 'Personal Information'),
+            e('p', {
+              key: 'personal-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'We collect information you provide directly to us, including:'),
+            e('ul', {
+              key: 'personal-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'item1' }, 'Name, email address, and contact information'),
+              e('li', { key: 'item2' }, 'Immigration status and documentation'),
+              e('li', { key: 'item3' }, 'Financial information for loan applications'),
+              e('li', { key: 'item4' }, 'Communications and feedback you provide')
+            ]),
+            e('h3', {
+              key: 'usage-title',
+              className: 'text-xl font-medium text-gray-900 mb-3'
+            }, 'Usage Information'),
+            e('p', {
+              key: 'usage-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'We automatically collect certain information about your use of our services, including device information, IP address, browser type, and usage patterns.')
+          ]),
+
+          e('section', {
+            key: 'use',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'use-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'How We Use Your Information'),
+            e('p', {
+              key: 'use-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'We use the information we collect to:'),
+            e('ul', {
+              key: 'use-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'use1' }, 'Provide and improve our immigration services'),
+              e('li', { key: 'use2' }, 'Process loan applications and financial services'),
+              e('li', { key: 'use3' }, 'Communicate with you about our services'),
+              e('li', { key: 'use4' }, 'Ensure security and prevent fraud'),
+              e('li', { key: 'use5' }, 'Comply with legal obligations')
+            ])
+          ]),
+
+          e('section', {
+            key: 'sharing',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'sharing-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Information Sharing'),
+            e('p', {
+              key: 'sharing-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'We may share your information with:'),
+            e('ul', {
+              key: 'sharing-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'share1' }, 'Service providers who assist us in operating our platform'),
+              e('li', { key: 'share2' }, 'Financial institutions for loan processing'),
+              e('li', { key: 'share3' }, 'Government agencies as required by law'),
+              e('li', { key: 'share4' }, 'Professional advisors and legal counsel')
+            ])
+          ]),
+
+          e('section', {
+            key: 'security',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'security-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Data Security'),
+            e('p', {
+              key: 'security-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'We implement appropriate technical and organizational security measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. This includes encryption, secure servers, and regular security audits.')
+          ]),
+
+          e('section', {
+            key: 'rights',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'rights-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Your Rights'),
+            e('p', {
+              key: 'rights-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'You have the right to:'),
+            e('ul', {
+              key: 'rights-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'right1' }, 'Access and update your personal information'),
+              e('li', { key: 'right2' }, 'Request deletion of your data'),
+              e('li', { key: 'right3' }, 'Opt-out of marketing communications'),
+              e('li', { key: 'right4' }, 'Data portability where applicable')
+            ])
+          ]),
+
+          e('section', {
+            key: 'contact',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'contact-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Contact Us'),
+            e('p', {
+              key: 'contact-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'If you have any questions about this Privacy Policy or our data practices, please contact us at privacy@cush.com or through our support system.')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Terms of Use Page Component
+function TermsOfUsePage() {
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Navigation Header
+    e('nav', {
+      key: 'nav',
+      className: 'bg-white shadow-sm border-b border-gray-200'
+    }, [
+      e('div', {
+        key: 'nav-container',
+        className: 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+      }, [
+        e('div', {
+          key: 'nav-content',
+          className: 'flex items-center justify-between h-16'
+        }, [
+          e('div', {
+            key: 'nav-left',
+            className: 'flex items-center gap-4'
+          }, [
+            e('button', {
+              key: 'back-btn',
+              onClick: () => window.navigate('home'),
+              className: 'text-gray-500 hover:text-gray-700 text-sm font-medium flex items-center gap-2'
+            }, ['← Back to Home']),
+            e('h1', {
+              key: 'page-title',
+              className: 'text-xl font-semibold text-gray-900'
+            }, 'Terms of Use')
+          ])
+        ])
+      ])
+    ]),
+
+    // Main Content
+    e('main', {
+      key: 'main',
+      className: 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'
+    }, [
+      e('div', {
+        key: 'content',
+        className: 'bg-white rounded-lg shadow-sm border border-gray-200 p-6 md:p-8'
+      }, [
+        e('div', {
+          key: 'header',
+          className: 'text-center mb-8'
+        }, [
+          e('h1', {
+            key: 'title',
+            className: 'text-3xl font-bold text-gray-900 mb-2'
+          }, 'Terms of Use'),
+          e('p', {
+            key: 'subtitle',
+            className: 'text-gray-600'
+          }, 'Last updated: July 9, 2025')
+        ]),
+
+        e('div', {
+          key: 'sections',
+          className: 'prose prose-gray max-w-none'
+        }, [
+          e('section', {
+            key: 'intro',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'intro-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Acceptance of Terms'),
+            e('p', {
+              key: 'intro-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'By accessing and using the Cush platform, you accept and agree to be bound by these Terms of Use. If you do not agree to these terms, please do not use our services.'),
+            e('p', {
+              key: 'intro-text2',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'These terms may be updated from time to time, and continued use of the platform constitutes acceptance of any changes.')
+          ]),
+
+          e('section', {
+            key: 'services',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'services-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Description of Services'),
+            e('p', {
+              key: 'services-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'Cush provides immigration services including:'),
+            e('ul', {
+              key: 'services-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'service1' }, 'Immigration consultation and guidance'),
+              e('li', { key: 'service2' }, 'Financial services and loan referrals'),
+              e('li', { key: 'service3' }, 'Community support and networking'),
+              e('li', { key: 'service4' }, 'AI-powered immigration assistance (Imisi)'),
+              e('li', { key: 'service5' }, 'Job discovery and placement services')
+            ])
+          ]),
+
+          e('section', {
+            key: 'user-responsibilities',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'user-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'User Responsibilities'),
+            e('p', {
+              key: 'user-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'As a user of our platform, you agree to:'),
+            e('ul', {
+              key: 'user-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'resp1' }, 'Provide accurate and complete information'),
+              e('li', { key: 'resp2' }, 'Maintain the security of your account credentials'),
+              e('li', { key: 'resp3' }, 'Use the platform only for lawful purposes'),
+              e('li', { key: 'resp4' }, 'Respect the rights and privacy of other users'),
+              e('li', { key: 'resp5' }, 'Comply with all applicable laws and regulations')
+            ])
+          ]),
+
+          e('section', {
+            key: 'prohibited',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'prohibited-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Prohibited Activities'),
+            e('p', {
+              key: 'prohibited-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'You may not:'),
+            e('ul', {
+              key: 'prohibited-list',
+              className: 'list-disc list-inside text-gray-700 mb-4 space-y-2'
+            }, [
+              e('li', { key: 'prob1' }, 'Use the platform for illegal activities'),
+              e('li', { key: 'prob2' }, 'Interfere with the platform\'s operation'),
+              e('li', { key: 'prob3' }, 'Attempt to gain unauthorized access to systems'),
+              e('li', { key: 'prob4' }, 'Upload malicious content or viruses'),
+              e('li', { key: 'prob5' }, 'Violate intellectual property rights')
+            ])
+          ]),
+
+          e('section', {
+            key: 'limitations',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'limitations-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Limitations of Liability'),
+            e('p', {
+              key: 'limitations-text',
+              className: 'text-gray-700 leading-relaxed mb-4'
+            }, 'Cush provides services on an "as is" basis. We make no warranties about the accuracy, completeness, or reliability of our services. To the maximum extent permitted by law, we disclaim all liability for any damages arising from your use of our platform.'),
+            e('p', {
+              key: 'limitations-text2',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'Immigration laws and regulations are complex and subject to change. We recommend consulting with qualified legal professionals for specific immigration matters.')
+          ]),
+
+          e('section', {
+            key: 'termination',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'termination-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Termination'),
+            e('p', {
+              key: 'termination-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'We reserve the right to terminate or suspend your account and access to our services at our sole discretion, without notice, for conduct that violates these Terms of Use or is harmful to other users, us, or third parties.')
+          ]),
+
+          e('section', {
+            key: 'governing-law',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'law-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Governing Law'),
+            e('p', {
+              key: 'law-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'These Terms of Use are governed by and construed in accordance with applicable laws. Any disputes arising under these terms will be subject to the exclusive jurisdiction of the competent courts.')
+          ]),
+
+          e('section', {
+            key: 'contact',
+            className: 'mb-8'
+          }, [
+            e('h2', {
+              key: 'contact-title',
+              className: 'text-2xl font-semibold text-gray-900 mb-4'
+            }, 'Contact Information'),
+            e('p', {
+              key: 'contact-text',
+              className: 'text-gray-700 leading-relaxed'
+            }, 'If you have any questions about these Terms of Use, please contact us at legal@cush.com or through our support system.')
+          ])
+        ])
+      ])
+    ])
   ]);
 }
 
@@ -4033,6 +4515,10 @@ function AppRouter() {
       return e(AboutUsPage, { key: 'about' });
     case 'mentors':
       return e(MentorBookingPage, { key: 'mentors' });
+    case 'privacy':
+      return e(PrivacyPolicyPage, { key: 'privacy' });
+    case 'terms':
+      return e(TermsOfUsePage, { key: 'terms' });
     case 'home':
     default:
       return e(Homepage, { key: 'homepage' });
