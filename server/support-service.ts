@@ -80,6 +80,7 @@ export class SupportService {
       .insert(supportTicketMessages)
       .values({
         ...messageData,
+        userId: userId,
         senderId: userId
       })
       .returning();
