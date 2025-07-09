@@ -12,6 +12,19 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-09**: Implemented Scrollable Sidebar Navigation with Enhanced Settings Page
+- ✓ Added scrollable left sidebar navigation menu with smooth scroll functionality
+- ✓ Implemented comprehensive settings page with profile picture upload capability
+- ✓ Added profile picture backend support with base64 image storage
+- ✓ Enhanced sidebar with additional menu items (Analytics, Transactions, Budgets, Goals, etc.)
+- ✓ Fixed sidebar layout with proper flex structure for header, scrollable content, and footer
+- ✓ Added main content area scrolling to handle long page content
+- ✓ Enhanced user experience with professional scrollbar styling
+- ✓ Fixed database schema to include profile_picture column for user profiles
+- ✓ Created comprehensive settings interface with tabbed navigation
+- ✓ Added password change functionality with secure validation
+- ✓ Implemented file upload validation with size and type restrictions
+
 **2025-07-09**: Enhanced Imisi Chat Interface with Improved UI and User Experience
 - ✓ Added glowing ring effect to chat head button for enhanced visual appeal
 - ✓ Updated chat interface to use provided AI avatar image instead of emoji
