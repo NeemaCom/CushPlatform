@@ -12,6 +12,18 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-09**: Implemented Dedicated Privacy Policy and Terms of Use Pages with Unique URLs
+- ✓ Created dedicated Privacy Policy page accessible at #privacy with comprehensive legal content
+- ✓ Created dedicated Terms of Use page accessible at #terms with detailed service agreement
+- ✓ Added hash-based routing for /privacy and /terms URLs in AppRouter component
+- ✓ Updated authentication forms to link to new dedicated pages instead of modal dialogs
+- ✓ Enhanced legal page design with professional navigation header and back-to-home functionality
+- ✓ Added comprehensive legal content covering data collection, usage, sharing, and user rights
+- ✓ Implemented responsive design with proper typography and section organization
+- ✓ Added footer to homepage with convenient links to Privacy Policy and Terms of Use
+- ✓ Maintained consistent blue color scheme and professional styling throughout legal pages
+- ✓ Added proper page structure with navigation breadcrumbs and clear section headers
+
 **2025-07-09**: Implemented Mobile-First Horizontal Carousel Dashboard Layout with Specific Section Ordering
 - ✓ Completely reorganized dashboard with mobile-first horizontal carousel layout for financial overview cards
 - ✓ Implemented horizontal scrolling carousel with touch-friendly swipe gestures and smooth scrolling
