@@ -1,27 +1,46 @@
 {
   "name": "Cush - Global Immigration Services",
   "short_name": "Cush",
-  "description": "Leading digital platform for global immigration services, mentorship, and financial management",
+  "description": "Comprehensive immigration services platform with AI-powered assistance, financial tools, and community support",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#3b82f6",
+  "theme_color": "#4f46e5",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en",
   "categories": ["finance", "business", "productivity"],
   "icons": [
     {
-      "src": "/icons/icon-192x192.svg",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
-      "purpose": "maskable any"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/icons/icon-512x512.svg",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
-      "purpose": "maskable any"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-wide.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/screenshot-narrow.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ],
   "shortcuts": [
@@ -29,22 +48,53 @@
       "name": "Dashboard",
       "short_name": "Dashboard",
       "description": "View your financial dashboard",
-      "url": "/dashboard",
-      "icons": [{ "src": "/icons/dashboard-96x96.png", "sizes": "96x96" }]
+      "url": "/",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
-      "name": "Imisi AI Assistant",
-      "short_name": "Imisi",
-      "description": "Chat with your AI migration assistant",
-      "url": "/imisi",
-      "icons": [{ "src": "/icons/imisi-96x96.png", "sizes": "96x96" }]
+      "name": "Loans",
+      "short_name": "Loans",
+      "description": "Browse loan options",
+      "url": "/#loans",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Community",
       "short_name": "Community",
-      "description": "Access community insights and events",
-      "url": "/community",
-      "icons": [{ "src": "/icons/community-96x96.png", "sizes": "96x96" }]
+      "description": "Connect with the community",
+      "url": "/#community",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Imisi AI",
+      "short_name": "Imisi",
+      "description": "Chat with AI assistant",
+      "url": "/#imisi",
+      "icons": [
+        {
+          "src": "/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

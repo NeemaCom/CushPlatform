@@ -3867,6 +3867,11 @@ For personalized immigration strategy, consult with our experienced immigration 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
+  
+  // PWA Installation State
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -3879,6 +3884,81 @@ function App() {
         setIsLoading(false);
       });
   }, []);
+
+  // PWA Installation Logic
+  useEffect(() => {
+    // Register Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js')
+        .then(registration => {
+          console.log('SW registered:', registration);
+        })
+        .catch(error => {
+          console.log('SW registration failed:', error);
+        });
+    }
+
+    // Check if app is already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+    }
+
+    // Listen for beforeinstallprompt event
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      
+      // Show install prompt after user has been on the site for 30 seconds
+      setTimeout(() => {
+        if (!isInstalled) {
+          setShowInstallPrompt(true);
+        }
+      }, 30000);
+    };
+
+    // Listen for appinstalled event
+    const handleAppInstalled = () => {
+      setIsInstalled(true);
+      setShowInstallPrompt(false);
+      setDeferredPrompt(null);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, [isInstalled]);
+
+  // Install PWA function
+  const installPWA = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const choiceResult = await deferredPrompt.userChoice;
+      
+      if (choiceResult.outcome === 'accepted') {
+        console.log('User accepted the install prompt');
+        setShowInstallPrompt(false);
+      } else {
+        console.log('User dismissed the install prompt');
+      }
+      
+      setDeferredPrompt(null);
+    }
+  };
+
+  // Dismiss install prompt
+  const dismissInstallPrompt = () => {
+    setShowInstallPrompt(false);
+    // Show again after 24 hours
+    setTimeout(() => {
+      if (!isInstalled && deferredPrompt) {
+        setShowInstallPrompt(true);
+      }
+    }, 24 * 60 * 60 * 1000);
+  };
 
   if (isLoading) {
     return e('div', { 
@@ -3903,7 +3983,63 @@ function App() {
   return user ? 
     e('div', { key: 'app-container' }, [
       e(Dashboard, { key: 'dashboard', user }),
-      e(ImisiChatHead, { key: 'imisi-chat' })
+      e(ImisiChatHead, { key: 'imisi-chat' }),
+      
+      // PWA Install Prompt
+      showInstallPrompt && !isInstalled && e('div', {
+        key: 'pwa-install-prompt',
+        className: 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4'
+      }, [
+        e('div', {
+          key: 'install-content',
+          className: 'flex items-start gap-3'
+        }, [
+          e('div', {
+            key: 'install-icon',
+            className: 'flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center'
+          }, [
+            e('svg', {
+              key: 'icon',
+              className: 'w-5 h-5 text-blue-600',
+              fill: 'currentColor',
+              viewBox: '0 0 20 20'
+            }, [
+              e('path', {
+                key: 'path',
+                d: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z'
+              })
+            ])
+          ]),
+          e('div', {
+            key: 'install-text',
+            className: 'flex-1 min-w-0'
+          }, [
+            e('h3', {
+              key: 'install-title',
+              className: 'text-sm font-medium text-gray-900'
+            }, 'Install Cush App'),
+            e('p', {
+              key: 'install-desc',
+              className: 'text-sm text-gray-500 mt-1'
+            }, 'Get quick access to your immigration services directly from your home screen.')
+          ])
+        ]),
+        e('div', {
+          key: 'install-actions',
+          className: 'flex gap-2 mt-4'
+        }, [
+          e('button', {
+            key: 'install-btn',
+            onClick: installPWA,
+            className: 'flex-1 bg-blue-600 text-white text-sm font-medium py-2 px-3 rounded-md hover:bg-blue-700 transition-colors'
+          }, 'Install'),
+          e('button', {
+            key: 'dismiss-btn',
+            onClick: dismissInstallPrompt,
+            className: 'flex-1 bg-gray-100 text-gray-700 text-sm font-medium py-2 px-3 rounded-md hover:bg-gray-200 transition-colors'
+          }, 'Later')
+        ])
+      ])
     ]) :
     e(AppRouter, { key: 'router' });
 }
