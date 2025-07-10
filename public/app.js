@@ -168,7 +168,7 @@ function NavigationHeader() {
             }, 'Sign In'),
             e('button', {
               key: 'get-started',
-              onClick: () => navigate('signin'),
+              onClick: () => navigate('signup'),
               className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
             }, 'Get Started')
           ])
@@ -228,7 +228,7 @@ function NavigationHeader() {
             }, 'Sign In'),
             e('button', {
               key: 'mobile-get-started',
-              onClick: () => navigate('signin'),
+              onClick: () => navigate('signup'),
               className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
             }, 'Get Started')
           ])
@@ -2119,7 +2119,7 @@ function AuthComponent() {
         }, [
           e('button', {
             key: 'get-started',
-            onClick: () => navigate('signin'),
+            onClick: () => navigate('signup'),
             className: 'bg-blue-600 hover:bg-blue-700 text-white font-bold px-12 py-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1'
           }, 'Get Started Now'),
           e('button', {
@@ -5226,6 +5226,8 @@ function AppRouter() {
   switch (currentRoute) {
     case 'signin':
       return e(SignInPage, { key: 'signin' });
+    case 'signup':
+      return e(SignUpPage, { key: 'signup' });
     case 'about':
       return e(AboutUsPage, { key: 'about' });
     case 'mentors':
@@ -8762,7 +8764,7 @@ function AboutUsPage() {
         }, [
           e('button', {
             key: 'get-started',
-            onClick: () => navigate('signin'),
+            onClick: () => navigate('signup'),
             className: 'bg-white text-blue-600 hover:bg-gray-100 font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl'
           }, 'Get Started Today'),
           e('button', {
@@ -11130,6 +11132,477 @@ function HelpSupport({ user, onBack }) {
               type: 'submit',
               className: 'flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
             }, 'Send Feedback')
+          ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Sign Up Page Component
+function SignUpPage() {
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    username: '',
+    password: '',
+    confirmPassword: '',
+    phoneNumber: '',
+    nationality: '',
+    acceptTerms: false,
+    acceptPrivacy: false,
+    marketingConsent: false
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: null
+      }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
+    if (!formData.email.trim()) newErrors.email = 'Email is required';
+    if (!formData.username.trim()) newErrors.username = 'Username is required';
+    if (!formData.password) newErrors.password = 'Password is required';
+    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!formData.acceptTerms) newErrors.acceptTerms = 'You must accept the terms of service';
+    if (!formData.acceptPrivacy) newErrors.acceptPrivacy = 'You must accept the privacy policy';
+    
+    if (formData.email && !formData.email.includes('@')) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    
+    if (formData.password && formData.password.length < 6) {
+      newErrors.password = 'Password must be at least 6 characters';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm()) return;
+    
+    setLoading(true);
+    
+    try {
+      const response = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Registration successful - redirect to dashboard
+        window.location.href = '/';
+      } else {
+        // Handle registration error
+        if (data.error) {
+          setErrors({ general: data.error });
+        } else {
+          setErrors({ general: 'Registration failed. Please try again.' });
+        }
+      }
+    } catch (error) {
+      console.error('Registration error:', error);
+      setErrors({ general: 'Registration failed. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignUp = () => {
+    window.location.href = '/api/auth/google';
+  };
+
+  return e('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50' }, [
+    // Header
+    e('div', {
+      key: 'header',
+      className: 'bg-white shadow-sm border-b border-gray-200 py-4'
+    }, [
+      e('div', { className: 'container mx-auto px-6 flex items-center justify-between' }, [
+        e('button', {
+          key: 'back-button',
+          onClick: () => navigate('home'),
+          className: 'flex items-center gap-2 text-gray-500 hover:text-gray-700 transition-colors'
+        }, [
+          e('svg', {
+            key: 'back-icon',
+            className: 'w-5 h-5',
+            fill: 'none',
+            stroke: 'currentColor',
+            viewBox: '0 0 24 24'
+          }, [
+            e('path', {
+              key: 'back-path',
+              strokeLinecap: 'round',
+              strokeLinejoin: 'round',
+              strokeWidth: 2,
+              d: 'M10 19l-7-7m0 0l7-7m-7 7h18'
+            })
+          ]),
+          e('span', { key: 'back-text' }, 'Back to Home')
+        ]),
+        e('img', {
+          key: 'logo',
+          src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+          alt: 'Cush Logo',
+          className: 'h-8'
+        })
+      ])
+    ]),
+
+    // Main Content
+    e('div', {
+      key: 'main-content',
+      className: 'container mx-auto px-6 py-12'
+    }, [
+      e('div', {
+        key: 'form-container',
+        className: 'max-w-md mx-auto'
+      }, [
+        // Header Section
+        e('div', {
+          key: 'form-header',
+          className: 'text-center mb-8'
+        }, [
+          e('h1', {
+            key: 'title',
+            className: 'text-3xl font-bold text-gray-900 mb-2'
+          }, 'Create Your Account'),
+          e('p', {
+            key: 'subtitle',
+            className: 'text-gray-600'
+          }, 'Join thousands of successful immigrants worldwide')
+        ]),
+
+        // Form Card
+        e('div', {
+          key: 'form-card',
+          className: 'bg-white rounded-xl shadow-lg p-8 border border-gray-100'
+        }, [
+          // Google Sign Up Button
+          e('button', {
+            key: 'google-signup',
+            onClick: handleGoogleSignUp,
+            className: 'w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200 mb-6'
+          }, [
+            e('svg', {
+              key: 'google-icon',
+              className: 'w-5 h-5',
+              viewBox: '0 0 24 24'
+            }, [
+              e('path', {
+                key: 'google-path',
+                fill: '#4285F4',
+                d: 'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
+              }),
+              e('path', {
+                key: 'google-path-2',
+                fill: '#34A853',
+                d: 'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
+              }),
+              e('path', {
+                key: 'google-path-3',
+                fill: '#FBBC05',
+                d: 'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
+              }),
+              e('path', {
+                key: 'google-path-4',
+                fill: '#EA4335',
+                d: 'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+              })
+            ]),
+            'Continue with Google'
+          ]),
+
+          // Divider
+          e('div', {
+            key: 'divider',
+            className: 'flex items-center mb-6'
+          }, [
+            e('div', { key: 'line1', className: 'flex-1 border-t border-gray-300' }),
+            e('span', { key: 'or-text', className: 'px-4 text-gray-500 text-sm' }, 'or continue with email'),
+            e('div', { key: 'line2', className: 'flex-1 border-t border-gray-300' })
+          ]),
+
+          // Registration Form
+          e('form', { key: 'signup-form', onSubmit: handleSubmit }, [
+            // General Error
+            errors.general && e('div', {
+              key: 'general-error',
+              className: 'mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm'
+            }, errors.general),
+
+            // First Name and Last Name
+            e('div', {
+              key: 'name-fields',
+              className: 'grid grid-cols-2 gap-4 mb-4'
+            }, [
+              e('div', { key: 'first-name-field' }, [
+                e('label', {
+                  key: 'first-name-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'First Name'),
+                e('input', {
+                  key: 'first-name-input',
+                  type: 'text',
+                  value: formData.firstName,
+                  onChange: (e) => handleInputChange('firstName', e.target.value),
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.firstName ? 'border-red-300' : 'border-gray-300'}`
+                }),
+                errors.firstName && e('p', {
+                  key: 'first-name-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.firstName)
+              ]),
+              e('div', { key: 'last-name-field' }, [
+                e('label', {
+                  key: 'last-name-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'Last Name'),
+                e('input', {
+                  key: 'last-name-input',
+                  type: 'text',
+                  value: formData.lastName,
+                  onChange: (e) => handleInputChange('lastName', e.target.value),
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.lastName ? 'border-red-300' : 'border-gray-300'}`
+                }),
+                errors.lastName && e('p', {
+                  key: 'last-name-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.lastName)
+              ])
+            ]),
+
+            // Email Field
+            e('div', { key: 'email-field', className: 'mb-4' }, [
+              e('label', {
+                key: 'email-label',
+                className: 'block text-sm font-medium text-gray-700 mb-1'
+              }, 'Email'),
+              e('input', {
+                key: 'email-input',
+                type: 'email',
+                value: formData.email,
+                onChange: (e) => handleInputChange('email', e.target.value),
+                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.email ? 'border-red-300' : 'border-gray-300'}`
+              }),
+              errors.email && e('p', {
+                key: 'email-error',
+                className: 'mt-1 text-sm text-red-600'
+              }, errors.email)
+            ]),
+
+            // Username Field
+            e('div', { key: 'username-field', className: 'mb-4' }, [
+              e('label', {
+                key: 'username-label',
+                className: 'block text-sm font-medium text-gray-700 mb-1'
+              }, 'Username'),
+              e('input', {
+                key: 'username-input',
+                type: 'text',
+                value: formData.username,
+                onChange: (e) => handleInputChange('username', e.target.value),
+                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.username ? 'border-red-300' : 'border-gray-300'}`
+              }),
+              errors.username && e('p', {
+                key: 'username-error',
+                className: 'mt-1 text-sm text-red-600'
+              }, errors.username)
+            ]),
+
+            // Password Fields
+            e('div', {
+              key: 'password-fields',
+              className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'
+            }, [
+              e('div', { key: 'password-field' }, [
+                e('label', {
+                  key: 'password-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'Password'),
+                e('input', {
+                  key: 'password-input',
+                  type: 'password',
+                  value: formData.password,
+                  onChange: (e) => handleInputChange('password', e.target.value),
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.password ? 'border-red-300' : 'border-gray-300'}`
+                }),
+                errors.password && e('p', {
+                  key: 'password-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.password)
+              ]),
+              e('div', { key: 'confirm-password-field' }, [
+                e('label', {
+                  key: 'confirm-password-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'Confirm Password'),
+                e('input', {
+                  key: 'confirm-password-input',
+                  type: 'password',
+                  value: formData.confirmPassword,
+                  onChange: (e) => handleInputChange('confirmPassword', e.target.value),
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.confirmPassword ? 'border-red-300' : 'border-gray-300'}`
+                }),
+                errors.confirmPassword && e('p', {
+                  key: 'confirm-password-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.confirmPassword)
+              ])
+            ]),
+
+            // Optional Fields
+            e('div', {
+              key: 'optional-fields',
+              className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6'
+            }, [
+              e('div', { key: 'phone-field' }, [
+                e('label', {
+                  key: 'phone-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'Phone Number (Optional)'),
+                e('input', {
+                  key: 'phone-input',
+                  type: 'tel',
+                  value: formData.phoneNumber,
+                  onChange: (e) => handleInputChange('phoneNumber', e.target.value),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                })
+              ]),
+              e('div', { key: 'nationality-field' }, [
+                e('label', {
+                  key: 'nationality-label',
+                  className: 'block text-sm font-medium text-gray-700 mb-1'
+                }, 'Nationality (Optional)'),
+                e('input', {
+                  key: 'nationality-input',
+                  type: 'text',
+                  value: formData.nationality,
+                  onChange: (e) => handleInputChange('nationality', e.target.value),
+                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
+                })
+              ])
+            ]),
+
+            // Checkboxes
+            e('div', { key: 'checkboxes', className: 'mb-6 space-y-3' }, [
+              e('div', { key: 'terms-checkbox', className: 'flex items-start' }, [
+                e('input', {
+                  key: 'terms-input',
+                  type: 'checkbox',
+                  checked: formData.acceptTerms,
+                  onChange: (e) => handleInputChange('acceptTerms', e.target.checked),
+                  className: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+                }),
+                e('label', {
+                  key: 'terms-label',
+                  className: 'ml-2 text-sm text-gray-700'
+                }, [
+                  'I accept the ',
+                  e('button', {
+                    key: 'terms-link',
+                    type: 'button',
+                    onClick: () => navigate('terms'),
+                    className: 'text-blue-600 hover:text-blue-800 underline'
+                  }, 'Terms of Service')
+                ]),
+                errors.acceptTerms && e('p', {
+                  key: 'terms-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.acceptTerms)
+              ]),
+              e('div', { key: 'privacy-checkbox', className: 'flex items-start' }, [
+                e('input', {
+                  key: 'privacy-input',
+                  type: 'checkbox',
+                  checked: formData.acceptPrivacy,
+                  onChange: (e) => handleInputChange('acceptPrivacy', e.target.checked),
+                  className: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+                }),
+                e('label', {
+                  key: 'privacy-label',
+                  className: 'ml-2 text-sm text-gray-700'
+                }, [
+                  'I accept the ',
+                  e('button', {
+                    key: 'privacy-link',
+                    type: 'button',
+                    onClick: () => navigate('privacy'),
+                    className: 'text-blue-600 hover:text-blue-800 underline'
+                  }, 'Privacy Policy')
+                ]),
+                errors.acceptPrivacy && e('p', {
+                  key: 'privacy-error',
+                  className: 'mt-1 text-sm text-red-600'
+                }, errors.acceptPrivacy)
+              ]),
+              e('div', { key: 'marketing-checkbox', className: 'flex items-start' }, [
+                e('input', {
+                  key: 'marketing-input',
+                  type: 'checkbox',
+                  checked: formData.marketingConsent,
+                  onChange: (e) => handleInputChange('marketingConsent', e.target.checked),
+                  className: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
+                }),
+                e('label', {
+                  key: 'marketing-label',
+                  className: 'ml-2 text-sm text-gray-700'
+                }, 'I agree to receive marketing communications (optional)')
+              ])
+            ]),
+
+            // Submit Button
+            e('button', {
+              key: 'submit-button',
+              type: 'submit',
+              disabled: loading,
+              className: `w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors ${loading ? 'cursor-not-allowed' : ''}`
+            }, loading ? 'Creating Account...' : 'Create Account')
+          ])
+        ]),
+
+        // Sign In Link
+        e('div', {
+          key: 'signin-link',
+          className: 'text-center mt-6'
+        }, [
+          e('p', {
+            key: 'signin-text',
+            className: 'text-gray-600'
+          }, [
+            'Already have an account? ',
+            e('button', {
+              key: 'signin-button',
+              onClick: () => navigate('signin'),
+              className: 'text-blue-600 hover:text-blue-800 font-medium'
+            }, 'Sign In')
           ])
         ])
       ])
