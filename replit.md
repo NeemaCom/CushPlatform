@@ -12,6 +12,20 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-10**: Successfully Implemented Mentor Carousel on Homepage with Profile Pictures
+- ✓ Added profile_picture column to mentors database table
+- ✓ Created comprehensive MentorCarouselSection component with auto-scroll functionality
+- ✓ Enhanced storage layer to join mentors with users table for firstName/lastName display
+- ✓ Added /api/mentors endpoint specifically for homepage mentor carousel
+- ✓ Implemented mentor profile picture support in admin mentor creation backend
+- ✓ Added sample mentors with SVG profile pictures for carousel demonstration
+- ✓ Created responsive carousel with navigation arrows, indicators, and touch-friendly design
+- ✓ Integrated mentor booking button linking to Community section
+- ✓ Added smooth transitions and professional styling matching site design
+- ✓ Positioned mentor carousel between testimonials and about sections on homepage
+- ✓ Enhanced mentor display with experience, languages, and certification details
+- ✓ Implemented fallback avatar display with initials for mentors without pictures
+
 **2025-07-10**: Added Social Media Handles to Homepage Contact Section
 - ✓ Added social media handles section to the "Get in Touch" section of homepage
 - ✓ Included TikTok, LinkedIn, and Instagram handles: @wearecush for all platforms

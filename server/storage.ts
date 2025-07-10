@@ -431,7 +431,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Mentor methods
-  async getMentors(specialty?: string, isActive: boolean = true): Promise<Mentor[]> {
+  async getMentors(specialty?: string, isActive: boolean = true): Promise<any[]> {
     const conditions = [];
     conditions.push(eq(mentors.isActive, isActive));
     
@@ -440,8 +440,29 @@ export class DatabaseStorage implements IStorage {
     }
 
     return await db
-      .select()
+      .select({
+        id: mentors.id,
+        userId: mentors.userId,
+        specialty: mentors.specialty,
+        bio: mentors.bio,
+        experience: mentors.experience,
+        profilePicture: mentors.profilePicture,
+        availability: mentors.availability,
+        hourlyRate: mentors.hourlyRate,
+        rating: mentors.rating,
+        totalSessions: mentors.totalSessions,
+        languages: mentors.languages,
+        certifications: mentors.certifications,
+        linkedinUrl: mentors.linkedinUrl,
+        isVerified: mentors.isVerified,
+        isActive: mentors.isActive,
+        createdAt: mentors.createdAt,
+        updatedAt: mentors.updatedAt,
+        firstName: users.firstName,
+        lastName: users.lastName
+      })
       .from(mentors)
+      .innerJoin(users, eq(mentors.userId, users.id))
       .where(and(...conditions))
       .orderBy(desc(mentors.createdAt));
   }
