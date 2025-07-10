@@ -2097,15 +2097,59 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   ];
 
   return e('div', { className: 'bg-gray-50 flex min-h-screen' }, [
+    // Custom CSS for sidebar enhancements
+    e('style', { key: 'sidebar-styles' }, `
+      .sidebar-scrollbar::-webkit-scrollbar {
+        width: 4px;
+      }
+      .sidebar-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .sidebar-scrollbar::-webkit-scrollbar-thumb {
+        background: rgba(156, 163, 175, 0.3);
+        border-radius: 2px;
+      }
+      .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: rgba(156, 163, 175, 0.5);
+      }
+      .nav-item-shadow {
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+      }
+      .nav-item-shadow:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+      }
+      .active-nav-item {
+        box-shadow: 0 8px 16px rgba(59, 130, 246, 0.15);
+      }
+      .gradient-border {
+        position: relative;
+        overflow: hidden;
+      }
+      .gradient-border::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+        border-radius: 12px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+      .gradient-border:hover::before {
+        opacity: 1;
+      }
+    `),
     // Left Sidebar
     e('div', { 
       key: 'sidebar',
-      className: `fixed inset-y-0 left-0 z-50 w-72 sm:w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
+      className: `fixed inset-y-0 left-0 z-50 w-72 sm:w-64 bg-white/95 backdrop-blur-sm shadow-xl border-r border-gray-100 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 lg:bg-white lg:backdrop-blur-none flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`
     }, [
       // Sidebar Header
       e('div', { 
         key: 'sidebar-header',
-        className: 'flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-200'
+        className: 'flex items-center justify-between px-6 py-5 border-b border-gray-100'
       }, [
         e('div', {
           key: 'logo-section',
@@ -2113,54 +2157,54 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         }, [
           e('div', {
             key: 'logo-circle',
-            className: 'w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center'
+            className: 'w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl flex items-center justify-center shadow-lg'
           }, [
             e('span', {
               key: 'logo-text',
-              className: 'text-white font-bold text-sm'
+              className: 'text-white font-bold text-lg'
             }, 'C')
           ]),
           e('span', {
             key: 'brand-name',
-            className: 'font-bold text-lg text-gray-900'
+            className: 'font-bold text-xl text-gray-900 tracking-tight'
           }, 'Cush')
         ]),
         // Mobile close button
         e('button', {
           key: 'close-sidebar',
           onClick: () => setSidebarOpen(false),
-          className: 'lg:hidden text-gray-500 hover:text-gray-700'
+          className: 'lg:hidden text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors'
         }, '✕')
       ]),
 
       // User Profile Section
       e('div', {
         key: 'user-profile',
-        className: 'px-4 sm:px-6 py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white'
+        className: 'px-6 py-6 bg-gradient-to-br from-blue-50 to-indigo-50 border-b border-blue-100'
       }, [
         e('div', { 
           key: 'user-avatar',
-          className: 'flex items-center gap-3'
+          className: 'flex items-center gap-4'
         }, [
           e('div', {
             key: 'avatar-circle',
-            className: 'w-12 h-12 bg-white/20 rounded-full flex items-center justify-center'
+            className: 'w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-blue-100'
           }, [
             e('img', {
               key: 'user-image',
               src: '/attached_assets/guy smiling2_1751497479944.jpg',
               alt: 'User Avatar',
-              className: 'w-10 h-10 rounded-full object-cover'
+              className: 'w-10 h-10 rounded-lg object-cover'
             })
           ]),
           e('div', { key: 'user-info' }, [
             e('div', {
               key: 'user-name',
-              className: 'font-medium text-sm'
+              className: 'font-semibold text-sm text-gray-900'
             }, `${user?.firstName || 'User'} ${user?.lastName || ''}`),
             e('div', {
               key: 'user-status',
-              className: 'text-xs text-blue-100'
+              className: 'text-xs text-gray-500 mt-0.5'
             }, 'Welcome back!')
           ])
         ])
@@ -2169,7 +2213,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
       // Navigation Menu - Allow natural content flow
       e('nav', { 
         key: 'navigation',
-        className: 'flex-1 px-3 sm:px-4 py-4 sm:py-6 space-y-1 sm:space-y-2 overflow-y-auto'
+        className: 'flex-1 px-4 py-6 space-y-2 overflow-y-auto sidebar-scrollbar'
       }, [
         // Main navigation items
         sidebarItems.map(item => 
@@ -2179,21 +2223,34 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
               setCurrentView(item.view);
               setSidebarOpen(false); // Close sidebar on mobile after selection
             },
-            className: `w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg transition-colors text-left ${
+            className: `group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200 text-left relative overflow-hidden gradient-border ${
               currentView === item.view 
-                ? 'bg-blue-50 text-blue-600 border-r-3 border-blue-600' 
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white active-nav-item scale-[1.02]' 
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 nav-item-shadow hover:scale-[1.01]'
             }`
           }, [
-            e('span', { key: 'icon', className: 'text-lg flex-shrink-0' }, item.icon),
-            e('span', { key: 'label', className: 'font-medium text-sm sm:text-base' }, item.label)
+            e('span', { 
+              key: 'icon', 
+              className: `text-xl flex-shrink-0 transition-transform duration-200 ${
+                currentView === item.view ? 'scale-110' : 'group-hover:scale-110'
+              }`
+            }, item.icon),
+            e('span', { 
+              key: 'label', 
+              className: 'font-medium text-sm tracking-wide' 
+            }, item.label),
+            // Active indicator
+            currentView === item.view && e('div', {
+              key: 'active-indicator',
+              className: 'absolute right-0 top-0 bottom-0 w-1 bg-white/30 rounded-l-full'
+            })
           ])
         ),
         
         // Account section
-        e('div', { key: 'account-section', className: 'mt-6 pt-4 border-t border-gray-200' }, [
-          e('div', { key: 'account-header', className: 'px-3 sm:px-4 pb-2' }, [
-            e('span', { className: 'text-xs font-semibold text-gray-500 uppercase tracking-wide' }, 'Account')
+        e('div', { key: 'account-section', className: 'mt-8 pt-6 border-t border-gray-100' }, [
+          e('div', { key: 'account-header', className: 'px-4 pb-3' }, [
+            e('span', { className: 'text-xs font-semibold text-gray-400 uppercase tracking-wider' }, 'Account')
           ]),
           accountItems.map(item => 
             e('button', {
@@ -2202,14 +2259,27 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                 setCurrentView(item.view);
                 setSidebarOpen(false); // Close sidebar on mobile after selection
               },
-              className: `w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg transition-colors text-left ${
+              className: `group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200 text-left relative overflow-hidden gradient-border ${
                 currentView === item.view 
-                  ? 'bg-blue-50 text-blue-600 border-r-3 border-blue-600' 
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white active-nav-item scale-[1.02]' 
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 nav-item-shadow hover:scale-[1.01]'
               }`
             }, [
-              e('span', { key: 'icon', className: 'text-lg flex-shrink-0' }, item.icon),
-              e('span', { key: 'label', className: 'font-medium text-sm sm:text-base' }, item.label)
+              e('span', { 
+                key: 'icon', 
+                className: `text-xl flex-shrink-0 transition-transform duration-200 ${
+                  currentView === item.view ? 'scale-110' : 'group-hover:scale-110'
+                }`
+              }, item.icon),
+              e('span', { 
+                key: 'label', 
+                className: 'font-medium text-sm tracking-wide' 
+              }, item.label),
+              // Active indicator
+              currentView === item.view && e('div', {
+                key: 'active-indicator',
+                className: 'absolute right-0 top-0 bottom-0 w-1 bg-white/30 rounded-l-full'
+              })
             ])
           )
         ])
@@ -2218,7 +2288,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
       // Admin Panel & Logout - Fixed at bottom
       e('div', {
         key: 'sidebar-footer',
-        className: 'px-3 sm:px-4 py-4 border-t border-gray-200 space-y-2 flex-shrink-0'
+        className: 'px-4 py-4 border-t border-gray-100 space-y-2 flex-shrink-0'
       }, [
         // Show admin panel for admin users
         ...(user && user.role === 'admin' ? [
@@ -2228,19 +2298,31 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
               setCurrentView('admin');
               setSidebarOpen(false);
             },
-            className: 'w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg text-purple-600 hover:bg-purple-50 transition-colors font-medium'
+            className: 'group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200 text-left relative overflow-hidden text-purple-600 hover:bg-purple-50 nav-item-shadow hover:scale-[1.01] gradient-border'
           }, [
-            e('span', { key: 'admin-icon', className: 'text-lg flex-shrink-0' }, '🛡️'),
-            e('span', { key: 'admin-label', className: 'font-medium text-sm sm:text-base' }, 'Admin Panel')
+            e('span', { 
+              key: 'admin-icon', 
+              className: 'text-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-110' 
+            }, '🛡️'),
+            e('span', { 
+              key: 'admin-label', 
+              className: 'font-medium text-sm tracking-wide' 
+            }, 'Admin Panel')
           ])
         ] : []),
         e('button', {
           key: 'logout-btn',
           onClick: handleLogout,
-          className: 'w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-lg text-red-600 hover:bg-red-50 transition-colors'
+          className: 'group w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all duration-200 text-left relative overflow-hidden text-red-600 hover:bg-red-50 nav-item-shadow hover:scale-[1.01] gradient-border'
         }, [
-          e('span', { key: 'logout-icon', className: 'text-lg flex-shrink-0' }, '🚪'),
-          e('span', { key: 'logout-label', className: 'font-medium text-sm sm:text-base' }, 'Sign Out')
+          e('span', { 
+            key: 'logout-icon', 
+            className: 'text-xl flex-shrink-0 transition-transform duration-200 group-hover:scale-110' 
+          }, '🚪'),
+          e('span', { 
+            key: 'logout-label', 
+            className: 'font-medium text-sm tracking-wide' 
+          }, 'Sign Out')
         ])
       ])
     ]),
