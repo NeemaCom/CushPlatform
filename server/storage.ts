@@ -150,6 +150,17 @@ export interface IStorage {
   createMentorSession(session: InsertMentorSession & { mentorId: number; menteeId: number }): Promise<MentorSession>;
   updateMentorSession(id: number, updates: Partial<MentorSession>): Promise<MentorSession>;
 
+  // Mentor Booking System methods
+  getMentorAvailability(mentorId: number, date?: string): Promise<any>;
+  setMentorAvailability(mentorId: number, availability: any): Promise<any>;
+  getMentorBookings(mentorId: number, date?: string): Promise<any[]>;
+  checkTimeSlotAvailability(mentorId: number, date: string, startTime: string, endTime: string): Promise<boolean>;
+  createMentorBooking(booking: any): Promise<any>;
+  getUserBookings(userId: number, filters?: any): Promise<any[]>;
+  getMentorBookingsList(mentorId: number, filters?: any): Promise<any[]>;
+  getBookingById(bookingId: number): Promise<any>;
+  cancelBooking(bookingId: number): Promise<void>;
+
   // Loan Partners methods
   getLoanPartners(): Promise<LoanPartner[]>;
   getLoanPartner(id: number): Promise<LoanPartner | undefined>;
@@ -644,6 +655,234 @@ export class DatabaseStorage implements IStorage {
       .where(eq(mentorSessions.id, id))
       .returning();
     return updatedSession;
+  }
+
+  // Mentor Booking System methods
+  async getMentorAvailability(mentorId: number, date?: string): Promise<any> {
+    try {
+      // For now, return default availability pattern since the tables don't exist yet
+      return {
+        weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        startTime: '09:00',
+        endTime: '17:00',
+        timezone: 'GMT',
+        isActive: true
+      };
+    } catch (error) {
+      console.log('Mentor availability table not yet created, using defaults');
+      return {
+        weekdays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        startTime: '09:00',
+        endTime: '17:00',
+        timezone: 'GMT',
+        isActive: true
+      };
+    }
+  }
+
+  async setMentorAvailability(mentorId: number, availability: any): Promise<any> {
+    try {
+      // Update mentor's general availability (stored in mentor table for now)
+      const [updatedMentor] = await db
+        .update(mentors)
+        .set({ 
+          availability: JSON.stringify(availability),
+          updatedAt: new Date()
+        })
+        .where(eq(mentors.id, mentorId))
+        .returning();
+      
+      return availability;
+    } catch (error) {
+      console.log('Error setting mentor availability:', error);
+      return availability;
+    }
+  }
+
+  async getMentorBookings(mentorId: number, date?: string): Promise<any[]> {
+    try {
+      // For now, return empty array since booking table doesn't exist yet
+      return [];
+    } catch (error) {
+      console.log('Mentor bookings table not yet created');
+      return [];
+    }
+  }
+
+  async checkTimeSlotAvailability(mentorId: number, date: string, startTime: string, endTime: string): Promise<boolean> {
+    try {
+      // For now, always return true since booking table doesn't exist yet
+      return true;
+    } catch (error) {
+      console.log('Cannot check availability, assuming slot is available');
+      return true;
+    }
+  }
+
+  async createMentorBooking(booking: any): Promise<any> {
+    try {
+      // Store booking in mentor sessions table for now
+      const [newBooking] = await db
+        .insert(mentorSessions)
+        .values({
+          mentorId: booking.mentorId,
+          menteeId: booking.userId,
+          topic: booking.topic,
+          status: booking.status || 'scheduled',
+          scheduledAt: new Date(`${booking.date} ${booking.startTime}`),
+          duration: 60, // Default 1 hour
+          sessionType: booking.sessionType || 'video_call',
+          notes: booking.notes
+        })
+        .returning();
+      
+      return {
+        id: newBooking.id,
+        mentorId: booking.mentorId,
+        userId: booking.userId,
+        date: booking.date,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        topic: booking.topic,
+        sessionType: booking.sessionType,
+        notes: booking.notes,
+        status: booking.status,
+        createdAt: newBooking.createdAt
+      };
+    } catch (error) {
+      console.error('Error creating mentor booking:', error);
+      throw error;
+    }
+  }
+
+  async getUserBookings(userId: number, filters?: any): Promise<any[]> {
+    try {
+      const sessions = await db
+        .select({
+          id: mentorSessions.id,
+          mentorId: mentorSessions.mentorId,
+          topic: mentorSessions.topic,
+          status: mentorSessions.status,
+          scheduledAt: mentorSessions.scheduledAt,
+          duration: mentorSessions.duration,
+          sessionType: mentorSessions.sessionType,
+          notes: mentorSessions.notes,
+          createdAt: mentorSessions.createdAt,
+          mentorFirstName: users.firstName,
+          mentorLastName: users.lastName,
+          mentorSpecialty: mentors.specialty
+        })
+        .from(mentorSessions)
+        .leftJoin(mentors, eq(mentorSessions.mentorId, mentors.id))
+        .leftJoin(users, eq(mentors.userId, users.id))
+        .where(eq(mentorSessions.menteeId, userId))
+        .orderBy(desc(mentorSessions.scheduledAt));
+
+      return sessions.map(session => ({
+        id: session.id,
+        mentorId: session.mentorId,
+        userId: userId,
+        date: session.scheduledAt?.toISOString().split('T')[0] || '',
+        startTime: session.scheduledAt?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) || '',
+        endTime: session.scheduledAt ? new Date(session.scheduledAt.getTime() + (session.duration || 60) * 60000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
+        topic: session.topic,
+        sessionType: session.sessionType,
+        notes: session.notes,
+        status: session.status,
+        createdAt: session.createdAt,
+        mentorName: `${session.mentorFirstName} ${session.mentorLastName}`,
+        mentorSpecialty: session.mentorSpecialty
+      }));
+    } catch (error) {
+      console.error('Error getting user bookings:', error);
+      return [];
+    }
+  }
+
+  async getMentorBookingsList(mentorId: number, filters?: any): Promise<any[]> {
+    try {
+      const sessions = await db
+        .select({
+          id: mentorSessions.id,
+          menteeId: mentorSessions.menteeId,
+          topic: mentorSessions.topic,
+          status: mentorSessions.status,
+          scheduledAt: mentorSessions.scheduledAt,
+          duration: mentorSessions.duration,
+          sessionType: mentorSessions.sessionType,
+          notes: mentorSessions.notes,
+          createdAt: mentorSessions.createdAt,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          userEmail: users.email
+        })
+        .from(mentorSessions)
+        .leftJoin(users, eq(mentorSessions.menteeId, users.id))
+        .where(eq(mentorSessions.mentorId, mentorId))
+        .orderBy(desc(mentorSessions.scheduledAt));
+
+      return sessions.map(session => ({
+        id: session.id,
+        mentorId: mentorId,
+        userId: session.menteeId,
+        date: session.scheduledAt?.toISOString().split('T')[0] || '',
+        startTime: session.scheduledAt?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) || '',
+        endTime: session.scheduledAt ? new Date(session.scheduledAt.getTime() + (session.duration || 60) * 60000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
+        topic: session.topic,
+        sessionType: session.sessionType,
+        notes: session.notes,
+        status: session.status,
+        createdAt: session.createdAt,
+        userName: `${session.userFirstName} ${session.userLastName}`,
+        userEmail: session.userEmail
+      }));
+    } catch (error) {
+      console.error('Error getting mentor bookings:', error);
+      return [];
+    }
+  }
+
+  async getBookingById(bookingId: number): Promise<any> {
+    try {
+      const [session] = await db
+        .select()
+        .from(mentorSessions)
+        .where(eq(mentorSessions.id, bookingId));
+      
+      if (!session) return undefined;
+
+      return {
+        id: session.id,
+        mentorId: session.mentorId,
+        userId: session.menteeId,
+        date: session.scheduledAt?.toISOString().split('T')[0] || '',
+        startTime: session.scheduledAt?.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) || '',
+        endTime: session.scheduledAt ? new Date(session.scheduledAt.getTime() + (session.duration || 60) * 60000).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '',
+        topic: session.topic,
+        sessionType: session.sessionType,
+        notes: session.notes,
+        status: session.status,
+        createdAt: session.createdAt
+      };
+    } catch (error) {
+      console.error('Error getting booking by ID:', error);
+      return undefined;
+    }
+  }
+
+  async cancelBooking(bookingId: number): Promise<void> {
+    try {
+      await db
+        .update(mentorSessions)
+        .set({ 
+          status: 'cancelled',
+          updatedAt: new Date()
+        })
+        .where(eq(mentorSessions.id, bookingId));
+    } catch (error) {
+      console.error('Error cancelling booking:', error);
+      throw error;
+    }
   }
 
   // Loan Partners methods

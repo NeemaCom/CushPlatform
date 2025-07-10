@@ -4200,6 +4200,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // =============================================================================
+  // MENTOR BOOKING & AVAILABILITY API ROUTES
+  // =============================================================================
+
+  // Get mentor availability
+  app.get('/api/mentors/:mentorId/availability', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { mentorId } = req.params;
+      const { date } = req.query;
+
+      const mentor = await storage.getMentorById(parseInt(mentorId));
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+
+      // Get mentor's general availability and specific time slots
+      const availability = await storage.getMentorAvailability(parseInt(mentorId), date as string);
+      const bookedSlots = await storage.getMentorBookings(parseInt(mentorId), date as string);
+
+      res.json({
+        mentor: {
+          id: mentor.id,
+          name: `${mentor.firstName} ${mentor.lastName}`,
+          specialty: mentor.specialty,
+          timezone: mentor.availability?.timezone || 'GMT'
+        },
+        availability,
+        bookedSlots
+      });
+    } catch (error: any) {
+      console.error('Get mentor availability error:', error);
+      res.status(500).json({ error: "Failed to fetch mentor availability" });
+    }
+  });
+
+  // Set mentor availability (mentor only)
+  app.post('/api/mentors/availability', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { weekdays, startTime, endTime, timezone, isActive } = req.body;
+
+      // Check if user is a mentor
+      const mentor = await storage.getMentorByUserId(userId);
+      if (!mentor) {
+        return res.status(403).json({ error: "Only mentors can set availability" });
+      }
+
+      const availability = await storage.setMentorAvailability(mentor.id, {
+        weekdays: weekdays || ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        startTime: startTime || '09:00',
+        endTime: endTime || '17:00',
+        timezone: timezone || 'GMT',
+        isActive: isActive !== undefined ? isActive : true
+      });
+
+      res.json({ success: true, availability });
+    } catch (error: any) {
+      console.error('Set mentor availability error:', error);
+      res.status(500).json({ error: "Failed to set mentor availability" });
+    }
+  });
+
+  // Book a session with mentor
+  app.post('/api/mentors/:mentorId/book', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { mentorId } = req.params;
+      const userId = req.user!.id;
+      const { date, startTime, endTime, topic, sessionType, notes } = req.body;
+
+      if (!date || !startTime || !endTime || !topic) {
+        return res.status(400).json({ error: "Missing required fields: date, startTime, endTime, topic" });
+      }
+
+      const mentor = await storage.getMentorById(parseInt(mentorId));
+      if (!mentor) {
+        return res.status(404).json({ error: "Mentor not found" });
+      }
+
+      // Check if time slot is available
+      const isAvailable = await storage.checkTimeSlotAvailability(parseInt(mentorId), date, startTime, endTime);
+      if (!isAvailable) {
+        return res.status(400).json({ error: "Time slot is not available" });
+      }
+
+      // Create booking
+      const booking = await storage.createMentorBooking({
+        mentorId: parseInt(mentorId),
+        userId,
+        date,
+        startTime,
+        endTime,
+        topic,
+        sessionType: sessionType || 'video_call',
+        notes: notes || null,
+        status: 'confirmed'
+      });
+
+      // Send notification emails
+      try {
+        const { sendEmail } = await import('./email-service');
+        const user = await storage.getUserById(userId);
+        
+        // Email to user
+        if (user?.email) {
+          await sendEmail({
+            to: user.email,
+            subject: 'Booking Confirmation - Cush Mentorship',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">Booking Confirmed!</h2>
+                <p>Your session with ${mentor.firstName} ${mentor.lastName} has been confirmed.</p>
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 10px 0; color: #374151;">Session Details:</h3>
+                  <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
+                  <p><strong>Time:</strong> ${startTime} - ${endTime}</p>
+                  <p><strong>Topic:</strong> ${topic}</p>
+                  <p><strong>Type:</strong> ${sessionType?.replace('_', ' ') || 'Video Call'}</p>
+                </div>
+                <p>A calendar invite will be sent separately with meeting details.</p>
+              </div>
+            `
+          });
+        }
+
+        // Email to mentor (if they have user account)
+        const mentorUser = await storage.getUserById(mentor.userId);
+        if (mentorUser?.email) {
+          await sendEmail({
+            to: mentorUser.email,
+            subject: 'New Booking - Cush Mentorship',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #2563eb;">New Session Booked!</h2>
+                <p>You have a new mentorship session booked with ${user?.firstName} ${user?.lastName}.</p>
+                <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 10px 0; color: #374151;">Session Details:</h3>
+                  <p><strong>Date:</strong> ${new Date(date).toLocaleDateString()}</p>
+                  <p><strong>Time:</strong> ${startTime} - ${endTime}</p>
+                  <p><strong>Topic:</strong> ${topic}</p>
+                  <p><strong>Type:</strong> ${sessionType?.replace('_', ' ') || 'Video Call'}</p>
+                  ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+                </div>
+              </div>
+            `
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send booking emails:', emailError);
+        // Don't fail the booking if email fails
+      }
+
+      res.json({ success: true, booking });
+    } catch (error: any) {
+      console.error('Book mentor session error:', error);
+      res.status(500).json({ error: "Failed to book session" });
+    }
+  });
+
+  // Get user's bookings
+  app.get('/api/bookings', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { status, upcoming } = req.query;
+
+      const bookings = await storage.getUserBookings(userId, {
+        status: status as string,
+        upcoming: upcoming === 'true'
+      });
+
+      res.json({ bookings });
+    } catch (error: any) {
+      console.error('Get user bookings error:', error);
+      res.status(500).json({ error: "Failed to fetch bookings" });
+    }
+  });
+
+  // Get mentor's bookings
+  app.get('/api/mentors/bookings', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const { status, date } = req.query;
+
+      const mentor = await storage.getMentorByUserId(userId);
+      if (!mentor) {
+        return res.status(403).json({ error: "Only mentors can view mentor bookings" });
+      }
+
+      const bookings = await storage.getMentorBookingsList(mentor.id, {
+        status: status as string,
+        date: date as string
+      });
+
+      res.json({ bookings });
+    } catch (error: any) {
+      console.error('Get mentor bookings error:', error);
+      res.status(500).json({ error: "Failed to fetch mentor bookings" });
+    }
+  });
+
+  // Cancel booking
+  app.delete('/api/bookings/:bookingId', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { bookingId } = req.params;
+      const userId = req.user!.id;
+
+      const booking = await storage.getBookingById(parseInt(bookingId));
+      if (!booking) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
+
+      // Check if user owns the booking or is the mentor
+      const mentor = await storage.getMentorByUserId(userId);
+      const canCancel = booking.userId === userId || (mentor && booking.mentorId === mentor.id);
+      
+      if (!canCancel) {
+        return res.status(403).json({ error: "Not authorized to cancel this booking" });
+      }
+
+      await storage.cancelBooking(parseInt(bookingId));
+
+      res.json({ success: true, message: "Booking cancelled successfully" });
+    } catch (error: any) {
+      console.error('Cancel booking error:', error);
+      res.status(500).json({ error: "Failed to cancel booking" });
+    }
+  });
+
+  // =============================================================================
   // CREDIT PASSPORT API ROUTES
   // =============================================================================
 

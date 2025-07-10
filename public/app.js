@@ -2361,6 +2361,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
     { id: 'credit-passport', label: 'Credit Passport', icon: '🛂', view: 'credit-passport' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
     { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
+    { id: 'bookings', label: 'My Bookings', icon: '📅', view: 'bookings' },
     { id: 'jobs', label: 'Local Jobs', icon: '💼', view: 'jobs' },
     { id: 'analytics', label: 'Analytics', icon: '📈', view: 'analytics' },
     { id: 'reports', label: 'Reports', icon: '📋', view: 'reports' },
@@ -2639,6 +2640,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
               className: 'text-lg sm:text-xl lg:text-2xl font-bold text-gray-900'
             }, currentView === 'dashboard' ? 'Dashboard' : 
                currentView === 'community' ? 'Community Hub' :
+               currentView === 'bookings' ? 'My Bookings' :
                currentView === 'loans' ? 'Loans' :
                currentView === 'railsr-pay' ? 'Railsr Pay' :
                currentView === 'credit-passport' ? 'Credit Passport' :
@@ -2771,6 +2773,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         currentView === 'account' ? e(SettingsPage, { key: 'settings-page', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
+        currentView === 'bookings' ? e(MyBookingsPage, { key: 'bookings-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'railsr-pay' ? e(RailsrPayPage, { key: 'railsr-pay-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'credit-passport' ? e(CreditPassportPage, { key: 'credit-passport-page', user, onBack: () => setCurrentView('dashboard') }) :
@@ -3400,6 +3403,17 @@ function CommunityHub() {
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedInsight, setSelectedInsight] = useState(null);
+  const [bookingData, setBookingData] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    topic: '',
+    sessionType: 'video_call',
+    notes: ''
+  });
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
 
   // Sample data for insights until backend is connected
   const sampleInsights = [
@@ -4270,12 +4284,96 @@ For personalized immigration strategy, consult with our experienced immigration 
     ]);
   };
 
+  // Generate next 14 days for booking
+  const generateAvailableDates = () => {
+    const dates = [];
+    const today = new Date();
+    for (let i = 1; i <= 14; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() + i);
+      dates.push({
+        value: date.toISOString().split('T')[0],
+        label: date.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          month: 'short', 
+          day: 'numeric' 
+        }),
+        dayName: date.toLocaleDateString('en-US', { weekday: 'long' })
+      });
+    }
+    return dates;
+  };
+
+  // Generate time slots for a selected date
+  const generateTimeSlots = () => {
+    const slots = [];
+    const startHour = 9;
+    const endHour = 17;
+    
+    for (let hour = startHour; hour < endHour; hour++) {
+      const startTime = `${hour.toString().padStart(2, '0')}:00`;
+      const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
+      slots.push({
+        startTime,
+        endTime,
+        label: `${startTime} - ${endTime}`,
+        available: true
+      });
+    }
+    return slots;
+  };
+
+  // Handle booking submission
+  const handleBookingSubmit = async () => {
+    if (!bookingData.date || !bookingData.startTime || !bookingData.topic.trim()) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    setBookingLoading(true);
+    
+    try {
+      const response = await fetch(`/api/mentors/${selectedMentor.id}/book`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(bookingData)
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setShowBookingForm(false);
+        setBookingData({
+          date: '',
+          startTime: '',
+          endTime: '',
+          topic: '',
+          sessionType: 'video_call',
+          notes: ''
+        });
+        alert('Session booked successfully! You will receive a confirmation email shortly.');
+      } else {
+        const error = await response.json();
+        alert(`Booking failed: ${error.error || 'Please try again'}`);
+      }
+    } catch (error) {
+      console.error('Booking error:', error);
+      alert('Booking failed. Please check your connection and try again.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   const renderBookingForm = () => {
     if (!showBookingForm || !selectedMentor) return null;
 
+    const availableDates = generateAvailableDates();
+    const timeSlots = generateTimeSlots();
+
     return e('div', {
       key: 'booking-modal',
-      className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+      className: 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4',
       onClick: (e) => {
         if (e.target === e.currentTarget) {
           setShowBookingForm(false);
@@ -4283,67 +4381,214 @@ For personalized immigration strategy, consult with our experienced immigration 
       }
     }, [
       e('div', {
-        key: 'booking-form',
-        className: 'bg-white rounded-xl max-w-lg w-full p-6'
+        key: 'booking-container',
+        className: 'bg-white rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto'
       }, [
-        e('h2', {
-          key: 'form-title',
-          className: 'text-2xl font-bold text-gray-900 mb-4'
-        }, `Book Session with ${selectedMentor.name}`),
-        
+        // Header
         e('div', {
-          key: 'form-fields',
-          className: 'space-y-4'
+          key: 'booking-header',
+          className: 'p-6 border-b border-gray-200'
         }, [
-          e('div', { key: 'date-field' }, [
-            e('label', {
-              key: 'date-label',
-              className: 'block text-sm font-medium text-gray-700 mb-2'
-            }, 'Select Date & Time:'),
-            e('select', {
-              key: 'date-select',
-              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-            }, [
-              e('option', { key: 'default-option', value: '' }, 'Choose available slot...'),
-              ...selectedMentor.availability.weekdays.map((slot, index) =>
-                e('option', {
-                  key: `slot-${index}`,
-                  value: `${slot.day}-${slot.startTime}`
-                }, `${slot.day} ${slot.startTime} - ${slot.endTime}`)
-              )
+          e('div', {
+            key: 'header-content',
+            className: 'flex items-center justify-between'
+          }, [
+            e('div', { key: 'title-section' }, [
+              e('h2', {
+                key: 'title',
+                className: 'text-2xl font-bold text-gray-900'
+              }, 'Book Your Session'),
+              e('p', {
+                key: 'subtitle',
+                className: 'text-gray-600 mt-1'
+              }, `with ${selectedMentor.firstName} ${selectedMentor.lastName} - ${selectedMentor.specialty} Expert`)
+            ]),
+            e('button', {
+              key: 'close-btn',
+              onClick: () => setShowBookingForm(false),
+              className: 'p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100'
+            }, '✕')
+          ])
+        ]),
+
+        // Form Content
+        e('div', {
+          key: 'booking-form',
+          className: 'p-6'
+        }, [
+          e('div', {
+            key: 'form-grid',
+            className: 'grid grid-cols-1 md:grid-cols-2 gap-6'
+          }, [
+            // Date Selection
+            e('div', { key: 'date-section' }, [
+              e('h3', {
+                key: 'date-title',
+                className: 'text-lg font-semibold text-gray-900 mb-4'
+              }, '📅 Select Date'),
+              e('div', {
+                key: 'date-grid',
+                className: 'grid grid-cols-1 gap-2'
+              }, availableDates.slice(0, 7).map(date =>
+                e('button', {
+                  key: `date-${date.value}`,
+                  onClick: () => {
+                    setBookingData(prev => ({ ...prev, date: date.value }));
+                    setSelectedDate(date.value);
+                  },
+                  className: `p-3 text-left rounded-lg border transition-all ${
+                    bookingData.date === date.value
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`
+                }, [
+                  e('div', {
+                    key: 'date-label',
+                    className: 'font-medium'
+                  }, date.label),
+                  e('div', {
+                    key: 'day-name',
+                    className: 'text-sm text-gray-500'
+                  }, date.dayName)
+                ])
+              ))
+            ]),
+
+            // Time Selection
+            e('div', { key: 'time-section' }, [
+              e('h3', {
+                key: 'time-title',
+                className: 'text-lg font-semibold text-gray-900 mb-4'
+              }, '🕐 Select Time'),
+              e('div', {
+                key: 'time-grid',
+                className: 'grid grid-cols-2 gap-2'
+              }, bookingData.date ? timeSlots.map(slot =>
+                e('button', {
+                  key: `time-${slot.startTime}`,
+                  onClick: () => {
+                    setBookingData(prev => ({ 
+                      ...prev, 
+                      startTime: slot.startTime,
+                      endTime: slot.endTime
+                    }));
+                  },
+                  disabled: !slot.available,
+                  className: `p-2 text-sm rounded-lg border transition-all ${
+                    bookingData.startTime === slot.startTime
+                      ? 'border-blue-500 bg-blue-50 text-blue-700'
+                      : slot.available
+                        ? 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                  }`
+                }, slot.label)
+              ) : [
+                e('div', {
+                  key: 'select-date-first',
+                  className: 'col-span-2 text-center py-8 text-gray-500'
+                }, 'Please select a date first')
+              ])
             ])
           ]),
 
-          e('div', { key: 'topic-field' }, [
-            e('label', {
-              key: 'topic-label',
-              className: 'block text-sm font-medium text-gray-700 mb-2'
-            }, 'Consultation Topic:'),
-            e('textarea', {
-              key: 'topic-input',
-              className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
-              rows: 3,
-              placeholder: 'Briefly describe what you\'d like to discuss...'
-            })
+          // Session Details
+          e('div', {
+            key: 'session-details',
+            className: 'mt-6 space-y-4'
+          }, [
+            // Topic
+            e('div', { key: 'topic-field' }, [
+              e('label', {
+                key: 'topic-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Session Topic *'),
+              e('input', {
+                key: 'topic-input',
+                type: 'text',
+                value: bookingData.topic,
+                onChange: (e) => setBookingData(prev => ({ ...prev, topic: e.target.value })),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                placeholder: 'e.g., Express Entry application guidance, UK visa questions...'
+              })
+            ]),
+
+            // Session Type
+            e('div', { key: 'session-type-field' }, [
+              e('label', {
+                key: 'session-type-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Session Type'),
+              e('select', {
+                key: 'session-type-select',
+                value: bookingData.sessionType,
+                onChange: (e) => setBookingData(prev => ({ ...prev, sessionType: e.target.value })),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+              }, [
+                e('option', { key: 'video-call', value: 'video_call' }, '📹 Video Call'),
+                e('option', { key: 'phone-call', value: 'phone_call' }, '📞 Phone Call'),
+                e('option', { key: 'chat', value: 'chat' }, '💬 Text Chat')
+              ])
+            ]),
+
+            // Additional Notes
+            e('div', { key: 'notes-field' }, [
+              e('label', {
+                key: 'notes-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Additional Notes (Optional)'),
+              e('textarea', {
+                key: 'notes-input',
+                value: bookingData.notes,
+                onChange: (e) => setBookingData(prev => ({ ...prev, notes: e.target.value })),
+                className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+                rows: 3,
+                placeholder: 'Any specific questions or context you\'d like to share...'
+              })
+            ])
           ]),
 
+          // Summary & Actions
           e('div', {
-            key: 'actions',
-            className: 'flex gap-3 pt-4'
+            key: 'booking-summary',
+            className: 'mt-6 pt-6 border-t border-gray-200'
           }, [
-            e('button', {
-              key: 'cancel',
-              onClick: () => setShowBookingForm(false),
-              className: 'flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-50 transition-colors'
-            }, 'Cancel'),
-            e('button', {
-              key: 'book',
-              onClick: () => {
-                setShowBookingForm(false);
-                alert('Consultation booked successfully! You will receive a confirmation email shortly.');
-              },
-              className: 'flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors'
-            }, 'Book Session')
+            bookingData.date && bookingData.startTime && e('div', {
+              key: 'session-summary',
+              className: 'bg-blue-50 rounded-lg p-4 mb-4'
+            }, [
+              e('h4', {
+                key: 'summary-title',
+                className: 'font-semibold text-blue-900 mb-2'
+              }, 'Session Summary'),
+              e('div', {
+                key: 'summary-details',
+                className: 'text-sm text-blue-800 space-y-1'
+              }, [
+                e('p', { key: 'mentor-summary' }, `Mentor: ${selectedMentor.firstName} ${selectedMentor.lastName}`),
+                e('p', { key: 'date-summary' }, `Date: ${new Date(bookingData.date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`),
+                e('p', { key: 'time-summary' }, `Time: ${bookingData.startTime} - ${bookingData.endTime}`),
+                e('p', { key: 'type-summary' }, `Type: ${bookingData.sessionType.replace('_', ' ').toUpperCase()}`)
+              ])
+            ]),
+
+            e('div', {
+              key: 'actions',
+              className: 'flex gap-3'
+            }, [
+              e('button', {
+                key: 'cancel',
+                onClick: () => setShowBookingForm(false),
+                className: 'flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors'
+              }, 'Cancel'),
+              e('button', {
+                key: 'book',
+                onClick: handleBookingSubmit,
+                disabled: bookingLoading || !bookingData.date || !bookingData.startTime || !bookingData.topic.trim(),
+                className: `flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-lg transition-colors font-medium ${
+                  bookingLoading ? 'opacity-75' : ''
+                }`
+              }, bookingLoading ? 'Booking...' : 'Book Session')
+            ])
           ])
         ])
       ])
@@ -11214,6 +11459,409 @@ function HelpSupport({ user, onBack }) {
         ])
       ])
     ])
+  ]);
+}
+
+// My Bookings Page Component
+function MyBookingsPage({ user, onBack }) {
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('upcoming');
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [actionLoading, setActionLoading] = useState(false);
+
+  // Load user bookings
+  const loadBookings = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/bookings');
+      if (response.ok) {
+        const data = await response.json();
+        setBookings(data);
+      } else {
+        console.error('Failed to load bookings');
+      }
+    } catch (error) {
+      console.error('Error loading bookings:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadBookings();
+  }, []);
+
+  // Filter bookings based on status
+  const filterBookings = (status) => {
+    const now = new Date();
+    return bookings.filter(booking => {
+      const bookingDate = new Date(`${booking.scheduledDate}T${booking.startTime}`);
+      
+      switch (status) {
+        case 'upcoming':
+          return booking.status === 'confirmed' && bookingDate > now;
+        case 'completed':
+          return booking.status === 'completed' || (booking.status === 'confirmed' && bookingDate < now);
+        case 'cancelled':
+          return booking.status === 'cancelled';
+        default:
+          return true;
+      }
+    });
+  };
+
+  // Cancel booking
+  const handleCancelBooking = async (bookingId) => {
+    if (!cancelReason.trim()) {
+      alert('Please provide a reason for cancellation');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason: cancelReason })
+      });
+
+      if (response.ok) {
+        setShowCancelModal(false);
+        setCancelReason('');
+        setSelectedBooking(null);
+        loadBookings();
+        alert('Booking cancelled successfully');
+      } else {
+        const error = await response.json();
+        alert(`Failed to cancel booking: ${error.error || 'Please try again'}`);
+      }
+    } catch (error) {
+      console.error('Cancel booking error:', error);
+      alert('Failed to cancel booking. Please check your connection and try again.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Reschedule booking
+  const handleRescheduleBooking = async (bookingId) => {
+    // This would open a reschedule modal similar to the booking form
+    alert('Reschedule functionality coming soon!');
+  };
+
+  // Join session (for video calls)
+  const handleJoinSession = (booking) => {
+    if (booking.sessionLink) {
+      window.open(booking.sessionLink, '_blank');
+    } else {
+      alert('Session link not available yet. Please check back closer to your appointment time.');
+    }
+  };
+
+  const renderBookingCard = (booking) => {
+    const bookingDate = new Date(`${booking.scheduledDate}T${booking.startTime}`);
+    const isUpcoming = booking.status === 'confirmed' && bookingDate > new Date();
+    const canJoin = isUpcoming && bookingDate <= new Date(Date.now() + 15 * 60 * 1000); // 15 minutes before
+
+    return e('div', {
+      key: `booking-${booking.id}`,
+      className: 'bg-white rounded-xl p-6 shadow-lg border hover:shadow-xl transition-shadow'
+    }, [
+      // Booking Header
+      e('div', {
+        key: 'booking-header',
+        className: 'flex items-start justify-between mb-4'
+      }, [
+        e('div', { key: 'booking-info' }, [
+          e('h3', {
+            key: 'session-topic',
+            className: 'text-lg font-bold text-gray-900 mb-1'
+          }, booking.topic),
+          e('p', {
+            key: 'mentor-name',
+            className: 'text-blue-600 font-medium'
+          }, `with ${booking.mentorFirstName} ${booking.mentorLastName}`)
+        ]),
+        e('div', {
+          key: 'booking-status',
+          className: `px-3 py-1 rounded-full text-sm font-medium ${
+            booking.status === 'confirmed' ? 'bg-green-100 text-green-800' :
+            booking.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+            booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+            'bg-gray-100 text-gray-800'
+          }`
+        }, booking.status.charAt(0).toUpperCase() + booking.status.slice(1))
+      ]),
+
+      // Session Details
+      e('div', {
+        key: 'session-details',
+        className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'
+      }, [
+        e('div', { key: 'date-time', className: 'flex items-center gap-2' }, [
+          e('span', { key: 'calendar-icon', className: 'text-lg' }, '📅'),
+          e('div', { key: 'date-info' }, [
+            e('p', { key: 'date', className: 'font-medium text-gray-900' }, 
+              bookingDate.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })
+            ),
+            e('p', { key: 'time', className: 'text-gray-600 text-sm' }, 
+              `${booking.startTime} - ${booking.endTime}`)
+          ])
+        ]),
+        e('div', { key: 'session-type', className: 'flex items-center gap-2' }, [
+          e('span', { key: 'type-icon', className: 'text-lg' }, 
+            booking.sessionType === 'video_call' ? '📹' :
+            booking.sessionType === 'phone_call' ? '📞' : '💬'
+          ),
+          e('p', { key: 'type-text', className: 'font-medium text-gray-900' }, 
+            booking.sessionType.replace('_', ' ').toUpperCase())
+        ])
+      ]),
+
+      // Mentor Specialty & Notes
+      e('div', {
+        key: 'additional-info',
+        className: 'mb-4'
+      }, [
+        e('p', {
+          key: 'specialty',
+          className: 'text-gray-600 mb-2'
+        }, `Specialty: ${booking.mentorSpecialty} Expert`),
+        booking.notes && e('div', { key: 'notes-section' }, [
+          e('p', { key: 'notes-label', className: 'text-sm font-medium text-gray-700 mb-1' }, 'Notes:'),
+          e('p', { key: 'notes-text', className: 'text-sm text-gray-600 bg-gray-50 p-2 rounded' }, booking.notes)
+        ])
+      ]),
+
+      // Action Buttons
+      e('div', {
+        key: 'actions',
+        className: 'flex flex-wrap gap-2'
+      }, [
+        // Join Session (for upcoming video calls)
+        canJoin && booking.sessionType === 'video_call' && e('button', {
+          key: 'join-session',
+          onClick: () => handleJoinSession(booking),
+          className: 'px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium'
+        }, 'Join Session'),
+
+        // Reschedule (for upcoming bookings)
+        isUpcoming && e('button', {
+          key: 'reschedule',
+          onClick: () => handleRescheduleBooking(booking.id),
+          className: 'px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors'
+        }, 'Reschedule'),
+
+        // Cancel (for upcoming bookings)
+        isUpcoming && e('button', {
+          key: 'cancel',
+          onClick: () => {
+            setSelectedBooking(booking);
+            setShowCancelModal(true);
+          },
+          className: 'px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors'
+        }, 'Cancel'),
+
+        // Contact Mentor
+        e('button', {
+          key: 'contact',
+          onClick: () => alert('Contact mentor functionality coming soon!'),
+          className: 'px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors'
+        }, 'Contact Mentor')
+      ])
+    ]);
+  };
+
+  const renderCancelModal = () => {
+    if (!showCancelModal || !selectedBooking) return null;
+
+    return e('div', {
+      key: 'cancel-modal',
+      className: 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4',
+      onClick: (e) => {
+        if (e.target === e.currentTarget) {
+          setShowCancelModal(false);
+        }
+      }
+    }, [
+      e('div', {
+        key: 'modal-content',
+        className: 'bg-white rounded-xl max-w-md w-full p-6'
+      }, [
+        e('h3', {
+          key: 'modal-title',
+          className: 'text-xl font-bold text-gray-900 mb-4'
+        }, 'Cancel Booking'),
+        e('p', {
+          key: 'modal-description',
+          className: 'text-gray-600 mb-4'
+        }, `Are you sure you want to cancel your session with ${selectedBooking.mentorFirstName} ${selectedBooking.mentorLastName}?`),
+        e('div', {
+          key: 'reason-field',
+          className: 'mb-6'
+        }, [
+          e('label', {
+            key: 'reason-label',
+            className: 'block text-sm font-medium text-gray-700 mb-2'
+          }, 'Reason for cancellation:'),
+          e('textarea', {
+            key: 'reason-input',
+            value: cancelReason,
+            onChange: (e) => setCancelReason(e.target.value),
+            className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
+            rows: 3,
+            placeholder: 'Please provide a reason for cancelling...'
+          })
+        ]),
+        e('div', {
+          key: 'modal-actions',
+          className: 'flex gap-3'
+        }, [
+          e('button', {
+            key: 'modal-cancel',
+            onClick: () => setShowCancelModal(false),
+            className: 'flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors'
+          }, 'Keep Booking'),
+          e('button', {
+            key: 'modal-confirm',
+            onClick: () => handleCancelBooking(selectedBooking.id),
+            disabled: actionLoading || !cancelReason.trim(),
+            className: 'flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors'
+          }, actionLoading ? 'Cancelling...' : 'Cancel Booking')
+        ])
+      ])
+    ]);
+  };
+
+  if (loading) {
+    return e('div', {
+      className: 'flex items-center justify-center py-12'
+    }, [
+      e('div', {
+        key: 'spinner',
+        className: 'w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin'
+      })
+    ]);
+  }
+
+  const upcomingBookings = filterBookings('upcoming');
+  const completedBookings = filterBookings('completed');
+  const cancelledBookings = filterBookings('cancelled');
+
+  return e('div', { className: 'bg-gray-50 min-h-screen' }, [
+    // Header
+    e('div', { key: 'header', className: 'bg-white border-b border-gray-200 px-6 py-4' }, [
+      e('div', { className: 'flex items-center justify-between' }, [
+        e('button', {
+          key: 'back',
+          onClick: onBack,
+          className: 'flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors'
+        }, [
+          e('span', { key: 'icon' }, '←'),
+          e('span', { key: 'text' }, 'Back to Dashboard')
+        ]),
+        e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'My Bookings')
+      ])
+    ]),
+
+    // Content
+    e('div', { key: 'content', className: 'p-6' }, [
+      // Summary Stats
+      e('div', {
+        key: 'stats',
+        className: 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-6'
+      }, [
+        e('div', { key: 'upcoming-stat', className: 'bg-blue-50 p-4 rounded-lg' }, [
+          e('h3', { className: 'text-2xl font-bold text-blue-600' }, upcomingBookings.length.toString()),
+          e('p', { className: 'text-blue-800' }, 'Upcoming Sessions')
+        ]),
+        e('div', { key: 'completed-stat', className: 'bg-green-50 p-4 rounded-lg' }, [
+          e('h3', { className: 'text-2xl font-bold text-green-600' }, completedBookings.length.toString()),
+          e('p', { className: 'text-green-800' }, 'Completed Sessions')
+        ]),
+        e('div', { key: 'cancelled-stat', className: 'bg-red-50 p-4 rounded-lg' }, [
+          e('h3', { className: 'text-2xl font-bold text-red-600' }, cancelledBookings.length.toString()),
+          e('p', { className: 'text-red-800' }, 'Cancelled Sessions')
+        ])
+      ]),
+
+      // Tab Navigation
+      e('div', {
+        key: 'tabs',
+        className: 'flex space-x-1 bg-gray-100 p-1 rounded-lg mb-6'
+      }, [
+        ['upcoming', 'Upcoming', upcomingBookings.length],
+        ['completed', 'Completed', completedBookings.length],
+        ['cancelled', 'Cancelled', cancelledBookings.length]
+      ].map(([key, label, count]) =>
+        e('button', {
+          key: `tab-${key}`,
+          onClick: () => setActiveTab(key),
+          className: `flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md font-medium transition-colors ${
+            activeTab === key
+              ? 'bg-white text-blue-600 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`
+        }, [
+          e('span', { key: 'label' }, label),
+          e('span', { 
+            key: 'count', 
+            className: `ml-1 px-2 py-0.5 text-xs rounded-full ${
+              activeTab === key ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-600'
+            }`
+          }, count.toString())
+        ])
+      )),
+
+      // Bookings List
+      e('div', {
+        key: 'bookings-list',
+        className: 'space-y-4'
+      }, [
+        activeTab === 'upcoming' && upcomingBookings.length === 0 && 
+          e('div', { key: 'no-upcoming', className: 'text-center py-12' }, [
+            e('div', { className: 'text-gray-400 text-6xl mb-4' }, '📅'),
+            e('h3', { className: 'text-xl font-semibold text-gray-900 mb-2' }, 'No Upcoming Sessions'),
+            e('p', { className: 'text-gray-600 mb-6' }, 'Schedule a session with one of our expert mentors'),
+            e('button', {
+              onClick: () => window.location.hash = '#dashboard',
+              className: 'px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors'
+            }, 'Browse Mentors')
+          ]),
+
+        activeTab === 'completed' && completedBookings.length === 0 && 
+          e('div', { key: 'no-completed', className: 'text-center py-12' }, [
+            e('div', { className: 'text-gray-400 text-6xl mb-4' }, '✅'),
+            e('h3', { className: 'text-xl font-semibold text-gray-900 mb-2' }, 'No Completed Sessions'),
+            e('p', { className: 'text-gray-600' }, 'Your completed sessions will appear here')
+          ]),
+
+        activeTab === 'cancelled' && cancelledBookings.length === 0 && 
+          e('div', { key: 'no-cancelled', className: 'text-center py-12' }, [
+            e('div', { className: 'text-gray-400 text-6xl mb-4' }, '❌'),
+            e('h3', { className: 'text-xl font-semibold text-gray-900 mb-2' }, 'No Cancelled Sessions'),
+            e('p', { className: 'text-gray-600' }, 'Keep your momentum going!')
+          ]),
+
+        // Render filtered bookings
+        activeTab === 'upcoming' ? upcomingBookings.map(renderBookingCard) :
+        activeTab === 'completed' ? completedBookings.map(renderBookingCard) :
+        cancelledBookings.map(renderBookingCard)
+      ])
+    ]),
+
+    // Modals
+    renderCancelModal()
   ]);
 }
 
