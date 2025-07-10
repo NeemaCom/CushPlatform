@@ -5266,6 +5266,7 @@ function AdminDashboard({ user, onBack }) {
     hourlyRate: '',
     languages: '',
     certifications: '',
+    profilePicture: '',
     availability: {
       timezone: 'EST',
       weekdays: []
@@ -5280,6 +5281,30 @@ function AdminDashboard({ user, onBack }) {
   const [showAddFaq, setShowAddFaq] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [replyMessage, setReplyMessage] = useState('');
+
+  // Handle profile picture upload
+  const handleProfilePictureUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setNewMentor({ ...newMentor, profilePicture: event.target.result });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // Fetch dashboard statistics
   useEffect(() => {
@@ -5622,6 +5647,7 @@ function AdminDashboard({ user, onBack }) {
           hourlyRate: '',
           languages: '',
           certifications: '',
+          profilePicture: '',
           availability: {
             timezone: 'EST',
             weekdays: []
@@ -6728,6 +6754,41 @@ function AdminDashboard({ user, onBack }) {
                   onChange: (e) => setNewMentor({ ...newMentor, languages: e.target.value }),
                   className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 })
+              ])
+            ]),
+            e('div', { key: 'profile-picture-field' }, [
+              e('label', {
+                key: 'profile-picture-label',
+                className: 'block text-sm font-medium text-gray-700 mb-2'
+              }, 'Profile Picture'),
+              e('div', {
+                key: 'profile-picture-container',
+                className: 'flex items-center space-x-4'
+              }, [
+                newMentor.profilePicture && e('div', {
+                  key: 'profile-preview',
+                  className: 'w-16 h-16 rounded-full overflow-hidden border-2 border-gray-300'
+                }, [
+                  e('img', {
+                    key: 'preview-image',
+                    src: newMentor.profilePicture,
+                    alt: 'Profile preview',
+                    className: 'w-full h-full object-cover'
+                  })
+                ]),
+                e('input', {
+                  key: 'profile-picture-input',
+                  type: 'file',
+                  accept: 'image/*',
+                  onChange: handleProfilePictureUpload,
+                  className: 'flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 file:cursor-pointer'
+                }),
+                newMentor.profilePicture && e('button', {
+                  key: 'remove-picture',
+                  type: 'button',
+                  onClick: () => setNewMentor({ ...newMentor, profilePicture: '' }),
+                  className: 'px-3 py-1 text-sm text-red-600 hover:text-red-800 border border-red-300 rounded-lg hover:bg-red-50'
+                }, 'Remove')
               ])
             ]),
             e('div', { key: 'bio-field' }, [
