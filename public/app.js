@@ -11276,7 +11276,7 @@ function SignUpPage() {
             key: 'main-image',
             src: '/attached_assets/lady smiling_1752121060443.jpg',
             alt: 'Happy professional woman',
-            className: 'w-80 h-80 object-cover rounded-2xl shadow-2xl'
+            className: 'w-96 h-96 object-cover rounded-2xl shadow-2xl'
           }),
           e('div', {
             key: 'image-overlay',
