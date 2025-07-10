@@ -948,6 +948,140 @@ export type InsertLoanProvider = z.infer<typeof loanProviderSchema>;
 export type LoanReview = typeof loanReviews.$inferSelect;
 export type InsertLoanReview = z.infer<typeof loanReviewSchema>;
 
+// Railsr Embedded Finance Tables
+export const railsrConfig = pgTable("railsr_config", {
+  id: serial("id").primaryKey(),
+  environment: text("environment").notNull(), // sandbox, production
+  baseUrl: text("base_url").notNull(),
+  apiKey: text("api_key").notNull(),
+  webhookSecret: text("webhook_secret"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const railsrEndusers = pgTable("railsr_endusers", {
+  id: serial("id").primaryKey(),
+  cushUserId: text("cush_user_id").notNull(), // Reference to Cush user
+  railsrEnduserId: text("railsr_enduser_id").notNull().unique(), // Railsr's enduser ID
+  email: text("email").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  status: text("status").default("active"), // active, inactive, suspended
+  kycStatus: text("kyc_status").default("pending"), // pending, approved, rejected
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const railsrWallets = pgTable("railsr_wallets", {
+  id: serial("id").primaryKey(),
+  railsrWalletId: text("railsr_wallet_id").notNull().unique(), // Railsr's wallet ID
+  railsrEnduserId: text("railsr_enduser_id").notNull(), // Reference to Railsr enduser
+  currency: text("currency").notNull().default("GBP"),
+  balance: decimal("balance", { precision: 15, scale: 2 }).default("0.00"),
+  status: text("status").default("active"), // active, inactive, suspended
+  type: text("type").default("ledger"), // ledger, iban, etc.
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const railsrCards = pgTable("railsr_cards", {
+  id: serial("id").primaryKey(),
+  railsrCardId: text("railsr_card_id").notNull().unique(), // Railsr's card ID
+  railsrWalletId: text("railsr_wallet_id").notNull(), // Reference to Railsr wallet
+  type: text("type").notNull(), // virtual, physical
+  status: text("status").default("inactive"), // inactive, active, suspended, cancelled
+  cardholderName: text("cardholder_name").notNull(),
+  lastFourDigits: text("last_four_digits"), // For display purposes
+  expiryDate: text("expiry_date"), // MM/YY format
+  limits: json("limits").$type<{
+    daily?: number;
+    monthly?: number;
+    transaction?: number;
+  }>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const railsrTransactions = pgTable("railsr_transactions", {
+  id: serial("id").primaryKey(),
+  railsrTransactionId: text("railsr_transaction_id").notNull().unique(), // Railsr's transaction ID
+  railsrWalletId: text("railsr_wallet_id").notNull(), // Reference to Railsr wallet
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  description: text("description").notNull(),
+  type: text("type").notNull(), // transfer, payment, load, etc.
+  status: text("status").default("pending"), // pending, completed, failed, cancelled
+  reference: text("reference"),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Railsr Relations
+export const railsrEndusersRelations = relations(railsrEndusers, ({ many }) => ({
+  wallets: many(railsrWallets),
+}));
+
+export const railsrWalletsRelations = relations(railsrWallets, ({ one, many }) => ({
+  enduser: one(railsrEndusers, {
+    fields: [railsrWallets.railsrEnduserId],
+    references: [railsrEndusers.railsrEnduserId],
+  }),
+  cards: many(railsrCards),
+  transactions: many(railsrTransactions),
+}));
+
+export const railsrCardsRelations = relations(railsrCards, ({ one }) => ({
+  wallet: one(railsrWallets, {
+    fields: [railsrCards.railsrWalletId],
+    references: [railsrWallets.railsrWalletId],
+  }),
+}));
+
+export const railsrTransactionsRelations = relations(railsrTransactions, ({ one }) => ({
+  wallet: one(railsrWallets, {
+    fields: [railsrTransactions.railsrWalletId],
+    references: [railsrWallets.railsrWalletId],
+  }),
+}));
+
+// Railsr Schemas
+export const railsrEnduserSchema = createInsertSchema(railsrEndusers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const railsrWalletSchema = createInsertSchema(railsrWallets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const railsrCardSchema = createInsertSchema(railsrCards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const railsrTransactionSchema = createInsertSchema(railsrTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Railsr Types
+export type RailsrEnduser = typeof railsrEndusers.$inferSelect;
+export type InsertRailsrEnduser = z.infer<typeof railsrEnduserSchema>;
+export type RailsrWallet = typeof railsrWallets.$inferSelect;
+export type InsertRailsrWallet = z.infer<typeof railsrWalletSchema>;
+export type RailsrCard = typeof railsrCards.$inferSelect;
+export type InsertRailsrCard = z.infer<typeof railsrCardSchema>;
+export type RailsrTransaction = typeof railsrTransactions.$inferSelect;
+export type InsertRailsrTransaction = z.infer<typeof railsrTransactionSchema>;
+
 export const insertAccountSchema = createInsertSchema(accounts).pick({
   name: true,
   type: true,

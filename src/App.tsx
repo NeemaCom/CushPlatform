@@ -13,6 +13,7 @@ import Settings from '@/pages/Settings'
 import Achievements from '@/pages/Achievements'
 import Loans from '@/pages/Loans'
 import Jobs from '@/pages/Jobs'
+import RailsrPay from '@/pages/RailsrPay'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
 import { useAuth } from '@/hooks/useAuth'
@@ -74,6 +75,12 @@ function App() {
               <Route path="/jobs">
                 <AuthRoute>
                   <Jobs />
+                </AuthRoute>
+              </Route>
+              
+              <Route path="/railsr-pay">
+                <AuthRoute>
+                  <RailsrPay />
                 </AuthRoute>
               </Route>
               
