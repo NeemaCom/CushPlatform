@@ -5263,7 +5263,6 @@ function AdminDashboard({ user, onBack }) {
     specialty: '',
     experience: '',
     bio: '',
-    hourlyRate: '',
     languages: '',
     certifications: '',
     profilePicture: '',
@@ -5644,7 +5643,6 @@ function AdminDashboard({ user, onBack }) {
           specialty: '',
           experience: '',
           bio: '',
-          hourlyRate: '',
           languages: '',
           certifications: '',
           profilePicture: '',
@@ -5780,6 +5778,35 @@ function AdminDashboard({ user, onBack }) {
       }
     } catch (error) {
       alert('Failed to update user role');
+    }
+  };
+
+  const makeUserMentor = async (userId) => {
+    const specialty = prompt('Enter mentor specialty (Professional/Career, Legal, Entrepreneurship, Tech Dev):');
+    if (!specialty) return;
+
+    const bio = prompt('Enter mentor bio:');
+    if (!bio) return;
+
+    const experience = prompt('Enter experience level:');
+    if (!experience) return;
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/make-mentor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ specialty, bio, experience })
+      });
+
+      if (response.ok) {
+        fetchUsers();
+        alert('User converted to mentor successfully');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to convert user to mentor');
+      }
+    } catch (error) {
+      alert('Failed to convert user to mentor');
     }
   };
 
@@ -6274,6 +6301,11 @@ function AdminDashboard({ user, onBack }) {
                           onClick: () => updateUserRole(userItem.id, userItem.role === 'admin' ? 'customer' : 'admin'),
                           className: 'text-blue-600 hover:text-blue-900 text-xs px-2 py-1 rounded hover:bg-blue-50'
                         }, userItem.role === 'admin' ? 'Make Customer' : 'Make Admin'),
+                        userItem.role !== 'mentor' && e('button', {
+                          key: 'make-mentor',
+                          onClick: () => makeUserMentor(userItem.id),
+                          className: 'text-green-600 hover:text-green-900 text-xs px-2 py-1 rounded hover:bg-green-50'
+                        }, 'Make Mentor'),
                         e('button', {
                           key: 'restrict',
                           onClick: () => restrictUser(userItem.id),
@@ -6703,11 +6735,10 @@ function AdminDashboard({ user, onBack }) {
                   className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 }, [
                   e('option', { key: 'default-specialty', value: '' }, 'Select Specialty'),
-                  e('option', { key: 'canada', value: 'Canadian Immigration' }, 'Canadian Immigration'),
-                  e('option', { key: 'australia', value: 'Australian Migration' }, 'Australian Migration'),
-                  e('option', { key: 'uk', value: 'UK Immigration' }, 'UK Immigration'),
-                  e('option', { key: 'usa', value: 'US Immigration' }, 'US Immigration'),
-                  e('option', { key: 'general', value: 'General Immigration' }, 'General Immigration')
+                  e('option', { key: 'professional', value: 'Professional/Career' }, 'Professional/Career'),
+                  e('option', { key: 'legal', value: 'Legal' }, 'Legal'),
+                  e('option', { key: 'entrepreneurship', value: 'Entrepreneurship' }, 'Entrepreneurship'),
+                  e('option', { key: 'techdev', value: 'Tech Dev' }, 'Tech Dev')
                 ])
               ]),
               e('div', { key: 'experience-field' }, [
@@ -6725,21 +6756,7 @@ function AdminDashboard({ user, onBack }) {
                   className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                 })
               ]),
-              e('div', { key: 'hourly-rate-field' }, [
-                e('label', {
-                  key: 'hourly-rate-label',
-                  className: 'block text-sm font-medium text-gray-700 mb-2'
-                }, 'Hourly Rate'),
-                e('input', {
-                  key: 'hourly-rate-input',
-                  type: 'text',
-                  required: true,
-                  placeholder: 'e.g., $120',
-                  value: newMentor.hourlyRate,
-                  onChange: (e) => setNewMentor({ ...newMentor, hourlyRate: e.target.value }),
-                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                })
-              ]),
+
               e('div', { key: 'languages-field' }, [
                 e('label', {
                   key: 'languages-label',

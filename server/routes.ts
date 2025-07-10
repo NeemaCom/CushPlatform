@@ -3986,7 +3986,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, email, specialty, experience, bio, hourlyRate, languages, certifications, profilePicture } = req.body;
       
-      if (!name || !email || !specialty || !experience || !bio || !hourlyRate) {
+      if (!name || !email || !specialty || !experience || !bio) {
         return res.status(400).json({ error: "Missing required fields" });
       }
 
@@ -4018,7 +4018,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         specialty,
         experience,
         bio,
-        hourlyRate,
+        hourlyRate: null,
         languages: languages || [],
         certifications: certifications || [],
         profilePicture: profilePicture || null,
@@ -4095,6 +4095,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error('Admin delete mentor error:', error);
       res.status(500).json({ error: "Failed to delete mentor" });
+    }
+  });
+
+  // Make user a mentor endpoint
+  app.post('/api/admin/users/:id/make-mentor', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { specialty, bio, experience } = req.body;
+
+      if (!specialty || !bio || !experience) {
+        return res.status(400).json({ error: "Missing required fields: specialty, bio, experience" });
+      }
+
+      // First update user role to mentor
+      await storage.adminUpdateUser(parseInt(id), { role: 'mentor' }, req.user!.id);
+
+      // Then create mentor profile
+      const mentor = await storage.createMentor({
+        userId: parseInt(id),
+        specialty,
+        bio,
+        experience,
+        isActive: true,
+        isVerified: false,
+        rating: '0.00',
+        totalSessions: 0
+      });
+
+      // Log admin action
+      await storage.logAdminActivity({
+        userId: req.user!.id,
+        action: 'USER_CONVERTED_TO_MENTOR',
+        details: `Converted user ID ${id} to mentor with specialty: ${specialty}`,
+        ipAddress: req.ip || null,
+        userAgent: req.get('User-Agent') || null,
+        success: true
+      });
+
+      res.json({ success: true, mentor });
+    } catch (error: any) {
+      console.error('Make user mentor error:', error);
+      res.status(500).json({ error: "Failed to convert user to mentor" });
     }
   });
 

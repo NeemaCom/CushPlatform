@@ -305,19 +305,48 @@ export const eventRegistrations = pgTable("event_registrations", {
   notes: text("notes"), // Special requirements or notes
 });
 
+// Mentor Availability Slots
+export const mentorAvailability = pgTable("mentor_availability", {
+  id: serial("id").primaryKey(),
+  mentorId: integer("mentor_id").notNull().references(() => mentors.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0-6 (Sunday-Saturday)
+  startTime: text("start_time").notNull(), // Format: "09:00"
+  endTime: text("end_time").notNull(), // Format: "17:00"
+  timezone: text("timezone").default("UTC"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Mentor Booking Slots (specific available time slots)
+export const mentorBookingSlots = pgTable("mentor_booking_slots", {
+  id: serial("id").primaryKey(),
+  mentorId: integer("mentor_id").notNull().references(() => mentors.id),
+  dateTime: timestamp("date_time").notNull(),
+  duration: integer("duration").default(60), // Duration in minutes
+  isBooked: boolean("is_booked").default(false),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Mentor Sessions table (for booking and tracking sessions)
 export const mentorSessions = pgTable("mentor_sessions", {
   id: serial("id").primaryKey(),
   mentorId: integer("mentor_id").notNull().references(() => mentors.id),
   menteeId: integer("mentee_id").notNull().references(() => users.id),
+  bookingSlotId: integer("booking_slot_id").references(() => mentorBookingSlots.id),
   scheduledAt: timestamp("scheduled_at").notNull(),
   duration: integer("duration").default(60), // Duration in minutes
   status: text("status").default("scheduled"), // scheduled, completed, cancelled, no_show
   sessionType: text("session_type").default("consultation"), // consultation, follow_up, workshop
+  topic: text("topic"), // Session topic or focus area
   notes: text("notes"), // Session notes
   menteeRating: integer("mentee_rating"), // 1-5 rating from mentee
   menteeReview: text("mentee_review"),
   mentorNotes: text("mentor_notes"), // Private notes for mentor
+  cancelledBy: integer("cancelled_by"), // User ID who cancelled
+  cancellationReason: text("cancellation_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1864,6 +1893,8 @@ export type RegisterEvent = z.infer<typeof registerEventSchema>;
 export type MentorSession = typeof mentorSessions.$inferSelect;
 export type InsertMentorSession = z.infer<typeof insertMentorSessionSchema>;
 export type BookMentorSession = z.infer<typeof bookMentorSessionSchema>;
+export type MentorAvailability = typeof mentorAvailability.$inferSelect;
+export type MentorBookingSlot = typeof mentorBookingSlots.$inferSelect;
 
 // ===== ACHIEVEMENT BADGES SYSTEM =====
 
