@@ -1,0 +1,478 @@
+import { SecurityLogger } from "./security";
+import { db } from "./db";
+import { cymonzConfig } from "@shared/schema";
+import { eq } from "drizzle-orm";
+
+export interface CymonzUser {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  address?: string;
+  country: string;
+  idType?: string;
+  idNumber?: string;
+}
+
+export interface CymonzRecipient {
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  country: string;
+  bankName?: string;
+  bankCode?: string;
+  accountNumber?: string;
+  accountName?: string;
+  swiftCode?: string;
+}
+
+export interface CymonzTransactionRequest {
+  sender: CymonzUser;
+  recipient: CymonzRecipient;
+  sendAmount: number;
+  sendCurrency: string;
+  receiveCurrency: string;
+  deliveryMethod: "bank_transfer" | "cash_pickup" | "mobile_money";
+  purpose?: string;
+  reference?: string;
+  callbackUrl?: string;
+  webhookUrl?: string;
+}
+
+export interface CymonzTransactionResponse {
+  transactionId: string;
+  status: "initiated" | "pending" | "processing" | "completed" | "failed" | "cancelled";
+  redirectUrl?: string;
+  paymentUrl?: string;
+  receiveAmount?: number;
+  exchangeRate?: number;
+  fees: number;
+  totalAmount: number;
+  estimatedDeliveryTime?: string;
+  trackingNumber?: string;
+  error?: string;
+  errorCode?: string;
+}
+
+export interface CymonzRatesResponse {
+  sendCurrency: string;
+  receiveCurrency: string;
+  exchangeRate: number;
+  fees: number;
+  totalCost: number;
+  estimatedDeliveryTime: string;
+  minAmount: number;
+  maxAmount: number;
+}
+
+export interface CymonzWebhookData {
+  transactionId: string;
+  status: string;
+  reference: string;
+  timestamp: string;
+  amount: number;
+  currency: string;
+  recipient: any;
+  metadata?: Record<string, any>;
+}
+
+class CymonzService {
+  private config: any = null;
+
+  constructor() {
+    this.initializeConfig();
+  }
+
+  private async initializeConfig() {
+    try {
+      // Get active Cymonz configuration from database
+      const [activeConfig] = await db
+        .select()
+        .from(cymonzConfig)
+        .where(eq(cymonzConfig.isActive, true))
+        .limit(1);
+
+      if (!activeConfig) {
+        // Create default configuration if none exists
+        const defaultConfig = {
+          environment: process.env.NODE_ENV === "production" ? "production" : "sandbox",
+          baseUrl: process.env.CYMONZ_BASE_URL || "https://sandbox-api.cymonz.com",
+          apiKey: process.env.CYMONZ_API_KEY || "",
+          secretKey: process.env.CYMONZ_SECRET_KEY || "",
+          webhookUrl: process.env.CYMONZ_WEBHOOK_URL || "",
+          callbackUrl: process.env.CYMONZ_CALLBACK_URL || "",
+          partnerCode: process.env.CYMONZ_PARTNER_CODE || "",
+          isActive: true,
+        };
+
+        const [newConfig] = await db.insert(cymonzConfig).values(defaultConfig).returning();
+        this.config = newConfig;
+      } else {
+        this.config = activeConfig;
+      }
+
+      // await SecurityLogger.logSecurityEvent(
+      //   "cymonz_config_loaded",
+      //   "info",
+      //   { environment: this.config.environment }
+      // );
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+      //   "cymonz_config_error",
+      //   "error",
+      //   { error: error instanceof Error ? error.message : "Unknown error" }
+      // );
+      throw new Error("Failed to initialize Cymonz configuration");
+    }
+  }
+
+  private async makeRequest(endpoint: string, method: string = "GET", body?: any): Promise<any> {
+    if (!this.config) {
+      await this.initializeConfig();
+    }
+
+    const url = `${this.config.baseUrl}${endpoint}`;
+    const headers = {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${this.config.apiKey}`,
+      "X-Partner-Code": this.config.partnerCode,
+      "X-Secret-Key": this.config.secretKey,
+    };
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return data;
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_api_error",
+        "error",
+        { 
+          endpoint, 
+          method, 
+          error: error instanceof Error ? error.message : "Unknown error" 
+        }
+      );
+      throw error;
+    }
+  }
+
+  async createOrUpdateUser(user: CymonzUser): Promise<{ success: boolean; userId?: string; error?: string }> {
+    try {
+      const userData = {
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        address: user.address,
+        country: user.country,
+        identification: user.idType && user.idNumber ? {
+          type: user.idType,
+          number: user.idNumber
+        } : undefined,
+      };
+
+      const response = await this.makeRequest("/v1/users", "POST", userData);
+      
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_user_created",
+        "info",
+        { email: user.email, cymonzUserId: response.userId, userId: user.id }
+      );
+
+      return {
+        success: true,
+        userId: response.userId,
+      };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_user_creation_failed",
+        "error",
+        { 
+          email: user.email, 
+          error: error instanceof Error ? error.message : "Unknown error",
+          userId: user.id
+        }
+      );
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Failed to create user",
+      };
+    }
+  }
+
+  async getRates(
+    sendCurrency: string,
+    receiveCurrency: string,
+    amount: number,
+    deliveryMethod: string = "bank_transfer"
+  ): Promise<CymonzRatesResponse> {
+    try {
+      const response = await this.makeRequest(
+        `/v1/rates?sendCurrency=${sendCurrency}&receiveCurrency=${receiveCurrency}&amount=${amount}&deliveryMethod=${deliveryMethod}`
+      );
+
+      return {
+        sendCurrency,
+        receiveCurrency,
+        exchangeRate: response.exchangeRate,
+        fees: response.fees,
+        totalCost: response.totalCost,
+        estimatedDeliveryTime: response.estimatedDeliveryTime,
+        minAmount: response.minAmount,
+        maxAmount: response.maxAmount,
+      };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_rates_error",
+        { 
+          sendCurrency, 
+          receiveCurrency, 
+          amount, 
+          error: error instanceof Error ? error.message : "Unknown error" 
+        },
+        "system"
+      );
+      throw error;
+    }
+  }
+
+  async initiateTransaction(request: CymonzTransactionRequest): Promise<CymonzTransactionResponse> {
+    try {
+      const transactionData = {
+        sender: {
+          id: request.sender.id,
+          email: request.sender.email,
+          firstName: request.sender.firstName,
+          lastName: request.sender.lastName,
+          phone: request.sender.phone,
+          address: request.sender.address,
+          country: request.sender.country,
+          identification: request.sender.idType && request.sender.idNumber ? {
+            type: request.sender.idType,
+            number: request.sender.idNumber
+          } : undefined,
+        },
+        recipient: {
+          name: request.recipient.name,
+          email: request.recipient.email,
+          phone: request.recipient.phone,
+          address: request.recipient.address,
+          country: request.recipient.country,
+          bankDetails: request.recipient.bankName ? {
+            bankName: request.recipient.bankName,
+            bankCode: request.recipient.bankCode,
+            accountNumber: request.recipient.accountNumber,
+            accountName: request.recipient.accountName,
+            swiftCode: request.recipient.swiftCode,
+          } : undefined,
+        },
+        transaction: {
+          sendAmount: request.sendAmount,
+          sendCurrency: request.sendCurrency,
+          receiveCurrency: request.receiveCurrency,
+          deliveryMethod: request.deliveryMethod,
+          purpose: request.purpose || "family_support",
+          reference: request.reference,
+        },
+        callbacks: {
+          callbackUrl: request.callbackUrl || this.config.callbackUrl,
+          webhookUrl: request.webhookUrl || this.config.webhookUrl,
+        },
+      };
+
+      const response = await this.makeRequest("/v1/transactions", "POST", transactionData);
+
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_transaction_initiated",
+        { 
+          transactionId: response.transactionId,
+          amount: request.sendAmount,
+          currency: request.sendCurrency,
+          recipient: request.recipient.country
+        },
+        request.sender.id
+      );
+
+      return {
+        transactionId: response.transactionId,
+        status: response.status,
+        redirectUrl: response.redirectUrl,
+        paymentUrl: response.paymentUrl,
+        receiveAmount: response.receiveAmount,
+        exchangeRate: response.exchangeRate,
+        fees: response.fees,
+        totalAmount: response.totalAmount,
+        estimatedDeliveryTime: response.estimatedDeliveryTime,
+        trackingNumber: response.trackingNumber,
+      };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_transaction_failed",
+        { 
+          sendAmount: request.sendAmount,
+          sendCurrency: request.sendCurrency,
+          receiveCurrency: request.receiveCurrency,
+          error: error instanceof Error ? error.message : "Unknown error" 
+        },
+        request.sender.id
+      );
+
+      return {
+        transactionId: "",
+        status: "failed",
+        fees: 0,
+        totalAmount: request.sendAmount,
+        error: error instanceof Error ? error.message : "Transaction failed",
+        errorCode: "TRANSACTION_FAILED",
+      };
+    }
+  }
+
+  async getTransactionStatus(transactionId: string): Promise<CymonzTransactionResponse> {
+    try {
+      const response = await this.makeRequest(`/v1/transactions/${transactionId}`);
+
+      return {
+        transactionId: response.transactionId,
+        status: response.status,
+        receiveAmount: response.receiveAmount,
+        exchangeRate: response.exchangeRate,
+        fees: response.fees,
+        totalAmount: response.totalAmount,
+        estimatedDeliveryTime: response.estimatedDeliveryTime,
+        trackingNumber: response.trackingNumber,
+      };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_status_check_failed",
+        { 
+          transactionId,
+          error: error instanceof Error ? error.message : "Unknown error" 
+        },
+        "system"
+      );
+
+      return {
+        transactionId,
+        status: "failed",
+        fees: 0,
+        totalAmount: 0,
+        error: error instanceof Error ? error.message : "Status check failed",
+        errorCode: "STATUS_CHECK_FAILED",
+      };
+    }
+  }
+
+  async cancelTransaction(transactionId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const response = await this.makeRequest(`/v1/transactions/${transactionId}/cancel`, "POST", {
+        reason: reason || "User requested cancellation",
+      });
+
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_transaction_cancelled",
+        { transactionId, reason },
+        "system"
+      );
+
+      return { success: true };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_cancellation_failed",
+        { 
+          transactionId,
+          error: error instanceof Error ? error.message : "Unknown error" 
+        },
+        "system"
+      );
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Cancellation failed",
+      };
+    }
+  }
+
+  async processWebhook(webhookData: CymonzWebhookData): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Validate webhook signature (if implemented by Cymonz)
+      // This would typically involve verifying the webhook signature
+      // using the secret key to ensure the request is from Cymonz
+
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_webhook_received",
+        { 
+          transactionId: webhookData.transactionId,
+          status: webhookData.status,
+          amount: webhookData.amount,
+          currency: webhookData.currency
+        },
+        "system"
+      );
+
+      return { success: true };
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_webhook_processing_failed",
+        { 
+          transactionId: webhookData.transactionId,
+          error: error instanceof Error ? error.message : "Unknown error" 
+        },
+        "system"
+      );
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Webhook processing failed",
+      };
+    }
+  }
+
+  async getSupportedCountries(): Promise<string[]> {
+    try {
+      const response = await this.makeRequest("/v1/countries");
+      return response.countries || [];
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_countries_fetch_failed",
+        { error: error instanceof Error ? error.message : "Unknown error" },
+        "system"
+      );
+      
+      // Return fallback list of commonly supported countries
+      return ["US", "UK", "CA", "AU", "NG", "GH", "KE", "UG", "TZ", "ZA", "IN", "PH"];
+    }
+  }
+
+  async getSupportedCurrencies(): Promise<string[]> {
+    try {
+      const response = await this.makeRequest("/v1/currencies");
+      return response.currencies || [];
+    } catch (error) {
+      // await SecurityLogger.logSecurityEvent(
+        "cymonz_currencies_fetch_failed",
+        { error: error instanceof Error ? error.message : "Unknown error" },
+        "system"
+      );
+      
+      // Return fallback list of commonly supported currencies
+      return ["USD", "GBP", "EUR", "CAD", "AUD", "NGN", "GHS", "KES", "UGX", "TZS", "ZAR", "INR", "PHP"];
+    }
+  }
+}
+
+export const cymonzService = new CymonzService();

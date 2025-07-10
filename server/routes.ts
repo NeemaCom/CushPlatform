@@ -75,6 +75,9 @@ import rateLimit from "express-rate-limit";
 import { notificationService } from "./notification-service";
 import { adminService } from "./admin-service";
 import { supportService } from "./support-service";
+import { walletService } from "./wallet-service";
+import { remittanceService } from "./remittance-service";
+import { cymonzService } from "./cymonz-service";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -4919,6 +4922,251 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching support statistics:', error);
       res.status(500).json({ error: "Failed to fetch support statistics" });
+    }
+  });
+
+  // ===== WALLET MANAGEMENT API ROUTES =====
+
+  // Get user's wallets
+  app.get('/api/wallet/wallets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const wallets = await storage.getUserWallets(userId);
+      res.json(wallets);
+    } catch (error) {
+      console.error('Error fetching wallets:', error);
+      res.status(500).json({ error: 'Failed to fetch wallets' });
+    }
+  });
+
+  // Create a new wallet
+  app.post('/api/wallet/create', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { currency = 'USD' } = req.body;
+
+      const result = await walletService.createWallet(userId, currency);
+      res.json(result);
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      res.status(500).json({ error: 'Failed to create wallet' });
+    }
+  });
+
+  // Get wallet balance
+  app.get('/api/wallet/:walletId/balance', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const walletId = parseInt(req.params.walletId);
+      const balance = await walletService.getWalletBalance(walletId);
+      
+      if (!balance) {
+        return res.status(404).json({ error: 'Wallet not found' });
+      }
+      
+      res.json(balance);
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      res.status(500).json({ error: 'Failed to fetch wallet balance' });
+    }
+  });
+
+  // Process wallet transaction
+  app.post('/api/wallet/transaction', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { walletId, type, amount, currency, description, reference, metadata } = req.body;
+
+      const transactionRequest = {
+        walletId,
+        userId,
+        type,
+        amount,
+        currency,
+        description,
+        reference,
+        metadata
+      };
+
+      const result = await walletService.processTransaction(transactionRequest);
+      res.json(result);
+    } catch (error) {
+      console.error('Error processing wallet transaction:', error);
+      res.status(500).json({ error: 'Failed to process wallet transaction' });
+    }
+  });
+
+  // Get wallet transaction history
+  app.get('/api/wallet/:walletId/transactions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const walletId = parseInt(req.params.walletId);
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const transactions = await walletService.getTransactionHistory(walletId, limit, offset);
+      res.json(transactions);
+    } catch (error) {
+      console.error('Error fetching wallet transactions:', error);
+      res.status(500).json({ error: 'Failed to fetch wallet transactions' });
+    }
+  });
+
+  // Get wallet statistics
+  app.get('/api/wallet/stats', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const stats = await walletService.getWalletStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching wallet stats:', error);
+      res.status(500).json({ error: 'Failed to fetch wallet statistics' });
+    }
+  });
+
+  // ===== REMITTANCE API ROUTES =====
+
+  // Get exchange rates quote
+  app.post('/api/remittance/quote', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { sendAmount, sendCurrency, receiveCurrency, deliveryMethod } = req.body;
+      
+      const quote = await remittanceService.getQuote(
+        sendAmount,
+        sendCurrency,
+        receiveCurrency,
+        deliveryMethod
+      );
+      
+      res.json(quote);
+    } catch (error) {
+      console.error('Error getting remittance quote:', error);
+      res.status(500).json({ error: 'Failed to get remittance quote' });
+    }
+  });
+
+  // Initiate remittance transaction
+  app.post('/api/remittance/initiate', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const remittanceData = { ...req.body, userId };
+      
+      const result = await remittanceService.initiateRemittance(remittanceData);
+      res.json(result);
+    } catch (error) {
+      console.error('Error initiating remittance:', error);
+      res.status(500).json({ error: 'Failed to initiate remittance' });
+    }
+  });
+
+  // Get remittance status
+  app.get('/api/remittance/:transactionId/status', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const transactionId = parseInt(req.params.transactionId);
+      const status = await remittanceService.getRemittanceStatus(transactionId);
+      
+      if (!status) {
+        return res.status(404).json({ error: 'Remittance transaction not found' });
+      }
+      
+      res.json(status);
+    } catch (error) {
+      console.error('Error fetching remittance status:', error);
+      res.status(500).json({ error: 'Failed to fetch remittance status' });
+    }
+  });
+
+  // Get remittance history
+  app.get('/api/remittance/history', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const offset = parseInt(req.query.offset as string) || 0;
+
+      const history = await remittanceService.getRemittanceHistory(userId, limit, offset);
+      res.json(history);
+    } catch (error) {
+      console.error('Error fetching remittance history:', error);
+      res.status(500).json({ error: 'Failed to fetch remittance history' });
+    }
+  });
+
+  // Save remittance recipient
+  app.post('/api/remittance/recipients', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const recipientData = { ...req.body, userId };
+      
+      const result = await remittanceService.saveRecipient(recipientData);
+      res.json(result);
+    } catch (error) {
+      console.error('Error saving remittance recipient:', error);
+      res.status(500).json({ error: 'Failed to save remittance recipient' });
+    }
+  });
+
+  // Get saved recipients
+  app.get('/api/remittance/recipients', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const recipients = await remittanceService.getSavedRecipients(userId);
+      res.json(recipients);
+    } catch (error) {
+      console.error('Error fetching saved recipients:', error);
+      res.status(500).json({ error: 'Failed to fetch saved recipients' });
+    }
+  });
+
+  // Cancel remittance
+  app.post('/api/remittance/:transactionId/cancel', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const transactionId = parseInt(req.params.transactionId);
+      const { reason } = req.body;
+      
+      const result = await remittanceService.cancelRemittance(transactionId, reason);
+      res.json(result);
+    } catch (error) {
+      console.error('Error cancelling remittance:', error);
+      res.status(500).json({ error: 'Failed to cancel remittance' });
+    }
+  });
+
+  // Get supported countries
+  app.get('/api/remittance/countries', async (req, res) => {
+    try {
+      const countries = await cymonzService.getSupportedCountries();
+      res.json(countries);
+    } catch (error) {
+      console.error('Error fetching supported countries:', error);
+      res.status(500).json({ error: 'Failed to fetch supported countries' });
+    }
+  });
+
+  // Get supported currencies
+  app.get('/api/remittance/currencies', async (req, res) => {
+    try {
+      const currencies = await cymonzService.getSupportedCurrencies();
+      res.json(currencies);
+    } catch (error) {
+      console.error('Error fetching supported currencies:', error);
+      res.status(500).json({ error: 'Failed to fetch supported currencies' });
+    }
+  });
+
+  // Webhook endpoint for Cymonz notifications
+  app.post('/api/remittance/webhook', async (req, res) => {
+    try {
+      const webhookData = req.body;
+      
+      // Process webhook data
+      const result = await remittanceService.processWebhook(webhookData);
+      
+      if (result.success) {
+        res.status(200).json({ message: 'Webhook processed successfully' });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error processing remittance webhook:', error);
+      res.status(500).json({ error: 'Failed to process webhook' });
     }
   });
 
