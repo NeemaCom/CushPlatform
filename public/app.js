@@ -1021,38 +1021,27 @@ function ContactSection() {
           e('div', { key: 'social-media' }, [
             e('h3', {
               key: 'social-title',
-              className: 'text-2xl font-bold text-white mb-8'
+              className: 'text-lg font-bold text-white mb-4'
             }, 'Follow Us'),
             e('div', {
               key: 'social-grid',
-              className: 'grid grid-cols-1 gap-4'
+              className: 'flex flex-wrap gap-2'
             }, socialMediaHandles.map((social, index) =>
               e('a', {
                 key: index,
                 href: social.url,
                 target: '_blank',
                 rel: 'noopener noreferrer',
-                className: 'bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all hover:scale-105 cursor-pointer'
+                className: 'bg-white/5 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10 hover:bg-white/10 transition-all hover:scale-105 cursor-pointer flex items-center gap-2'
               }, [
                 e('div', {
-                  key: 'social-content',
-                  className: 'flex items-center gap-4'
-                }, [
-                  e('div', {
-                    key: 'social-icon',
-                    className: `w-10 h-10 bg-gradient-to-r ${social.color} rounded-lg flex items-center justify-center text-lg shadow-lg`
-                  }, social.icon),
-                  e('div', { key: 'social-info' }, [
-                    e('h4', {
-                      key: 'social-platform',
-                      className: 'text-white font-semibold'
-                    }, social.platform),
-                    e('p', {
-                      key: 'social-handle',
-                      className: 'text-gray-300 text-sm'
-                    }, social.handle)
-                  ])
-                ])
+                  key: 'social-icon',
+                  className: `w-6 h-6 bg-gradient-to-r ${social.color} rounded flex items-center justify-center text-sm shadow-lg`
+                }, social.icon),
+                e('span', {
+                  key: 'social-handle',
+                  className: 'text-white text-sm font-medium'
+                }, social.handle)
               ])
             ))
           ])
