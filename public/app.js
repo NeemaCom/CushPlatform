@@ -4103,54 +4103,56 @@ For personalized immigration strategy, consult with our experienced immigration 
 
   const renderInsightCard = (insight) => e('div', {
     key: `insight-${insight.id}`,
-    className: 'bg-white rounded-xl p-6 shadow-lg border hover:shadow-xl transition-shadow cursor-pointer',
+    className: 'bg-white rounded-xl p-4 sm:p-6 shadow-lg border hover:shadow-xl transition-shadow cursor-pointer w-full',
     onClick: () => setSelectedInsight(insight)
   }, [
     e('div', {
       key: 'insight-header',
-      className: 'flex items-start gap-4 mb-4'
+      className: 'flex items-start gap-3 sm:gap-4 mb-4'
     }, [
       e('div', {
         key: 'insight-content',
-        className: 'flex-1'
+        className: 'flex-1 min-w-0'
       }, [
         e('h3', {
           key: 'title',
-          className: 'text-xl font-bold text-gray-900 mb-2'
+          className: 'text-lg sm:text-xl font-bold text-gray-900 mb-2 line-clamp-2'
         }, insight.title),
         e('p', {
           key: 'excerpt',
-          className: 'text-gray-600 leading-relaxed mb-3'
+          className: 'text-gray-600 leading-relaxed mb-3 text-sm sm:text-base line-clamp-3'
         }, insight.excerpt),
         e('div', {
           key: 'meta',
-          className: 'flex items-center gap-4 text-sm text-gray-500'
+          className: 'flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs sm:text-sm text-gray-500'
         }, [
-          e('span', { key: 'author' }, `By ${insight.author}`),
+          e('span', { key: 'author', className: 'font-medium' }, `By ${insight.author}`),
           e('span', { key: 'role' }, insight.authorRole),
-          e('span', { key: 'read-time' }, `${insight.readTime} min read`),
-          e('span', { key: 'date' }, new Date(insight.publishedAt).toLocaleDateString())
+          e('div', { key: 'time-date', className: 'flex items-center gap-2' }, [
+            e('span', { key: 'read-time' }, `${insight.readTime} min read`),
+            e('span', { key: 'date' }, new Date(insight.publishedAt).toLocaleDateString())
+          ])
         ])
       ])
     ]),
     e('div', {
       key: 'tags',
-      className: 'flex flex-wrap gap-2'
-    }, insight.tags.map((tag, index) => 
+      className: 'flex flex-wrap gap-1 sm:gap-2'
+    }, insight.tags.slice(0, 3).map((tag, index) => 
       e('span', {
         key: `tag-${index}`,
-        className: 'px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium'
+        className: 'px-2 sm:px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs sm:text-sm font-medium'
       }, tag)
     ))
   ]);
 
   const renderMentorCard = (mentor) => e('div', {
     key: `mentor-${mentor.id}`,
-    className: 'bg-white rounded-xl p-6 shadow-lg border'
+    className: 'bg-white rounded-xl p-4 sm:p-6 shadow-lg border w-full'
   }, [
     e('div', {
       key: 'mentor-header',
-      className: 'flex items-start gap-4 mb-4'
+      className: 'flex items-start gap-3 sm:gap-4 mb-4'
     }, [
       // Profile Picture or Avatar
       mentor.profilePicture ? 
@@ -4158,62 +4160,67 @@ For personalized immigration strategy, consult with our experienced immigration 
           key: 'mentor-image',
           src: mentor.profilePicture,
           alt: `${mentor.firstName} ${mentor.lastName}`,
-          className: 'w-16 h-16 rounded-full object-cover'
+          className: 'w-14 h-14 sm:w-16 sm:h-16 rounded-full object-cover flex-shrink-0'
         }) :
         e('div', {
           key: 'mentor-avatar',
-          className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold'
+          className: 'w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg sm:text-xl font-bold flex-shrink-0'
         }, `${mentor.firstName?.[0] || ''}${mentor.lastName?.[0] || ''}`),
       e('div', {
         key: 'mentor-info',
-        className: 'flex-1'
+        className: 'flex-1 min-w-0'
       }, [
         e('h3', {
           key: 'name',
-          className: 'text-xl font-bold text-gray-900'
+          className: 'text-lg sm:text-xl font-bold text-gray-900 truncate'
         }, `${mentor.firstName || ''} ${mentor.lastName || ''}`),
         e('p', {
           key: 'specialty',
-          className: 'text-blue-600 font-medium'
+          className: 'text-blue-600 font-medium text-sm sm:text-base'
         }, mentor.specialty?.charAt(0).toUpperCase() + mentor.specialty?.slice(1) + ' Expert'),
         e('div', {
           key: 'stats',
-          className: 'flex items-center gap-4 mt-2 text-sm text-gray-600'
+          className: 'flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2 text-xs sm:text-sm text-gray-600'
         }, [
-          e('span', { key: 'experience' }, mentor.experience || 'Experienced Professional'),
-          e('span', { key: 'rating' }, `⭐ ${mentor.rating || '5.0'}`),
-          e('span', { key: 'sessions' }, `${mentor.totalSessions || 0} sessions`)
+          e('span', { key: 'experience', className: 'truncate' }, mentor.experience || 'Experienced Professional'),
+          e('div', { key: 'rating-sessions', className: 'flex items-center gap-2 sm:gap-4' }, [
+            e('span', { key: 'rating' }, `⭐ ${mentor.rating || '5.0'}`),
+            e('span', { key: 'sessions' }, `${mentor.totalSessions || 0} sessions`)
+          ])
         ])
       ])
     ]),
     e('p', {
       key: 'bio',
-      className: 'text-gray-600 mb-4'
+      className: 'text-gray-600 mb-4 text-sm sm:text-base line-clamp-3'
     }, mentor.bio),
-    e('div', {
-      key: 'specialties',
-      className: 'flex flex-wrap gap-2 mb-4'
-    }, mentor.specialties.map((spec, index) =>
+    
+    // Languages & Certifications
+    mentor.languages && mentor.languages.length > 0 && e('div', {
+      key: 'languages',
+      className: 'flex flex-wrap gap-1 sm:gap-2 mb-3'
+    }, mentor.languages.slice(0, 3).map((lang, index) =>
       e('span', {
-        key: `spec-${index}`,
-        className: 'px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm'
-      }, spec)
+        key: `lang-${index}`,
+        className: 'px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs sm:text-sm'
+      }, lang)
     )),
+    
     e('div', {
       key: 'actions',
-      className: 'flex items-center justify-between'
+      className: 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
     }, [
       e('span', {
         key: 'rate',
-        className: 'text-lg font-bold text-gray-900'
-      }, mentor.hourlyRate + '/hour'),
+        className: 'text-base sm:text-lg font-bold text-gray-900'
+      }, mentor.hourlyRate ? `$${mentor.hourlyRate}/hour` : 'Contact for rates'),
       e('button', {
         key: 'book-btn',
         onClick: () => {
           setSelectedMentor(mentor);
           setShowBookingForm(true);
         },
-        className: 'px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors'
+        className: 'w-full sm:w-auto px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm sm:text-base'
       }, 'Book Session')
     ])
   ]);
@@ -4363,24 +4370,24 @@ For personalized immigration strategy, consult with our experienced immigration 
   }
 
   return e('div', {
-    className: 'max-w-7xl mx-auto p-6'
+    className: 'w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6'
   }, [
     // Header
     e('div', {
       key: 'header',
-      className: 'mb-8'
+      className: 'mb-6 sm:mb-8'
     }, [
       e('div', {
         key: 'title-section',
-        className: 'flex items-center gap-4 mb-4'
+        className: 'flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-4'
       }, [
         e('h1', {
           key: 'title',
-          className: 'text-3xl font-bold text-gray-900'
+          className: 'text-2xl sm:text-3xl font-bold text-gray-900'
         }, 'Community Hub'),
         e('div', {
           key: 'stats',
-          className: 'flex items-center gap-6 text-sm text-gray-600'
+          className: 'flex flex-wrap items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-600'
         }, [
           e('span', { key: 'insights-count' }, `${insights.length} Expert Insights`),
           e('span', { key: 'mentors-count' }, `${mentors.length} Certified Mentors`),
@@ -4389,14 +4396,14 @@ For personalized immigration strategy, consult with our experienced immigration 
       ]),
       e('p', {
         key: 'description',
-        className: 'text-gray-600 text-lg'
+        className: 'text-gray-600 text-base sm:text-lg'
       }, 'Connect with experts, access curated insights, and join our global immigration community')
     ]),
 
     // Tab Navigation
     e('div', {
       key: 'tabs',
-      className: 'flex space-x-1 bg-gray-100 p-1 rounded-lg mb-8'
+      className: 'flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-1 bg-gray-100 p-1 rounded-lg mb-6 sm:mb-8'
     }, [
       ['insights', 'Expert Insights', '📚'],
       ['mentors', 'Find Mentors', '👥'],
@@ -4405,20 +4412,21 @@ For personalized immigration strategy, consult with our experienced immigration 
       e('button', {
         key: `tab-${key}`,
         onClick: () => setActiveTab(key),
-        className: `flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-md font-medium transition-colors ${
+        className: `flex-1 flex items-center justify-center gap-2 py-2 sm:py-3 px-3 sm:px-4 rounded-md font-medium transition-colors text-sm sm:text-base ${
           activeTab === key
             ? 'bg-white text-blue-600 shadow-sm'
             : 'text-gray-600 hover:text-gray-900'
         }`
       }, [
-        e('span', { key: 'icon' }, icon),
-        e('span', { key: 'label' }, label)
+        e('span', { key: 'icon', className: 'text-sm sm:text-base' }, icon),
+        e('span', { key: 'label', className: 'whitespace-nowrap' }, label)
       ])
     )),
 
     // Content
     e('div', {
-      key: 'content'
+      key: 'content',
+      className: 'w-full'
     }, [
       // Insights Tab
       activeTab === 'insights' && e('div', {
@@ -4426,7 +4434,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       }, [
         e('div', {
           key: 'insights-grid',
-          className: 'grid md:grid-cols-2 gap-6'
+          className: 'grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6'
         }, insights.map(renderInsightCard))
       ]),
 
@@ -4436,7 +4444,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       }, [
         e('div', {
           key: 'mentors-grid',
-          className: 'grid md:grid-cols-2 lg:grid-cols-3 gap-6'
+          className: 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6'
         }, mentors.map(renderMentorCard))
       ]),
 
