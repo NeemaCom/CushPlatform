@@ -11238,13 +11238,156 @@ function SignUpPage() {
     window.location.href = '/api/auth/google';
   };
 
-  return e('div', { className: 'min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50' }, [
-    // Header
+  return e('div', { className: 'min-h-screen flex' }, [
+    // Left Side - Image Panel
     e('div', {
-      key: 'header',
-      className: 'bg-white shadow-sm border-b border-gray-200 py-4'
+      key: 'left-panel',
+      className: 'hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 relative overflow-hidden'
     }, [
-      e('div', { className: 'container mx-auto px-6 flex items-center justify-between' }, [
+      // Background Pattern
+      e('div', {
+        key: 'pattern',
+        className: 'absolute inset-0 opacity-10',
+        style: {
+          backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
+          backgroundSize: '30px 30px'
+        }
+      }),
+      
+      // Content
+      e('div', {
+        key: 'left-content',
+        className: 'relative z-10 flex flex-col justify-center items-center p-12 text-white'
+      }, [
+        // Logo
+        e('img', {
+          key: 'logo-left',
+          src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
+          alt: 'Cush Logo',
+          className: 'h-12 mb-8'
+        }),
+        
+        // Main Image
+        e('div', {
+          key: 'image-container',
+          className: 'mb-8 relative'
+        }, [
+          e('img', {
+            key: 'main-image',
+            src: '/attached_assets/lady smiling_1752121060443.jpg',
+            alt: 'Happy professional woman',
+            className: 'w-80 h-80 object-cover rounded-2xl shadow-2xl'
+          }),
+          e('div', {
+            key: 'image-overlay',
+            className: 'absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-2xl'
+          })
+        ]),
+        
+        // Text Content
+        e('div', {
+          key: 'text-content',
+          className: 'text-center max-w-md'
+        }, [
+          e('h2', {
+            key: 'welcome-title',
+            className: 'text-3xl font-bold mb-4'
+          }, 'Welcome to Cush'),
+          e('p', {
+            key: 'welcome-subtitle',
+            className: 'text-xl text-blue-100 mb-6 leading-relaxed'
+          }, 'Your gateway to global success. Join thousands of immigrants who have transformed their dreams into reality.'),
+          e('div', {
+            key: 'features',
+            className: 'space-y-3 text-left'
+          }, [
+            e('div', {
+              key: 'feature-1',
+              className: 'flex items-center gap-3'
+            }, [
+              e('div', {
+                key: 'check-1',
+                className: 'w-6 h-6 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0'
+              }, [
+                e('svg', {
+                  key: 'check-icon-1',
+                  className: 'w-4 h-4 text-white',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'check-path-1',
+                    fillRule: 'evenodd',
+                    d: 'M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z',
+                    clipRule: 'evenodd'
+                  })
+                ])
+              ]),
+              e('span', { key: 'feature-1-text' }, 'AI-powered immigration guidance')
+            ]),
+            e('div', {
+              key: 'feature-2',
+              className: 'flex items-center gap-3'
+            }, [
+              e('div', {
+                key: 'check-2',
+                className: 'w-6 h-6 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0'
+              }, [
+                e('svg', {
+                  key: 'check-icon-2',
+                  className: 'w-4 h-4 text-white',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'check-path-2',
+                    fillRule: 'evenodd',
+                    d: 'M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z',
+                    clipRule: 'evenodd'
+                  })
+                ])
+              ]),
+              e('span', { key: 'feature-2-text' }, 'Comprehensive financial services')
+            ]),
+            e('div', {
+              key: 'feature-3',
+              className: 'flex items-center gap-3'
+            }, [
+              e('div', {
+                key: 'check-3',
+                className: 'w-6 h-6 bg-green-400 rounded-full flex items-center justify-center flex-shrink-0'
+              }, [
+                e('svg', {
+                  key: 'check-icon-3',
+                  className: 'w-4 h-4 text-white',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'check-path-3',
+                    fillRule: 'evenodd',
+                    d: 'M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z',
+                    clipRule: 'evenodd'
+                  })
+                ])
+              ]),
+              e('span', { key: 'feature-3-text' }, 'Expert mentor network')
+            ])
+          ])
+        ])
+      ])
+    ]),
+
+    // Right Side - Form Panel
+    e('div', {
+      key: 'right-panel',
+      className: 'w-full lg:w-1/2 flex flex-col justify-center px-8 py-12 bg-gray-50'
+    }, [
+      // Header with Back Button (Mobile)
+      e('div', {
+        key: 'mobile-header',
+        className: 'lg:hidden mb-8 flex items-center justify-between'
+      }, [
         e('button', {
           key: 'back-button',
           onClick: () => navigate('home'),
@@ -11265,25 +11408,20 @@ function SignUpPage() {
               d: 'M10 19l-7-7m0 0l7-7m-7 7h18'
             })
           ]),
-          e('span', { key: 'back-text' }, 'Back to Home')
+          e('span', { key: 'back-text' }, 'Back')
         ]),
         e('img', {
-          key: 'logo',
+          key: 'logo-mobile',
           src: '/attached_assets/Logo + Typeface_PNG (4)_1751497310419.png',
           alt: 'Cush Logo',
           className: 'h-8'
         })
-      ])
-    ]),
-
-    // Main Content
-    e('div', {
-      key: 'main-content',
-      className: 'container mx-auto px-6 py-12'
-    }, [
+      ]),
+      
+      // Form Container
       e('div', {
         key: 'form-container',
-        className: 'max-w-md mx-auto'
+        className: 'max-w-md mx-auto w-full'
       }, [
         // Header Section
         e('div', {
