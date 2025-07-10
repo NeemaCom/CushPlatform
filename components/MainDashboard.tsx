@@ -22,6 +22,7 @@ import { PayPage } from './pages/PayPage';
 import { CommunityPage } from './pages/CommunityPage';
 import { ImisiPage } from './pages/ImisiPage';
 import { LocalJobsPage } from './pages/LocalJobsPage';
+import RailsrPay from '@/pages/RailsrPay';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/dashboard' },
   { id: 'loans', label: 'Loans', icon: CreditCard, path: '/loans' },
   { id: 'pay', label: 'Pay', icon: Wallet, path: '/pay' },
+  { id: 'railsr-pay', label: 'Railsr Pay', icon: Wallet, path: '/railsr-pay' },
   { id: 'community', label: 'Community', icon: Users, path: '/community', badge: 3 },
   { id: 'imisi', label: 'Imisi 2.0', icon: Bot, path: '/imisi' },
   { id: 'jobs', label: 'Local Jobs', icon: MapPin, path: '/jobs', badge: 12 },
@@ -59,6 +61,8 @@ export function MainDashboard() {
         return <LoansPage />;
       case '/pay':
         return <PayPage />;
+      case '/railsr-pay':
+        return <RailsrPay />;
       case '/community':
         return <CommunityPage />;
       case '/imisi':

@@ -78,6 +78,7 @@ import { supportService } from "./support-service";
 import { walletService } from "./wallet-service";
 import { remittanceService } from "./remittance-service";
 import { cymonzService } from "./cymonz-service";
+import { railsrService } from "./railsr-service";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -4642,6 +4643,325 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching support ticket messages:', error);
       res.status(500).json({ error: "Failed to fetch support ticket messages" });
+    }
+  });
+
+  // ===== RAILSR EMBEDDED FINANCE ENDPOINTS =====
+
+  // Create Railsr Enduser (User Onboarding)
+  app.post('/api/railsr/endusers', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const { dateOfBirth, phone, address, nationality, identityDocument } = req.body;
+      
+      const enduserData = {
+        id: '', // Will be set by Railsr
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        dateOfBirth,
+        phone,
+        address,
+        nationality,
+        identityDocument,
+      };
+
+      const result = await railsrService.createEnduser(userId.toString(), enduserData);
+      
+      if (result.success) {
+        res.status(201).json({
+          success: true,
+          railsrEnduserId: result.railsrEnduserId,
+          message: "Railsr enduser created successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error creating Railsr enduser:', error);
+      res.status(500).json({ error: "Failed to create Railsr enduser" });
+    }
+  });
+
+  // Get User's Railsr Wallets
+  app.get('/api/railsr/wallets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const wallets = await railsrService.getUserWallets(userId.toString());
+      res.json({ wallets });
+    } catch (error) {
+      console.error('Error fetching user wallets:', error);
+      res.status(500).json({ error: "Failed to fetch wallets" });
+    }
+  });
+
+  // Create Railsr Wallet
+  app.post('/api/railsr/wallets', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { currency = 'GBP', type = 'ledger' } = req.body;
+      
+      // Get user's Railsr enduser ID
+      const wallets = await railsrService.getUserWallets(userId.toString());
+      if (wallets.length === 0) {
+        return res.status(400).json({ error: "No Railsr enduser found. Please complete onboarding first." });
+      }
+
+      const result = await railsrService.createWallet(wallets[0].railsrEnduserId, currency, type);
+      
+      if (result.success) {
+        res.status(201).json({
+          success: true,
+          walletId: result.walletId,
+          message: "Wallet created successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      res.status(500).json({ error: "Failed to create wallet" });
+    }
+  });
+
+  // Get Wallet Details
+  app.get('/api/railsr/wallets/:walletId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { walletId } = req.params;
+      const wallet = await railsrService.getWallet(walletId);
+      res.json({ wallet });
+    } catch (error) {
+      console.error('Error fetching wallet:', error);
+      res.status(500).json({ error: "Failed to fetch wallet" });
+    }
+  });
+
+  // Get Wallet Transactions
+  app.get('/api/railsr/wallets/:walletId/transactions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { walletId } = req.params;
+      const { limit = 50 } = req.query;
+      
+      const transactions = await railsrService.getWalletTransactions(walletId, parseInt(limit as string));
+      res.json({ transactions });
+    } catch (error) {
+      console.error('Error fetching wallet transactions:', error);
+      res.status(500).json({ error: "Failed to fetch wallet transactions" });
+    }
+  });
+
+  // Get User's Railsr Cards
+  app.get('/api/railsr/cards', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const cards = await railsrService.getUserCards(userId.toString());
+      res.json({ cards });
+    } catch (error) {
+      console.error('Error fetching user cards:', error);
+      res.status(500).json({ error: "Failed to fetch cards" });
+    }
+  });
+
+  // Create Railsr Card
+  app.post('/api/railsr/cards', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { walletId, type = 'virtual' } = req.body;
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const cardholderName = `${user.firstName} ${user.lastName}`;
+      const result = await railsrService.createCard(walletId, type, cardholderName);
+      
+      if (result.success) {
+        res.status(201).json({
+          success: true,
+          cardId: result.cardId,
+          message: "Card created successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error creating card:', error);
+      res.status(500).json({ error: "Failed to create card" });
+    }
+  });
+
+  // Get Card Details
+  app.get('/api/railsr/cards/:cardId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { cardId } = req.params;
+      const card = await railsrService.getCard(cardId);
+      res.json({ card });
+    } catch (error) {
+      console.error('Error fetching card:', error);
+      res.status(500).json({ error: "Failed to fetch card" });
+    }
+  });
+
+  // Activate Card
+  app.put('/api/railsr/cards/:cardId/activate', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { cardId } = req.params;
+      const result = await railsrService.activateCard(cardId);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "Card activated successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error activating card:', error);
+      res.status(500).json({ error: "Failed to activate card" });
+    }
+  });
+
+  // Set Card Limits
+  app.put('/api/railsr/cards/:cardId/limits', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { cardId } = req.params;
+      const { limits } = req.body;
+      
+      const result = await railsrService.setCardLimits(cardId, limits);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          message: "Card limits updated successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error setting card limits:', error);
+      res.status(500).json({ error: "Failed to set card limits" });
+    }
+  });
+
+  // Create Transaction (Transfer/Payment)
+  app.post('/api/railsr/transactions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { fromWalletId, toWalletId, amount, currency, description, reference, metadata } = req.body;
+      
+      if (!fromWalletId || !amount || !currency || !description) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      const transferRequest = {
+        fromWalletId,
+        toWalletId,
+        amount,
+        currency,
+        description,
+        reference,
+        metadata,
+      };
+
+      const result = await railsrService.createTransaction(transferRequest);
+      
+      if (result.success) {
+        res.status(201).json({
+          success: true,
+          transactionId: result.transactionId,
+          message: "Transaction created successfully"
+        });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error creating transaction:', error);
+      res.status(500).json({ error: "Failed to create transaction" });
+    }
+  });
+
+  // Get Transaction Details
+  app.get('/api/railsr/transactions/:transactionId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { transactionId } = req.params;
+      const transaction = await railsrService.getTransaction(transactionId);
+      res.json({ transaction });
+    } catch (error) {
+      console.error('Error fetching transaction:', error);
+      res.status(500).json({ error: "Failed to fetch transaction" });
+    }
+  });
+
+  // Railsr Webhook Handler
+  app.post('/api/railsr/webhooks', async (req, res) => {
+    try {
+      const webhookData = req.body;
+      console.log('Received Railsr webhook:', webhookData);
+      
+      const result = await railsrService.processWebhook(webhookData);
+      
+      if (result.success) {
+        res.status(200).json({ success: true, message: "Webhook processed successfully" });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error('Error processing Railsr webhook:', error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // Get Railsr Dashboard Data
+  app.get('/api/railsr/dashboard', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      const [wallets, cards] = await Promise.all([
+        railsrService.getUserWallets(userId.toString()),
+        railsrService.getUserCards(userId.toString())
+      ]);
+
+      // Calculate total balance across all wallets
+      const totalBalance = wallets.reduce((sum, wallet) => {
+        return sum + parseFloat(wallet.balance || '0');
+      }, 0);
+
+      // Get recent transactions from all wallets
+      const recentTransactions = [];
+      for (const wallet of wallets.slice(0, 3)) { // Limit to first 3 wallets
+        try {
+          const transactions = await railsrService.getWalletTransactions(wallet.railsrWalletId, 10);
+          recentTransactions.push(...transactions);
+        } catch (error) {
+          console.error(`Error fetching transactions for wallet ${wallet.railsrWalletId}:`, error);
+        }
+      }
+
+      // Sort transactions by date
+      recentTransactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      res.json({
+        summary: {
+          totalWallets: wallets.length,
+          totalCards: cards.length,
+          totalBalance,
+          activeWallets: wallets.filter(w => w.status === 'active').length,
+          activeCards: cards.filter(c => c.status === 'active').length,
+        },
+        wallets: wallets.slice(0, 5), // Return first 5 wallets
+        cards: cards.slice(0, 5), // Return first 5 cards
+        recentTransactions: recentTransactions.slice(0, 10), // Return 10 most recent transactions
+      });
+    } catch (error) {
+      console.error('Error fetching Railsr dashboard data:', error);
+      res.status(500).json({ error: "Failed to fetch dashboard data" });
     }
   });
 
