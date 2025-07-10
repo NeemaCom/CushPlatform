@@ -710,6 +710,30 @@ function ContactSection() {
     }
   ];
 
+  const socialMediaHandles = [
+    {
+      platform: 'TikTok',
+      handle: '@wearecush',
+      icon: '🎵',
+      color: 'from-pink-500 to-rose-500',
+      url: 'https://tiktok.com/@wearecush'
+    },
+    {
+      platform: 'LinkedIn',
+      handle: '@wearecush',
+      icon: '💼',
+      color: 'from-blue-600 to-blue-700',
+      url: 'https://linkedin.com/company/wearecush'
+    },
+    {
+      platform: 'Instagram',
+      handle: '@wearecush',
+      icon: '📸',
+      color: 'from-pink-500 to-purple-600',
+      url: 'https://instagram.com/wearecush'
+    }
+  ];
+
   return e('section', {
     id: 'contact-section',
     className: 'py-24 bg-gray-900'
@@ -739,7 +763,7 @@ function ContactSection() {
           }, 'Contact Methods'),
           e('div', {
             key: 'methods-grid',
-            className: 'space-y-6'
+            className: 'space-y-6 mb-12'
           }, contactMethods.map((method, index) =>
             e('div', {
               key: index,
@@ -769,7 +793,47 @@ function ContactSection() {
                 className: 'text-blue-400 font-medium pl-16'
               }, method.contact)
             ])
-          ))
+          )),
+          
+          // Social Media Section
+          e('div', { key: 'social-media' }, [
+            e('h3', {
+              key: 'social-title',
+              className: 'text-2xl font-bold text-white mb-8'
+            }, 'Follow Us'),
+            e('div', {
+              key: 'social-grid',
+              className: 'grid grid-cols-1 gap-4'
+            }, socialMediaHandles.map((social, index) =>
+              e('a', {
+                key: index,
+                href: social.url,
+                target: '_blank',
+                rel: 'noopener noreferrer',
+                className: 'bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/10 transition-all hover:scale-105 cursor-pointer'
+              }, [
+                e('div', {
+                  key: 'social-content',
+                  className: 'flex items-center gap-4'
+                }, [
+                  e('div', {
+                    key: 'social-icon',
+                    className: `w-10 h-10 bg-gradient-to-r ${social.color} rounded-lg flex items-center justify-center text-lg shadow-lg`
+                  }, social.icon),
+                  e('div', { key: 'social-info' }, [
+                    e('h4', {
+                      key: 'social-platform',
+                      className: 'text-white font-semibold'
+                    }, social.platform),
+                    e('p', {
+                      key: 'social-handle',
+                      className: 'text-gray-300 text-sm'
+                    }, social.handle)
+                  ])
+                ])
+              ])
+            ))
+          ])
         ]),
 
         // Contact Form
