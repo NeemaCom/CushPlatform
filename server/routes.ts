@@ -1767,6 +1767,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Simple mentors endpoint for homepage carousel
+  app.get('/api/mentors', async (req, res) => {
+    try {
+      const mentors = await storage.getMentors(undefined, true);
+      res.json(mentors);
+    } catch (error: any) {
+      console.error("Get mentors error:", error);
+      res.status(500).json({ error: "Failed to fetch mentors" });
+    }
+  });
+
   // Mentors routes
   app.get('/api/community/mentors', async (req, res) => {
     try {
@@ -3969,7 +3980,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/mentors', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-      const { name, email, specialty, experience, bio, hourlyRate, languages, certifications } = req.body;
+      const { name, email, specialty, experience, bio, hourlyRate, languages, certifications, profilePicture } = req.body;
       
       if (!name || !email || !specialty || !experience || !bio || !hourlyRate) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -4006,6 +4017,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hourlyRate,
         languages: languages || [],
         certifications: certifications || [],
+        profilePicture: profilePicture || null,
         isActive: true,
         isVerified: true,
         availability: {

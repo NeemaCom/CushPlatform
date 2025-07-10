@@ -547,6 +547,228 @@ function TestimonialsSection() {
   ]);
 }
 
+// Meet Our Mentors Section
+function MentorCarouselSection() {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [mentors, setMentors] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchMentors = async () => {
+      try {
+        const response = await fetch('/api/mentors');
+        if (response.ok) {
+          const data = await response.json();
+          setMentors(data);
+        }
+      } catch (error) {
+        console.error('Error fetching mentors:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMentors();
+  }, []);
+
+  // Auto-scroll carousel
+  useEffect(() => {
+    if (mentors.length > 0) {
+      const interval = setInterval(() => {
+        setCurrentIndex(prev => (prev + 1) % mentors.length);
+      }, 4000);
+      return () => clearInterval(interval);
+    }
+  }, [mentors.length]);
+
+  const nextSlide = () => {
+    setCurrentIndex(prev => (prev + 1) % mentors.length);
+  };
+
+  const prevSlide = () => {
+    setCurrentIndex(prev => (prev - 1 + mentors.length) % mentors.length);
+  };
+
+  if (isLoading) {
+    return e('section', {
+      className: 'py-24 bg-gradient-to-b from-gray-900 to-gray-800'
+    }, [
+      e('div', { key: 'loading', className: 'text-center text-white' }, [
+        e('div', { key: 'spinner', className: 'animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto' })
+      ])
+    ]);
+  }
+
+  if (mentors.length === 0) {
+    return null;
+  }
+
+  return e('section', {
+    className: 'py-24 bg-gradient-to-b from-gray-900 to-gray-800'
+  }, [
+    e('div', { key: 'container', className: 'container mx-auto px-6' }, [
+      // Header
+      e('div', { key: 'header', className: 'text-center mb-16' }, [
+        e('div', {
+          key: 'badge',
+          className: 'inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full mb-6'
+        }, [
+          e('span', { key: 'dot', className: 'w-2 h-2 bg-blue-500 rounded-full mr-2' }),
+          'Expert Mentors'
+        ]),
+        e('h2', { 
+          key: 'title',
+          className: 'text-4xl md:text-5xl font-bold text-white mb-6'
+        }, 'Meet Our Mentors'),
+        e('p', { 
+          key: 'subtitle',
+          className: 'text-xl text-gray-300 max-w-2xl mx-auto'
+        }, 'Connect with experienced immigration experts who have successfully navigated their own journeys')
+      ]),
+
+      // Carousel Container
+      e('div', { key: 'carousel-container', className: 'relative max-w-6xl mx-auto' }, [
+        // Carousel Track
+        e('div', { 
+          key: 'carousel-track',
+          className: 'overflow-hidden rounded-2xl'
+        }, [
+          e('div', {
+            key: 'carousel-wrapper',
+            className: 'flex transition-transform duration-500 ease-in-out',
+            style: { transform: `translateX(-${currentIndex * 100}%)` }
+          }, mentors.map((mentor, index) =>
+            e('div', {
+              key: mentor.id,
+              className: 'w-full flex-shrink-0 px-4'
+            }, [
+              e('div', {
+                key: 'mentor-card',
+                className: 'bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/15 transition-all duration-300'
+              }, [
+                // Mentor Content
+                e('div', {
+                  key: 'mentor-content',
+                  className: 'flex flex-col md:flex-row items-center gap-8'
+                }, [
+                  // Mentor Image
+                  e('div', {
+                    key: 'mentor-image',
+                    className: 'flex-shrink-0'
+                  }, [
+                    mentor.profilePicture ? 
+                      e('img', {
+                        key: 'mentor-photo',
+                        src: mentor.profilePicture,
+                        alt: `${mentor.firstName} ${mentor.lastName}`,
+                        className: 'w-32 h-32 rounded-full object-cover border-4 border-blue-400 shadow-lg'
+                      }) :
+                      e('div', {
+                        key: 'mentor-avatar',
+                        className: 'w-32 h-32 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-3xl shadow-lg'
+                      }, `${mentor.firstName?.[0] || ''}${mentor.lastName?.[0] || ''}`)
+                  ]),
+                  
+                  // Mentor Info
+                  e('div', {
+                    key: 'mentor-info',
+                    className: 'flex-1 text-center md:text-left'
+                  }, [
+                    // Name and Title
+                    e('h3', {
+                      key: 'mentor-name',
+                      className: 'text-2xl font-bold text-white mb-2'
+                    }, `${mentor.firstName || ''} ${mentor.lastName || ''}`),
+                    e('p', {
+                      key: 'mentor-specialty',
+                      className: 'text-blue-400 font-medium mb-4'
+                    }, mentor.specialty?.charAt(0).toUpperCase() + mentor.specialty?.slice(1) + ' Expert'),
+                    
+                    // Bio
+                    e('p', {
+                      key: 'mentor-bio',
+                      className: 'text-gray-300 mb-6 leading-relaxed'
+                    }, mentor.bio || 'Experienced immigration mentor ready to guide you through your journey.'),
+                    
+                    // Experience and Languages
+                    e('div', {
+                      key: 'mentor-details',
+                      className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-6'
+                    }, [
+                      e('div', { key: 'experience' }, [
+                        e('p', {
+                          key: 'exp-label',
+                          className: 'text-sm text-gray-400 mb-1'
+                        }, 'Experience'),
+                        e('p', {
+                          key: 'exp-value',
+                          className: 'text-white font-medium'
+                        }, mentor.experience || 'Immigration Expert')
+                      ]),
+                      e('div', { key: 'languages' }, [
+                        e('p', {
+                          key: 'lang-label',
+                          className: 'text-sm text-gray-400 mb-1'
+                        }, 'Languages'),
+                        e('p', {
+                          key: 'lang-value',
+                          className: 'text-white font-medium'
+                        }, mentor.languages?.join(', ') || 'English')
+                      ])
+                    ]),
+                    
+                    // Action Button
+                    e('button', {
+                      key: 'book-session',
+                      className: 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 px-8 rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl',
+                      onClick: () => {
+                        // Navigate to mentor booking
+                        window.location.hash = 'community';
+                      }
+                    }, 'Book a Session')
+                  ])
+                ])
+              ])
+            ])
+          ))
+        ]),
+        
+        // Navigation Arrows
+        mentors.length > 1 && e('div', { key: 'navigation' }, [
+          e('button', {
+            key: 'prev-btn',
+            onClick: prevSlide,
+            className: 'absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-3 transition-all duration-300 shadow-lg'
+          }, [
+            e('span', { key: 'prev-icon', className: 'text-white text-xl' }, '←')
+          ]),
+          e('button', {
+            key: 'next-btn',
+            onClick: nextSlide,
+            className: 'absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-full p-3 transition-all duration-300 shadow-lg'
+          }, [
+            e('span', { key: 'next-icon', className: 'text-white text-xl' }, '→')
+          ])
+        ])
+      ]),
+      
+      // Carousel Indicators
+      mentors.length > 1 && e('div', {
+        key: 'indicators',
+        className: 'flex justify-center mt-8 gap-2'
+      }, mentors.map((_, index) =>
+        e('button', {
+          key: index,
+          onClick: () => setCurrentIndex(index),
+          className: `w-3 h-3 rounded-full transition-all duration-300 ${
+            index === currentIndex ? 'bg-blue-500 scale-125' : 'bg-gray-400 hover:bg-gray-300'
+          }`
+        })
+      ))
+    ])
+  ]);
+}
+
 // About Us Section
 function AboutUsSection() {
   const stats = [
@@ -4433,6 +4655,7 @@ function Homepage() {
     e(HeroSection, { key: 'hero' }),
     e(ServicesSection, { key: 'services' }),
     e(TestimonialsSection, { key: 'testimonials' }),
+    e(MentorCarouselSection, { key: 'mentors' }),
     e(AboutUsSection, { key: 'about' }),
     e(ContactSection, { key: 'contact' }),
     e(AuthComponent, { key: 'auth' }),

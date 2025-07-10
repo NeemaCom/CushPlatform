@@ -253,6 +253,7 @@ export const mentors = pgTable("mentors", {
   specialty: text("specialty").notNull(), // finance, legal, career, immigration
   bio: text("bio").notNull(),
   experience: text("experience"), // Years of experience or background
+  profilePicture: text("profile_picture"), // Base64 encoded image data
   availability: json("availability").$type<{
     timezone: string;
     weekdays: { day: string; startTime: string; endTime: string; }[];
