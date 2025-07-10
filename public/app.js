@@ -4076,9 +4076,29 @@ For personalized immigration strategy, consult with our experienced immigration 
 
   useEffect(() => {
     // Load data
-    setInsights(sampleInsights);
-    setMentors(sampleMentors);
-    setLoading(false);
+    const loadData = async () => {
+      try {
+        setInsights(sampleInsights);
+        
+        // Fetch real mentor data from API
+        const mentorsResponse = await fetch('/api/mentors');
+        if (mentorsResponse.ok) {
+          const mentorsData = await mentorsResponse.json();
+          setMentors(mentorsData);
+        } else {
+          // Fallback to sample data if API fails
+          setMentors(sampleMentors);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+        // Fallback to sample data if API fails
+        setMentors(sampleMentors);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, []);
 
   const renderInsightCard = (insight) => e('div', {
@@ -4132,10 +4152,18 @@ For personalized immigration strategy, consult with our experienced immigration 
       key: 'mentor-header',
       className: 'flex items-start gap-4 mb-4'
     }, [
-      e('div', {
-        key: 'avatar',
-        className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold'
-      }, mentor.name.split(' ').map(n => n[0]).join('')),
+      // Profile Picture or Avatar
+      mentor.profilePicture ? 
+        e('img', {
+          key: 'mentor-image',
+          src: mentor.profilePicture,
+          alt: `${mentor.firstName} ${mentor.lastName}`,
+          className: 'w-16 h-16 rounded-full object-cover'
+        }) :
+        e('div', {
+          key: 'mentor-avatar',
+          className: 'w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xl font-bold'
+        }, `${mentor.firstName?.[0] || ''}${mentor.lastName?.[0] || ''}`),
       e('div', {
         key: 'mentor-info',
         className: 'flex-1'
@@ -4143,18 +4171,18 @@ For personalized immigration strategy, consult with our experienced immigration 
         e('h3', {
           key: 'name',
           className: 'text-xl font-bold text-gray-900'
-        }, mentor.name),
+        }, `${mentor.firstName || ''} ${mentor.lastName || ''}`),
         e('p', {
           key: 'specialty',
           className: 'text-blue-600 font-medium'
-        }, mentor.specialty),
+        }, mentor.specialty?.charAt(0).toUpperCase() + mentor.specialty?.slice(1) + ' Expert'),
         e('div', {
           key: 'stats',
           className: 'flex items-center gap-4 mt-2 text-sm text-gray-600'
         }, [
-          e('span', { key: 'experience' }, mentor.experience),
-          e('span', { key: 'rating' }, `⭐ ${mentor.rating}`),
-          e('span', { key: 'sessions' }, `${mentor.sessions} sessions`)
+          e('span', { key: 'experience' }, mentor.experience || 'Experienced Professional'),
+          e('span', { key: 'rating' }, `⭐ ${mentor.rating || '5.0'}`),
+          e('span', { key: 'sessions' }, `${mentor.totalSessions || 0} sessions`)
         ])
       ])
     ]),
