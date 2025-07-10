@@ -1,0 +1,80 @@
+Implement a remittance feature within the Cush platform, utilizing Cymonz as the primary gateway. Cush will act as a secure conduit, guiding users to Cymonz for the actual money transfer process, ensuring a seamless user experience while leveraging Cymonz's robust compliance and payment infrastructure.
+
+Feature Goal (Remittance Service):
+To enable Cush users (migrants and underserved individuals) to securely and conveniently send money internationally by initiating transfers through the Cush platform, which then hands off the process to Cymonz.
+
+Core Requirements for Cymonz Remittance Integration (Conduit Model):
+Cymonz Account & API Key Management (Conceptual for AI Agent):
+
+Action: Acknowledge that a Cymonz partner account and API keys are prerequisites. The AI agent will design the integration assuming these are available.
+
+Implementation: Securely store Cymonz API credentials in environment variables (.env).
+
+Backend Integration Service (src/services/cymonzService.ts):
+
+Create a dedicated service to encapsulate all interactions with the Cymonz API.
+
+Authentication: Implement secure authentication with Cymonz using provided API keys/tokens.
+
+User Creation/Linking: If Cymonz requires user pre-registration, implement API calls to create or link Cush users to Cymonz profiles.
+
+Transaction Initiation: Develop a function to initiate a remittance transaction with Cymonz, passing necessary details (sender info, recipient info, amount, currencies). This will likely involve generating a secure URL or token for redirection.
+
+Status Webhooks (Optional but Recommended for robust feedback): Design an endpoint (POST /api/remittance/cymonz/webhook) to receive status updates from Cymonz regarding the transaction (e.g., pending, complete, failed). This allows Cush to update its internal records and notify the user.
+
+Cush Backend API Endpoints (src/routes/remittance.ts):
+
+POST /api/remittance/initiate:
+
+Receives remittance details from the Cush frontend.
+
+Performs initial validation (e.g., user authentication, basic amount checks).
+
+Calls cymonzService.initiateTransaction to get the redirection URL or necessary parameters.
+
+Returns the secure redirection URL to the frontend.
+
+GET /api/remittance/status/:transactionId: Allows Cush to query the status of a transaction (either directly from Cymonz or from Cush's internal updated records via webhook).
+
+Frontend User Flow (React Native):
+
+Remittance Initiation Screen:
+
+UI for users to input sender details (if not pre-filled from profile), recipient details (name, bank, etc.), amount, and currencies.
+
+A clear "Send Money" button.
+
+Redirection: Upon initiating the transaction, the Cush app should redirect the user securely to the Cymonz platform (e.g., using Linking.openURL in React Native or a WebView if necessary for a more embedded feel).
+
+Return to Cush: Design a callback URL (configured with Cymonz) that brings the user back to a Cush confirmation or status page after the Cymonz transaction is completed or abandoned.
+
+Status Display: Display the current status of the remittance transaction to the user (e.g., "Transfer in progress," "Completed," "Failed").
+
+Data Handling & Compliance:
+
+Minimal Data Storage: Cush should only store essential transaction identifiers and status (e.g., transactionId, status, amount, currency, senderId, recipientIdentifier) to track the remittance. Sensitive payment details are handled directly by Cymonz.
+
+User Consent: Ensure clear UI elements and legal text (linking to Cush's Privacy Policy and Terms of Service) inform the user that they are being redirected to a third-party service (Cymonz) for the actual money transfer and that Cymonz's own terms and privacy policy will apply.
+
+Audit Logging: Log all remittance initiation attempts and status updates within Cush's securityLogger for compliance and troubleshooting.
+
+Wallet Integration (if applicable):
+
+If Cush implements a wallet, ensure the remittance feature can deduct funds from the user's Cush wallet balance (and update the wallet balance accordingly via a backend transaction).
+
+If the wallet is funded via external methods, ensure the flow to fund the wallet is clear before initiating remittance.
+
+Expected Deliverables:
+backend/src/services/cymonzService.ts: Functions for interacting with Cymonz API (initiation, status checks, webhook handling).
+
+backend/src/routes/remittance.ts: API endpoints for initiating remittances and receiving Cymonz webhooks.
+
+backend/src/db/schema.ts: Updated schema for RemittanceTransaction to store Cush's internal record of the transfer (e.g., id, userId, cymonzTransactionId, amount, currency, status, createdAt, updatedAt).
+
+frontend/src/screens/Remittance/SendMoneyScreen.tsx: React Native UI for inputting remittance details.
+
+frontend/src/screens/Remittance/RemittanceStatusScreen.tsx: React Native UI for displaying transaction status.
+
+frontend/src/navigation/index.tsx (or similar): Updated navigation to include remittance screens.
+
+README.md updates: Instructions on configuring Cymonz API keys and webhook URLs.

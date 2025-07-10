@@ -17,6 +17,10 @@ import {
   financialGoals,
   goalProgress,
   jobListings,
+  wallets,
+  walletTransactions,
+  remittanceTransactions,
+  remittanceRecipients,
 
   type User, 
   type SafeUser,
@@ -52,9 +56,16 @@ import {
   type GoalProgress,
   type InsertGoalProgress,
   type JobListing,
-
   type InsertJobListing,
   type SearchJobsQuery,
+  type Wallet,
+  type InsertWallet,
+  type WalletTransaction,
+  type InsertWalletTransaction,
+  type RemittanceTransaction,
+  type InsertRemittanceTransaction,
+  type RemittanceRecipient,
+  type InsertRemittanceRecipient,
 
 } from "@shared/schema";
 import { db } from "./db";
@@ -218,6 +229,27 @@ export interface IStorage {
     avgTransactionsPerUser: number;
     totalBalance: string;
   }>;
+
+  // Wallet management methods
+  getUserWallets(userId: number): Promise<Wallet[]>;
+  getWallet(userId: number, currency?: string): Promise<Wallet | undefined>;
+  createWallet(wallet: InsertWallet): Promise<Wallet>;
+  updateWallet(id: number, updates: Partial<Wallet>): Promise<Wallet>;
+  getWalletTransactions(walletId: number, limit?: number, offset?: number): Promise<WalletTransaction[]>;
+  createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction>;
+
+  // Remittance management methods
+  getRemittanceTransactions(userId: number, limit?: number, offset?: number): Promise<RemittanceTransaction[]>;
+  getRemittanceTransaction(id: number): Promise<RemittanceTransaction | undefined>;
+  createRemittanceTransaction(transaction: InsertRemittanceTransaction): Promise<RemittanceTransaction>;
+  updateRemittanceTransaction(id: number, updates: Partial<RemittanceTransaction>): Promise<RemittanceTransaction>;
+  
+  // Remittance recipients methods
+  getRemittanceRecipients(userId: number): Promise<RemittanceRecipient[]>;
+  getRemittanceRecipient(id: number): Promise<RemittanceRecipient | undefined>;
+  createRemittanceRecipient(recipient: InsertRemittanceRecipient): Promise<RemittanceRecipient>;
+  updateRemittanceRecipient(id: number, updates: Partial<RemittanceRecipient>): Promise<RemittanceRecipient>;
+  deleteRemittanceRecipient(id: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1427,6 +1459,133 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCommunityEvent(id: number): Promise<void> {
     await db.delete(communityEvents).where(eq(communityEvents.id, id));
+  }
+
+  // ===== WALLET MANAGEMENT METHODS =====
+
+  async getUserWallets(userId: number): Promise<Wallet[]> {
+    return await db
+      .select()
+      .from(wallets)
+      .where(and(eq(wallets.userId, userId), eq(wallets.isActive, true)))
+      .orderBy(desc(wallets.createdAt));
+  }
+
+  async getWallet(userId: number, currency: string = "USD"): Promise<Wallet | undefined> {
+    const [wallet] = await db
+      .select()
+      .from(wallets)
+      .where(and(
+        eq(wallets.userId, userId),
+        eq(wallets.currency, currency),
+        eq(wallets.isActive, true)
+      ))
+      .limit(1);
+    return wallet || undefined;
+  }
+
+  async createWallet(wallet: InsertWallet): Promise<Wallet> {
+    const [created] = await db.insert(wallets).values(wallet).returning();
+    return created;
+  }
+
+  async updateWallet(id: number, updates: Partial<Wallet>): Promise<Wallet> {
+    const [updated] = await db
+      .update(wallets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(wallets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getWalletTransactions(walletId: number, limit: number = 20, offset: number = 0): Promise<WalletTransaction[]> {
+    return await db
+      .select()
+      .from(walletTransactions)
+      .where(eq(walletTransactions.walletId, walletId))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async createWalletTransaction(transaction: InsertWalletTransaction): Promise<WalletTransaction> {
+    const [created] = await db.insert(walletTransactions).values(transaction).returning();
+    return created;
+  }
+
+  // ===== REMITTANCE MANAGEMENT METHODS =====
+
+  async getRemittanceTransactions(userId: number, limit: number = 20, offset: number = 0): Promise<RemittanceTransaction[]> {
+    return await db
+      .select()
+      .from(remittanceTransactions)
+      .where(eq(remittanceTransactions.userId, userId))
+      .orderBy(desc(remittanceTransactions.createdAt))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async getRemittanceTransaction(id: number): Promise<RemittanceTransaction | undefined> {
+    const [transaction] = await db
+      .select()
+      .from(remittanceTransactions)
+      .where(eq(remittanceTransactions.id, id))
+      .limit(1);
+    return transaction || undefined;
+  }
+
+  async createRemittanceTransaction(transaction: InsertRemittanceTransaction): Promise<RemittanceTransaction> {
+    const [created] = await db.insert(remittanceTransactions).values(transaction).returning();
+    return created;
+  }
+
+  async updateRemittanceTransaction(id: number, updates: Partial<RemittanceTransaction>): Promise<RemittanceTransaction> {
+    const [updated] = await db
+      .update(remittanceTransactions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(remittanceTransactions.id, id))
+      .returning();
+    return updated;
+  }
+
+  // ===== REMITTANCE RECIPIENTS METHODS =====
+
+  async getRemittanceRecipients(userId: number): Promise<RemittanceRecipient[]> {
+    return await db
+      .select()
+      .from(remittanceRecipients)
+      .where(and(eq(remittanceRecipients.userId, userId), eq(remittanceRecipients.isActive, true)))
+      .orderBy(desc(remittanceRecipients.lastUsed), desc(remittanceRecipients.createdAt));
+  }
+
+  async getRemittanceRecipient(id: number): Promise<RemittanceRecipient | undefined> {
+    const [recipient] = await db
+      .select()
+      .from(remittanceRecipients)
+      .where(eq(remittanceRecipients.id, id))
+      .limit(1);
+    return recipient || undefined;
+  }
+
+  async createRemittanceRecipient(recipient: InsertRemittanceRecipient): Promise<RemittanceRecipient> {
+    const [created] = await db.insert(remittanceRecipients).values(recipient).returning();
+    return created;
+  }
+
+  async updateRemittanceRecipient(id: number, updates: Partial<RemittanceRecipient>): Promise<RemittanceRecipient> {
+    const [updated] = await db
+      .update(remittanceRecipients)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(remittanceRecipients.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteRemittanceRecipient(id: number): Promise<void> {
+    await db
+      .update(remittanceRecipients)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(remittanceRecipients.id, id));
   }
 }
 

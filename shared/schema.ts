@@ -1298,6 +1298,271 @@ export const insertFinancialGoalSchema = createInsertSchema(financialGoals).pick
   notes: true,
 });
 
+// ===== CUSH WALLET & REMITTANCE SYSTEM =====
+
+// Cush Wallet table
+export const wallets = pgTable("wallets", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  currency: text("currency").notNull().default("USD"),
+  balance: decimal("balance", { precision: 15, scale: 2 }).notNull().default("0.00"),
+  availableBalance: decimal("available_balance", { precision: 15, scale: 2 }).notNull().default("0.00"),
+  pendingBalance: decimal("pending_balance", { precision: 15, scale: 2 }).notNull().default("0.00"),
+  isActive: boolean("is_active").default(true),
+  isFrozen: boolean("is_frozen").default(false),
+  dailyLimit: decimal("daily_limit", { precision: 15, scale: 2 }).default("5000.00"),
+  monthlyLimit: decimal("monthly_limit", { precision: 15, scale: 2 }).default("25000.00"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Wallet Transactions table
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: serial("id").primaryKey(),
+  walletId: integer("wallet_id").notNull().references(() => wallets.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // deposit, withdrawal, transfer_out, transfer_in, fee, refund
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  currency: text("currency").notNull(),
+  description: text("description").notNull(),
+  reference: text("reference"), // external reference number
+  status: text("status").notNull().default("pending"), // pending, completed, failed, cancelled
+  balanceBefore: decimal("balance_before", { precision: 15, scale: 2 }).notNull(),
+  balanceAfter: decimal("balance_after", { precision: 15, scale: 2 }).notNull(),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Remittance Transactions table
+export const remittanceTransactions = pgTable("remittance_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  walletId: integer("wallet_id").references(() => wallets.id),
+  cymonzTransactionId: text("cymonz_transaction_id"), // Cymonz reference
+  cymonzRedirectUrl: text("cymonz_redirect_url"), // Cymonz redirect URL
+  
+  // Sender Information
+  senderName: text("sender_name").notNull(),
+  senderEmail: text("sender_email").notNull(),
+  senderPhone: text("sender_phone"),
+  senderAddress: text("sender_address"),
+  senderCountry: text("sender_country").notNull(),
+  senderIdType: text("sender_id_type"), // passport, national_id, drivers_license
+  senderIdNumber: text("sender_id_number"),
+  
+  // Recipient Information
+  recipientName: text("recipient_name").notNull(),
+  recipientEmail: text("recipient_email"),
+  recipientPhone: text("recipient_phone"),
+  recipientAddress: text("recipient_address"),
+  recipientCountry: text("recipient_country").notNull(),
+  recipientBankName: text("recipient_bank_name"),
+  recipientBankCode: text("recipient_bank_code"),
+  recipientAccountNumber: text("recipient_account_number"),
+  recipientAccountName: text("recipient_account_name"),
+  
+  // Transaction Details
+  sendAmount: decimal("send_amount", { precision: 15, scale: 2 }).notNull(),
+  sendCurrency: text("send_currency").notNull(),
+  receiveAmount: decimal("receive_amount", { precision: 15, scale: 2 }),
+  receiveCurrency: text("receive_currency").notNull(),
+  exchangeRate: decimal("exchange_rate", { precision: 10, scale: 6 }),
+  fees: decimal("fees", { precision: 15, scale: 2 }).notNull().default("0.00"),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  
+  // Status and Tracking
+  status: text("status").notNull().default("initiated"), // initiated, pending, processing, completed, failed, cancelled, refunded
+  paymentMethod: text("payment_method"), // wallet, card, bank_transfer
+  deliveryMethod: text("delivery_method"), // bank_transfer, cash_pickup, mobile_money
+  purpose: text("purpose"), // family_support, business, education, etc.
+  
+  // Timestamps
+  initiatedAt: timestamp("initiated_at").defaultNow(),
+  processedAt: timestamp("processed_at"),
+  completedAt: timestamp("completed_at"),
+  failedAt: timestamp("failed_at"),
+  
+  // Metadata
+  cymonzData: json("cymonz_data").$type<Record<string, any>>(),
+  complianceData: json("compliance_data").$type<Record<string, any>>(),
+  notes: text("notes"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Remittance Recipients table (for saved recipients)
+export const remittanceRecipients = pgTable("remittance_recipients", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  nickname: text("nickname").notNull(), // User-friendly name
+  
+  // Recipient Details
+  fullName: text("full_name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  country: text("country").notNull(),
+  
+  // Banking Details
+  bankName: text("bank_name"),
+  bankCode: text("bank_code"),
+  accountNumber: text("account_number"),
+  accountName: text("account_name"),
+  swiftCode: text("swift_code"),
+  
+  // Delivery Options
+  deliveryMethod: text("delivery_method"), // bank_transfer, cash_pickup, mobile_money
+  
+  // Metadata
+  isActive: boolean("is_active").default(true),
+  lastUsed: timestamp("last_used"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Cymonz Configuration table
+export const cymonzConfig = pgTable("cymonz_config", {
+  id: serial("id").primaryKey(),
+  environment: text("environment").notNull(), // sandbox, production
+  baseUrl: text("base_url").notNull(),
+  apiKey: text("api_key").notNull(),
+  secretKey: text("secret_key").notNull(),
+  webhookUrl: text("webhook_url"),
+  callbackUrl: text("callback_url"),
+  partnerCode: text("partner_code"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Wallet and Remittance Relations
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  user: one(users, {
+    fields: [wallets.userId],
+    references: [users.id],
+  }),
+  transactions: many(walletTransactions),
+  remittances: many(remittanceTransactions),
+}));
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, {
+    fields: [walletTransactions.walletId],
+    references: [wallets.id],
+  }),
+  user: one(users, {
+    fields: [walletTransactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const remittanceTransactionsRelations = relations(remittanceTransactions, ({ one }) => ({
+  user: one(users, {
+    fields: [remittanceTransactions.userId],
+    references: [users.id],
+  }),
+  wallet: one(wallets, {
+    fields: [remittanceTransactions.walletId],
+    references: [wallets.id],
+  }),
+}));
+
+export const remittanceRecipientsRelations = relations(remittanceRecipients, ({ one }) => ({
+  user: one(users, {
+    fields: [remittanceRecipients.userId],
+    references: [users.id],
+  }),
+}));
+
+// Wallet and Remittance Schemas
+export const walletSchema = createInsertSchema(wallets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const walletTransactionSchema = createInsertSchema(walletTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const remittanceTransactionSchema = createInsertSchema(remittanceTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  initiatedAt: true,
+  processedAt: true,
+  completedAt: true,
+  failedAt: true,
+});
+
+export const remittanceRecipientSchema = createInsertSchema(remittanceRecipients).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsed: true,
+});
+
+// Remittance Form Schemas
+export const initiateRemittanceSchema = z.object({
+  recipientId: z.number().optional(),
+  senderName: z.string().min(1, "Sender name is required"),
+  senderEmail: z.string().email("Valid email required"),
+  senderPhone: z.string().optional(),
+  senderAddress: z.string().optional(),
+  senderCountry: z.string().min(1, "Sender country is required"),
+  senderIdType: z.enum(["passport", "national_id", "drivers_license"]).optional(),
+  senderIdNumber: z.string().optional(),
+  
+  recipientName: z.string().min(1, "Recipient name is required"),
+  recipientEmail: z.string().email().optional(),
+  recipientPhone: z.string().optional(),
+  recipientAddress: z.string().optional(),
+  recipientCountry: z.string().min(1, "Recipient country is required"),
+  recipientBankName: z.string().optional(),
+  recipientBankCode: z.string().optional(),
+  recipientAccountNumber: z.string().optional(),
+  recipientAccountName: z.string().optional(),
+  
+  sendAmount: z.string().min(1, "Send amount is required"),
+  sendCurrency: z.string().min(1, "Send currency is required"),
+  receiveCurrency: z.string().min(1, "Receive currency is required"),
+  paymentMethod: z.enum(["wallet", "card", "bank_transfer"]).default("wallet"),
+  deliveryMethod: z.enum(["bank_transfer", "cash_pickup", "mobile_money"]).default("bank_transfer"),
+  purpose: z.string().optional(),
+});
+
+export const saveRecipientSchema = z.object({
+  nickname: z.string().min(1, "Nickname is required"),
+  fullName: z.string().min(1, "Full name is required"),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  country: z.string().min(1, "Country is required"),
+  bankName: z.string().optional(),
+  bankCode: z.string().optional(),
+  accountNumber: z.string().optional(),
+  accountName: z.string().optional(),
+  swiftCode: z.string().optional(),
+  deliveryMethod: z.enum(["bank_transfer", "cash_pickup", "mobile_money"]).default("bank_transfer"),
+});
+
+// Wallet and Remittance Type Exports
+export type Wallet = typeof wallets.$inferSelect;
+export type InsertWallet = z.infer<typeof walletSchema>;
+export type WalletTransaction = typeof walletTransactions.$inferSelect;
+export type InsertWalletTransaction = z.infer<typeof walletTransactionSchema>;
+export type RemittanceTransaction = typeof remittanceTransactions.$inferSelect;
+export type InsertRemittanceTransaction = z.infer<typeof remittanceTransactionSchema>;
+export type RemittanceRecipient = typeof remittanceRecipients.$inferSelect;
+export type InsertRemittanceRecipient = z.infer<typeof remittanceRecipientSchema>;
+export type CymonzConfig = typeof cymonzConfig.$inferSelect;
+export type InitiateRemittance = z.infer<typeof initiateRemittanceSchema>;
+export type SaveRecipient = z.infer<typeof saveRecipientSchema>;
+
 export const insertGoalProgressSchema = createInsertSchema(goalProgress).pick({
   amount: true,
   progressPercentage: true,
