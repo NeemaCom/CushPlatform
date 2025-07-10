@@ -2357,6 +2357,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', view: 'dashboard' },
     { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
+    { id: 'railsr-pay', label: 'Railsr Pay', icon: '💳', view: 'railsr-pay' },
     { id: 'credit-passport', label: 'Credit Passport', icon: '🛂', view: 'credit-passport' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
     { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
@@ -2639,6 +2640,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             }, currentView === 'dashboard' ? 'Dashboard' : 
                currentView === 'community' ? 'Community Hub' :
                currentView === 'loans' ? 'Loans' :
+               currentView === 'railsr-pay' ? 'Railsr Pay' :
                currentView === 'credit-passport' ? 'Credit Passport' :
                currentView === 'imisi' ? 'Imisi AI Assistant' :
                currentView === 'jobs' ? 'Local Jobs' :
@@ -2770,6 +2772,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         currentView === 'admin' && user?.role === 'admin' ? e(AdminDashboard, { key: 'admin-dashboard', user, onBack: () => setCurrentView('dashboard') }) : 
         currentView === 'community' ? e(CommunityHub, { key: 'community-hub' }) :
         currentView === 'loans' ? e(LoansPage, { key: 'loans-page', user, onBack: () => setCurrentView('dashboard') }) :
+        currentView === 'railsr-pay' ? e(RailsrPayPage, { key: 'railsr-pay-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'credit-passport' ? e(CreditPassportPage, { key: 'credit-passport-page', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'help' ? e(HelpSupport, { key: 'help-support', user, onBack: () => setCurrentView('dashboard') }) :
         currentView === 'mood-meter' ? e(FinancialMoodMeter, { key: 'mood-meter', onBack: () => setCurrentView('dashboard') }) :
@@ -11128,6 +11131,286 @@ function HelpSupport({ user, onBack }) {
               className: 'flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors'
             }, 'Send Feedback')
           ])
+        ])
+      ])
+    ])
+  ]);
+}
+
+// Railsr Pay Page Component
+function RailsrPayPage({ user, onBack }) {
+  const [activeTab, setActiveTab] = useState('wallets');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [wallets, setWallets] = useState([]);
+  const [cards, setCards] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [dashboardData, setDashboardData] = useState(null);
+
+  // Load data on component mount
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/railsr/dashboard');
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardData(data);
+        setWallets(data.wallets || []);
+        setCards(data.cards || []);
+        setTransactions(data.recentTransactions || []);
+      } else {
+        throw new Error('Failed to load dashboard data');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createWallet = async (currency) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/railsr/wallets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency })
+      });
+      
+      if (response.ok) {
+        loadDashboardData();
+      } else {
+        throw new Error('Failed to create wallet');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createCard = async (walletId, cardType) => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/railsr/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ walletId, cardType })
+      });
+      
+      if (response.ok) {
+        loadDashboardData();
+      } else {
+        throw new Error('Failed to create card');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return e('div', { className: 'min-h-screen bg-gray-50' }, [
+    // Header
+    e('div', {
+      key: 'header',
+      className: 'bg-white shadow-sm border-b border-gray-200 mb-6'
+    }, [
+      e('div', { className: 'flex items-center justify-between px-6 py-4' }, [
+        e('div', { key: 'title-section', className: 'flex items-center gap-3' }, [
+          e('button', {
+            key: 'back-button',
+            onClick: onBack,
+            className: 'text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors'
+          }, '← Back to Dashboard'),
+          e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Railsr Pay'),
+          e('span', { key: 'badge', className: 'bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1 rounded-full' }, 'Embedded Finance')
+        ])
+      ])
+    ]),
+
+    // Tab Navigation
+    e('div', {
+      key: 'tabs',
+      className: 'bg-white border-b border-gray-200 mb-6'
+    }, [
+      e('div', { className: 'container mx-auto px-6' }, [
+        e('nav', { className: 'flex space-x-8' }, [
+          ['wallets', 'Wallets', '💳'],
+          ['cards', 'Cards', '🎯'],
+          ['transfers', 'Transfers', '💸'],
+          ['transactions', 'Transactions', '📊']
+        ].map(([tab, label, icon]) =>
+          e('button', {
+            key: tab,
+            onClick: () => setActiveTab(tab),
+            className: `flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === tab 
+                ? 'border-blue-500 text-blue-600' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } transition-colors`
+          }, [
+            e('span', { key: 'icon' }, icon),
+            label
+          ])
+        ))
+      ])
+    ]),
+
+    // Content Area
+    e('div', {
+      key: 'content',
+      className: 'container mx-auto px-6 py-8'
+    }, [
+      // Error Message
+      error && e('div', {
+        key: 'error',
+        className: 'mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800'
+      }, error),
+
+      // Loading State
+      loading && e('div', {
+        key: 'loading',
+        className: 'text-center py-8'
+      }, 'Loading...'),
+
+      // Dashboard Stats
+      dashboardData && e('div', {
+        key: 'stats',
+        className: 'grid grid-cols-1 md:grid-cols-3 gap-6 mb-8'
+      }, [
+        e('div', {
+          key: 'total-balance',
+          className: 'bg-white p-6 rounded-lg shadow-sm border border-gray-200'
+        }, [
+          e('h3', { key: 'title', className: 'text-sm font-medium text-gray-600' }, 'Total Balance'),
+          e('p', { key: 'amount', className: 'text-2xl font-bold text-gray-900' }, `£${dashboardData.totalBalance?.toFixed(2) || '0.00'}`),
+          e('p', { key: 'change', className: 'text-sm text-green-600' }, '+2.5% from last month')
+        ]),
+        
+        e('div', {
+          key: 'active-wallets',
+          className: 'bg-white p-6 rounded-lg shadow-sm border border-gray-200'
+        }, [
+          e('h3', { key: 'title', className: 'text-sm font-medium text-gray-600' }, 'Active Wallets'),
+          e('p', { key: 'count', className: 'text-2xl font-bold text-gray-900' }, wallets.length.toString()),
+          e('p', { key: 'currencies', className: 'text-sm text-gray-500' }, `${[...new Set(wallets.map(w => w.currency))].join(', ')} currencies`)
+        ]),
+        
+        e('div', {
+          key: 'active-cards',
+          className: 'bg-white p-6 rounded-lg shadow-sm border border-gray-200'
+        }, [
+          e('h3', { key: 'title', className: 'text-sm font-medium text-gray-600' }, 'Active Cards'),
+          e('p', { key: 'count', className: 'text-2xl font-bold text-gray-900' }, cards.length.toString()),
+          e('p', { key: 'types', className: 'text-sm text-gray-500' }, 'Virtual & Physical cards')
+        ])
+      ]),
+
+      // Tab Content
+      activeTab === 'wallets' && e('div', { key: 'wallets-content' }, [
+        e('div', { key: 'wallets-header', className: 'flex items-center justify-between mb-6' }, [
+          e('h2', { key: 'title', className: 'text-xl font-semibold text-gray-900' }, 'Your Wallets'),
+          e('div', { key: 'actions', className: 'flex gap-2' }, [
+            ['GBP', 'EUR', 'USD'].map(currency =>
+              e('button', {
+                key: currency,
+                onClick: () => createWallet(currency),
+                className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm'
+              }, `Create ${currency} Wallet`)
+            )
+          ])
+        ]),
+        
+        e('div', { key: 'wallets-grid', className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' }, 
+          wallets.length === 0 ? 
+            [e('p', { key: 'no-wallets', className: 'col-span-full text-center py-8 text-gray-500' }, 'No wallets created yet')] :
+            wallets.map((wallet, index) =>
+              e('div', {
+                key: `wallet-${wallet.id || index}`,
+                className: 'bg-white p-6 rounded-lg shadow-sm border border-gray-200'
+              }, [
+                e('div', { key: 'wallet-header', className: 'flex items-center justify-between mb-4' }, [
+                  e('h3', { key: 'currency', className: 'font-semibold text-gray-900' }, wallet.currency),
+                  e('span', { key: 'status', className: 'text-xs bg-green-100 text-green-800 px-2 py-1 rounded' }, wallet.status || 'Active')
+                ]),
+                e('p', { key: 'balance', className: 'text-2xl font-bold text-gray-900' }, `${wallet.currency === 'GBP' ? '£' : wallet.currency === 'EUR' ? '€' : '$'}${wallet.balance?.toFixed(2) || '0.00'}`),
+                e('p', { key: 'id', className: 'text-xs text-gray-500 mt-2' }, `ID: ${wallet.railsrWalletId || 'N/A'}`)
+              ])
+            )
+        )
+      ]),
+
+      activeTab === 'cards' && e('div', { key: 'cards-content' }, [
+        e('div', { key: 'cards-header', className: 'flex items-center justify-between mb-6' }, [
+          e('h2', { key: 'title', className: 'text-xl font-semibold text-gray-900' }, 'Your Cards'),
+          wallets.length > 0 && e('button', {
+            key: 'create-card',
+            onClick: () => createCard(wallets[0].id, 'virtual'),
+            className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors'
+          }, 'Create Virtual Card')
+        ]),
+        
+        e('div', { key: 'cards-grid', className: 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' }, 
+          cards.length === 0 ? 
+            [e('p', { key: 'no-cards', className: 'col-span-full text-center py-8 text-gray-500' }, 'No cards created yet')] :
+            cards.map((card, index) =>
+              e('div', {
+                key: `card-${card.id || index}`,
+                className: 'bg-gradient-to-br from-blue-500 to-blue-600 p-6 rounded-lg text-white shadow-lg'
+              }, [
+                e('div', { key: 'card-header', className: 'flex items-center justify-between mb-4' }, [
+                  e('span', { key: 'type', className: 'text-blue-100 text-sm' }, card.cardType || 'Virtual'),
+                  e('span', { key: 'brand', className: 'text-white font-bold' }, 'VISA')
+                ]),
+                e('p', { key: 'number', className: 'text-lg font-mono tracking-wider' }, '**** **** **** ****'),
+                e('div', { key: 'card-details', className: 'flex justify-between mt-4' }, [
+                  e('div', { key: 'holder' }, [
+                    e('p', { key: 'label', className: 'text-blue-100 text-xs' }, 'CARD HOLDER'),
+                    e('p', { key: 'name', className: 'text-sm font-medium' }, `${user.firstName} ${user.lastName}`)
+                  ]),
+                  e('div', { key: 'expiry' }, [
+                    e('p', { key: 'label', className: 'text-blue-100 text-xs' }, 'EXPIRES'),
+                    e('p', { key: 'date', className: 'text-sm font-medium' }, '12/26')
+                  ])
+                ])
+              ])
+            )
+        )
+      ]),
+
+      activeTab === 'transfers' && e('div', { key: 'transfers-content' }, [
+        e('h2', { key: 'title', className: 'text-xl font-semibold text-gray-900 mb-6' }, 'Send Money'),
+        e('div', { key: 'transfer-form', className: 'bg-white p-6 rounded-lg shadow-sm border border-gray-200' }, [
+          e('p', { key: 'coming-soon', className: 'text-center py-8 text-gray-500' }, 'Transfer functionality coming soon...')
+        ])
+      ]),
+
+      activeTab === 'transactions' && e('div', { key: 'transactions-content' }, [
+        e('h2', { key: 'title', className: 'text-xl font-semibold text-gray-900 mb-6' }, 'Recent Transactions'),
+        e('div', { key: 'transactions-list', className: 'bg-white rounded-lg shadow-sm border border-gray-200' }, [
+          transactions.length === 0 ? 
+            e('p', { key: 'no-transactions', className: 'text-center py-8 text-gray-500' }, 'No transactions yet') :
+            transactions.map((transaction, index) =>
+              e('div', {
+                key: `transaction-${transaction.id || index}`,
+                className: 'p-4 border-b border-gray-200 last:border-b-0'
+              }, [
+                e('div', { key: 'transaction-content', className: 'flex items-center justify-between' }, [
+                  e('div', { key: 'transaction-info' }, [
+                    e('p', { key: 'description', className: 'font-medium text-gray-900' }, transaction.description || 'Transaction'),
+                    e('p', { key: 'date', className: 'text-sm text-gray-500' }, new Date(transaction.createdAt).toLocaleDateString())
+                  ]),
+                  e('div', { key: 'amount', className: `font-semibold ${transaction.amount > 0 ? 'text-green-600' : 'text-red-600'}` }, 
+                    `${transaction.amount > 0 ? '+' : ''}£${transaction.amount?.toFixed(2) || '0.00'}`
+                  )
+                ])
+              ])
+            )
         ])
       ])
     ])
