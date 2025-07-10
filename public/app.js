@@ -11149,6 +11149,7 @@ function SignUpPage() {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
+    countryCode: '+1',
     nationality: '',
     acceptTerms: false,
     acceptPrivacy: false,
@@ -11157,12 +11158,189 @@ function SignUpPage() {
   
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [fieldValidation, setFieldValidation] = useState({});
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  const [countrySearch, setCountrySearch] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState({
+    score: 0,
+    feedback: '',
+    color: 'bg-gray-200'
+  });
+
+  // Country codes data
+  const countryCodes = [
+    { code: '+1', country: 'United States', flag: '🇺🇸' },
+    { code: '+1', country: 'Canada', flag: '🇨🇦' },
+    { code: '+44', country: 'United Kingdom', flag: '🇬🇧' },
+    { code: '+49', country: 'Germany', flag: '🇩🇪' },
+    { code: '+33', country: 'France', flag: '🇫🇷' },
+    { code: '+39', country: 'Italy', flag: '🇮🇹' },
+    { code: '+34', country: 'Spain', flag: '🇪🇸' },
+    { code: '+31', country: 'Netherlands', flag: '🇳🇱' },
+    { code: '+46', country: 'Sweden', flag: '🇸🇪' },
+    { code: '+47', country: 'Norway', flag: '🇳🇴' },
+    { code: '+45', country: 'Denmark', flag: '🇩🇰' },
+    { code: '+41', country: 'Switzerland', flag: '🇨🇭' },
+    { code: '+43', country: 'Austria', flag: '🇦🇹' },
+    { code: '+32', country: 'Belgium', flag: '🇧🇪' },
+    { code: '+351', country: 'Portugal', flag: '🇵🇹' },
+    { code: '+61', country: 'Australia', flag: '🇦🇺' },
+    { code: '+64', country: 'New Zealand', flag: '🇳🇿' },
+    { code: '+81', country: 'Japan', flag: '🇯🇵' },
+    { code: '+82', country: 'South Korea', flag: '🇰🇷' },
+    { code: '+65', country: 'Singapore', flag: '🇸🇬' },
+    { code: '+852', country: 'Hong Kong', flag: '🇭🇰' },
+    { code: '+91', country: 'India', flag: '🇮🇳' },
+    { code: '+86', country: 'China', flag: '🇨🇳' },
+    { code: '+234', country: 'Nigeria', flag: '🇳🇬' },
+    { code: '+27', country: 'South Africa', flag: '🇿🇦' },
+    { code: '+254', country: 'Kenya', flag: '🇰🇪' },
+    { code: '+233', country: 'Ghana', flag: '🇬🇭' },
+    { code: '+55', country: 'Brazil', flag: '🇧🇷' },
+    { code: '+52', country: 'Mexico', flag: '🇲🇽' },
+    { code: '+54', country: 'Argentina', flag: '🇦🇷' },
+    { code: '+56', country: 'Chile', flag: '🇨🇱' },
+    { code: '+57', country: 'Colombia', flag: '🇨🇴' },
+    { code: '+51', country: 'Peru', flag: '🇵🇪' },
+    { code: '+58', country: 'Venezuela', flag: '🇻🇪' },
+    { code: '+20', country: 'Egypt', flag: '🇪🇬' },
+    { code: '+971', country: 'UAE', flag: '🇦🇪' },
+    { code: '+966', country: 'Saudi Arabia', flag: '🇸🇦' },
+    { code: '+90', country: 'Turkey', flag: '🇹🇷' },
+    { code: '+7', country: 'Russia', flag: '🇷🇺' },
+    { code: '+380', country: 'Ukraine', flag: '🇺🇦' },
+    { code: '+48', country: 'Poland', flag: '🇵🇱' },
+    { code: '+420', country: 'Czech Republic', flag: '🇨🇿' },
+    { code: '+36', country: 'Hungary', flag: '🇭🇺' },
+    { code: '+40', country: 'Romania', flag: '🇷🇴' },
+    { code: '+30', country: 'Greece', flag: '🇬🇷' },
+    { code: '+353', country: 'Ireland', flag: '🇮🇪' },
+    { code: '+358', country: 'Finland', flag: '🇫🇮' },
+    { code: '+370', country: 'Lithuania', flag: '🇱🇹' },
+    { code: '+371', country: 'Latvia', flag: '🇱🇻' },
+    { code: '+372', country: 'Estonia', flag: '🇪🇪' }
+  ];
+
+  const filteredCountries = countryCodes.filter(country => 
+    country.country.toLowerCase().includes(countrySearch.toLowerCase()) ||
+    country.code.includes(countrySearch)
+  );
+
+  const calculatePasswordStrength = (password) => {
+    let score = 0;
+    let feedback = '';
+    
+    if (password.length >= 8) score += 25;
+    if (password.match(/[a-z]/)) score += 15;
+    if (password.match(/[A-Z]/)) score += 15;
+    if (password.match(/[0-9]/)) score += 15;
+    if (password.match(/[^A-Za-z0-9]/)) score += 30;
+    
+    if (score < 30) {
+      feedback = 'Weak password';
+      return { score, feedback, color: 'bg-red-500' };
+    } else if (score < 60) {
+      feedback = 'Fair password';
+      return { score, feedback, color: 'bg-yellow-500' };
+    } else if (score < 80) {
+      feedback = 'Good password';
+      return { score, feedback, color: 'bg-blue-500' };
+    } else {
+      feedback = 'Strong password';
+      return { score, feedback, color: 'bg-green-500' };
+    }
+  };
+
+  const validateField = (field, value) => {
+    const validation = { isValid: true, message: '' };
+    
+    switch (field) {
+      case 'firstName':
+        if (!value.trim()) {
+          validation.isValid = false;
+          validation.message = 'First name is required';
+        } else if (value.length < 2) {
+          validation.isValid = false;
+          validation.message = 'First name must be at least 2 characters';
+        }
+        break;
+      case 'lastName':
+        if (!value.trim()) {
+          validation.isValid = false;
+          validation.message = 'Last name is required';
+        } else if (value.length < 2) {
+          validation.isValid = false;
+          validation.message = 'Last name must be at least 2 characters';
+        }
+        break;
+      case 'email':
+        if (!value.trim()) {
+          validation.isValid = false;
+          validation.message = 'Email is required';
+        } else if (!value.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+          validation.isValid = false;
+          validation.message = 'Please enter a valid email address';
+        }
+        break;
+      case 'username':
+        if (!value.trim()) {
+          validation.isValid = false;
+          validation.message = 'Username is required';
+        } else if (value.length < 3) {
+          validation.isValid = false;
+          validation.message = 'Username must be at least 3 characters';
+        } else if (!value.match(/^[a-zA-Z0-9_]+$/)) {
+          validation.isValid = false;
+          validation.message = 'Username can only contain letters, numbers, and underscores';
+        }
+        break;
+      case 'password':
+        if (!value) {
+          validation.isValid = false;
+          validation.message = 'Password is required';
+        } else if (value.length < 8) {
+          validation.isValid = false;
+          validation.message = 'Password must be at least 8 characters';
+        }
+        break;
+      case 'confirmPassword':
+        if (!value) {
+          validation.isValid = false;
+          validation.message = 'Please confirm your password';
+        } else if (value !== formData.password) {
+          validation.isValid = false;
+          validation.message = 'Passwords do not match';
+        }
+        break;
+      case 'phoneNumber':
+        if (value && !value.match(/^[0-9\s\-\(\)]+$/)) {
+          validation.isValid = false;
+          validation.message = 'Please enter a valid phone number';
+        }
+        break;
+    }
+    
+    return validation;
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    
+    // Real-time validation
+    const validation = validateField(field, value);
+    setFieldValidation(prev => ({
+      ...prev,
+      [field]: validation
+    }));
+    
+    // Password strength calculation
+    if (field === 'password') {
+      const strength = calculatePasswordStrength(value);
+      setPasswordStrength(strength);
+    }
     
     // Clear error for this field
     if (errors[field]) {
@@ -11172,6 +11350,28 @@ function SignUpPage() {
       }));
     }
   };
+
+  const handleCountrySelect = (country) => {
+    setFormData(prev => ({
+      ...prev,
+      countryCode: country.code
+    }));
+    setShowCountryDropdown(false);
+    setCountrySearch('');
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showCountryDropdown && !event.target.closest('.country-dropdown-container')) {
+        setShowCountryDropdown(false);
+        setCountrySearch('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCountryDropdown]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -11205,12 +11405,18 @@ function SignUpPage() {
     setLoading(true);
     
     try {
+      // Combine country code and phone number
+      const submitData = {
+        ...formData,
+        phoneNumber: formData.phoneNumber ? `${formData.countryCode} ${formData.phoneNumber}` : ''
+      };
+      
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       const data = await response.json();
@@ -11505,35 +11711,111 @@ function SignUpPage() {
                 e('label', {
                   key: 'first-name-label',
                   className: 'block text-sm font-medium text-gray-700 mb-1'
-                }, 'First Name'),
+                }, 'First Name *'),
                 e('input', {
                   key: 'first-name-input',
                   type: 'text',
                   value: formData.firstName,
                   onChange: (e) => handleInputChange('firstName', e.target.value),
-                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.firstName ? 'border-red-300' : 'border-gray-300'}`
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    fieldValidation.firstName?.isValid === false ? 'border-red-300 bg-red-50' :
+                    fieldValidation.firstName?.isValid === true ? 'border-green-300 bg-green-50' :
+                    'border-gray-300'
+                  }`
                 }),
-                errors.firstName && e('p', {
-                  key: 'first-name-error',
-                  className: 'mt-1 text-sm text-red-600'
-                }, errors.firstName)
+                fieldValidation.firstName && !fieldValidation.firstName.isValid && e('p', {
+                  key: 'first-name-validation',
+                  className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'error-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'error-path',
+                      fillRule: 'evenodd',
+                      d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  fieldValidation.firstName.message
+                ]),
+                fieldValidation.firstName && fieldValidation.firstName.isValid && e('p', {
+                  key: 'first-name-success',
+                  className: 'mt-1 text-sm text-green-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'success-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'success-path',
+                      fillRule: 'evenodd',
+                      d: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  'Looks good!'
+                ])
               ]),
               e('div', { key: 'last-name-field' }, [
                 e('label', {
                   key: 'last-name-label',
                   className: 'block text-sm font-medium text-gray-700 mb-1'
-                }, 'Last Name'),
+                }, 'Last Name *'),
                 e('input', {
                   key: 'last-name-input',
                   type: 'text',
                   value: formData.lastName,
                   onChange: (e) => handleInputChange('lastName', e.target.value),
-                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.lastName ? 'border-red-300' : 'border-gray-300'}`
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    fieldValidation.lastName?.isValid === false ? 'border-red-300 bg-red-50' :
+                    fieldValidation.lastName?.isValid === true ? 'border-green-300 bg-green-50' :
+                    'border-gray-300'
+                  }`
                 }),
-                errors.lastName && e('p', {
-                  key: 'last-name-error',
-                  className: 'mt-1 text-sm text-red-600'
-                }, errors.lastName)
+                fieldValidation.lastName && !fieldValidation.lastName.isValid && e('p', {
+                  key: 'last-name-validation',
+                  className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'error-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'error-path',
+                      fillRule: 'evenodd',
+                      d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  fieldValidation.lastName.message
+                ]),
+                fieldValidation.lastName && fieldValidation.lastName.isValid && e('p', {
+                  key: 'last-name-success',
+                  className: 'mt-1 text-sm text-green-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'success-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'success-path',
+                      fillRule: 'evenodd',
+                      d: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  'Looks good!'
+                ])
               ])
             ]),
 
@@ -11542,18 +11824,56 @@ function SignUpPage() {
               e('label', {
                 key: 'email-label',
                 className: 'block text-sm font-medium text-gray-700 mb-1'
-              }, 'Email'),
+              }, 'Email *'),
               e('input', {
                 key: 'email-input',
                 type: 'email',
                 value: formData.email,
                 onChange: (e) => handleInputChange('email', e.target.value),
-                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.email ? 'border-red-300' : 'border-gray-300'}`
+                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  fieldValidation.email?.isValid === false ? 'border-red-300 bg-red-50' :
+                  fieldValidation.email?.isValid === true ? 'border-green-300 bg-green-50' :
+                  'border-gray-300'
+                }`
               }),
-              errors.email && e('p', {
-                key: 'email-error',
-                className: 'mt-1 text-sm text-red-600'
-              }, errors.email)
+              fieldValidation.email && !fieldValidation.email.isValid && e('p', {
+                key: 'email-validation',
+                className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+              }, [
+                e('svg', {
+                  key: 'error-icon',
+                  className: 'w-4 h-4',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'error-path',
+                    fillRule: 'evenodd',
+                    d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                    clipRule: 'evenodd'
+                  })
+                ]),
+                fieldValidation.email.message
+              ]),
+              fieldValidation.email && fieldValidation.email.isValid && e('p', {
+                key: 'email-success',
+                className: 'mt-1 text-sm text-green-600 flex items-center gap-1'
+              }, [
+                e('svg', {
+                  key: 'success-icon',
+                  className: 'w-4 h-4',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'success-path',
+                    fillRule: 'evenodd',
+                    d: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                    clipRule: 'evenodd'
+                  })
+                ]),
+                'Looks good!'
+              ])
             ]),
 
             // Username Field
@@ -11561,18 +11881,56 @@ function SignUpPage() {
               e('label', {
                 key: 'username-label',
                 className: 'block text-sm font-medium text-gray-700 mb-1'
-              }, 'Username'),
+              }, 'Username *'),
               e('input', {
                 key: 'username-input',
                 type: 'text',
                 value: formData.username,
                 onChange: (e) => handleInputChange('username', e.target.value),
-                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.username ? 'border-red-300' : 'border-gray-300'}`
+                className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                  fieldValidation.username?.isValid === false ? 'border-red-300 bg-red-50' :
+                  fieldValidation.username?.isValid === true ? 'border-green-300 bg-green-50' :
+                  'border-gray-300'
+                }`
               }),
-              errors.username && e('p', {
-                key: 'username-error',
-                className: 'mt-1 text-sm text-red-600'
-              }, errors.username)
+              fieldValidation.username && !fieldValidation.username.isValid && e('p', {
+                key: 'username-validation',
+                className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+              }, [
+                e('svg', {
+                  key: 'error-icon',
+                  className: 'w-4 h-4',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'error-path',
+                    fillRule: 'evenodd',
+                    d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                    clipRule: 'evenodd'
+                  })
+                ]),
+                fieldValidation.username.message
+              ]),
+              fieldValidation.username && fieldValidation.username.isValid && e('p', {
+                key: 'username-success',
+                className: 'mt-1 text-sm text-green-600 flex items-center gap-1'
+              }, [
+                e('svg', {
+                  key: 'success-icon',
+                  className: 'w-4 h-4',
+                  fill: 'currentColor',
+                  viewBox: '0 0 20 20'
+                }, [
+                  e('path', {
+                    key: 'success-path',
+                    fillRule: 'evenodd',
+                    d: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                    clipRule: 'evenodd'
+                  })
+                ]),
+                'Looks good!'
+              ])
             ]),
 
             // Password Fields
@@ -11584,35 +11942,168 @@ function SignUpPage() {
                 e('label', {
                   key: 'password-label',
                   className: 'block text-sm font-medium text-gray-700 mb-1'
-                }, 'Password'),
+                }, 'Password *'),
                 e('input', {
                   key: 'password-input',
                   type: 'password',
                   value: formData.password,
                   onChange: (e) => handleInputChange('password', e.target.value),
-                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.password ? 'border-red-300' : 'border-gray-300'}`
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    fieldValidation.password?.isValid === false ? 'border-red-300 bg-red-50' :
+                    fieldValidation.password?.isValid === true ? 'border-green-300 bg-green-50' :
+                    'border-gray-300'
+                  }`
                 }),
-                errors.password && e('p', {
-                  key: 'password-error',
-                  className: 'mt-1 text-sm text-red-600'
-                }, errors.password)
+                // Password Strength Indicator
+                formData.password && e('div', {
+                  key: 'password-strength',
+                  className: 'mt-2'
+                }, [
+                  e('div', {
+                    key: 'strength-bar-container',
+                    className: 'w-full bg-gray-200 rounded-full h-2 mb-1'
+                  }, [
+                    e('div', {
+                      key: 'strength-bar',
+                      className: `h-2 rounded-full transition-all duration-300 ${passwordStrength.color}`,
+                      style: { width: `${passwordStrength.score}%` }
+                    })
+                  ]),
+                  e('div', {
+                    key: 'strength-feedback',
+                    className: 'flex justify-between text-xs'
+                  }, [
+                    e('span', {
+                      key: 'strength-text',
+                      className: `font-medium ${
+                        passwordStrength.score < 30 ? 'text-red-600' :
+                        passwordStrength.score < 60 ? 'text-yellow-600' :
+                        passwordStrength.score < 80 ? 'text-blue-600' : 'text-green-600'
+                      }`
+                    }, passwordStrength.feedback),
+                    e('span', {
+                      key: 'strength-score',
+                      className: 'text-gray-500'
+                    }, `${passwordStrength.score}/100`)
+                  ]),
+                  e('div', {
+                    key: 'password-requirements',
+                    className: 'mt-2 text-xs text-gray-600'
+                  }, [
+                    e('p', { key: 'req-text', className: 'mb-1' }, 'Password should include:'),
+                    e('ul', { key: 'req-list', className: 'space-y-1' }, [
+                      e('li', {
+                        key: 'req-length',
+                        className: `flex items-center gap-1 ${formData.password.length >= 8 ? 'text-green-600' : 'text-gray-400'}`
+                      }, [
+                        formData.password.length >= 8 ? '✓' : '○',
+                        ' At least 8 characters'
+                      ]),
+                      e('li', {
+                        key: 'req-upper',
+                        className: `flex items-center gap-1 ${formData.password.match(/[A-Z]/) ? 'text-green-600' : 'text-gray-400'}`
+                      }, [
+                        formData.password.match(/[A-Z]/) ? '✓' : '○',
+                        ' Uppercase letter'
+                      ]),
+                      e('li', {
+                        key: 'req-lower',
+                        className: `flex items-center gap-1 ${formData.password.match(/[a-z]/) ? 'text-green-600' : 'text-gray-400'}`
+                      }, [
+                        formData.password.match(/[a-z]/) ? '✓' : '○',
+                        ' Lowercase letter'
+                      ]),
+                      e('li', {
+                        key: 'req-number',
+                        className: `flex items-center gap-1 ${formData.password.match(/[0-9]/) ? 'text-green-600' : 'text-gray-400'}`
+                      }, [
+                        formData.password.match(/[0-9]/) ? '✓' : '○',
+                        ' Number'
+                      ]),
+                      e('li', {
+                        key: 'req-special',
+                        className: `flex items-center gap-1 ${formData.password.match(/[^A-Za-z0-9]/) ? 'text-green-600' : 'text-gray-400'}`
+                      }, [
+                        formData.password.match(/[^A-Za-z0-9]/) ? '✓' : '○',
+                        ' Special character'
+                      ])
+                    ])
+                  ])
+                ]),
+                fieldValidation.password && !fieldValidation.password.isValid && e('p', {
+                  key: 'password-validation',
+                  className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'error-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'error-path',
+                      fillRule: 'evenodd',
+                      d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  fieldValidation.password.message
+                ])
               ]),
               e('div', { key: 'confirm-password-field' }, [
                 e('label', {
                   key: 'confirm-password-label',
                   className: 'block text-sm font-medium text-gray-700 mb-1'
-                }, 'Confirm Password'),
+                }, 'Confirm Password *'),
                 e('input', {
                   key: 'confirm-password-input',
                   type: 'password',
                   value: formData.confirmPassword,
                   onChange: (e) => handleInputChange('confirmPassword', e.target.value),
-                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.confirmPassword ? 'border-red-300' : 'border-gray-300'}`
+                  className: `w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    fieldValidation.confirmPassword?.isValid === false ? 'border-red-300 bg-red-50' :
+                    fieldValidation.confirmPassword?.isValid === true ? 'border-green-300 bg-green-50' :
+                    'border-gray-300'
+                  }`
                 }),
-                errors.confirmPassword && e('p', {
-                  key: 'confirm-password-error',
-                  className: 'mt-1 text-sm text-red-600'
-                }, errors.confirmPassword)
+                fieldValidation.confirmPassword && !fieldValidation.confirmPassword.isValid && e('p', {
+                  key: 'confirm-password-validation',
+                  className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'error-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'error-path',
+                      fillRule: 'evenodd',
+                      d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  fieldValidation.confirmPassword.message
+                ]),
+                fieldValidation.confirmPassword && fieldValidation.confirmPassword.isValid && e('p', {
+                  key: 'confirm-password-success',
+                  className: 'mt-1 text-sm text-green-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'success-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'success-path',
+                      fillRule: 'evenodd',
+                      d: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  'Passwords match!'
+                ])
               ])
             ]),
 
@@ -11626,13 +12117,127 @@ function SignUpPage() {
                   key: 'phone-label',
                   className: 'block text-sm font-medium text-gray-700 mb-1'
                 }, 'Phone Number (Optional)'),
-                e('input', {
-                  key: 'phone-input',
-                  type: 'tel',
-                  value: formData.phoneNumber,
-                  onChange: (e) => handleInputChange('phoneNumber', e.target.value),
-                  className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent'
-                })
+                e('div', {
+                  key: 'phone-container',
+                  className: 'flex gap-2'
+                }, [
+                  // Country Code Selector
+                  e('div', {
+                    key: 'country-selector',
+                    className: 'relative country-dropdown-container'
+                  }, [
+                    e('button', {
+                      key: 'country-button',
+                      type: 'button',
+                      onClick: () => setShowCountryDropdown(!showCountryDropdown),
+                      className: 'flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white min-w-20'
+                    }, [
+                      e('span', {
+                        key: 'country-flag',
+                        className: 'text-base'
+                      }, countryCodes.find(c => c.code === formData.countryCode)?.flag || '🌍'),
+                      e('span', {
+                        key: 'country-code',
+                        className: 'text-sm font-medium'
+                      }, formData.countryCode),
+                      e('svg', {
+                        key: 'dropdown-icon',
+                        className: 'w-4 h-4 text-gray-400',
+                        fill: 'none',
+                        stroke: 'currentColor',
+                        viewBox: '0 0 24 24'
+                      }, [
+                        e('path', {
+                          key: 'dropdown-path',
+                          strokeLinecap: 'round',
+                          strokeLinejoin: 'round',
+                          strokeWidth: 2,
+                          d: 'M19 9l-7 7-7-7'
+                        })
+                      ])
+                    ]),
+                    
+                    // Dropdown Menu
+                    showCountryDropdown && e('div', {
+                      key: 'country-dropdown',
+                      className: 'absolute z-50 mt-1 w-80 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto'
+                    }, [
+                      // Search Input
+                      e('div', {
+                        key: 'search-container',
+                        className: 'p-3 border-b border-gray-200'
+                      }, [
+                        e('input', {
+                          key: 'search-input',
+                          type: 'text',
+                          value: countrySearch,
+                          onChange: (e) => setCountrySearch(e.target.value),
+                          placeholder: 'Search country...',
+                          className: 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm'
+                        })
+                      ]),
+                      
+                      // Country List
+                      e('div', {
+                        key: 'country-list',
+                        className: 'py-1'
+                      }, filteredCountries.map((country, index) => 
+                        e('button', {
+                          key: `country-${index}`,
+                          type: 'button',
+                          onClick: () => handleCountrySelect(country),
+                          className: 'w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-gray-50 transition-colors'
+                        }, [
+                          e('span', {
+                            key: `flag-${index}`,
+                            className: 'text-base'
+                          }, country.flag),
+                          e('span', {
+                            key: `code-${index}`,
+                            className: 'text-sm font-medium text-gray-600 w-12'
+                          }, country.code),
+                          e('span', {
+                            key: `name-${index}`,
+                            className: 'text-sm text-gray-900 flex-1'
+                          }, country.country)
+                        ])
+                      ))
+                    ])
+                  ]),
+                  
+                  // Phone Number Input
+                  e('input', {
+                    key: 'phone-input',
+                    type: 'tel',
+                    value: formData.phoneNumber,
+                    onChange: (e) => handleInputChange('phoneNumber', e.target.value),
+                    placeholder: 'Phone number',
+                    className: `flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                      fieldValidation.phoneNumber?.isValid === false ? 'border-red-300 bg-red-50' :
+                      fieldValidation.phoneNumber?.isValid === true ? 'border-green-300 bg-green-50' :
+                      'border-gray-300'
+                    }`
+                  })
+                ]),
+                fieldValidation.phoneNumber && !fieldValidation.phoneNumber.isValid && e('p', {
+                  key: 'phone-validation',
+                  className: 'mt-1 text-sm text-red-600 flex items-center gap-1'
+                }, [
+                  e('svg', {
+                    key: 'error-icon',
+                    className: 'w-4 h-4',
+                    fill: 'currentColor',
+                    viewBox: '0 0 20 20'
+                  }, [
+                    e('path', {
+                      key: 'error-path',
+                      fillRule: 'evenodd',
+                      d: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+                      clipRule: 'evenodd'
+                    })
+                  ]),
+                  fieldValidation.phoneNumber.message
+                ])
               ]),
               e('div', { key: 'nationality-field' }, [
                 e('label', {
