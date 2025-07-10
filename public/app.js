@@ -11161,6 +11161,7 @@ function SignUpPage() {
   const [fieldValidation, setFieldValidation] = useState({});
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
     feedback: '',
@@ -11422,8 +11423,13 @@ function SignUpPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // Registration successful - redirect to dashboard
-        window.location.href = '/';
+        // Registration successful - show success message
+        setShowSuccessMessage(true);
+        
+        // Redirect to sign-in page after 2 seconds
+        setTimeout(() => {
+          window.location.href = '/signin';
+        }, 2000);
       } else {
         // Handle registration error
         if (data.error) {
@@ -12346,6 +12352,80 @@ function SignUpPage() {
               onClick: () => navigate('signin'),
               className: 'text-blue-600 hover:text-blue-800 font-medium'
             }, 'Sign In')
+          ])
+        ])
+      ])
+    ]),
+
+    // Success Message Modal
+    showSuccessMessage && e('div', {
+      key: 'success-modal',
+      className: 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'
+    }, [
+      e('div', {
+        key: 'success-content',
+        className: 'bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden transform transition-all duration-300 ease-out scale-105'
+      }, [
+        e('div', {
+          key: 'success-header',
+          className: 'bg-gradient-to-r from-green-500 to-emerald-600 p-6 text-center'
+        }, [
+          e('div', {
+            key: 'success-icon',
+            className: 'w-16 h-16 bg-white bg-opacity-20 rounded-full flex items-center justify-center mx-auto mb-4'
+          }, [
+            e('svg', {
+              key: 'check-icon',
+              className: 'w-8 h-8 text-white',
+              fill: 'none',
+              stroke: 'currentColor',
+              viewBox: '0 0 24 24'
+            }, [
+              e('path', {
+                key: 'check-path',
+                strokeLinecap: 'round',
+                strokeLinejoin: 'round',
+                strokeWidth: 3,
+                d: 'M5 13l4 4L19 7'
+              })
+            ])
+          ]),
+          e('h2', {
+            key: 'success-title',
+            className: 'text-2xl font-bold text-white mb-2'
+          }, 'Yaay! 🎉'),
+          e('p', {
+            key: 'success-message',
+            className: 'text-green-100 text-lg'
+          }, 'Your account has been successfully created!')
+        ]),
+        e('div', {
+          key: 'success-body',
+          className: 'p-6 text-center'
+        }, [
+          e('p', {
+            key: 'redirect-message',
+            className: 'text-gray-600 mb-4'
+          }, 'Redirecting you to the sign-in page...'),
+          e('div', {
+            key: 'loading-dots',
+            className: 'flex justify-center space-x-1'
+          }, [
+            e('div', {
+              key: 'dot-1',
+              className: 'w-2 h-2 bg-blue-500 rounded-full animate-bounce',
+              style: { animationDelay: '0ms' }
+            }),
+            e('div', {
+              key: 'dot-2',
+              className: 'w-2 h-2 bg-blue-500 rounded-full animate-bounce',
+              style: { animationDelay: '150ms' }
+            }),
+            e('div', {
+              key: 'dot-3',
+              className: 'w-2 h-2 bg-blue-500 rounded-full animate-bounce',
+              style: { animationDelay: '300ms' }
+            })
           ])
         ])
       ])
