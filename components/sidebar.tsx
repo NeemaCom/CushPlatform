@@ -1,6 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// Extend window interface for Firebase
+declare global {
+  interface Window {
+    firebaseAuth?: any;
+  }
+}
 import { 
   Home, 
   BarChart3, 
@@ -53,10 +60,48 @@ export function Sidebar() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/auth/logout");
+      try {
+        // Clear Firebase authentication first
+        if (window.firebaseAuth) {
+          try {
+            const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+            await signOut(window.firebaseAuth);
+          } catch (firebaseError) {
+            console.error('Firebase logout error:', firebaseError);
+          }
+        }
+        
+        // Clear local storage
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear all cookies
+        if (typeof window !== 'undefined') {
+          document.cookie.split(";").forEach(function(c) { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+          });
+        }
+        
+        // Call backend logout endpoint
+        const response = await apiRequest("POST", "/api/auth/logout");
+        
+        return response;
+      } catch (error) {
+        console.error('Logout error:', error);
+        // Even if logout fails, clear local state
+        localStorage.clear();
+        sessionStorage.clear();
+        throw error;
+      }
     },
     onSuccess: () => {
-      navigate("/");
+      // Force redirect to homepage
+      window.location.href = '/';
+    },
+    onError: (error) => {
+      console.error('Logout failed:', error);
+      // Force redirect even on error
+      window.location.href = '/';
     },
   });
 

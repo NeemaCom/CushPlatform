@@ -46,19 +46,28 @@ export function ImisiChatHead() {
   const [hasNewSuggestion, setHasNewSuggestion] = useState(true);
   const [, setLocation] = useLocation();
 
-  // Get proactive suggestions
+  // Check if user is authenticated
+  const { data: user } = useQuery<{ id: number; email: string; role: string; firstName: string; lastName: string }>({
+    queryKey: ['/api/profile'],
+    retry: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Get proactive suggestions - only if user is authenticated
   const { data: proactiveSuggestion } = useQuery<ProactiveSuggestion>({
     queryKey: ['/api/imisi/suggestions'],
     refetchInterval: 5 * 60 * 1000, // Check every 5 minutes
     retry: false,
     staleTime: 4 * 60 * 1000, // 4 minutes
+    enabled: !!user, // Only fetch if user is logged in
   });
 
-  // Check subscription status
+  // Check subscription status - only if user is authenticated
   const { data: subscriptionStatus } = useQuery<{ hasActiveSubscription: boolean; status: string }>({
     queryKey: ['/api/subscription-status'],
     retry: false,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    enabled: !!user, // Only fetch if user is logged in
   });
 
   React.useEffect(() => {
@@ -74,6 +83,23 @@ export function ImisiChatHead() {
       setIsMinimized(false);
     }
   };
+
+  const minimizeChat = () => {
+    setIsMinimized(true);
+    setIsOpen(false);
+  };
+
+  const closeChat = () => {
+    setIsOpen(false);
+    setIsMinimized(false);
+  };
+
+  const hasActiveSub = subscriptionStatus?.hasActiveSubscription;
+
+  // Only show chat head if user is authenticated
+  if (!user) {
+    return null;
+  }
 
   return (
     <>
