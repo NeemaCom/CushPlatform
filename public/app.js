@@ -1235,6 +1235,29 @@ function SignInPage() {
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [oauthError, setOauthError] = useState(null);
   const [authError, setAuthError] = useState('');
+  const [validationErrors, setValidationErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Client-side validation function
+  const validateCredentials = (email, password) => {
+    const errors = {};
+    
+    // Email validation
+    if (!email) {
+      errors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+    
+    // Password validation
+    if (!password) {
+      errors.password = 'Password is required';
+    } else if (password.length < 6) {
+      errors.password = 'Password must be at least 6 characters';
+    }
+    
+    return errors;
+  };
 
   useEffect(() => {
     // Firebase is initialized in the main app component
@@ -1266,6 +1289,16 @@ function SignInPage() {
     console.log('handleLogin called');
     setLoading(true);
     setAuthError('');
+    setValidationErrors({});
+    setSuccessMessage('');
+    
+    // Client-side validation
+    const errors = validateCredentials(loginForm.email, loginForm.password);
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      setLoading(false);
+      return;
+    }
     
     // Check if this is a test account that should use backend auth
     const isTestAccount = loginForm.email.includes('@cush.com');
@@ -1293,9 +1326,14 @@ function SignInPage() {
           // Set user in global state
           setUser(userData);
           
+          // Show success message briefly
+          setSuccessMessage('Successfully signed in!');
+          
           // Force redirect to dashboard after successful login
           console.log('Login successful, redirecting to dashboard');
-          window.location.hash = 'dashboard';
+          setTimeout(() => {
+            window.location.hash = 'dashboard';
+          }, 1000);
         } else {
           const errorData = await response.json();
           throw new Error(errorData.error || 'Login failed');
@@ -1369,20 +1407,53 @@ function SignInPage() {
 
   const getFirebaseErrorMessage = (error) => {
     switch (error.code) {
+      // Modern Firebase error codes (with email enumeration protection)
+      case 'auth/invalid-credential':
+      case 'INVALID_LOGIN_CREDENTIALS':
+        return 'Invalid email or password. Please check your credentials and try again.';
+      
+      // Legacy error codes (when enumeration protection is disabled)
       case 'auth/user-not-found':
-        return 'No account found with this email address';
+        return 'No account found with this email address. Please sign up first.';
       case 'auth/wrong-password':
-        return 'Incorrect password';
+        return 'Incorrect password. Please try again.';
+      
+      // Account creation errors
       case 'auth/email-already-in-use':
-        return 'An account with this email already exists';
+        return 'An account with this email already exists. Please sign in instead.';
       case 'auth/weak-password':
-        return 'Password should be at least 6 characters';
+        return 'Password should be at least 6 characters long.';
+      
+      // Email and format errors
       case 'auth/invalid-email':
-        return 'Please enter a valid email address';
+        return 'Please enter a valid email address.';
+      case 'auth/invalid-action-code':
+        return 'Invalid or expired verification code.';
+      case 'auth/expired-action-code':
+        return 'Verification code has expired. Please request a new one.';
+      
+      // Rate limiting and network errors
       case 'auth/too-many-requests':
-        return 'Too many failed attempts. Please try again later';
+        return 'Too many failed attempts. Please try again later.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection and try again.';
+      
+      // Account status errors
+      case 'auth/user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'auth/operation-not-allowed':
+        return 'This sign-in method is not enabled. Please contact support.';
+      
+      // OAuth and social sign-in errors
+      case 'auth/account-exists-with-different-credential':
+        return 'An account with this email already exists with a different sign-in method.';
+      case 'auth/credential-already-in-use':
+        return 'This credential is already associated with a different account.';
+      
+      // Default fallback
       default:
-        return error.message || 'Authentication failed';
+        console.error('Unknown Firebase error:', error);
+        return 'Authentication failed. Please try again or contact support.';
     }
   };
 
@@ -1833,6 +1904,74 @@ function SignInPage() {
           ])
         ]),
 
+        // Auth Error Alert
+        authError && e('div', {
+          key: 'auth-error',
+          className: 'mb-6 p-4 bg-red-50 border border-red-200 rounded-xl'
+        }, [
+          e('div', {
+            key: 'error-content',
+            className: 'flex items-start gap-3'
+          }, [
+            e('div', {
+              key: 'error-icon',
+              className: 'w-5 h-5 text-red-500 mt-0.5'
+            }, '⚠️'),
+            e('div', {
+              key: 'error-message',
+              className: 'flex-1'
+            }, [
+              e('h3', {
+                key: 'error-title',
+                className: 'text-sm font-semibold text-red-800 mb-1'
+              }, 'Authentication Error'),
+              e('p', {
+                key: 'error-text',
+                className: 'text-sm text-red-600 mb-2'
+              }, authError),
+              authError.includes('Invalid email or password') && e('p', {
+                key: 'error-help',
+                className: 'text-xs text-red-500'
+              }, [
+                'Don\'t have an account? ',
+                e('button', {
+                  key: 'signup-link',
+                  onClick: () => {
+                    setAuthError('');
+                    setIsSignUp(true);
+                  },
+                  className: 'underline hover:text-red-700 font-medium'
+                }, 'Create one here')
+              ])
+            ]),
+            e('button', {
+              key: 'dismiss-error',
+              onClick: () => setAuthError(''),
+              className: 'text-red-400 hover:text-red-600 transition-colors'
+            }, '×')
+          ])
+        ]),
+
+        // Success Message
+        successMessage && e('div', {
+          key: 'success-message',
+          className: 'mb-6 p-4 bg-green-50 border border-green-200 rounded-xl'
+        }, [
+          e('div', {
+            key: 'success-content',
+            className: 'flex items-center gap-3'
+          }, [
+            e('div', {
+              key: 'success-icon',
+              className: 'w-5 h-5 text-green-500'
+            }, '✓'),
+            e('p', {
+              key: 'success-text',
+              className: 'text-sm text-green-600 font-medium'
+            }, successMessage)
+          ])
+        ]),
+
         // Auth Form
         !isSignUp ? (
           // Sign In Form
@@ -1848,9 +1987,15 @@ function SignInPage() {
                 value: loginForm.email,
                 onChange: (e) => setLoginForm({ ...loginForm, email: e.target.value }),
                 required: true,
-                className: 'w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                className: `w-full px-4 py-4 border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all text-gray-900 placeholder-gray-500 ${
+                  validationErrors.email ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                }`,
                 placeholder: 'ajitd@gmail.com'
-              })
+              }),
+              validationErrors.email && e('p', {
+                key: 'email-error',
+                className: 'mt-2 text-sm text-red-600'
+              }, validationErrors.email)
             ]),
             
             e('div', { key: 'password-field' }, [
@@ -1860,9 +2005,15 @@ function SignInPage() {
                 value: loginForm.password,
                 onChange: (e) => setLoginForm({ ...loginForm, password: e.target.value }),
                 required: true,
-                className: 'w-full px-4 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 placeholder-gray-500',
+                className: `w-full px-4 py-4 border rounded-xl focus:outline-none focus:ring-2 focus:border-transparent transition-all text-gray-900 placeholder-gray-500 ${
+                  validationErrors.password ? 'border-red-300 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                }`,
                 placeholder: 'Enter your password'
-              })
+              }),
+              validationErrors.password && e('p', {
+                key: 'password-error',
+                className: 'mt-2 text-sm text-red-600'
+              }, validationErrors.password)
             ]),
 
             e('div', {
