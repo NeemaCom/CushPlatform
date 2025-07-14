@@ -101,7 +101,7 @@ function InteractiveChart({ type = 'line', data, options = {}, className = '' })
 }
 
 // Navigation Header Component
-function NavigationHeader() {
+function NavigationHeader({ user }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const scrollToSection = (sectionId) => {
@@ -160,7 +160,28 @@ function NavigationHeader() {
           e('div', {
             key: 'auth-buttons',
             className: 'flex items-center gap-3 ml-4'
-          }, [
+          }, user ? [
+            e('div', {
+              key: 'user-info',
+              className: 'flex items-center gap-3'
+            }, [
+              e('span', {
+                key: 'welcome',
+                className: 'text-white/90 font-medium'
+              }, `Welcome, ${user.firstName || user.username}!`),
+              e('button', {
+                key: 'dashboard-btn',
+                onClick: () => {
+                  if (typeof window.navigate === 'function') {
+                    window.navigate('dashboard');
+                  } else {
+                    window.location.hash = 'dashboard';
+                  }
+                },
+                className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
+              }, 'Dashboard')
+            ])
+          ] : [
             e('button', {
               key: 'sign-in',
               onClick: () => {
@@ -251,12 +272,12 @@ function NavigationHeader() {
 }
 
 // Homepage Hero Section - Based on Reference Design
-function HeroSection() {
+function HeroSection({ user }) {
   return e('section', { 
     className: 'relative bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 min-h-screen flex items-center justify-center overflow-hidden'
   }, [
     // Navigation Header
-    e(NavigationHeader, { key: 'navigation' }),
+    e(NavigationHeader, { key: 'navigation', user }),
     
     // Background pattern overlay
     e('div', {
@@ -335,20 +356,35 @@ function HeroSection() {
           key: 'cta-buttons',
           className: 'flex flex-col sm:flex-row gap-4 justify-center items-center'
         }, [
-          e('button', {
-            key: 'primary',
-            className: 'group bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105',
-            onClick: () => {
-              if (typeof window.navigate === 'function') {
-                window.navigate('signin');
-              } else {
-                window.location.hash = 'signin';
+          user ? 
+            e('button', {
+              key: 'dashboard',
+              className: 'group bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105',
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('dashboard');
+                } else {
+                  window.location.hash = 'dashboard';
+                }
               }
-            }
-          }, [
-            'Start Your Journey ',
-            e('span', { key: 'arrow', className: 'inline-block transform group-hover:translate-x-1 transition-transform' }, '→')
-          ]),
+            }, [
+              'Go to Dashboard ',
+              e('span', { key: 'arrow', className: 'inline-block transform group-hover:translate-x-1 transition-transform' }, '→')
+            ]) :
+            e('button', {
+              key: 'primary',
+              className: 'group bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105',
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signin');
+                } else {
+                  window.location.hash = 'signin';
+                }
+              }
+            }, [
+              'Start Your Journey ',
+              e('span', { key: 'arrow', className: 'inline-block transform group-hover:translate-x-1 transition-transform' }, '→')
+            ]),
           e('button', {
             key: 'secondary',
             className: 'bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-semibold px-10 py-4 rounded-full border border-white/30 transition-all duration-300 hover:border-white/50 hover:shadow-lg',
@@ -2691,19 +2727,28 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
 
   const handleLogout = async () => {
     try {
-      // Clear storage first
+      // Clear Firebase authentication first
+      if (window.firebaseAuth) {
+        try {
+          const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+          await signOut(window.firebaseAuth);
+        } catch (firebaseError) {
+          console.error('Firebase logout error:', firebaseError);
+        }
+      }
+      
+      // Clear storage
       localStorage.clear();
       sessionStorage.clear();
       
-      // Clear any cached data
+      // Clear all cookies
       if (typeof window !== 'undefined') {
-        // Clear all cookies
         document.cookie.split(";").forEach(function(c) { 
           document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
         });
       }
       
-      // Call logout endpoint
+      // Call backend logout endpoint
       await fetch('/api/auth/logout', { 
         method: 'POST',
         credentials: 'include',
@@ -2712,12 +2757,16 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         }
       });
       
-      // Force redirect regardless of response
+      // Clear user state
+      setUser(null);
+      
+      // Force redirect to homepage
       window.location.href = '/';
       
     } catch (error) {
       console.error('Logout error:', error);
       // Force redirect even on error
+      setUser(null);
       window.location.href = '/';
     }
   };
@@ -5340,80 +5389,86 @@ function App() {
     ]);
   }
 
-  return user ? 
-    e('div', { key: 'app-container' }, [
-      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }),
-      e(ImisiChatHead, { key: 'imisi-chat' }),
-      
-      // PWA Install Prompt
-      showInstallPrompt && !isInstalled && e('div', {
-        key: 'pwa-install-prompt',
-        className: 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 max-w-sm mx-auto md:mx-0'
+  const currentHash = window.location.hash;
+  const shouldShowDashboard = currentHash === '#dashboard' || currentHash === '#' + window.location.pathname.split('/')[1];
+  
+  return e('div', { key: 'app-container' }, [
+    // Show Dashboard only if user is authenticated AND explicitly navigated to dashboard
+    user && shouldShowDashboard ? 
+      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
+      e(AppRouter, { key: 'router', user }),
+    
+    // Show Imisi chat for authenticated users
+    user && e(ImisiChatHead, { key: 'imisi-chat' }),
+    
+    // PWA Install Prompt
+    showInstallPrompt && !isInstalled && e('div', {
+      key: 'pwa-install-prompt',
+      className: 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 max-w-sm mx-auto md:mx-0'
+    }, [
+      e('div', {
+        key: 'install-content',
+        className: 'flex items-start gap-3'
       }, [
         e('div', {
-          key: 'install-content',
-          className: 'flex items-start gap-3'
+          key: 'install-icon',
+          className: 'flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center'
         }, [
-          e('div', {
-            key: 'install-icon',
-            className: 'flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg flex items-center justify-center'
+          e('svg', {
+            key: 'icon',
+            className: 'w-4 h-4 sm:w-5 sm:h-5 text-blue-600',
+            fill: 'currentColor',
+            viewBox: '0 0 20 20'
           }, [
-            e('svg', {
-              key: 'icon',
-              className: 'w-4 h-4 sm:w-5 sm:h-5 text-blue-600',
-              fill: 'currentColor',
-              viewBox: '0 0 20 20'
-            }, [
-              e('path', {
-                key: 'path',
-                d: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z'
-              })
-            ])
-          ]),
-          e('div', {
-            key: 'install-text',
-            className: 'flex-1 min-w-0'
-          }, [
-            e('h3', {
-              key: 'install-title',
-              className: 'text-sm font-medium text-gray-900'
-            }, 'Install Cush App'),
-            e('p', {
-              key: 'install-desc',
-              className: 'text-xs sm:text-sm text-gray-500 mt-1'
-            }, 'Get quick access to your immigration services directly from your home screen.')
+            e('path', {
+              key: 'path',
+              d: 'M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z'
+            })
           ])
         ]),
         e('div', {
-          key: 'install-actions',
-          className: 'flex gap-2 mt-3 sm:mt-4'
+          key: 'install-text',
+          className: 'flex-1 min-w-0'
         }, [
-          e('button', {
-            key: 'install-btn',
-            onClick: installPWA,
-            className: 'flex-1 bg-blue-600 text-white text-xs sm:text-sm font-medium py-2 px-3 rounded-md hover:bg-blue-700 transition-colors'
-          }, 'Install'),
-          e('button', {
-            key: 'dismiss-btn',
-            onClick: dismissInstallPrompt,
-            className: 'flex-1 bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium py-2 px-3 rounded-md hover:bg-gray-200 transition-colors'
-          }, 'Later')
+          e('h3', {
+            key: 'install-title',
+            className: 'text-sm font-medium text-gray-900'
+          }, 'Install Cush App'),
+          e('p', {
+            key: 'install-desc',
+            className: 'text-xs sm:text-sm text-gray-500 mt-1'
+          }, 'Get quick access to your immigration services directly from your home screen.')
         ])
+      ]),
+      e('div', {
+        key: 'install-actions',
+        className: 'flex gap-2 mt-3 sm:mt-4'
+      }, [
+        e('button', {
+          key: 'install-btn',
+          onClick: installPWA,
+          className: 'flex-1 bg-blue-600 text-white text-xs sm:text-sm font-medium py-2 px-3 rounded-md hover:bg-blue-700 transition-colors'
+        }, 'Install'),
+        e('button', {
+          key: 'dismiss-btn',
+          onClick: dismissInstallPrompt,
+          className: 'flex-1 bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium py-2 px-3 rounded-md hover:bg-gray-200 transition-colors'
+        }, 'Later')
       ])
-    ]) :
-    e(AppRouter, { key: 'router' });
+    ])
+  ]);
 }
 
 // Homepage Component
-function Homepage() {
+function Homepage({ user }) {
   return e('div', { className: 'min-h-screen' }, [
-    e(HeroSection, { key: 'hero' }),
+    e(HeroSection, { key: 'hero', user }),
     e(ServicesSection, { key: 'services' }),
     e(TestimonialsSection, { key: 'testimonials' }),
     e(MentorCarouselSection, { key: 'mentors' }),
     e(AboutUsSection, { key: 'about' }),
     e(ContactSection, { key: 'contact' }),
-    e(AuthComponent, { key: 'auth' }),
+    !user && e(AuthComponent, { key: 'auth' }),
     
     // Footer with Legal Links and Compliance Information
     e('footer', {
@@ -5930,7 +5985,7 @@ function TermsOfUsePage() {
 }
 
 // Main App Router Component
-function AppRouter() {
+function AppRouter({ user }) {
   const [currentRoute, setCurrentRoute] = useState(() => {
     return window.location.hash.substring(1) || 'home';
   });
@@ -5963,9 +6018,15 @@ function AppRouter() {
       return e(PrivacyPolicyPage, { key: 'privacy' });
     case 'terms':
       return e(TermsOfUsePage, { key: 'terms' });
+    case 'dashboard':
+      // Redirect to dashboard if user is authenticated
+      if (user) {
+        return e(Dashboard, { key: 'dashboard-from-router', user });
+      }
+      return e(Homepage, { key: 'homepage', user });
     case 'home':
     default:
-      return e(Homepage, { key: 'homepage' });
+      return e(Homepage, { key: 'homepage', user });
   }
 }
 
