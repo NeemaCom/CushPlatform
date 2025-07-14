@@ -1197,9 +1197,9 @@ function SignInPage() {
         // Listen for auth state changes
         onAuthStateChanged(auth, (user) => {
           if (user) {
-            // User is signed in, redirect to dashboard
+            // User is signed in, redirect to main app
             console.log('User authenticated:', user.email);
-            window.location.href = '/dashboard';
+            window.location.href = '/';
           }
         });
       } catch (error) {
@@ -12211,9 +12211,9 @@ function SignUpPage() {
         // Listen for auth state changes
         onAuthStateChanged(auth, (user) => {
           if (user) {
-            // User is signed in, redirect to dashboard
+            // User is signed in, redirect to main app
             console.log('User authenticated:', user.email);
-            window.location.href = '/dashboard';
+            window.location.href = '/';
           }
         });
       } catch (error) {
