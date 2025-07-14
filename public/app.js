@@ -1136,7 +1136,7 @@ function ContactSection() {
   ]);
 }
 
-// Modern Sign In Page inspired by Vesti design
+// Modern Sign In Page with Firebase Authentication
 function SignInPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -1162,8 +1162,49 @@ function SignInPage() {
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [showTermsModal, setShowTermsModal] = useState(false);
   const [oauthError, setOauthError] = useState(null);
+  const [authError, setAuthError] = useState('');
 
   useEffect(() => {
+    // Load Firebase dynamically
+    const loadFirebase = async () => {
+      try {
+        // Import Firebase from the CDN
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+        const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
+          authDomain: "cushportal.firebaseapp.com",
+          projectId: "cushportal",
+          storageBucket: "cushportal.firebasestorage.app",
+          messagingSenderId: "304174661302",
+          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
+          measurementId: "G-VGYNJNCJ2F"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Store Firebase instances globally for use in handlers
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        
+        // Listen for auth state changes
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            // User is signed in, redirect to dashboard
+            console.log('User authenticated:', user.email);
+            window.location.href = '/dashboard';
+          }
+        });
+      } catch (error) {
+        console.error('Error loading Firebase:', error);
+        setAuthError('Failed to load authentication service');
+      }
+    };
+
+    loadFirebase();
+    
     // Check for OAuth errors in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get('error');
@@ -1185,63 +1226,126 @@ function SignInPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setAuthError('');
     
     try {
-      const response = await fetch('/api/auth/login', {
+      const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const userCredential = await signInWithEmailAndPassword(
+        window.firebaseAuth, 
+        loginForm.email, 
+        loginForm.password
+      );
+      
+      // Get the user info
+      const user = userCredential.user;
+      console.log('Login successful:', user.email);
+      
+      // Create/update user in our backend
+      await fetch('/api/auth/firebase-sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(loginForm)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified
+        }),
       });
       
-      if (response.ok) {
-        window.location.reload();
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Login failed');
-      }
+      // Redirect will happen automatically via onAuthStateChanged
     } catch (error) {
-      alert('Login failed. Please try again.');
+      console.error('Login error:', error);
+      setAuthError(getFirebaseErrorMessage(error));
     } finally {
       setLoading(false);
     }
   };
 
+  const getFirebaseErrorMessage = (error) => {
+    switch (error.code) {
+      case 'auth/user-not-found':
+        return 'No account found with this email address';
+      case 'auth/wrong-password':
+        return 'Incorrect password';
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists';
+      case 'auth/weak-password':
+        return 'Password should be at least 6 characters';
+      case 'auth/invalid-email':
+        return 'Please enter a valid email address';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please try again later';
+      default:
+        return error.message || 'Authentication failed';
+    }
+  };
+
   const handleSignUp = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setAuthError('');
+    
     if (signupForm.password !== signupForm.confirmPassword) {
-      alert('Passwords do not match');
+      setAuthError('Passwords do not match');
+      setLoading(false);
       return;
     }
-    setLoading(true);
+    
+    if (!signupForm.agreeToTerms) {
+      setAuthError('Please accept the Terms of Service and Privacy Policy');
+      setLoading(false);
+      return;
+    }
     
     try {
-      const response = await fetch('/api/auth/signup', {
+      const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const userCredential = await createUserWithEmailAndPassword(
+        window.firebaseAuth, 
+        signupForm.email, 
+        signupForm.password
+      );
+      
+      // Update user profile with display name
+      await updateProfile(userCredential.user, {
+        displayName: `${signupForm.firstName} ${signupForm.lastName}`
+      });
+      
+      // Get the user info
+      const user = userCredential.user;
+      console.log('Signup successful:', user.email);
+      
+      // Create user in our backend
+      await fetch('/api/auth/firebase-sync', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          username: signupForm.email,
-          email: signupForm.email,
-          password: signupForm.password,
+          uid: user.uid,
+          email: user.email,
+          displayName: `${signupForm.firstName} ${signupForm.lastName}`,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified,
+          // Additional user data
           firstName: signupForm.firstName,
           lastName: signupForm.lastName,
           address: signupForm.address,
           country: signupForm.country,
           phone: signupForm.phone,
-          acceptTerms: signupForm.agreeToTerms || false,
-          acceptPrivacy: signupForm.agreeToTerms || false
-        })
+          acceptTerms: signupForm.agreeToTerms,
+          acceptPrivacy: signupForm.agreeToTerms
+        }),
       });
       
-      if (response.ok) {
-        alert('Account created successfully! Please sign in.');
-        setIsSignUp(false);
-        setLoginForm({ email: signupForm.email, password: '' });
-      } else {
-        const error = await response.json();
-        alert(error.error || 'Registration failed');
-      }
+      // Redirect will happen automatically via onAuthStateChanged
     } catch (error) {
-      alert('Registration failed. Please try again.');
+      console.error('Signup error:', error);
+      setAuthError(getFirebaseErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -1271,29 +1375,68 @@ function SignInPage() {
     setResetSuccess('');
 
     try {
-      const response = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ email: resetEmail })
-      });
-
-      if (response.ok) {
-        setResetSuccess('Password reset instructions have been sent to your email.');
-        setResetEmail('');
-        setTimeout(() => {
-          setShowForgotPassword(false);
-          setResetSuccess('');
-        }, 3000);
-      } else {
-        const error = await response.json();
-        setResetError(error.error || 'Failed to send reset email');
-      }
+      const { sendPasswordResetEmail } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      await sendPasswordResetEmail(window.firebaseAuth, resetEmail);
+      
+      setResetSuccess('Password reset instructions have been sent to your email.');
+      setResetEmail('');
+      setTimeout(() => {
+        setShowForgotPassword(false);
+        setResetSuccess('');
+      }, 3000);
     } catch (error) {
-      setResetError('Failed to send reset email. Please try again.');
+      console.error('Password reset error:', error);
+      setResetError(getFirebaseErrorMessage(error));
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setAuthError('');
+    
+    try {
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      const result = await signInWithPopup(window.firebaseAuth, provider);
+      const user = result.user;
+      
+      console.log('Google sign-in successful:', user.email);
+      
+      // Create/update user in our backend
+      await fetch('/api/auth/firebase-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified,
+          // Parse name from displayName
+          firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+          lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+          acceptTerms: true,
+          acceptPrivacy: true
+        }),
+      });
+      
+      // Redirect will happen automatically via onAuthStateChanged
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        setAuthError(getFirebaseErrorMessage(error));
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1562,10 +1705,9 @@ function SignInPage() {
               e('button', {
                 key: 'google-signin-button',
                 type: 'button',
-                onClick: () => {
-                  window.location.href = '/api/auth/google';
-                },
-                className: 'w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3'
+                onClick: handleGoogleSignIn,
+                disabled: loading,
+                className: `w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 ${loading ? 'cursor-not-allowed opacity-60' : ''}`
               }, [
                 e('svg', {
                   key: 'google-icon',
