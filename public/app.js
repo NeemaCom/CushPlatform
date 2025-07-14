@@ -12223,7 +12223,20 @@ function SignUpPage() {
     };
 
     loadFirebase();
-  }, []);
+    
+    // Add click outside handler for country dropdown
+    const handleClickOutside = (event) => {
+      if (showCountryDropdown && !event.target.closest('.country-dropdown-container')) {
+        setShowCountryDropdown(false);
+        setCountrySearch('');
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCountryDropdown]);
 
   const getFirebaseErrorMessage = (errorCode) => {
     switch (errorCode) {
