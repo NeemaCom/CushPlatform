@@ -155,6 +155,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Google OAuth routes
   setupGoogleAuth(app);
 
+  // Firebase sync endpoint
+  app.post("/api/auth/firebase-sync", async (req, res) => {
+    try {
+      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, address, country, phone, acceptTerms, acceptPrivacy } = req.body;
+      
+      if (!uid || !email) {
+        return res.status(400).json({ error: "UID and email are required" });
+      }
+      
+      // Check if user exists by Firebase UID
+      let user = await storage.getUserByFirebaseUid(uid);
+      
+      if (!user) {
+        // Create new user with Firebase data
+        user = await storage.createUser({
+          firebaseUid: uid,
+          email,
+          username: email,
+          firstName: firstName || displayName?.split(' ')[0] || 'Unknown',
+          lastName: lastName || displayName?.split(' ').slice(1).join(' ') || 'User',
+          address: address || '',
+          country: country || '',
+          phone: phone || '',
+          profileImageUrl: photoURL || '',
+          emailVerified: emailVerified || false,
+          acceptTerms: acceptTerms || false,
+          acceptPrivacy: acceptPrivacy || false,
+          role: 'customer',
+          isActive: true,
+          password: '' // Empty password for Firebase users
+        });
+      } else {
+        // Update existing user
+        user = await storage.updateUser(user.id, {
+          email,
+          firstName: firstName || displayName?.split(' ')[0] || user.firstName,
+          lastName: lastName || displayName?.split(' ').slice(1).join(' ') || user.lastName,
+          profileImageUrl: photoURL || user.profileImageUrl,
+          emailVerified: emailVerified || user.emailVerified,
+          address: address || user.address,
+          country: country || user.country,
+          phone: phone || user.phone,
+          acceptTerms: acceptTerms || user.acceptTerms,
+          acceptPrivacy: acceptPrivacy || user.acceptPrivacy
+        });
+      }
+      
+      // Set session
+      const safeUser = createSafeUser(user);
+      req.session.user = safeUser;
+      
+      SecurityLogger.logAuth(req.ip, email, 'firebase_sync_success');
+      
+      res.json({ success: true, user: safeUser });
+    } catch (error) {
+      console.error('Firebase sync error:', error);
+      SecurityLogger.logAuth(req.ip, req.body?.email || 'unknown', 'firebase_sync_error', { error: error.message });
+      res.status(500).json({ error: "Failed to sync Firebase user" });
+    }
+  });
+
   // Enhanced registration endpoint
   app.post("/api/auth/signup", authRateLimit, async (req: AuthenticatedRequest, res) => {
     try {
