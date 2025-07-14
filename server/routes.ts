@@ -252,6 +252,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Legacy register endpoint redirect (for backwards compatibility)
+  app.post("/api/auth/register", authRateLimit, async (req: AuthenticatedRequest, res) => {
+    console.log('Legacy register endpoint called, redirecting to signup');
+    // Redirect to the correct signup endpoint
+    return res.status(400).json({ 
+      error: "This endpoint is deprecated. Please use Firebase authentication through the signup form.",
+      redirectTo: "/api/auth/signup",
+      instructions: "Use the signup form on the website which uses Firebase authentication.",
+      currentMethod: "Go to the website and use the Sign Up button to create an account with Firebase authentication."
+    });
+  });
+
+  // Handle GET requests to signup endpoint (some users might try to access it directly)
+  app.get("/api/auth/signup", (req: AuthenticatedRequest, res) => {
+    return res.status(405).json({ 
+      error: "Method not allowed. This endpoint only accepts POST requests.",
+      instructions: "Use the signup form on the website to create an account."
+    });
+  });
+
   // Enhanced registration endpoint
   app.post("/api/auth/signup", authRateLimit, async (req: AuthenticatedRequest, res) => {
     try {
