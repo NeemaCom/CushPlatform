@@ -169,22 +169,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!user) {
         // Create new user with Firebase data
+        // Generate a placeholder password hash for OAuth users
+        const bcrypt = require('bcrypt');
+        const placeholderPasswordHash = await bcrypt.hash('oauth-user-no-password', 10);
+        
         user = await storage.createUser({
           firebaseUid: uid,
           email,
           username: email,
+          passwordHash: placeholderPasswordHash,
           firstName: firstName || displayName?.split(' ')[0] || 'Unknown',
           lastName: lastName || displayName?.split(' ').slice(1).join(' ') || 'User',
-          address: address || '',
-          country: country || '',
-          phone: phone || '',
-          profileImageUrl: photoURL || '',
-          emailVerified: emailVerified || false,
+          phoneNumber: phone || null,
+          nationality: country || null,
+          profilePicture: photoURL || null,
+          isEmailVerified: emailVerified || false,
           acceptTerms: acceptTerms || false,
           acceptPrivacy: acceptPrivacy || false,
-          role: 'customer',
-          isActive: true,
-          password: '' // Empty password for Firebase users
+          role: 'customer'
         });
       } else {
         // Update existing user
