@@ -1263,15 +1263,18 @@ function SignInPage() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    console.log('handleLogin called');
     setLoading(true);
     setAuthError('');
     
     try {
       // Wait for Firebase to be initialized
       if (!window.firebaseAuth) {
+        console.log('Waiting for Firebase to initialize...');
         await new Promise((resolve) => {
           const checkFirebase = () => {
             if (window.firebaseAuth) {
+              console.log('Firebase is ready');
               resolve();
             } else {
               setTimeout(checkFirebase, 100);
@@ -1281,6 +1284,7 @@ function SignInPage() {
         });
       }
       
+      console.log('Attempting to sign in with email:', loginForm.email);
       const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const userCredential = await signInWithEmailAndPassword(
@@ -1344,6 +1348,7 @@ function SignInPage() {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
+    console.log('handleSignUp called');
     setLoading(true);
     setAuthError('');
     
@@ -1362,9 +1367,11 @@ function SignInPage() {
     try {
       // Wait for Firebase to be initialized
       if (!window.firebaseAuth) {
+        console.log('Waiting for Firebase to initialize...');
         await new Promise((resolve) => {
           const checkFirebase = () => {
             if (window.firebaseAuth) {
+              console.log('Firebase is ready');
               resolve();
             } else {
               setTimeout(checkFirebase, 100);
@@ -1374,6 +1381,7 @@ function SignInPage() {
         });
       }
       
+      console.log('Attempting to create user with email:', signupForm.email);
       const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const userCredential = await createUserWithEmailAndPassword(
@@ -1892,6 +1900,10 @@ function SignInPage() {
               key: 'submit-button',
               type: 'submit',
               disabled: loading,
+              onClick: (e) => {
+                console.log('Sign in button clicked');
+                // Let form submission handle it
+              },
               className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading ? 'cursor-not-allowed' : ''}`
             }, loading ? 'Signing in...' : 'Continue'),
 
@@ -2135,6 +2147,10 @@ function SignInPage() {
               key: 'submit-button',
               type: 'submit',
               disabled: loading || !signupForm.agreeToTerms,
+              onClick: (e) => {
+                console.log('Create account button clicked');
+                // Let form submission handle it
+              },
               className: `w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl ${loading || !signupForm.agreeToTerms ? 'cursor-not-allowed opacity-60' : ''}`
             }, loading ? 'Creating Account...' : 'Create Account'),
 
