@@ -1215,9 +1215,9 @@ function SignInPage() {
         // Listen for auth state changes
         onAuthStateChanged(auth, (user) => {
           if (user) {
-            // User is signed in, redirect to main app
+            // User is authenticated, but allow them to access sign-in page
             console.log('User authenticated:', user.email);
-            window.location.href = '/';
+            // Don't redirect - let them access the sign-in page
           }
         });
       } catch (error) {
@@ -12235,9 +12235,9 @@ function SignUpPage() {
         // Listen for auth state changes
         onAuthStateChanged(auth, (user) => {
           if (user) {
-            // User is signed in, redirect to main app
+            // User is authenticated, but allow them to access sign-up page
             console.log('User authenticated:', user.email);
-            window.location.href = '/';
+            // Don't redirect - let them access the sign-up page
           }
         });
       } catch (error) {
