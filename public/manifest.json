@@ -1,7 +1,7 @@
 {
-  "name": "Cush - Global Immigration Services",
-  "short_name": "Cush",
-  "description": "Comprehensive immigration services platform with AI-powered assistance, financial tools, and community support",
+  "name": "CushGlobal - Financial tools for Expats",
+  "short_name": "CushGlobal",
+  "description": "Financial tools for Expats - comprehensive immigration services platform with AI-powered assistance, financial tools, and community support",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
