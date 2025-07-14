@@ -3134,12 +3134,17 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             key: 'avatar-circle',
             className: 'w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg ring-2 ring-blue-100'
           }, [
-            e('img', {
-              key: 'user-image',
-              src: '/attached_assets/guy smiling2_1751497479944.jpg',
-              alt: 'User Avatar',
-              className: 'w-10 h-10 rounded-lg object-cover'
-            })
+            user.profilePicture ? 
+              e('img', {
+                key: 'user-image',
+                src: user.profilePicture,
+                alt: 'User Avatar',
+                className: 'w-10 h-10 rounded-lg object-cover'
+              }) :
+              e('div', {
+                key: 'user-initials',
+                className: 'w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center text-white font-bold text-sm'
+              }, `${user?.firstName?.[0] || ''}${user?.lastName?.[0] || ''}`)
           ]),
           e('div', { key: 'user-info' }, [
             e('div', {
