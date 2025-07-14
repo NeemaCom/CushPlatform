@@ -126,7 +126,13 @@ function NavigationHeader({ user }) {
         // Logo
         e('button', {
           key: 'logo',
-          onClick: () => navigate('home'),
+          onClick: () => {
+            if (typeof window.navigate === 'function') {
+              window.navigate('home');
+            } else {
+              window.location.hash = 'home';
+            }
+          },
           className: 'flex items-center hover:opacity-80 transition-opacity'
         }, [
           e('img', {
@@ -195,7 +201,13 @@ function NavigationHeader({ user }) {
             }, 'Sign In'),
             e('button', {
               key: 'get-started',
-              onClick: () => navigate('signup'),
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signup');
+                } else {
+                  window.location.hash = 'signup';
+                }
+              },
               className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl'
             }, 'Get Started')
           ])
@@ -261,7 +273,13 @@ function NavigationHeader({ user }) {
             }, 'Sign In'),
             e('button', {
               key: 'mobile-get-started',
-              onClick: () => navigate('signup'),
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signup');
+                } else {
+                  window.location.hash = 'signup';
+                }
+              },
               className: 'bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-2 rounded-lg transition-all duration-200 shadow-lg text-center'
             }, 'Get Started')
           ])
@@ -1276,7 +1294,7 @@ function SignInPage() {
       console.log('Login successful:', user.email);
       
       // Create/update user in our backend
-      await fetch('/api/auth/firebase-sync', {
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1290,8 +1308,13 @@ function SignInPage() {
         }),
       });
       
-      // The main app will handle the redirect automatically
-      console.log('Login successful, main app will redirect');
+      if (syncResponse.ok) {
+        // Force redirect to dashboard after successful login
+        console.log('Login successful, redirecting to dashboard');
+        window.location.hash = 'dashboard';
+      } else {
+        throw new Error('Failed to sync user with backend');
+      }
     } catch (error) {
       console.error('Login error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1369,7 +1392,7 @@ function SignInPage() {
       console.log('Signup successful:', user.email);
       
       // Create user in our backend
-      await fetch('/api/auth/firebase-sync', {
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1392,8 +1415,13 @@ function SignInPage() {
         }),
       });
       
-      // The main app will handle the redirect automatically
-      console.log('Sign-up successful, main app will redirect');
+      if (syncResponse.ok) {
+        // Force redirect to dashboard after successful sign-up
+        console.log('Sign-up successful, redirecting to dashboard');
+        window.location.hash = 'dashboard';
+      } else {
+        throw new Error('Failed to sync user with backend');
+      }
     } catch (error) {
       console.error('Signup error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1538,8 +1566,9 @@ function SignInPage() {
         }
       }
       
-      // The main app will handle the redirect automatically
-      console.log('Firebase sync successful, main app will redirect');
+      // Force redirect to dashboard after successful Google sign-in
+      console.log('Google sign-in successful, redirecting to dashboard');
+      window.location.hash = 'dashboard';
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
@@ -1687,7 +1716,13 @@ function SignInPage() {
           }),
           e('button', {
             key: 'back-home',
-            onClick: () => navigate('home'),
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('home');
+              } else {
+                window.location.hash = 'home';
+              }
+            },
             className: 'text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors'
           }, '← Back to Home')
         ]),
@@ -2518,7 +2553,13 @@ function AuthComponent() {
         }, [
           e('button', {
             key: 'get-started',
-            onClick: () => navigate('signup'),
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('signup');
+              } else {
+                window.location.hash = 'signup';
+              }
+            },
             className: 'bg-blue-600 hover:bg-blue-700 text-white font-bold px-12 py-4 rounded-xl transition-all duration-300 shadow-xl hover:shadow-2xl transform hover:-translate-y-1'
           }, 'Get Started Now'),
           e('button', {
@@ -9630,12 +9671,24 @@ function AboutUsPage() {
         }, [
           e('button', {
             key: 'get-started',
-            onClick: () => navigate('signup'),
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('signup');
+              } else {
+                window.location.hash = 'signup';
+              }
+            },
             className: 'bg-white text-blue-600 hover:bg-gray-100 font-bold px-8 py-4 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl'
           }, 'Get Started Today'),
           e('button', {
             key: 'find-mentors',
-            onClick: () => navigate('mentors'),
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('mentors');
+              } else {
+                window.location.hash = 'mentors';
+              }
+            },
             className: 'border-2 border-white text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl transition-all duration-300'
           }, 'Find a Mentor')
         ])
@@ -12433,45 +12486,17 @@ function SignUpPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    // Load Firebase dynamically
-    const loadFirebase = async () => {
-      try {
-        // Import Firebase from the CDN
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-        const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-        
-        const firebaseConfig = {
-          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "cushportal.firebaseapp.com",
-          projectId: "cushportal",
-          storageBucket: "cushportal.firebasestorage.app",
-          messagingSenderId: "304174661302",
-          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
-          measurementId: "G-VGYNJNCJ2F"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        
-        // Store Firebase instances globally for use in handlers
-        window.firebaseApp = app;
-        window.firebaseAuth = auth;
-        
-        // Listen for auth state changes
-        onAuthStateChanged(auth, (user) => {
-          if (user) {
-            // User is authenticated, but allow them to access sign-up page
-            console.log('User authenticated:', user.email);
-            // Don't redirect - let them access the sign-up page
-          }
-        });
-      } catch (error) {
-        console.error('Error loading Firebase:', error);
-        setError('Failed to load authentication service');
+    // Firebase is already initialized in the main app component
+    // Just wait for it to be available
+    const waitForFirebase = () => {
+      if (window.firebaseAuth) {
+        console.log('Firebase already initialized and ready');
+      } else {
+        setTimeout(waitForFirebase, 100);
       }
     };
 
-    loadFirebase();
+    waitForFirebase();
     
     // Add click outside handler for country dropdown
     const handleClickOutside = (event) => {
@@ -12775,7 +12800,7 @@ function SignUpPage() {
       console.log('Firebase sign-up successful:', user.email);
       
       // Create user in our backend
-      await fetch('/api/auth/firebase-sync', {
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -12797,7 +12822,13 @@ function SignUpPage() {
         }),
       });
       
-      // Redirect will happen automatically via onAuthStateChanged
+      if (syncResponse.ok) {
+        // Force redirect to dashboard after successful sign-up
+        console.log('Sign-up successful, redirecting to dashboard');
+        window.location.hash = 'dashboard';
+      } else {
+        throw new Error('Failed to sync user with backend');
+      }
     } catch (error) {
       console.error('Registration error:', error);
       setError(getFirebaseErrorMessage(error.code));
@@ -12823,7 +12854,7 @@ function SignUpPage() {
       console.log('Google sign-up successful:', user.email);
       
       // Create/update user in our backend
-      await fetch('/api/auth/firebase-sync', {
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -12842,7 +12873,13 @@ function SignUpPage() {
         }),
       });
       
-      // Redirect will happen automatically via onAuthStateChanged
+      if (syncResponse.ok) {
+        // Force redirect to dashboard after successful Google sign-up
+        console.log('Google sign-up successful, redirecting to dashboard');
+        window.location.hash = 'dashboard';
+      } else {
+        throw new Error('Failed to sync user with backend');
+      }
     } catch (error) {
       console.error('Google sign-up error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
