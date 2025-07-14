@@ -1183,66 +1183,11 @@ function SignInPage() {
   const [authError, setAuthError] = useState('');
 
   useEffect(() => {
-    // Load Firebase dynamically
-    const loadFirebase = async () => {
-      try {
-        // Import Firebase from the CDN
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-        const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-        
-        const firebaseConfig = {
-          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "cushportal.firebaseapp.com",
-          projectId: "cushportal",
-          storageBucket: "cushportal.firebasestorage.app",
-          messagingSenderId: "304174661302",
-          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
-          measurementId: "G-VGYNJNCJ2F"
-        };
-        
-        // Log current domain for Firebase setup
-        console.log('Current domain for Firebase authorization:', window.location.origin);
-        console.log('Add this domain to Firebase Auth > Settings > Authorized domains:', window.location.hostname);
-        console.log('Required domain:', 'd418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev');
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        
-        // Store Firebase instances globally for use in handlers
-        window.firebaseApp = app;
-        window.firebaseAuth = auth;
-        
-        // Listen for auth state changes
-        onAuthStateChanged(auth, async (user) => {
-          if (user) {
-            console.log('User authenticated:', user.email);
-            
-            // Check if user exists in our backend
-            try {
-              const response = await fetch('/api/auth/me', {
-                credentials: 'include'
-              });
-              
-              if (response.ok) {
-                // User is authenticated in both Firebase and our backend
-                console.log('User authenticated in backend, redirecting to dashboard');
-                window.location.href = '/';
-              } else {
-                // User authenticated in Firebase but not in backend, stay on sign-in page
-                console.log('User authenticated in Firebase but not in backend');
-              }
-            } catch (error) {
-              console.error('Error checking auth status:', error);
-            }
-          }
-        });
-      } catch (error) {
-        console.error('Error loading Firebase:', error);
-        setAuthError('Failed to load authentication service');
-      }
-    };
-
-    loadFirebase();
+    // Firebase is initialized in the main app component
+    // Just log the current domain for debugging
+    console.log('Current domain for Firebase authorization:', window.location.origin);
+    console.log('Add this domain to Firebase Auth > Settings > Authorized domains:', window.location.hostname);
+    console.log('Required domain:', window.location.hostname);
     
     // Check for OAuth errors in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
@@ -1268,6 +1213,20 @@ function SignInPage() {
     setAuthError('');
     
     try {
+      // Wait for Firebase to be initialized
+      if (!window.firebaseAuth) {
+        await new Promise((resolve) => {
+          const checkFirebase = () => {
+            if (window.firebaseAuth) {
+              resolve();
+            } else {
+              setTimeout(checkFirebase, 100);
+            }
+          };
+          checkFirebase();
+        });
+      }
+      
       const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const userCredential = await signInWithEmailAndPassword(
@@ -1295,9 +1254,8 @@ function SignInPage() {
         }),
       });
       
-      // Force redirect after successful sync
-      console.log('Login successful, redirecting to dashboard');
-      window.location.href = '/';
+      // The main app will handle the redirect automatically
+      console.log('Login successful, main app will redirect');
     } catch (error) {
       console.error('Login error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1343,6 +1301,20 @@ function SignInPage() {
     }
     
     try {
+      // Wait for Firebase to be initialized
+      if (!window.firebaseAuth) {
+        await new Promise((resolve) => {
+          const checkFirebase = () => {
+            if (window.firebaseAuth) {
+              resolve();
+            } else {
+              setTimeout(checkFirebase, 100);
+            }
+          };
+          checkFirebase();
+        });
+      }
+      
       const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const userCredential = await createUserWithEmailAndPassword(
@@ -1384,9 +1356,8 @@ function SignInPage() {
         }),
       });
       
-      // Force redirect after successful sync
-      console.log('Sign-up successful, redirecting to dashboard');
-      window.location.href = '/';
+      // The main app will handle the redirect automatically
+      console.log('Sign-up successful, main app will redirect');
     } catch (error) {
       console.error('Signup error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1442,6 +1413,20 @@ function SignInPage() {
     setAuthError('');
     
     try {
+      // Wait for Firebase to be initialized
+      if (!window.firebaseAuth) {
+        await new Promise((resolve) => {
+          const checkFirebase = () => {
+            if (window.firebaseAuth) {
+              resolve();
+            } else {
+              setTimeout(checkFirebase, 100);
+            }
+          };
+          checkFirebase();
+        });
+      }
+      
       const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
@@ -1517,9 +1502,8 @@ function SignInPage() {
         }
       }
       
-      // Force redirect after successful sync
-      console.log('Firebase sync successful, redirecting to dashboard');
-      window.location.href = '/';
+      // The main app will handle the redirect automatically
+      console.log('Firebase sync successful, main app will redirect');
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
@@ -5098,26 +5082,139 @@ For personalized immigration strategy, consult with our experienced immigration 
   ]);
 }
 
-// Main App Component
+// Main App Component with Enhanced Firebase Authentication
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   
   // PWA Installation State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
 
+  // Initialize Firebase and setup authentication
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        setUser(data);
+    const initializeFirebase = async () => {
+      try {
+        // Import Firebase from the CDN
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+        const { getAuth, onAuthStateChanged, getRedirectResult } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
+          authDomain: "cushportal.firebaseapp.com",
+          projectId: "cushportal",
+          storageBucket: "cushportal.firebasestorage.app",
+          messagingSenderId: "304174661302",
+          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
+          measurementId: "G-VGYNJNCJ2F"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Store Firebase instances globally
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        
+        console.log('Firebase initialized successfully');
+        
+        // Check for redirect result first
+        try {
+          const redirectResult = await getRedirectResult(auth);
+          if (redirectResult) {
+            console.log('Firebase redirect result:', redirectResult.user.email);
+            await handleFirebaseUser(redirectResult.user);
+          }
+        } catch (redirectError) {
+          console.error('Firebase redirect error:', redirectError);
+        }
+        
+        // Listen for auth state changes
+        onAuthStateChanged(auth, async (firebaseUser) => {
+          console.log('Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
+          
+          if (firebaseUser) {
+            // Try to sync with backend
+            try {
+              await handleFirebaseUser(firebaseUser);
+            } catch (syncError) {
+              console.error('Firebase sync error:', syncError);
+              // Still check if user exists in backend
+              checkBackendAuth();
+            }
+          } else {
+            // No Firebase user, check backend directly
+            checkBackendAuth();
+          }
+        });
+        
+        setFirebaseInitialized(true);
+      } catch (error) {
+        console.error('Firebase initialization error:', error);
+        // Fallback to backend auth check
+        checkBackendAuth();
+      }
+    };
+
+    const handleFirebaseUser = async (firebaseUser) => {
+      try {
+        const response = await fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            emailVerified: firebaseUser.emailVerified,
+            firstName: firebaseUser.displayName ? firebaseUser.displayName.split(' ')[0] : '',
+            lastName: firebaseUser.displayName ? firebaseUser.displayName.split(' ').slice(1).join(' ') : '',
+            acceptTerms: true,
+            acceptPrivacy: true,
+            isNewUser: true
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+          setIsLoading(false);
+          console.log('Firebase user synced successfully');
+        } else {
+          console.error('Firebase sync failed:', response.status);
+          checkBackendAuth();
+        }
+      } catch (error) {
+        console.error('Firebase sync error:', error);
+        checkBackendAuth();
+      }
+    };
+
+    const checkBackendAuth = async () => {
+      try {
+        const response = await fetch('/api/auth/me', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data);
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Backend auth check failed:', error);
+        setUser(null);
+      } finally {
         setIsLoading(false);
-      })
-      .catch(() => {
-        setIsLoading(false);
-      });
+      }
+    };
+
+    initializeFirebase();
   }, []);
 
   // PWA Installation Logic
