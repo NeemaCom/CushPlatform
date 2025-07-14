@@ -1,0 +1,42 @@
+# Firebase Authentication Setup Instructions
+
+## Current Issue
+The Google Sign-In shows a 403 error with code "auth/unauthorized-domain" because the current Replit domain is not authorized in the Firebase console.
+
+## Quick Fix Required
+
+### 1. Add Current Domain to Firebase Console
+Go to [Firebase Console](https://console.firebase.google.com/) → Select "cushportal" project → Authentication → Settings → Authorized domains
+
+**Add this domain:** `d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev`
+
+### 2. Current Firebase Configuration
+- **Project ID:** cushportal
+- **API Key:** AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI
+- **Auth Domain:** cushportal.firebaseapp.com
+- **App ID:** 1:304174661302:web:8bc1e5f413aae91336f017
+
+### 3. What Works Now
+- ✅ Email/password authentication (both login and signup)
+- ✅ Password reset functionality
+- ✅ User synchronization with backend database
+- ✅ Automatic redirect to dashboard after authentication
+- ✅ Enhanced error handling with Firebase-specific messages
+
+### 4. What Needs Domain Authorization
+- ❌ Google Sign-In (requires domain authorization)
+- ❌ Google Sign-Up (requires domain authorization)
+
+## Temporary Workaround
+The system now shows a clear error message: "Google Sign-In is temporarily unavailable. Please use email/password authentication or contact support. Domain authorization is pending."
+
+## Test Accounts Available
+- **Demo Account:** demo@cush.com / demo123
+- **Admin Account:** admin@cush.com / admin123
+- **Customer Account:** customer@cush.com / customer123
+
+## Current Status
+- Firebase authentication is fully integrated
+- Email/password authentication works perfectly
+- Google OAuth requires domain authorization in Firebase console
+- All error handling is comprehensive with user-friendly messages

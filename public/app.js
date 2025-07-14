@@ -1181,6 +1181,11 @@ function SignInPage() {
           appId: "1:304174661302:web:8bc1e5f413aae91336f017",
           measurementId: "G-VGYNJNCJ2F"
         };
+        
+        // Log current domain for Firebase setup
+        console.log('Current domain for Firebase authorization:', window.location.origin);
+        console.log('Add this domain to Firebase Auth > Settings > Authorized domains:', window.location.hostname);
+        console.log('Required domain:', 'd418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev');
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -1433,7 +1438,11 @@ function SignInPage() {
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
-        setAuthError(getFirebaseErrorMessage(error));
+        if (error.code === 'auth/unauthorized-domain') {
+          setAuthError('Google Sign-In is temporarily unavailable. Please use email/password authentication or contact support. Domain authorization is pending.');
+        } else {
+          setAuthError(getFirebaseErrorMessage(error));
+        }
       }
     } finally {
       setLoading(false);
@@ -12172,6 +12181,78 @@ function SignUpPage() {
   const [fieldValidation, setFieldValidation] = useState({});
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [countrySearch, setCountrySearch] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    // Load Firebase dynamically
+    const loadFirebase = async () => {
+      try {
+        // Import Firebase from the CDN
+        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
+        const { getAuth, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        
+        const firebaseConfig = {
+          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
+          authDomain: "cushportal.firebaseapp.com",
+          projectId: "cushportal",
+          storageBucket: "cushportal.firebasestorage.app",
+          messagingSenderId: "304174661302",
+          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
+          measurementId: "G-VGYNJNCJ2F"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        
+        // Store Firebase instances globally for use in handlers
+        window.firebaseApp = app;
+        window.firebaseAuth = auth;
+        
+        // Listen for auth state changes
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            // User is signed in, redirect to dashboard
+            console.log('User authenticated:', user.email);
+            window.location.href = '/dashboard';
+          }
+        });
+      } catch (error) {
+        console.error('Error loading Firebase:', error);
+        setError('Failed to load authentication service');
+      }
+    };
+
+    loadFirebase();
+  }, []);
+
+  const getFirebaseErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'auth/user-not-found':
+        return 'No account found with this email address';
+      case 'auth/wrong-password':
+        return 'Incorrect password';
+      case 'auth/invalid-email':
+        return 'Invalid email address';
+      case 'auth/user-disabled':
+        return 'This account has been disabled';
+      case 'auth/too-many-requests':
+        return 'Too many failed attempts. Please try again later';
+      case 'auth/operation-not-allowed':
+        return 'This sign-in method is not enabled';
+      case 'auth/weak-password':
+        return 'Password should be at least 6 characters';
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists';
+      case 'auth/unauthorized-domain':
+        return 'This domain is not authorized for authentication';
+      case 'auth/popup-closed-by-user':
+        return 'Sign-in was cancelled';
+      case 'auth/cancelled-popup-request':
+        return 'Sign-in was cancelled';
+      default:
+        return 'An authentication error occurred. Please try again.';
+    }
+  };
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
@@ -12415,50 +12496,103 @@ function SignUpPage() {
     if (!validateForm()) return;
     
     setLoading(true);
+    setError('');
     
     try {
-      // Combine country code and phone number
-      const submitData = {
-        ...formData,
-        phoneNumber: formData.phoneNumber ? `${formData.countryCode} ${formData.phoneNumber}` : ''
-      };
+      const { createUserWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
-      const response = await fetch('/api/auth/signup', {
+      const userCredential = await createUserWithEmailAndPassword(
+        window.firebaseAuth,
+        formData.email,
+        formData.password
+      );
+      
+      // Get the user info
+      const user = userCredential.user;
+      
+      console.log('Firebase sign-up successful:', user.email);
+      
+      // Create user in our backend
+      await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(submitData),
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: `${formData.firstName} ${formData.lastName}`,
+          photoURL: null,
+          emailVerified: user.emailVerified,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          username: formData.username,
+          phoneNumber: formData.phoneNumber ? `${formData.countryCode} ${formData.phoneNumber}` : null,
+          nationality: formData.nationality,
+          acceptTerms: formData.acceptTerms,
+          acceptPrivacy: formData.acceptPrivacy,
+          marketingConsent: formData.marketingConsent
+        }),
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Registration successful - show success message
-        setShowSuccessMessage(true);
-        
-        // Redirect to sign-in page after 2 seconds
-        setTimeout(() => {
-          window.location.href = '/signin';
-        }, 2000);
-      } else {
-        // Handle registration error
-        if (data.error) {
-          setErrors({ general: data.error });
-        } else {
-          setErrors({ general: 'Registration failed. Please try again.' });
-        }
-      }
+      
+      // Redirect will happen automatically via onAuthStateChanged
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors({ general: 'Registration failed. Please try again.' });
+      setError(getFirebaseErrorMessage(error.code));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSignUp = () => {
-    window.location.href = '/api/auth/google';
+  const handleGoogleSignUp = async () => {
+    setLoading(true);
+    setError('');
+    
+    try {
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      const result = await signInWithPopup(window.firebaseAuth, provider);
+      const user = result.user;
+      
+      console.log('Google sign-up successful:', user.email);
+      
+      // Create/update user in our backend
+      await fetch('/api/auth/firebase-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified,
+          // Parse name from displayName
+          firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+          lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+          acceptTerms: true,
+          acceptPrivacy: true
+        }),
+      });
+      
+      // Redirect will happen automatically via onAuthStateChanged
+    } catch (error) {
+      console.error('Google sign-up error:', error);
+      if (error.code !== 'auth/popup-closed-by-user') {
+        if (error.code === 'auth/unauthorized-domain') {
+          setError('Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.');
+        } else {
+          setError(getFirebaseErrorMessage(error));
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return e('div', { className: 'min-h-screen flex' }, [
@@ -12714,10 +12848,10 @@ function SignUpPage() {
           // Registration Form
           e('form', { key: 'signup-form', onSubmit: handleSubmit }, [
             // General Error
-            errors.general && e('div', {
+            (errors.general || error) && e('div', {
               key: 'general-error',
               className: 'mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm'
-            }, errors.general),
+            }, errors.general || error),
 
             // First Name and Last Name
             e('div', {
