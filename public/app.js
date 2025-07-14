@@ -1361,7 +1361,8 @@ function SignInPage() {
           country: signupForm.country,
           phone: signupForm.phone,
           acceptTerms: signupForm.agreeToTerms,
-          acceptPrivacy: signupForm.agreeToTerms
+          acceptPrivacy: signupForm.agreeToTerms,
+          isNewUser: true
         }),
       });
       
@@ -1433,7 +1434,7 @@ function SignInPage() {
       console.log('Google sign-in successful:', user.email);
       
       // Create/update user in our backend
-      await fetch('/api/auth/firebase-sync', {
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1448,9 +1449,49 @@ function SignInPage() {
           firstName: user.displayName ? user.displayName.split(' ')[0] : '',
           lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
           acceptTerms: true,
-          acceptPrivacy: true
+          acceptPrivacy: true,
+          isNewUser: true // Allow user creation for Google sign-in
         }),
       });
+
+      if (!syncResponse.ok) {
+        const errorData = await syncResponse.json();
+        if (errorData.requiresSignup) {
+          // Show signup confirmation for new users
+          const userConfirmed = confirm(
+            `${errorData.message}\n\nClick OK to create a new account with ${user.email}, or Cancel to try a different email.`
+          );
+          
+          if (userConfirmed) {
+            // Retry with explicit new user flag
+            await fetch('/api/auth/firebase-sync', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                emailVerified: user.emailVerified,
+                firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+                lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+                acceptTerms: true,
+                acceptPrivacy: true,
+                isNewUser: true
+              }),
+            });
+          } else {
+            // Sign out of Firebase if user doesn't want to create account
+            const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+            await signOut(window.firebaseAuth);
+            return;
+          }
+        } else {
+          throw new Error(errorData.message || 'Failed to sync user');
+        }
+      }
       
       // Redirect will happen automatically via onAuthStateChanged
     } catch (error) {

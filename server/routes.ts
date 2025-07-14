@@ -158,50 +158,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Firebase sync endpoint
   app.post("/api/auth/firebase-sync", async (req, res) => {
     try {
-      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, address, country, phone, acceptTerms, acceptPrivacy } = req.body;
+      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, address, country, phone, acceptTerms, acceptPrivacy, isNewUser } = req.body;
       
       if (!uid || !email) {
         return res.status(400).json({ error: "UID and email are required" });
       }
       
-      // Check if user exists by Firebase UID
+      // Check if user exists by Firebase UID or email
       let user = await storage.getUserByFirebaseUid(uid);
+      if (!user) {
+        user = await storage.getUserByEmail(email);
+      }
       
       if (!user) {
-        // Create new user with Firebase data
-        // Generate a placeholder password hash for OAuth users
-        const bcrypt = require('bcrypt');
-        const placeholderPasswordHash = await bcrypt.hash('oauth-user-no-password', 10);
-        
-        user = await storage.createUser({
-          firebaseUid: uid,
-          email,
-          username: email,
-          passwordHash: placeholderPasswordHash,
-          firstName: firstName || displayName?.split(' ')[0] || 'Unknown',
-          lastName: lastName || displayName?.split(' ').slice(1).join(' ') || 'User',
-          phoneNumber: phone || null,
-          nationality: country || null,
-          profilePicture: photoURL || null,
-          isEmailVerified: emailVerified || false,
-          acceptTerms: acceptTerms || false,
-          acceptPrivacy: acceptPrivacy || false,
-          role: 'customer'
-        });
+        // For Google sign-in, check if this is a new user registration
+        if (isNewUser) {
+          // Create new user with Firebase data
+          const bcrypt = await import('bcrypt');
+          const placeholderPasswordHash = await bcrypt.hash('oauth-user-no-password', 10);
+          
+          user = await storage.createUser({
+            firebaseUid: uid,
+            email,
+            username: email,
+            passwordHash: placeholderPasswordHash,
+            firstName: firstName || displayName?.split(' ')[0] || 'Unknown',
+            lastName: lastName || displayName?.split(' ').slice(1).join(' ') || 'User',
+            phoneNumber: phone || null,
+            nationality: country || null,
+            profilePicture: photoURL || null,
+            isEmailVerified: emailVerified || false,
+            acceptTerms: acceptTerms || false,
+            acceptPrivacy: acceptPrivacy || false,
+            role: 'customer'
+          });
+        } else {
+          // User doesn't exist, return error for sign-in attempt
+          return res.status(404).json({ 
+            error: "No account found", 
+            message: "No account found with this email address. Would you like to create a new account?",
+            requiresSignup: true
+          });
+        }
       } else {
-        // Update existing user
-        user = await storage.updateUser(user.id, {
-          email,
-          firstName: firstName || displayName?.split(' ')[0] || user.firstName,
-          lastName: lastName || displayName?.split(' ').slice(1).join(' ') || user.lastName,
-          profileImageUrl: photoURL || user.profileImageUrl,
-          emailVerified: emailVerified || user.emailVerified,
-          address: address || user.address,
-          country: country || user.country,
-          phone: phone || user.phone,
-          acceptTerms: acceptTerms || user.acceptTerms,
-          acceptPrivacy: acceptPrivacy || user.acceptPrivacy
-        });
+        // Update existing user with Firebase UID if not set
+        if (!user.firebaseUid && uid) {
+          user = await storage.updateUser(user.id, {
+            firebaseUid: uid,
+            email,
+            firstName: firstName || displayName?.split(' ')[0] || user.firstName,
+            lastName: lastName || displayName?.split(' ').slice(1).join(' ') || user.lastName,
+            profilePicture: photoURL || user.profilePicture,
+            isEmailVerified: emailVerified || user.isEmailVerified
+          });
+        }
       }
       
       // Set session
