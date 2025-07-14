@@ -12,6 +12,12 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
+**2025-07-14**: Updated Cush Pay Branding and Imisi Chat Availability
+- ✓ Updated all "Cush Pay powered by Railsr" references to simply "Cush Pay"
+- ✓ Made Imisi chat head only available for signed-in users (not visible to guests)
+- ✓ Enhanced user experience by hiding AI assistant until user authentication
+- ✓ Maintained full functionality while improving security and user flow
+
 **2025-07-14**: Fully Resolved Firebase Authentication and Dashboard Redirect Issues
 - ✓ Fixed homepage sign-in link navigation that was redirecting to homepage instead of sign-in page
 - ✓ Enhanced navigate function with proper error handling and fallback to direct hash navigation
