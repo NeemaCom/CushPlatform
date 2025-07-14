@@ -12,8 +12,10 @@ The Cush platform is a comprehensive global immigration services platform featur
 - **Styling**: Tailwind CSS with custom utility classes
 
 ## Recent Changes
-**2025-07-14**: Updated Branding from "Railsr Pay" to "Cush Pay powered by Railsr"
-- ✓ Updated all navigation labels to reflect new branding
+**2025-07-14**: Fixed Google Sign-In Redirect Issue and Updated Branding
+- ✓ Fixed Firebase authentication redirect from `/dashboard` to `/` for proper app routing
+- ✓ Google sign-in now correctly redirects to main application instead of homepage
+- ✓ Updated all navigation labels from "Railsr Pay" to "Cush Pay powered by Railsr"
 - ✓ Changed page titles and headers throughout the application
 - ✓ Updated loading messages and error messages for consistency
 - ✓ Maintained all existing functionality while improving brand consistency
