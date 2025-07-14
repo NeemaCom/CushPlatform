@@ -1139,6 +1139,7 @@ function ContactSection() {
 // Modern Sign In Page inspired by Vesti design
 function SignInPage() {
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({ 
     firstName: '', 
@@ -1151,6 +1152,10 @@ function SignInPage() {
     confirmPassword: '',
     agreeToTerms: false
   });
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetError, setResetError] = useState('');
   const [loading, setLoading] = useState(false);
   const [testCredentials, setTestCredentials] = useState(null);
   const [showTestAccounts, setShowTestAccounts] = useState(false);
@@ -1252,6 +1257,44 @@ function SignInPage() {
 
   const showTermsOfService = () => {
     setShowTermsModal(true);
+  };
+
+  const handlePasswordReset = async (e) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetError('Please enter your email address');
+      return;
+    }
+
+    setResetLoading(true);
+    setResetError('');
+    setResetSuccess('');
+
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email: resetEmail })
+      });
+
+      if (response.ok) {
+        setResetSuccess('Password reset instructions have been sent to your email.');
+        setResetEmail('');
+        setTimeout(() => {
+          setShowForgotPassword(false);
+          setResetSuccess('');
+        }, 3000);
+      } else {
+        const error = await response.json();
+        setResetError(error.error || 'Failed to send reset email');
+      }
+    } catch (error) {
+      setResetError('Failed to send reset email. Please try again.');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return e('div', {
@@ -1488,6 +1531,7 @@ function SignInPage() {
               e('button', {
                 key: 'forgot-link',
                 type: 'button',
+                onClick: () => setShowForgotPassword(true),
                 className: 'text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors'
               }, 'Forgot Password? Reset here')
             ]),
@@ -2075,6 +2119,105 @@ function SignInPage() {
                 key: 'terms-section-7-content',
                 className: 'text-gray-700 mb-4'
               }, 'Questions about the Terms of Service should be sent to us at legal@cush.com or through our customer support channels.')
+            ])
+          ])
+        ])
+      ]),
+
+      // Forgot Password Modal
+      showForgotPassword && e('div', {
+        key: 'forgot-password-modal',
+        className: 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4',
+        onClick: (e) => {
+          if (e.target === e.currentTarget) {
+            setShowForgotPassword(false);
+            setResetError('');
+            setResetSuccess('');
+          }
+        }
+      }, [
+        e('div', {
+          key: 'modal-content',
+          className: 'bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl relative'
+        }, [
+          e('button', {
+            key: 'close-button',
+            onClick: () => {
+              setShowForgotPassword(false);
+              setResetError('');
+              setResetSuccess('');
+            },
+            className: 'absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-xl'
+          }, '×'),
+          
+          e('div', {
+            key: 'modal-header',
+            className: 'text-center mb-8'
+          }, [
+            e('h2', {
+              key: 'modal-title',
+              className: 'text-2xl font-bold text-gray-900 mb-2'
+            }, 'Reset Your Password'),
+            e('p', {
+              key: 'modal-subtitle',
+              className: 'text-gray-600'
+            }, 'Enter your email address and we\'ll send you a link to reset your password.')
+          ]),
+          
+          e('form', {
+            key: 'reset-form',
+            onSubmit: handlePasswordReset,
+            className: 'space-y-6'
+          }, [
+            e('div', {
+              key: 'email-field',
+              className: 'space-y-2'
+            }, [
+              e('label', {
+                key: 'email-label',
+                className: 'block text-sm font-medium text-gray-700'
+              }, 'Email Address'),
+              e('input', {
+                key: 'email-input',
+                type: 'email',
+                value: resetEmail,
+                onChange: (e) => setResetEmail(e.target.value),
+                required: true,
+                className: 'w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all',
+                placeholder: 'Enter your email address'
+              })
+            ]),
+            
+            resetError && e('div', {
+              key: 'error-message',
+              className: 'text-red-600 text-sm bg-red-50 p-3 rounded-lg'
+            }, resetError),
+            
+            resetSuccess && e('div', {
+              key: 'success-message',
+              className: 'text-green-600 text-sm bg-green-50 p-3 rounded-lg'
+            }, resetSuccess),
+            
+            e('div', {
+              key: 'form-actions',
+              className: 'flex gap-3'
+            }, [
+              e('button', {
+                key: 'cancel-button',
+                type: 'button',
+                onClick: () => {
+                  setShowForgotPassword(false);
+                  setResetError('');
+                  setResetSuccess('');
+                },
+                className: 'flex-1 border border-gray-300 text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-50 transition-colors'
+              }, 'Cancel'),
+              e('button', {
+                key: 'submit-button',
+                type: 'submit',
+                disabled: resetLoading,
+                className: 'flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 px-4 rounded-xl transition-colors'
+              }, resetLoading ? 'Sending...' : 'Send Reset Link')
             ])
           ])
         ])

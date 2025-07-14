@@ -418,6 +418,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Forgot password endpoint
+  app.post("/api/auth/forgot-password", authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || !isValidEmail(email)) {
+        return res.status(400).json({ error: "Please provide a valid email address" });
+      }
+
+      // Check if user exists
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        // Don't reveal whether user exists or not for security
+        return res.json({ message: "If an account with this email exists, a password reset link has been sent." });
+      }
+
+      // Generate reset token
+      const resetToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+      const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+      // Save reset token to database
+      await storage.savePasswordResetToken(user.id, resetToken, resetTokenExpiry);
+
+      // Send email with reset link
+      const resetLink = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+      
+      // Log the reset request
+      await SecurityLogger.logAuthEvent(
+        'password_reset_requested',
+        user.id,
+        true,
+        req.ip || '',
+        req.get('User-Agent') || '',
+        { email }
+      );
+
+      // TODO: Send actual email using SendGrid or similar service
+      // For now, just log it to console (you can implement actual email sending later)
+      console.log(`Password reset link for ${email}: ${resetLink}`);
+
+      res.json({ message: "If an account with this email exists, a password reset link has been sent." });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      await SecurityLogger.logAuthEvent(
+        'password_reset_error',
+        null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Failed to process password reset request" });
+    }
+  });
+
+  // Reset password endpoint
+  app.post("/api/auth/reset-password", authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { token, newPassword } = req.body;
+      
+      if (!token || !newPassword) {
+        return res.status(400).json({ error: "Token and new password are required" });
+      }
+
+      // Validate password strength
+      const passwordCheck = validatePasswordStrength(newPassword);
+      if (!passwordCheck.isValid) {
+        return res.status(400).json({ 
+          error: "Password does not meet requirements",
+          details: passwordCheck.errors 
+        });
+      }
+
+      // Find user by reset token
+      const user = await storage.getUserByPasswordResetToken(token);
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+      }
+
+      // Hash the new password
+      const bcrypt = await import("bcrypt");
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password and clear reset token
+      await storage.updateUser(user.id, { passwordHash: hashedPassword });
+      await storage.clearPasswordResetToken(user.id);
+
+      // Log successful password reset
+      await SecurityLogger.logAuthEvent(
+        'password_reset_success',
+        user.id,
+        true,
+        req.ip || '',
+        req.get('User-Agent') || '',
+        { email: user.email }
+      );
+
+      res.json({ message: "Password has been reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      await SecurityLogger.logAuthEvent(
+        'password_reset_error',
+        null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
   // Get current user endpoint
   app.get("/api/auth/me", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     res.json(req.user);

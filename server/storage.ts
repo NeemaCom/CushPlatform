@@ -81,6 +81,11 @@ export interface IStorage {
   updateUser(id: number, updates: Partial<User>): Promise<User>;
   deleteUser(id: number): Promise<void>;
   
+  // Password reset methods
+  savePasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void>;
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+  clearPasswordResetToken(userId: number): Promise<void>;
+  
   // Account management
   getAccountsByUserId(userId: number): Promise<Account[]>;
   createAccount(insertAccount: InsertAccount & { userId: number }): Promise<Account>;
@@ -309,6 +314,35 @@ export class DatabaseStorage implements IStorage {
 
   async deleteUser(id: number): Promise<void> {
     await db.delete(users).where(eq(users.id, id));
+  }
+
+  // Password reset methods
+  async savePasswordResetToken(userId: number, token: string, expiresAt: Date): Promise<void> {
+    await db.update(users)
+      .set({ 
+        passwordResetToken: token, 
+        passwordResetExpires: expiresAt 
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    const [user] = await db.select()
+      .from(users)
+      .where(and(
+        eq(users.passwordResetToken, token),
+        gte(users.passwordResetExpires, new Date())
+      ));
+    return user || undefined;
+  }
+
+  async clearPasswordResetToken(userId: number): Promise<void> {
+    await db.update(users)
+      .set({ 
+        passwordResetToken: null, 
+        passwordResetExpires: null 
+      })
+      .where(eq(users.id, userId));
   }
 
   // Account management
