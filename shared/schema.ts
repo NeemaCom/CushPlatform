@@ -15,6 +15,7 @@ export const users = pgTable("users", {
   phoneNumber: text("phone_number"),
   nationality: text("nationality"),
   profilePicture: text("profile_picture"),
+  gender: text("gender"), // male, female, other
   isEmailVerified: boolean("is_email_verified").default(false),
   isPhoneVerified: boolean("is_phone_verified").default(false),
   acceptTerms: boolean("accept_terms").notNull(),

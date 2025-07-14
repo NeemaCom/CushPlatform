@@ -73,6 +73,7 @@ import { z } from "zod";
 import { geminiService, type UserContext } from "./gemini-service";
 import rateLimit from "express-rate-limit";
 import { notificationService } from "./notification-service";
+import { AvatarService } from "./avatarService";
 import { adminService } from "./admin-service";
 import { supportService } from "./support-service";
 import { walletService } from "./wallet-service";
@@ -87,6 +88,8 @@ if (!process.env.STRIPE_SECRET_KEY) {
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize avatar service
+  const avatarService = new AvatarService(storage);
   // Enhanced health check endpoint for deployment platforms
   app.get('/api/health', (req, res) => {
     res.status(200).json({ 
@@ -192,6 +195,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             acceptPrivacy: acceptPrivacy || false,
             role: 'customer'
           });
+
+          // Generate default avatar if no photoURL provided
+          if (!photoURL) {
+            try {
+              await avatarService.ensureUserHasAvatar(user.id);
+            } catch (avatarError) {
+              console.error('Avatar generation failed for Firebase user:', avatarError);
+              // Don't fail registration if avatar generation fails
+            }
+          }
         } else {
           // User doesn't exist, return error for sign-in attempt
           return res.status(404).json({ 
@@ -302,6 +315,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         acceptPrivacy: userData.acceptPrivacy,
         marketingConsent: userData.marketingConsent || false,
       });
+
+      // Generate default avatar based on user's name
+      try {
+        await avatarService.ensureUserHasAvatar(user.id);
+      } catch (avatarError) {
+        console.error('Avatar generation failed:', avatarError);
+        // Don't fail registration if avatar generation fails
+      }
 
       // Create default accounts
       await Promise.all([
@@ -790,6 +811,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid email format" });
       }
       res.status(500).json({ error: "Password recovery failed" });
+    }
+  });
+
+  // Avatar Management Endpoints
+  
+  // Update user gender and regenerate avatar
+  app.put("/api/auth/gender", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { gender } = req.body;
+      
+      if (!gender || !['male', 'female', 'other'].includes(gender)) {
+        return res.status(400).json({ error: "Valid gender (male, female, other) is required" });
+      }
+      
+      // Update user gender and regenerate avatar
+      await avatarService.updateUserGender(userId, gender);
+      
+      // Get updated user to return the new avatar
+      const updatedUser = await storage.getUser(userId);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await SecurityLogger.logAuthEvent(
+        'gender_updated',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        { gender }
+      );
+      
+      res.json({ 
+        message: "Gender updated successfully",
+        profilePicture: updatedUser.profilePicture 
+      });
+    } catch (error) {
+      console.error("Gender update error:", error);
+      await SecurityLogger.logAuthEvent(
+        'gender_update_error',
+        req.userId || null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Failed to update gender" });
+    }
+  });
+
+  // Regenerate default avatar
+  app.post("/api/auth/regenerate-avatar", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      // Regenerate default avatar
+      const newAvatar = await avatarService.regenerateDefaultAvatar(userId);
+      
+      await SecurityLogger.logAuthEvent(
+        'avatar_regenerated',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json({ 
+        message: "Avatar regenerated successfully",
+        profilePicture: newAvatar 
+      });
+    } catch (error) {
+      console.error("Avatar regeneration error:", error);
+      await SecurityLogger.logAuthEvent(
+        'avatar_regeneration_error',
+        req.userId || null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Failed to regenerate avatar" });
+    }
+  });
+
+  // Ensure user has avatar (for existing users)
+  app.post("/api/auth/ensure-avatar", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      // Ensure user has an avatar
+      await avatarService.ensureUserHasAvatar(userId);
+      
+      // Get updated user to return the avatar
+      const updatedUser = await storage.getUser(userId);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      await SecurityLogger.logAuthEvent(
+        'avatar_ensured',
+        userId,
+        true,
+        req.ip,
+        req.get('User-Agent')
+      );
+      
+      res.json({ 
+        message: "Avatar ensured successfully",
+        profilePicture: updatedUser.profilePicture 
+      });
+    } catch (error) {
+      console.error("Avatar ensure error:", error);
+      await SecurityLogger.logAuthEvent(
+        'avatar_ensure_error',
+        req.userId || null,
+        false,
+        req.ip,
+        req.get('User-Agent'),
+        { error: error instanceof Error ? error.message : 'Unknown error' }
+      );
+      
+      res.status(500).json({ error: "Failed to ensure avatar" });
     }
   });
 
