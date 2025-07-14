@@ -249,7 +249,7 @@ export default function RailsrPay() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex items-center space-x-2">
             <RefreshCw className="w-5 h-5 animate-spin" />
-            <span>Loading Railsr dashboard...</span>
+            <span>Loading Cush Pay dashboard...</span>
           </div>
         </div>
       </div>
@@ -262,7 +262,7 @@ export default function RailsrPay() {
         <Alert className="border-red-200 bg-red-50">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            {dashboardError.message || 'Failed to load Railsr dashboard. Please try again.'}
+            {dashboardError.message || 'Failed to load Cush Pay dashboard. Please try again.'}
           </AlertDescription>
         </Alert>
       </div>
@@ -272,8 +272,8 @@ export default function RailsrPay() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Railsr Embedded Finance</h1>
-        <p className="text-gray-600">Manage your digital wallets, cards, and payments powered by Railsr</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Cush Pay powered by Railsr</h1>
+        <p className="text-gray-600">Manage your digital wallets, cards, and payments through Cush Pay powered by Railsr</p>
       </div>
 
       {/* Summary Cards */}

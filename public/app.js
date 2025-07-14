@@ -2651,7 +2651,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊', view: 'dashboard' },
     { id: 'loans', label: 'Loans', icon: '💰', view: 'loans' },
-    { id: 'railsr-pay', label: 'Railsr Pay', icon: '💳', view: 'railsr-pay' },
+    { id: 'railsr-pay', label: 'Cush Pay powered by Railsr', icon: '💳', view: 'railsr-pay' },
     { id: 'credit-passport', label: 'Credit Passport', icon: '🛂', view: 'credit-passport' },
     { id: 'imisi', label: 'Imisi AI', icon: '🤖', view: 'imisi' },
     { id: 'community', label: 'Community', icon: '🌍', view: 'community' },
@@ -2936,7 +2936,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                currentView === 'community' ? 'Community Hub' :
                currentView === 'bookings' ? 'My Bookings' :
                currentView === 'loans' ? 'Loans' :
-               currentView === 'railsr-pay' ? 'Railsr Pay' :
+               currentView === 'railsr-pay' ? 'Cush Pay powered by Railsr' :
                currentView === 'credit-passport' ? 'Credit Passport' :
                currentView === 'imisi' ? 'Imisi AI Assistant' :
                currentView === 'jobs' ? 'Local Jobs' :
@@ -13591,7 +13591,7 @@ function SignUpPage() {
   ]);
 }
 
-// Railsr Pay Page Component
+// Cush Pay powered by Railsr Page Component
 function RailsrPayPage({ user, onBack }) {
   const [activeTab, setActiveTab] = useState('wallets');
   const [loading, setLoading] = useState(false);
@@ -13681,7 +13681,7 @@ function RailsrPayPage({ user, onBack }) {
             onClick: onBack,
             className: 'text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors'
           }, '← Back to Dashboard'),
-          e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Railsr Pay'),
+          e('h1', { key: 'title', className: 'text-2xl font-bold text-gray-900' }, 'Cush Pay powered by Railsr'),
           e('span', { key: 'badge', className: 'bg-blue-100 text-blue-800 text-xs font-medium px-3 py-1 rounded-full' }, 'Embedded Finance')
         ])
       ])
