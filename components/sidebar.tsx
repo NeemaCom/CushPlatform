@@ -58,6 +58,19 @@ export function Sidebar() {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  // Fetch user profile for avatar display
+  const { data: userProfile } = useQuery<{ 
+    id: number; 
+    firstName: string; 
+    lastName: string; 
+    email: string; 
+    profilePicture?: string; 
+    role: string; 
+  }>({
+    queryKey: ["/api/profile"],
+    queryFn: getQueryFn({ on401: "returnNull" }),
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       try {
@@ -127,6 +140,38 @@ export function Sidebar() {
           />
         </div>
       </div>
+
+      {/* User Profile Section */}
+      {userProfile && (
+        <div className="px-6 py-4 mb-6 bg-white/10 backdrop-blur-sm rounded-lg mx-6 border border-white/20">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              {userProfile.profilePicture ? (
+                <img 
+                  src={userProfile.profilePicture} 
+                  alt={`${userProfile.firstName} ${userProfile.lastName}`}
+                  className="w-12 h-12 rounded-full object-cover border-2 border-white/30"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center border-2 border-white/30">
+                  <span className="text-white font-semibold text-lg">
+                    {userProfile.firstName?.[0]}{userProfile.lastName?.[0]}
+                  </span>
+                </div>
+              )}
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-white font-medium text-sm truncate">
+                {userProfile.firstName} {userProfile.lastName}
+              </h3>
+              <p className="text-white/70 text-xs truncate">
+                {userProfile.email}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       <nav className="mt-6">
         <div className="px-6">
