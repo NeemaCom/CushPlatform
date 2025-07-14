@@ -214,9 +214,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Set session
+      // Set session with proper format for authentication middleware
+      req.session.userId = user.id;
+      req.session.role = user.role || 'customer';
+      req.session.lastActivity = Date.now();
+      
+      // Update last login time
+      await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      
       const safeUser = createSafeUser(user);
-      req.session.user = safeUser;
       
       SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
       
