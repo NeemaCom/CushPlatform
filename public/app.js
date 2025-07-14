@@ -1267,36 +1267,57 @@ function SignInPage() {
     setAuthError('');
     
     try {
-      // Use backend API for email/password authentication
-      const response = await fetch('/api/auth/signin', {
+      // Wait for Firebase to be initialized
+      if (!window.firebaseAuth) {
+        await new Promise((resolve) => {
+          const checkFirebase = () => {
+            if (window.firebaseAuth) {
+              resolve();
+            } else {
+              setTimeout(checkFirebase, 100);
+            }
+          };
+          checkFirebase();
+        });
+      }
+      
+      const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const userCredential = await signInWithEmailAndPassword(
+        window.firebaseAuth, 
+        loginForm.email, 
+        loginForm.password
+      );
+      
+      // Get the user info
+      const user = userCredential.user;
+      console.log('Login successful:', user.email);
+      
+      // Create/update user in our backend
+      const syncResponse = await fetch('/api/auth/firebase-sync', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({
-          email: loginForm.email,
-          password: loginForm.password
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          emailVerified: user.emailVerified
         }),
       });
       
-      if (response.ok) {
-        const userData = await response.json();
-        console.log('Login successful:', userData.email);
-        
-        // Set user in global state
-        setUser(userData);
-        
+      if (syncResponse.ok) {
         // Force redirect to dashboard after successful login
         console.log('Login successful, redirecting to dashboard');
         window.location.hash = 'dashboard';
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        throw new Error('Failed to sync user with backend');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setAuthError(error.message || 'Authentication failed');
+      setAuthError(getFirebaseErrorMessage(error));
     } finally {
       setLoading(false);
     }
