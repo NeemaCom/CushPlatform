@@ -206,12 +206,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeUser = createSafeUser(user);
       req.session.user = safeUser;
       
-      SecurityLogger.logAuth(req.ip, email, 'firebase_sync_success');
+      SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
       
       res.json({ success: true, user: safeUser });
     } catch (error) {
       console.error('Firebase sync error:', error);
-      SecurityLogger.logAuth(req.ip, req.body?.email || 'unknown', 'firebase_sync_error', { error: error.message });
+      SecurityLogger.logAuthEvent('firebase_sync_error', null, false, req.ip, req.get('User-Agent'), { error: error.message });
       res.status(500).json({ error: "Failed to sync Firebase user" });
     }
   });
