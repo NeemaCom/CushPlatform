@@ -163,7 +163,13 @@ function NavigationHeader() {
           }, [
             e('button', {
               key: 'sign-in',
-              onClick: () => navigate('signin'),
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signin');
+                } else {
+                  window.location.hash = 'signin';
+                }
+              },
               className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all'
             }, 'Sign In'),
             e('button', {
@@ -223,7 +229,13 @@ function NavigationHeader() {
           }, [
             e('button', {
               key: 'mobile-sign-in',
-              onClick: () => navigate('signin'),
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signin');
+                } else {
+                  window.location.hash = 'signin';
+                }
+              },
               className: 'text-white/90 hover:text-white font-medium px-4 py-2 rounded-lg border border-white/30 hover:border-white/50 transition-all text-center'
             }, 'Sign In'),
             e('button', {
@@ -326,7 +338,13 @@ function HeroSection() {
           e('button', {
             key: 'primary',
             className: 'group bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-10 py-4 rounded-full transition-all duration-300 shadow-2xl hover:shadow-cyan-500/25 transform hover:-translate-y-1 hover:scale-105',
-            onClick: () => navigate('signin')
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('signin');
+              } else {
+                window.location.hash = 'signin';
+              }
+            }
           }, [
             'Start Your Journey ',
             e('span', { key: 'arrow', className: 'inline-block transform group-hover:translate-x-1 transition-transform' }, '→')
@@ -2418,7 +2436,13 @@ function AuthComponent() {
           }, 'Get Started Now'),
           e('button', {
             key: 'sign-in',
-            onClick: () => navigate('signin'),
+            onClick: () => {
+              if (typeof window.navigate === 'function') {
+                window.navigate('signin');
+              } else {
+                window.location.hash = 'signin';
+              }
+            },
             className: 'border-2 border-white/60 text-white hover:bg-white/10 hover:border-white font-semibold px-12 py-4 rounded-xl transition-all duration-300'
           }, 'Sign In')
         ]),
@@ -13507,7 +13531,13 @@ function SignUpPage() {
             'Already have an account? ',
             e('button', {
               key: 'signin-button',
-              onClick: () => navigate('signin'),
+              onClick: () => {
+                if (typeof window.navigate === 'function') {
+                  window.navigate('signin');
+                } else {
+                  window.location.hash = 'signin';
+                }
+              },
               className: 'text-blue-600 hover:text-blue-800 font-medium'
             }, 'Sign In')
           ])
