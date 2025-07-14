@@ -1213,11 +1213,27 @@ function SignInPage() {
         window.firebaseAuth = auth;
         
         // Listen for auth state changes
-        onAuthStateChanged(auth, (user) => {
+        onAuthStateChanged(auth, async (user) => {
           if (user) {
-            // User is authenticated, but allow them to access sign-in page
             console.log('User authenticated:', user.email);
-            // Don't redirect - let them access the sign-in page
+            
+            // Check if user exists in our backend
+            try {
+              const response = await fetch('/api/auth/me', {
+                credentials: 'include'
+              });
+              
+              if (response.ok) {
+                // User is authenticated in both Firebase and our backend
+                console.log('User authenticated in backend, redirecting to dashboard');
+                window.location.href = '/';
+              } else {
+                // User authenticated in Firebase but not in backend, stay on sign-in page
+                console.log('User authenticated in Firebase but not in backend');
+              }
+            } catch (error) {
+              console.error('Error checking auth status:', error);
+            }
           }
         });
       } catch (error) {
@@ -1279,7 +1295,9 @@ function SignInPage() {
         }),
       });
       
-      // Redirect will happen automatically via onAuthStateChanged
+      // Force redirect after successful sync
+      console.log('Login successful, redirecting to dashboard');
+      window.location.href = '/';
     } catch (error) {
       console.error('Login error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1366,7 +1384,9 @@ function SignInPage() {
         }),
       });
       
-      // Redirect will happen automatically via onAuthStateChanged
+      // Force redirect after successful sync
+      console.log('Sign-up successful, redirecting to dashboard');
+      window.location.href = '/';
     } catch (error) {
       console.error('Signup error:', error);
       setAuthError(getFirebaseErrorMessage(error));
@@ -1464,7 +1484,7 @@ function SignInPage() {
           
           if (userConfirmed) {
             // Retry with explicit new user flag
-            await fetch('/api/auth/firebase-sync', {
+            const retryResponse = await fetch('/api/auth/firebase-sync', {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -1482,6 +1502,10 @@ function SignInPage() {
                 isNewUser: true
               }),
             });
+            
+            if (!retryResponse.ok) {
+              throw new Error('Failed to create user account');
+            }
           } else {
             // Sign out of Firebase if user doesn't want to create account
             const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
@@ -1493,7 +1517,9 @@ function SignInPage() {
         }
       }
       
-      // Redirect will happen automatically via onAuthStateChanged
+      // Force redirect after successful sync
+      console.log('Firebase sync successful, redirecting to dashboard');
+      window.location.href = '/';
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
