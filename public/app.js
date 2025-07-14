@@ -1267,64 +1267,104 @@ function SignInPage() {
     setLoading(true);
     setAuthError('');
     
-    try {
-      // Wait for Firebase to be initialized
-      if (!window.firebaseAuth) {
-        console.log('Waiting for Firebase to initialize...');
-        await new Promise((resolve) => {
-          const checkFirebase = () => {
-            if (window.firebaseAuth) {
-              console.log('Firebase is ready');
-              resolve();
-            } else {
-              setTimeout(checkFirebase, 100);
-            }
-          };
-          checkFirebase();
+    // Check if this is a test account that should use backend auth
+    const isTestAccount = loginForm.email.includes('@cush.com');
+    
+    if (isTestAccount) {
+      // Use backend authentication for test accounts
+      try {
+        console.log('Using backend authentication for test account:', loginForm.email);
+        const response = await fetch('/api/auth/signin', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            email: loginForm.email,
+            password: loginForm.password
+          }),
         });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          console.log('Backend login successful:', userData.email);
+          
+          // Set user in global state
+          setUser(userData);
+          
+          // Force redirect to dashboard after successful login
+          console.log('Login successful, redirecting to dashboard');
+          window.location.hash = 'dashboard';
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Login failed');
+        }
+      } catch (error) {
+        console.error('Backend login error:', error);
+        setAuthError(error.message || 'Authentication failed');
       }
-      
-      console.log('Attempting to sign in with email:', loginForm.email);
-      const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const userCredential = await signInWithEmailAndPassword(
-        window.firebaseAuth, 
-        loginForm.email, 
-        loginForm.password
-      );
-      
-      // Get the user info
-      const user = userCredential.user;
-      console.log('Login successful:', user.email);
-      
-      // Create/update user in our backend
-      const syncResponse = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          emailVerified: user.emailVerified
-        }),
-      });
-      
-      if (syncResponse.ok) {
-        // Force redirect to dashboard after successful login
-        console.log('Login successful, redirecting to dashboard');
-        window.location.hash = 'dashboard';
-      } else {
-        throw new Error('Failed to sync user with backend');
+    } else {
+      // Use Firebase authentication for regular accounts
+      try {
+        // Wait for Firebase to be initialized
+        if (!window.firebaseAuth) {
+          console.log('Waiting for Firebase to initialize...');
+          await new Promise((resolve) => {
+            const checkFirebase = () => {
+              if (window.firebaseAuth) {
+                console.log('Firebase is ready');
+                resolve();
+              } else {
+                setTimeout(checkFirebase, 100);
+              }
+            };
+            checkFirebase();
+          });
+        }
+        
+        console.log('Attempting to sign in with Firebase:', loginForm.email);
+        const { signInWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        
+        const userCredential = await signInWithEmailAndPassword(
+          window.firebaseAuth, 
+          loginForm.email, 
+          loginForm.password
+        );
+        
+        // Get the user info
+        const user = userCredential.user;
+        console.log('Firebase login successful:', user.email);
+        
+        // Create/update user in our backend
+        const syncResponse = await fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified
+          }),
+        });
+        
+        if (syncResponse.ok) {
+          // Force redirect to dashboard after successful login
+          console.log('Login successful, redirecting to dashboard');
+          window.location.hash = 'dashboard';
+        } else {
+          throw new Error('Failed to sync user with backend');
+        }
+      } catch (error) {
+        console.error('Firebase login error:', error);
+        setAuthError(getFirebaseErrorMessage(error));
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      setAuthError(getFirebaseErrorMessage(error));
-    } finally {
-      setLoading(false);
     }
+    
+    setLoading(false);
   };
 
   const getFirebaseErrorMessage = (error) => {
@@ -1364,6 +1404,7 @@ function SignInPage() {
       return;
     }
     
+    // Always use Firebase for sign-up (new users)
     try {
       // Wait for Firebase to be initialized
       if (!window.firebaseAuth) {

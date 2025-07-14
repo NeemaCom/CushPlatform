@@ -1,0 +1,71 @@
+Failed to load resource: the server responded with a status of 400 ()Understand this error
+Console.js:61 Login error: FirebaseError: Firebase: Error (auth/invalid-credential).
+    at createErrorInternal (assert.ts:161:7)
+    at _fail (assert.ts:79:17)
+    at _performFetchWithErrorHandling (index.ts:214:22)
+    at async _performSignInRequest (index.ts:238:7)
+    at async _signInWithCredential (credential.ts:37:26)
+    at async handleLogin (app.js:1290:30)
+Mt.forEach.n.<computed> @ Console.js:61Understand this error
+Console.js:61 Sign in button clicked
+Console.js:61 handleLogin called
+Console.js:61 Attempting to sign in with email: admin@cush.com
+index.ts:152  POST https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI 400 (Bad Request)
+window.fetch @ Network.js:219
+(anonymous) @ index.ts:152
+await in (anonymous)
+_performFetchWithErrorHandling @ index.ts:181
+_performApiRequest @ index.ts:126
+_performSignInRequest @ index.ts:238
+signInWithPassword @ email_and_password.ts:57
+handleRecaptchaFlow @ recaptcha_enterprise_verifier.ts:205
+_getIdTokenResponse @ email.ts:123
+_processCredentialSavingMfaContextIfNecessary @ mfa_error.ts:77
+_signInWithCredential @ credential.ts:37
+signInWithCredential @ credential.ts:83
+signInWithEmailAndPassword @ email_and_password.ts:328
+handleLogin @ app.js:1290
+await in handleLogin
+callCallback @ react-dom.development.js:4151
+invokeGuardedCallbackDev @ react-dom.development.js:4200
+invokeGuardedCallback @ react-dom.development.js:4264
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4278
+executeDispatch @ react-dom.development.js:9051
+processDispatchQueueItemsInOrder @ react-dom.development.js:9083
+processDispatchQueue @ react-dom.development.js:9096
+dispatchEventsForPlugins @ react-dom.development.js:9107
+(anonymous) @ react-dom.development.js:9298
+batchedUpdates$1 @ react-dom.development.js:26189
+batchedUpdates @ react-dom.development.js:3978
+dispatchEventForPluginEventSystem @ react-dom.development.js:9297
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6475
+dispatchEvent @ react-dom.development.js:6467
+dispatchDiscreteEvent @ react-dom.development.js:6440Understand this error
+Console.js:61 Login error: FirebaseError: Firebase: Error (auth/invalid-credential).
+    at createErrorInternal (assert.ts:161:7)
+    at _fail (assert.ts:79:17)
+    at _performFetchWithErrorHandling (index.ts:214:22)
+    at async _performSignInRequest (index.ts:238:7)
+    at async _signInWithCredential (credential.ts:37:26)
+    at async handleLogin (app.js:1290:30)
+Mt.forEach.n.<computed> @ Console.js:61
+handleLogin @ app.js:1323
+await in handleLogin
+callCallback @ react-dom.development.js:4151
+invokeGuardedCallbackDev @ react-dom.development.js:4200
+invokeGuardedCallback @ react-dom.development.js:4264
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4278
+executeDispatch @ react-dom.development.js:9051
+processDispatchQueueItemsInOrder @ react-dom.development.js:9083
+processDispatchQueue @ react-dom.development.js:9096
+dispatchEventsForPlugins @ react-dom.development.js:9107
+(anonymous) @ react-dom.development.js:9298
+batchedUpdates$1 @ react-dom.development.js:26189
+batchedUpdates @ react-dom.development.js:3978
+dispatchEventForPluginEventSystem @ react-dom.development.js:9297
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6475
+dispatchEvent @ react-dom.development.js:6467
+dispatchDiscreteEvent @ react-dom.development.js:6440Understand this error
+Console.js:61 Sign in button clicked
+Console.js:61 handleLogin called
+Console.js:61 Attempting to sign in with email: admin@cush.com
