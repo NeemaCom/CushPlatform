@@ -200,6 +200,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!photoURL) {
             try {
               await avatarService.ensureUserHasAvatar(user.id);
+              // Get updated user with avatar
+              const refreshedUser = await storage.getUser(user.id);
+              if (refreshedUser && refreshedUser.profilePicture) {
+                user.profilePicture = refreshedUser.profilePicture;
+              }
             } catch (avatarError) {
               console.error('Avatar generation failed for Firebase user:', avatarError);
               // Don't fail registration if avatar generation fails
@@ -303,7 +308,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const hashedPassword = await EncryptionService.hashPassword(userData.password);
       
       // Create user
-      const user = await storage.createUser({
+      let user = await storage.createUser({
         username: userData.username,
         email: userData.email,
         passwordHash: hashedPassword,
@@ -319,6 +324,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate default avatar based on user's name
       try {
         await avatarService.ensureUserHasAvatar(user.id);
+        // Get updated user with avatar to include the generated avatar
+        const refreshedUser = await storage.getUser(user.id);
+        if (refreshedUser && refreshedUser.profilePicture) {
+          user.profilePicture = refreshedUser.profilePicture;
+        }
       } catch (avatarError) {
         console.error('Avatar generation failed:', avatarError);
         // Don't fail registration if avatar generation fails
