@@ -1261,12 +1261,6 @@ function SignInPage() {
   };
 
   useEffect(() => {
-    // Firebase is initialized in the main app component
-    // Just log the current domain for debugging
-    console.log('Current domain for Firebase authorization:', window.location.origin);
-    console.log('Add this domain to Firebase Auth > Settings > Authorized domains:', window.location.hostname);
-    console.log('Required domain:', window.location.hostname);
-    
     // Check for OAuth errors in URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get('error');
@@ -2145,15 +2139,7 @@ function SignInPage() {
                 'Continue with Google'
               ]),
               
-              // Debug information
-              e('div', {
-                key: 'debug-info',
-                className: 'text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded border'
-              }, [
-                e('div', { key: 'debug-domain' }, 'Domain: ' + window.location.origin),
-                e('div', { key: 'debug-firebase' }, 'Firebase: ' + (window.firebaseAuth ? 'Ready' : 'Loading...')),
-                e('div', { key: 'debug-project' }, 'Project: cushportal')
-              ])
+
             ]),
             
             e('button', {
