@@ -4355,8 +4355,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name, email, specialty, experience, bio, hourlyRate, languages, certifications, profilePicture } = req.body;
       
+      console.log('Creating mentor with data:', { name, email, specialty, experience, bio });
+      
       if (!name || !email || !specialty || !experience || !bio) {
-        return res.status(400).json({ error: "Missing required fields" });
+        const missing = [];
+        if (!name) missing.push('name');
+        if (!email) missing.push('email');
+        if (!specialty) missing.push('specialty');
+        if (!experience) missing.push('experience');
+        if (!bio) missing.push('bio');
+        return res.status(400).json({ 
+          error: "Missing required fields",
+          missing: missing
+        });
+      }
+
+      // Check if user with email already exists
+      const existingUser = await storage.getUserByEmail(email.toLowerCase());
+      if (existingUser) {
+        return res.status(400).json({ 
+          error: "A user with this email already exists",
+          details: `User with email ${email} already exists`
+        });
       }
 
       // Create user account for mentor with temporary password
@@ -4364,6 +4384,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bcrypt = require('bcrypt');
       const passwordHash = await bcrypt.hash(tempPassword, 12);
       
+      console.log('Creating mentor user account...');
       const mentorUser = await storage.createUser({
         username: email.toLowerCase().replace('@', '_').replace('.', '_'),
         email: email.toLowerCase(),
@@ -4381,13 +4402,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mfaEnabled: false
       });
 
+      console.log('Created mentor user:', mentorUser.id);
+
       // Create mentor profile
+      console.log('Creating mentor profile...');
       const mentor = await storage.createMentor({
         userId: mentorUser.id,
         specialty,
         experience,
         bio,
-        hourlyRate: null,
+        hourlyRate: hourlyRate ? parseFloat(hourlyRate) : null,
         languages: languages || [],
         certifications: certifications || [],
         profilePicture: profilePicture || null,
@@ -4400,10 +4424,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
 
-      // Admin action logged via console
-      console.log(`Admin ${req.user!.email} created mentor profile for ${name} (${email})`);
+      console.log('Created mentor profile:', mentor.id);
 
-      res.json({ mentor, success: true });
+      // Admin action logged via console
+      console.log(`Admin ${req.userId} created mentor profile for ${name} (${email})`);
+
+      res.json({ mentor, success: true, tempPassword });
     } catch (error: any) {
       console.error('Admin create mentor error:', error);
       console.error('Error details:', {
@@ -4411,6 +4437,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         code: error.code,
         stack: error.stack
       });
+      
+      // More specific error messages
+      if (error.code === '23505') {
+        return res.status(400).json({ 
+          error: "Email already exists",
+          details: "A user with this email address already exists"
+        });
+      }
+      
       res.status(500).json({ 
         error: "Failed to create mentor",
         details: error.message || "Unknown error"
@@ -4430,7 +4465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Log admin action
       await storage.logAdminActivity({
-        userId: req.user!.id,
+        userId: req.userId!,
         action: 'MENTOR_UPDATED',
         details: `Updated mentor profile ID: ${mentorId}`,
         ipAddress: req.ip || null,
