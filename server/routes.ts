@@ -2524,9 +2524,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // ===== LOAN REFERRAL SYSTEM ENDPOINTS =====
+  // ===== ENHANCED LOAN REFERRAL SYSTEM ENDPOINTS =====
 
-  // Submit loan pre-qualification
+  // Submit loan pre-qualification with enhanced partner matching
   app.post('/api/loans/pre-qualify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
@@ -2555,6 +2555,213 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error('Pre-qualification error:', error);
       res.status(500).json({ error: "Failed to process pre-qualification" });
+    }
+  });
+
+  // Enhanced prequalification with comprehensive partner matching
+  app.post('/api/loans/enhanced-prequalify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const validatedData = loanPreQualificationSchema.parse(req.body);
+      
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      const workflow = await enhancedLoanService.processEnhancedPrequalification(userId, validatedData);
+
+      res.status(201).json({
+        success: true,
+        workflow,
+        message: workflow.workflowStatus === 'matched' 
+          ? `Found ${workflow.matchingPartners.length} matching partners with ${workflow.totalPotentialCommission.toFixed(2)} potential commission`
+          : "No matching partners found at this time"
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid pre-qualification data", details: error.errors });
+      }
+      console.error('Enhanced pre-qualification error:', error);
+      res.status(500).json({ error: "Failed to process enhanced pre-qualification" });
+    }
+  });
+
+  // Create loan application with referral tracking
+  app.post('/api/loans/apply-with-referral', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { referralCode, ...applicationData } = req.body;
+      
+      const applicationSchema = loanApplicationSchema.parse(applicationData);
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      
+      const enhancedApplication = await enhancedLoanService.createLoanApplicationWithReferral(
+        userId,
+        applicationSchema,
+        referralCode
+      );
+
+      res.status(201).json({
+        success: true,
+        application: enhancedApplication,
+        message: referralCode ? "Application submitted with referral tracking" : "Application submitted"
+      });
+    } catch (error: any) {
+      if (error.name === 'ZodError') {
+        return res.status(400).json({ error: "Invalid application data", details: error.errors });
+      }
+      console.error('Enhanced loan application error:', error);
+      res.status(500).json({ error: "Failed to submit loan application" });
+    }
+  });
+
+  // Get loan application status with referral tracking
+  app.get('/api/loans/applications/:id/status', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const applicationId = parseInt(req.params.id);
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      
+      const statusInfo = await enhancedLoanService.getLoanApplicationStatus(applicationId);
+      
+      res.json({
+        success: true,
+        statusInfo
+      });
+    } catch (error: any) {
+      console.error('Get loan application status error:', error);
+      res.status(500).json({ error: "Failed to get application status" });
+    }
+  });
+
+  // Get user's comprehensive loan journey
+  app.get('/api/loans/user-journey', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      
+      const journey = await enhancedLoanService.getUserLoanJourney(userId);
+      
+      res.json({
+        success: true,
+        journey
+      });
+    } catch (error: any) {
+      console.error('Get user loan journey error:', error);
+      res.status(500).json({ error: "Failed to get loan journey" });
+    }
+  });
+
+  // Partner webhook endpoint for loan application updates
+  app.post('/api/loans/partner-webhook', async (req, res) => {
+    try {
+      const { referralCode, status, applicationId, approvedAmount, approvedRate, rejectionReason, signature } = req.body;
+      
+      // Verify webhook signature (basic implementation)
+      // In production, implement proper signature verification
+      
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      await enhancedLoanService.processPartnerWebhook(referralCode, {
+        status,
+        applicationId,
+        approvedAmount,
+        approvedRate,
+        rejectionReason,
+        additionalData: req.body
+      });
+
+      res.json({ success: true, message: "Webhook processed successfully" });
+    } catch (error: any) {
+      console.error('Partner webhook error:', error);
+      res.status(500).json({ error: "Failed to process webhook" });
+    }
+  });
+
+  // ===== ADMIN COMMISSION TRACKING ENDPOINTS =====
+
+  // Get commission analytics for admin dashboard
+  app.get('/api/admin/loans/commission-analytics', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      const analytics = await enhancedLoanService.getCommissionAnalytics(start, end);
+      
+      res.json({
+        success: true,
+        analytics
+      });
+    } catch (error: any) {
+      console.error('Commission analytics error:', error);
+      res.status(500).json({ error: "Failed to fetch commission analytics" });
+    }
+  });
+
+  // Process bulk commission payments
+  app.post('/api/admin/loans/process-commissions', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { partnerId } = req.body;
+      
+      const { enhancedLoanService } = await import('./enhanced-loan-service');
+      const result = await enhancedLoanService.processBulkCommissionPayments(partnerId);
+      
+      await SecurityLogger.logAuthEvent(
+        'bulk_commission_payment_processed',
+        req.userId!,
+        true,
+        req.ip,
+        req.get('User-Agent'),
+        {
+          partnerId,
+          processed: result.processed,
+          totalAmount: result.totalAmount
+        }
+      );
+      
+      res.json({
+        success: true,
+        result,
+        message: `Processed ${result.processed} commission payments totaling $${result.totalAmount.toFixed(2)}`
+      });
+    } catch (error: any) {
+      console.error('Process commissions error:', error);
+      res.status(500).json({ error: "Failed to process commission payments" });
+    }
+  });
+
+  // Get detailed referral tracking data
+  app.get('/api/admin/loans/referral-tracking', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { page = 1, limit = 20, status, partnerId } = req.query;
+      
+      const { partnerApiService } = await import('./partner-api-service');
+      const trackingData = await partnerApiService.getReferralAnalytics();
+      
+      res.json({
+        success: true,
+        trackingData
+      });
+    } catch (error: any) {
+      console.error('Referral tracking error:', error);
+      res.status(500).json({ error: "Failed to fetch referral tracking data" });
+    }
+  });
+
+  // Get partner performance metrics
+  app.get('/api/admin/loans/partner-performance', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+      
+      const { partnerApiService } = await import('./partner-api-service');
+      const performanceData = await partnerApiService.getReferralAnalytics(start, end);
+      
+      res.json({
+        success: true,
+        performance: performanceData
+      });
+    } catch (error: any) {
+      console.error('Partner performance error:', error);
+      res.status(500).json({ error: "Failed to fetch partner performance data" });
     }
   });
 
