@@ -1237,6 +1237,7 @@ function SignInPage() {
   const [authError, setAuthError] = useState('');
   const [validationErrors, setValidationErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [signupSuccess, setSignupSuccess] = useState('');
 
   // Client-side validation function
   const validateCredentials = (email, password) => {
@@ -1390,11 +1391,19 @@ function SignInPage() {
         });
         
         if (syncResponse.ok) {
+          // Show success message and redirect
+          setAuthError('');
+          setSuccessMessage('✅ Successfully signed in! Welcome back to CushGlobal!');
+          
           // Force redirect to dashboard after successful login
           console.log('Login successful, redirecting to dashboard');
-          window.location.hash = 'dashboard';
+          setTimeout(() => {
+            window.location.hash = 'dashboard';
+            window.location.reload(); // Force reload to ensure proper state
+          }, 1500);
         } else {
-          throw new Error('Failed to sync user with backend');
+          const errorData = await syncResponse.json();
+          throw new Error(errorData.error || 'Failed to sync user with backend');
         }
       } catch (error) {
         console.error('Firebase login error:', error);
@@ -1536,11 +1545,19 @@ function SignInPage() {
       });
       
       if (syncResponse.ok) {
+        // Show success message
+        setAuthError('');
+        setSignupSuccess('🎉 Account created successfully! Welcome to CushGlobal - Financial tools for Expats!');
+        
         // Force redirect to dashboard after successful sign-up
         console.log('Sign-up successful, redirecting to dashboard');
-        window.location.hash = 'dashboard';
+        setTimeout(() => {
+          window.location.hash = 'dashboard';
+          window.location.reload(); // Force reload to ensure proper state
+        }, 2000);
       } else {
-        throw new Error('Failed to sync user with backend');
+        const errorData = await syncResponse.json();
+        throw new Error(errorData.error || 'Failed to sync user with backend');
       }
     } catch (error) {
       console.error('Signup error:', error);
@@ -1686,9 +1703,16 @@ function SignInPage() {
         }
       }
       
+      // Show success message and redirect
+      setAuthError('');
+      setSuccessMessage('✅ Google Sign-In successful! Welcome back to CushGlobal!');
+      
       // Force redirect to dashboard after successful Google sign-in
       console.log('Google sign-in successful, redirecting to dashboard');
-      window.location.hash = 'dashboard';
+      setTimeout(() => {
+        window.location.hash = 'dashboard';
+        window.location.reload(); // Force reload to ensure proper state
+      }, 1500);
     } catch (error) {
       console.error('Google sign-in error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
@@ -1965,10 +1989,30 @@ function SignInPage() {
               key: 'success-icon',
               className: 'w-5 h-5 text-green-500'
             }, '✓'),
+            e('span', {
+              key: 'success-text',
+              className: 'text-green-800 font-medium'
+            }, successMessage)
+          ])
+        ]),
+
+        // Signup Success Message
+        signupSuccess && e('div', {
+          key: 'signup-success',
+          className: 'mb-6 p-4 bg-green-50 border border-green-200 rounded-xl'
+        }, [
+          e('div', {
+            key: 'success-content',
+            className: 'flex items-center gap-3'
+          }, [
+            e('div', {
+              key: 'success-icon',
+              className: 'w-5 h-5 text-green-500'
+            }, '✓'),
             e('p', {
               key: 'success-text',
               className: 'text-sm text-green-600 font-medium'
-            }, successMessage)
+            }, signupSuccess)
           ])
         ]),
 

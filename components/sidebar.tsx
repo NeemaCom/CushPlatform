@@ -108,13 +108,13 @@ export function Sidebar() {
       }
     },
     onSuccess: () => {
-      // Force redirect to homepage
-      window.location.href = '/';
+      // Force redirect to homepage with proper domain
+      window.location.href = 'https://portal.we-cush.com/dashboard';
     },
     onError: (error) => {
       console.error('Logout failed:', error);
       // Force redirect even on error
-      window.location.href = '/';
+      window.location.href = 'https://portal.we-cush.com/dashboard';
     },
   });
 
