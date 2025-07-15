@@ -1628,11 +1628,16 @@ function SignInPage() {
         });
       }
       
+      console.log('Starting Google Sign-In process...');
+      
       const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
+      
+      // Add more specific error handling for popup
+      console.log('Attempting to sign in with popup...');
       
       const result = await signInWithPopup(window.firebaseAuth, provider);
       const user = result.user;
@@ -1715,11 +1720,20 @@ function SignInPage() {
       }, 1500);
     } catch (error) {
       console.error('Google sign-in error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
       if (error.code !== 'auth/popup-closed-by-user') {
         if (error.code === 'auth/unauthorized-domain') {
           setAuthError('Google Sign-In is temporarily unavailable. Please use email/password authentication or contact support. Domain authorization is pending.');
+        } else if (error.code === 'auth/popup-blocked') {
+          setAuthError('Google Sign-In popup was blocked by your browser. Please allow popups for this site and try again.');
+        } else if (error.code === 'auth/cancelled-popup-request') {
+          setAuthError('Google Sign-In was cancelled. Please try again.');
+        } else if (error.code === 'auth/network-request-failed') {
+          setAuthError('Network error during Google Sign-In. Please check your internet connection and try again.');
         } else {
-          setAuthError(getFirebaseErrorMessage(error));
+          setAuthError('Google Sign-In failed: ' + (error.message || 'Unknown error. Please try again or use email/password authentication.'));
         }
       }
     } finally {
@@ -2129,6 +2143,16 @@ function SignInPage() {
                   })
                 ]),
                 'Continue with Google'
+              ]),
+              
+              // Debug information
+              e('div', {
+                key: 'debug-info',
+                className: 'text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded border'
+              }, [
+                e('div', { key: 'debug-domain' }, 'Domain: ' + window.location.origin),
+                e('div', { key: 'debug-firebase' }, 'Firebase: ' + (window.firebaseAuth ? 'Ready' : 'Loading...')),
+                e('div', { key: 'debug-project' }, 'Project: cushportal')
               ])
             ]),
             
