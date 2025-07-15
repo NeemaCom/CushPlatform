@@ -6734,15 +6734,22 @@ function AdminDashboard({ user, onBack }) {
     e.preventDefault();
     try {
       setLoading(true);
+      const mentorData = {
+        ...newMentor,
+        languages: newMentor.languages.split(',').map(lang => lang.trim()),
+        certifications: newMentor.certifications.split(',').map(cert => cert.trim())
+      };
+      
+      console.log('Sending mentor data:', mentorData);
+      
       const response = await fetch('/api/admin/mentors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newMentor,
-          languages: newMentor.languages.split(',').map(lang => lang.trim()),
-          certifications: newMentor.certifications.split(',').map(cert => cert.trim())
-        })
+        body: JSON.stringify(mentorData)
       });
+      
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
 
       if (response.ok) {
         fetchMentors();
@@ -6764,10 +6771,12 @@ function AdminDashboard({ user, onBack }) {
         alert('Mentor added successfully');
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to add mentor');
+        console.error('Mentor creation error:', error);
+        alert(error.error || `Failed to add mentor: ${error.details || 'Unknown error'}`);
       }
     } catch (error) {
-      alert('Failed to add mentor');
+      console.error('Mentor creation network error:', error);
+      alert('Failed to add mentor: Network error');
     } finally {
       setLoading(false);
     }
