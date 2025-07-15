@@ -4760,7 +4760,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       rating: 4.9,
       sessions: 150,
       languages: ["English", "Mandarin"],
-      hourlyRate: "$120",
+
       bio: "Certified Immigration Consultant with expertise in Express Entry, PNP programs, and family sponsorship.",
       availability: {
         timezone: "EST",
@@ -4782,7 +4782,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       rating: 4.8,
       sessions: 200,
       languages: ["English"],
-      hourlyRate: "$150",
+
       bio: "Registered Migration Agent specializing in skilled migration, business visas, and points optimization.",
       availability: {
         timezone: "AEST",
@@ -4804,7 +4804,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       rating: 4.9,
       sessions: 120,
       languages: ["English", "French"],
-      hourlyRate: "$130",
+
       bio: "UK Immigration Specialist with focus on Global Talent, Skilled Worker, and Student visas.",
       availability: {
         timezone: "GMT",
@@ -4956,10 +4956,7 @@ For personalized immigration strategy, consult with our experienced immigration 
       key: 'actions',
       className: 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3'
     }, [
-      e('span', {
-        key: 'rate',
-        className: 'text-base sm:text-lg font-bold text-gray-900'
-      }, mentor.hourlyRate ? `$${mentor.hourlyRate}/hour` : 'Contact for rates'),
+
       e('button', {
         key: 'book-btn',
         onClick: () => {
@@ -7502,7 +7499,6 @@ function AdminDashboard({ user, onBack }) {
                   className: 'flex items-center gap-4 mt-2 text-sm text-gray-600'
                 }, [
                   e('span', { key: 'experience' }, mentor.experience),
-                  e('span', { key: 'rate' }, mentor.hourlyRate),
                   e('span', { 
                     key: 'status',
                     className: mentor.isActive ? 'text-green-600' : 'text-red-600'
@@ -10000,7 +9996,7 @@ function MentorBookingPage() {
       specialty: 'Canada Immigration',
       rating: 4.9,
       reviews: 127,
-      hourlyRate: '$150',
+
       experience: '12 years',
       languages: ['English', 'French'],
       bio: 'Specialized in Express Entry, Provincial Nominee Programs, and skilled worker visas for Canada.',
@@ -10013,7 +10009,7 @@ function MentorBookingPage() {
       specialty: 'Australia Immigration',
       rating: 4.8,
       reviews: 89,
-      hourlyRate: '$140',
+
       experience: '10 years',
       languages: ['English', 'Mandarin'],
       bio: 'Expert in Australian skilled migration, business visas, and family reunion programs.',
@@ -10026,7 +10022,7 @@ function MentorBookingPage() {
       specialty: 'UK Immigration',
       rating: 4.9,
       reviews: 156,
-      hourlyRate: '$160',
+
       experience: '15 years',
       languages: ['English', 'Spanish'],
       bio: 'Specializes in UK work visas, investor visas, and British citizenship applications.',
@@ -10039,7 +10035,7 @@ function MentorBookingPage() {
       specialty: 'US Immigration',
       rating: 4.7,
       reviews: 203,
-      hourlyRate: '$170',
+
       experience: '18 years',
       languages: ['English', 'Spanish'],
       bio: 'Expert in H-1B, EB-5, family-based immigration, and naturalization processes.',
@@ -10201,13 +10197,7 @@ function MentorBookingPage() {
                 e('span', { key: 'exp-label', className: 'text-gray-600' }, 'Experience:'),
                 e('span', { key: 'exp-value', className: 'font-medium' }, mentor.experience)
               ]),
-              e('div', {
-                key: 'rate',
-                className: 'flex justify-between'
-              }, [
-                e('span', { key: 'rate-label', className: 'text-gray-600' }, 'Hourly Rate:'),
-                e('span', { key: 'rate-value', className: 'font-medium text-green-600' }, mentor.hourlyRate)
-              ]),
+
               e('div', {
                 key: 'languages',
                 className: 'flex justify-between'
