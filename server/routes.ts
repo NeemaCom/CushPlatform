@@ -4353,6 +4353,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/mentors', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
+      console.log('Admin user:', req.user);
+      console.log('Admin user ID:', req.userId);
+      console.log('Session data:', req.session);
+      
       const { name, email, specialty, experience, bio, hourlyRate, languages, certifications, profilePicture } = req.body;
       
       console.log('Creating mentor with data:', { name, email, specialty, experience, bio });
