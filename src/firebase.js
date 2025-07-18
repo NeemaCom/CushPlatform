@@ -6,7 +6,7 @@ import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPas
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-  authDomain: "portal.we-cush.com",
+  authDomain: "cushportal.firebaseapp.com",
   projectId: "cushportal",
   storageBucket: "cushportal.firebasestorage.app",
   messagingSenderId: "304174661302",

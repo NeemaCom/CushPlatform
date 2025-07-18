@@ -2106,7 +2106,9 @@ function SignInPage() {
               e('button', {
                 key: 'google-signin-button',
                 type: 'button',
-                onClick: handleGoogleSignIn,
+                onClick: () => {
+                  window.location.href = '/api/auth/google';
+                },
                 disabled: loading,
                 className: `w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 ${loading ? 'cursor-not-allowed opacity-60' : ''}`
               }, [
@@ -5585,7 +5587,7 @@ function App() {
         
         const firebaseConfig = {
           apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "portal.we-cush.com",
+          authDomain: "cushportal.firebaseapp.com",
           projectId: "cushportal",
           storageBucket: "cushportal.firebasestorage.app",
           messagingSenderId: "304174661302",
@@ -13577,10 +13579,17 @@ function SignUpPage() {
       provider.addScope('email');
       provider.addScope('profile');
       
+      console.log('Attempting Google sign-up with popup...');
       const result = await signInWithPopup(window.firebaseAuth, provider);
       const user = result.user;
       
       console.log('Google sign-up successful:', user.email);
+      console.log('User details:', {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        emailVerified: user.emailVerified
+      });
       
       // Create/update user in our backend with timeout
       const syncResponse = await Promise.race([
@@ -13636,14 +13645,21 @@ function SignUpPage() {
       }
     } catch (error) {
       console.error('Google sign-up error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
       if (error.code !== 'auth/popup-closed-by-user') {
         let errorMessage;
         if (error.code === 'auth/unauthorized-domain') {
           errorMessage = 'Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.';
+        } else if (error.code === 'auth/popup-blocked') {
+          errorMessage = 'Pop-up blocked by browser. Please allow pop-ups for this site and try again.';
+        } else if (error.code === 'auth/operation-not-allowed') {
+          errorMessage = 'Google Sign-In is not enabled. Please contact support.';
         } else if (error.message.includes('timeout') || error.message.includes('network')) {
           errorMessage = 'Network error. Please check your connection and try again.';
         } else {
-          errorMessage = getFirebaseErrorMessage(error.code);
+          errorMessage = getFirebaseErrorMessage(error.code) || 'An error occurred during sign-up. Please try again.';
         }
         setError(errorMessage);
       }
