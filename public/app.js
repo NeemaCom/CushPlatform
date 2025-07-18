@@ -1624,17 +1624,19 @@ function SignInPage() {
       
       console.log('Starting Google Sign-In process...');
       
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { signInWithRedirect, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
       
-      // Add more specific error handling for popup
-      console.log('Attempting to sign in with popup...');
+      console.log('Using redirect method for reliable authentication...');
+      console.log('Current window location:', window.location.href);
+      console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
       
-      const result = await signInWithPopup(window.firebaseAuth, provider);
-      const user = result.user;
+      // Use redirect instead of popup for better reliability
+      await signInWithRedirect(window.firebaseAuth, provider);
+      return; // Exit here as redirect will handle the rest
       
       console.log('Google sign-in successful:', user.email);
       
@@ -13569,17 +13571,19 @@ function SignUpPage() {
     setError('');
     
     try {
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { signInWithRedirect, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
       
-      console.log('Attempting Google sign-up with popup...');
-      const result = await signInWithPopup(window.firebaseAuth, provider);
-      const user = result.user;
+      console.log('Attempting Google sign-up with redirect...');
+      console.log('Current window location:', window.location.href);
+      console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
       
-      console.log('Google sign-up successful:', user.email);
+      // Use redirect instead of popup for better reliability
+      await signInWithRedirect(window.firebaseAuth, provider);
+      return; // Exit here as redirect will handle the rest
       console.log('User details:', {
         uid: user.uid,
         email: user.email,
