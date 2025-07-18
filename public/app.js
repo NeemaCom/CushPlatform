@@ -2106,9 +2106,7 @@ function SignInPage() {
               e('button', {
                 key: 'google-signin-button',
                 type: 'button',
-                onClick: () => {
-                  window.location.href = '/api/auth/google';
-                },
+                onClick: handleGoogleSignIn,
                 disabled: loading,
                 className: `w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 ${loading ? 'cursor-not-allowed opacity-60' : ''}`
               }, [
@@ -2356,9 +2354,7 @@ function SignInPage() {
               e('button', {
                 key: 'google-signup-button',
                 type: 'button',
-                onClick: () => {
-                  window.location.href = '/api/auth/google';
-                },
+                onClick: handleGoogleSignUp,
                 className: 'w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3'
               }, [
                 e('svg', {
@@ -5587,7 +5583,7 @@ function App() {
         
         const firebaseConfig = {
           apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "cushportal.firebaseapp.com",
+          authDomain: "portal.we-cush.com",
           projectId: "cushportal",
           storageBucket: "cushportal.firebasestorage.app",
           messagingSenderId: "304174661302",
