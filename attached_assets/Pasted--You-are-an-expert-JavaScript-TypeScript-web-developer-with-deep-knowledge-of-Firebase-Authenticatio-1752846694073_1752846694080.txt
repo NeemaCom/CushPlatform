@@ -1,0 +1,34 @@
+"You are an expert JavaScript/TypeScript web developer with deep knowledge of Firebase Authentication. Your task is to analyze and propose solutions for several issues related to user authentication flow in a web application.
+Context:
+App Type: Web Application
+Language: TypeScript / JavaScript
+Authentication: Firebase Authentication ( firebase/auth )
+Firebase Project: cushportal
+Tasks and Requirements:
+Investigate and Suggest Fixes for Sign-Up Button Responsiveness:
+Problem Description: The sign-up button 'isn't responding seamlessly.' This is vague, so you need to provide common reasons why a sign-up button might appear unresponsive or have issues, and suggest diagnostic steps or typical code patterns to ensure it works smoothly.
+Considerations:
+Are form submissions handled correctly (e.g., event.preventDefault() if using a form, correct onClick handler)?
+Are there any UI blocking issues (e.g., loading spinners not dismissing)?
+Are Firebase Auth methods (like createUserWithEmailAndPassword or social sign-in popups) being called correctly?
+Is error handling implemented to show feedback to the user?
+Are there any network issues or unhandled promises?
+Output: List common causes and provide a general code structure or pattern for a robust sign-up button handler, including basic error handling.
+Implement Robust Sign-Out and Redirection:
+Requirement: When the sign-out button is clicked:
+The user must be successfully signed out of Firebase.
+The application must then immediately redirect the user to the homepage ( / ).
+Output: Provide a TypeScript/JavaScript code snippet for a signOut function that ensures both successful sign-out and redirection. Assume a common client-side routing mechanism (e.g., window.location.href , or mention history.push /'router.push' if a client-side router like React Router or Vue Router is in use).
+Implement Automatic Session Timeout on Inactivity:
+Requirement: The user's account should automatically sign out if there is 10 minutes (600,000 milliseconds) of inactivity within the application.
+Inactivity Definition: No mouse movement, key presses, or clicks on the page.
+Output: Provide a TypeScript/JavaScript code snippet that demonstrates how to implement this inactivity detection and automatic sign-out.
+Considerations:
+You will need to track user interactions.
+You will need to use setTimeout and clearTimeout .
+This logic should ideally be applied globally (e.g., in your main app component or an effect hook).
+Ensure the signOut function from the previous task is leveraged.
+General Output Requirements:
+Provide clear, commented code examples for all requested functionalities.
+Assume the Firebase Auth instance is readily available (e.g., auth from getAuth(app) ).
+Use TypeScript types where appropriate if providing a TypeScript example.

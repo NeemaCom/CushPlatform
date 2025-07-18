@@ -5765,6 +5765,261 @@ function App() {
     };
   }, []);
 
+  // Enhanced Logout with comprehensive cleanup
+  const handleLogout = async () => {
+    // Prevent multiple simultaneous sign-outs
+    if (window.isSigningOut) {
+      console.log('Sign-out already in progress');
+      return;
+    }
+    
+    try {
+      window.isSigningOut = true;
+      console.log('Starting enhanced sign-out process...');
+      
+      // Step 1: Firebase sign-out
+      if (window.firebaseAuth) {
+        try {
+          const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+          await signOut(window.firebaseAuth);
+          console.log('Firebase sign-out successful');
+        } catch (firebaseError) {
+          console.error('Firebase sign-out error:', firebaseError);
+        }
+      }
+      
+      // Step 2: Backend session cleanup
+      try {
+        const response = await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          console.warn('Backend logout failed:', response.status);
+        }
+      } catch (backendError) {
+        console.error('Backend logout error:', backendError);
+      }
+      
+      // Step 3: Clear client-side data
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Clear cookies
+        document.cookie.split(";").forEach(cookie => {
+          const eqPos = cookie.indexOf("=");
+          const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+          document.cookie = `${name.trim()}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/`;
+          document.cookie = `${name.trim()}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=${window.location.hostname}`;
+        });
+      } catch (clearError) {
+        console.error('Error clearing client data:', clearError);
+      }
+      
+      // Step 4: Clear user state
+      setUser(null);
+      
+      // Step 5: Guaranteed redirection with multiple fallbacks
+      try {
+        window.location.href = '/';
+        
+        setTimeout(() => {
+          if (window.location.hash !== '' && window.location.hash !== '#') {
+            window.location.hash = '';
+            window.location.reload();
+          }
+        }, 100);
+        
+        setTimeout(() => {
+          window.location.replace('/');
+        }, 500);
+        
+      } catch (redirectError) {
+        console.error('Redirection error:', redirectError);
+        window.location.reload();
+      }
+      
+    } catch (error) {
+      console.error('Sign-out process error:', error);
+      setUser(null);
+      localStorage.clear();
+      sessionStorage.clear();
+      window.location.href = '/';
+    } finally {
+      window.isSigningOut = false;
+    }
+  };
+
+  // Inactivity Timeout System (10 minutes)
+  useEffect(() => {
+    if (!user) return;
+
+    const TIMEOUT_DURATION = 600000; // 10 minutes
+    const WARNING_DURATION = 120000; // 2 minutes warning
+    
+    let lastActivity = Date.now();
+    let timeoutId = null;
+    let warningId = null;
+    let warningShown = false;
+    
+    const activityEvents = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 
+      'touchstart', 'click', 'focus', 'blur'
+    ];
+    
+    const clearWarning = () => {
+      const warningDiv = document.getElementById('inactivity-warning');
+      if (warningDiv) {
+        warningDiv.remove();
+      }
+      warningShown = false;
+    };
+    
+    const showWarning = () => {
+      if (warningShown) return;
+      
+      warningShown = true;
+      
+      const warningDiv = document.createElement('div');
+      warningDiv.id = 'inactivity-warning';
+      warningDiv.innerHTML = `
+        <div style="
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #fef3c7;
+          border: 1px solid #f59e0b;
+          border-radius: 8px;
+          padding: 16px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          z-index: 10000;
+          max-width: 300px;
+        ">
+          <div style="color: #92400e; font-weight: bold; margin-bottom: 8px;">
+            Session Timeout Warning
+          </div>
+          <div style="color: #92400e; font-size: 14px; margin-bottom: 12px;">
+            You will be signed out in 2 minutes due to inactivity.
+          </div>
+          <button id="extend-session" style="
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+          ">
+            Stay Signed In
+          </button>
+        </div>
+      `;
+      
+      document.body.appendChild(warningDiv);
+      
+      document.getElementById('extend-session').addEventListener('click', () => {
+        handleActivity();
+      });
+    };
+    
+    const showTimeoutNotification = () => {
+      const notification = document.createElement('div');
+      notification.innerHTML = `
+        <div style="
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          padding: 24px;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+          z-index: 10001;
+          text-align: center;
+        ">
+          <div style="color: #374151; font-size: 18px; font-weight: bold; margin-bottom: 8px;">
+            Session Expired
+          </div>
+          <div style="color: #6b7280; font-size: 14px;">
+            You have been signed out due to inactivity.
+          </div>
+        </div>
+      `;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    };
+    
+    const handleTimeout = async () => {
+      console.log('Session timeout due to inactivity');
+      clearWarning();
+      showTimeoutNotification();
+      await handleLogout();
+    };
+    
+    const handleActivity = () => {
+      lastActivity = Date.now();
+      
+      if (warningShown) {
+        clearWarning();
+      }
+      
+      resetTimeout();
+    };
+    
+    const resetTimeout = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      if (warningId) {
+        clearTimeout(warningId);
+      }
+      
+      warningId = setTimeout(() => {
+        showWarning();
+      }, TIMEOUT_DURATION - WARNING_DURATION);
+      
+      timeoutId = setTimeout(() => {
+        handleTimeout();
+      }, TIMEOUT_DURATION);
+    };
+    
+    // Bind activity listeners
+    activityEvents.forEach(event => {
+      document.addEventListener(event, handleActivity, true);
+    });
+    
+    // Start initial timeout
+    resetTimeout();
+    
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, handleActivity, true);
+      });
+      
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      if (warningId) {
+        clearTimeout(warningId);
+      }
+      
+      clearWarning();
+    };
+  }, [user]);
+
   // Install PWA function
   const installPWA = async () => {
     if (deferredPrompt) {
@@ -13174,13 +13429,25 @@ function SignUpPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent double submissions
+    if (loading) {
+      console.log('Sign-up already in progress');
+      return;
+    }
+    
     if (!validateForm()) return;
     
     setLoading(true);
     setError('');
     
+    // Set timeout for the operation (30 seconds)
+    const timeoutId = setTimeout(() => {
+      setError('Request timeout. Please try again.');
+      setLoading(false);
+    }, 30000);
+    
     try {
-      const { createUserWithEmailAndPassword } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const userCredential = await createUserWithEmailAndPassword(
         window.firebaseAuth,
@@ -13191,47 +13458,94 @@ function SignUpPage() {
       // Get the user info
       const user = userCredential.user;
       
-      console.log('Firebase sign-up successful:', user.email);
-      
-      // Create user in our backend
-      const syncResponse = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: `${formData.firstName} ${formData.lastName}`,
-          photoURL: null,
-          emailVerified: user.emailVerified,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          username: formData.username,
-          phoneNumber: formData.phoneNumber ? `${formData.countryCode} ${formData.phoneNumber}` : null,
-          nationality: formData.nationality,
-          acceptTerms: formData.acceptTerms,
-          acceptPrivacy: formData.acceptPrivacy,
-          marketingConsent: formData.marketingConsent
-        }),
+      // Update user profile with display name
+      await updateProfile(user, {
+        displayName: `${formData.firstName} ${formData.lastName}`
       });
       
+      console.log('Firebase sign-up successful:', user.email);
+      
+      // Create user in our backend with network timeout
+      const syncResponse = await Promise.race([
+        fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: `${formData.firstName} ${formData.lastName}`,
+            photoURL: null,
+            emailVerified: user.emailVerified,
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            username: formData.username,
+            phoneNumber: formData.phoneNumber ? `${formData.countryCode} ${formData.phoneNumber}` : null,
+            nationality: formData.nationality,
+            acceptTerms: formData.acceptTerms,
+            acceptPrivacy: formData.acceptPrivacy,
+            marketingConsent: formData.marketingConsent
+          }),
+        }),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Network timeout')), 15000)
+        )
+      ]);
+      
       if (syncResponse.ok) {
-        // Force redirect to dashboard after successful sign-up
-        console.log('Sign-up successful, redirecting to dashboard');
-        window.location.hash = 'dashboard';
+        // Success feedback
+        clearTimeout(timeoutId);
+        setError('');
+        
+        // Show success message briefly
+        const successMessage = document.createElement('div');
+        successMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          z-index: 10000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        `;
+        successMessage.textContent = 'Account created successfully! Redirecting...';
+        document.body.appendChild(successMessage);
+        
+        // Remove success message and redirect
+        setTimeout(() => {
+          successMessage.remove();
+          window.location.hash = 'dashboard';
+        }, 2000);
       } else {
         throw new Error('Failed to sync user with backend');
       }
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error('Registration error:', error);
-      setError(getFirebaseErrorMessage(error.code));
+      
+      // Enhanced error handling
+      let errorMessage = getFirebaseErrorMessage(error.code);
+      
+      if (error.message.includes('timeout') || error.message.includes('network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleSignUp = async () => {
+    // Prevent double submissions
+    if (loading) {
+      console.log('Google sign-up already in progress');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     
@@ -13247,41 +13561,68 @@ function SignUpPage() {
       
       console.log('Google sign-up successful:', user.email);
       
-      // Create/update user in our backend
-      const syncResponse = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          emailVerified: user.emailVerified,
-          // Parse name from displayName
-          firstName: user.displayName ? user.displayName.split(' ')[0] : '',
-          lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
-          acceptTerms: true,
-          acceptPrivacy: true
+      // Create/update user in our backend with timeout
+      const syncResponse = await Promise.race([
+        fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified,
+            // Parse name from displayName
+            firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+            lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+            acceptTerms: true,
+            acceptPrivacy: true
+          }),
         }),
-      });
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Network timeout')), 15000)
+        )
+      ]);
       
       if (syncResponse.ok) {
-        // Force redirect to dashboard after successful Google sign-up
-        console.log('Google sign-up successful, redirecting to dashboard');
-        window.location.hash = 'dashboard';
+        // Success feedback
+        const successMessage = document.createElement('div');
+        successMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          z-index: 10000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        `;
+        successMessage.textContent = 'Successfully signed in with Google! Redirecting...';
+        document.body.appendChild(successMessage);
+        
+        // Remove success message and redirect
+        setTimeout(() => {
+          successMessage.remove();
+          window.location.hash = 'dashboard';
+        }, 2000);
       } else {
         throw new Error('Failed to sync user with backend');
       }
     } catch (error) {
       console.error('Google sign-up error:', error);
       if (error.code !== 'auth/popup-closed-by-user') {
+        let errorMessage;
         if (error.code === 'auth/unauthorized-domain') {
-          setError('Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.');
+          errorMessage = 'Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.';
+        } else if (error.message.includes('timeout') || error.message.includes('network')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
         } else {
-          setError(getFirebaseErrorMessage(error));
+          errorMessage = getFirebaseErrorMessage(error.code);
         }
+        setError(errorMessage);
       }
     } finally {
       setLoading(false);
