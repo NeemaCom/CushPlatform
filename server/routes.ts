@@ -5,7 +5,7 @@ import Stripe from "stripe";
 import session from "express-session";
 import passport from "passport";
 import { storage } from "./storage";
-import { setupGoogleAuth } from "./google-auth";
+
 import { aiAnalyticsService } from "./ai-analytics-service";
 import { analyzeFinancialMood, type FinancialMoodData } from './mood-analyzer';
 import { analyzeFinancialHealth, type FinancialHealthData } from './financial-health-analyzer';
@@ -155,8 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
-  // Setup Google OAuth routes
-  setupGoogleAuth(app);
+
 
   // Firebase sync endpoint
   app.post("/api/auth/firebase-sync", async (req, res) => {
