@@ -5607,10 +5607,59 @@ function App() {
           const redirectResult = await getRedirectResult(auth);
           if (redirectResult) {
             console.log('Firebase redirect result:', redirectResult.user.email);
+            
+            // Show success message for Google sign-in
+            const successMessage = document.createElement('div');
+            successMessage.style.cssText = `
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: #10b981;
+              color: white;
+              padding: 12px 24px;
+              border-radius: 8px;
+              z-index: 10000;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+              font-family: system-ui, -apple-system, sans-serif;
+            `;
+            successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
+            document.body.appendChild(successMessage);
+            
+            // Handle the Firebase user and redirect
             await handleFirebaseUser(redirectResult.user);
+            
+            // Remove success message after redirect
+            setTimeout(() => {
+              if (successMessage.parentNode) {
+                successMessage.remove();
+              }
+            }, 3000);
           }
         } catch (redirectError) {
           console.error('Firebase redirect error:', redirectError);
+          
+          // Show error message if redirect failed
+          const errorMessage = document.createElement('div');
+          errorMessage.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            font-family: system-ui, -apple-system, sans-serif;
+          `;
+          errorMessage.textContent = 'Google sign-in failed. Please try again.';
+          document.body.appendChild(errorMessage);
+          
+          setTimeout(() => {
+            if (errorMessage.parentNode) {
+              errorMessage.remove();
+            }
+          }, 5000);
         }
         
         // Listen for auth state changes
