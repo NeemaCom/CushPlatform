@@ -5666,6 +5666,13 @@ function App() {
           setUser(data.user);
           setIsLoading(false);
           console.log('Firebase user synced successfully');
+          
+          // Force redirect to dashboard for authenticated users
+          if (data.user && window.location.hash !== '#dashboard') {
+            console.log('Forcing redirect to dashboard for authenticated user');
+            window.location.hash = 'dashboard';
+            window.dispatchEvent(new Event('hashchange'));
+          }
         } else {
           console.error('Firebase sync failed:', response.status);
           checkBackendAuth();
@@ -5685,6 +5692,13 @@ function App() {
         if (response.ok) {
           const data = await response.json();
           setUser(data);
+          
+          // Force redirect to dashboard for authenticated users
+          if (data && window.location.hash !== '#dashboard') {
+            console.log('Backend auth check: Forcing redirect to dashboard for authenticated user');
+            window.location.hash = 'dashboard';
+            window.dispatchEvent(new Event('hashchange'));
+          }
         } else {
           setUser(null);
         }
@@ -6078,11 +6092,18 @@ function App() {
   }
 
   const currentHash = window.location.hash;
-  const shouldShowDashboard = currentHash === '#dashboard' || currentHash === '#' + window.location.pathname.split('/')[1];
+  const shouldShowDashboard = user && (
+    currentHash === '#dashboard' || 
+    currentHash === '#' || 
+    currentHash === '' || 
+    currentHash === '#home' ||
+    // If user is authenticated and no specific route is set, show dashboard
+    (user && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms'))
+  );
   
   return e('div', { key: 'app-container' }, [
-    // Show Dashboard only if user is authenticated AND explicitly navigated to dashboard
-    user && shouldShowDashboard ? 
+    // Show Dashboard for authenticated users unless on specific public pages
+    shouldShowDashboard ? 
       e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
       e(AppRouter, { key: 'router', user }),
     
@@ -13607,6 +13628,8 @@ function SignUpPage() {
         setTimeout(() => {
           successMessage.remove();
           window.location.hash = 'dashboard';
+          // Force re-render after redirect
+          window.dispatchEvent(new Event('hashchange'));
         }, 2000);
       } else {
         throw new Error('Failed to sync user with backend');
