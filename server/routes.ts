@@ -3504,6 +3504,132 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ===== NOTIFICATION SYSTEM ENDPOINTS =====
 
+  // Get notifications by priority
+  app.get('/api/notifications/priority/:priority', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const priority = req.params.priority as 'low' | 'medium' | 'high' | 'critical';
+      
+      if (!['low', 'medium', 'high', 'critical'].includes(priority)) {
+        return res.status(400).json({ error: "Invalid priority level" });
+      }
+      
+      const notifications = notificationService.getNotificationsByPriority(userId, priority);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching notifications by priority:', error);
+      res.status(500).json({ error: "Failed to fetch notifications" });
+    }
+  });
+
+  // Get critical notifications
+  app.get('/api/notifications/critical', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notifications = notificationService.getCriticalNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching critical notifications:', error);
+      res.status(500).json({ error: "Failed to fetch critical notifications" });
+    }
+  });
+
+  // Get notifications requiring action
+  app.get('/api/notifications/action-required', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const notifications = notificationService.getActionRequiredNotifications(userId);
+      res.json(notifications);
+    } catch (error) {
+      console.error('Error fetching action-required notifications:', error);
+      res.status(500).json({ error: "Failed to fetch action-required notifications" });
+    }
+  });
+
+  // Create test critical financial alerts (demo purposes)
+  app.post('/api/notifications/test-critical-alerts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      
+      // Create sample critical financial alerts
+      const alerts = [
+        notificationService.createCriticalSecurityAlert(
+          userId,
+          'Suspicious Login Detected',
+          'We detected a login attempt from an unusual location. Please verify your account security.',
+          '/account/security'
+        ),
+        notificationService.createPaymentAlert(
+          userId,
+          'failed',
+          '£500.00',
+          'GBP',
+          'LOAN-APP-001'
+        ),
+        notificationService.createLoanStatusAlert(
+          userId,
+          'loan_123',
+          'approved',
+          '£15,000',
+          'Barclays'
+        ),
+        notificationService.createCreditScoreAlert(
+          userId,
+          720,
+          695,
+          'increase'
+        ),
+        notificationService.createMigrationAlert(
+          userId,
+          'visa_expiry',
+          'Your visa expires in 30 days. Take action now to avoid status issues.',
+          30
+        )
+      ];
+      
+      res.json({ 
+        message: "Critical alerts created successfully",
+        alerts: alerts.map(a => ({ id: a.id, type: a.type, priority: a.priority, title: a.title }))
+      });
+    } catch (error) {
+      console.error('Error creating test alerts:', error);
+      res.status(500).json({ error: "Failed to create test alerts" });
+    }
+  });
+
+  // Create manual financial alert (admin only)
+  app.post('/api/admin/notifications/financial-alert', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { targetUserId, type, title, message, priority = 'medium', actionUrl, actionText } = req.body;
+      
+      if (!targetUserId || !type || !title || !message) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      const notification = notificationService.createNotification(
+        targetUserId,
+        type,
+        title,
+        message,
+        priority,
+        { adminCreated: true, createdBy: req.userId },
+        {
+          actionRequired: !!actionUrl,
+          actionUrl,
+          actionText
+        }
+      );
+      
+      res.json({ 
+        message: "Financial alert created successfully",
+        notification: { id: notification.id, type: notification.type, priority: notification.priority }
+      });
+    } catch (error) {
+      console.error('Error creating financial alert:', error);
+      res.status(500).json({ error: "Failed to create financial alert" });
+    }
+  });
+
   // Get user notifications
   app.get('/api/notifications', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {

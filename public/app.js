@@ -2961,10 +2961,38 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             
             // Show browser notification if permission granted
             if (Notification.permission === 'granted') {
-              new Notification(data.data.title, {
+              const notificationOptions = {
                 body: data.data.message,
-                icon: '/favicon.ico'
-              });
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: data.data.type,
+                requireInteraction: data.data.priority === 'critical',
+                silent: false
+              };
+              
+              // Add action buttons for actionable notifications
+              if (data.data.actionRequired && data.data.actionUrl) {
+                notificationOptions.actions = [{
+                  action: 'open',
+                  title: data.data.actionText || 'Take Action'
+                }];
+              }
+              
+              const notification = new Notification(data.data.title, notificationOptions);
+              
+              // Handle notification actions
+              notification.onclick = () => {
+                window.focus();
+                if (data.data.actionUrl) {
+                  window.location.hash = data.data.actionUrl.replace('/', '');
+                }
+                notification.close();
+              };
+              
+              // Auto-close non-critical notifications
+              if (data.data.priority !== 'critical') {
+                setTimeout(() => notification.close(), 8000);
+              }
             }
             break;
             
@@ -3419,7 +3447,11 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                 e('span', { key: 'bell-icon', className: 'text-xl' }, '🔔'),
                 unreadCount > 0 && e('span', {
                   key: 'notification-badge',
-                  className: 'absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center'
+                  className: `absolute -top-1 -right-1 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center ${
+                    notifications.some(n => !n.read && n.priority === 'critical') ? 'bg-red-600 animate-pulse' : 
+                    notifications.some(n => !n.read && n.priority === 'high') ? 'bg-orange-500' : 
+                    'bg-blue-500'
+                  }`
                 }, unreadCount.toString()),
                 // WebSocket connection indicator
                 e('div', {
@@ -3455,28 +3487,107 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                       key: 'no-notifications',
                       className: 'p-8 text-center text-gray-500'
                     }, 'No notifications yet') :
-                    notifications.map((notification, index) =>
-                      e('div', {
+                    notifications.map((notification, index) => {
+                      const getPriorityColor = (priority) => {
+                        switch(priority) {
+                          case 'critical': return 'border-l-red-500 bg-red-50';
+                          case 'high': return 'border-l-orange-500 bg-orange-50';
+                          case 'medium': return 'border-l-blue-500 bg-blue-50';
+                          case 'low': return 'border-l-gray-500 bg-gray-50';
+                          default: return 'border-l-gray-500 bg-gray-50';
+                        }
+                      };
+                      
+                      const getTypeIcon = (type) => {
+                        switch(type) {
+                          case 'loan': return '💰';
+                          case 'payment': return '💳';
+                          case 'security': return '🔐';
+                          case 'credit': return '📊';
+                          case 'investment': return '📈';
+                          case 'migration': return '🌍';
+                          case 'community': return '👥';
+                          case 'achievement': return '🏆';
+                          case 'financial': return '💹';
+                          default: return '🔔';
+                        }
+                      };
+                      
+                      const priorityBadge = notification.priority === 'critical' ? 
+                        e('span', { key: 'priority-badge', className: 'px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full' }, 'URGENT') :
+                        notification.priority === 'high' ? 
+                        e('span', { key: 'priority-badge', className: 'px-2 py-1 text-xs font-semibold text-orange-800 bg-orange-100 rounded-full' }, 'HIGH') :
+                        null;
+                      
+                      return e('div', {
                         key: `notification-${notification.id}-${index}`,
-                        className: `p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`,
+                        className: `p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer border-l-4 ${getPriorityColor(notification.priority)} ${!notification.read ? 'font-medium' : ''}`,
                         onClick: () => markAsRead(notification.id)
                       }, [
                         e('div', { key: 'notification-content', className: 'flex items-start gap-3' }, [
-                          e('div', { key: 'notification-icon', className: 'text-xl flex-shrink-0' }, 
-                            notification.type === 'loan' ? '💰' :
-                            notification.type === 'community' ? '🌍' :
-                            notification.type === 'achievement' ? '🏆' :
-                            notification.type === 'financial' ? '📊' : '🔔'
-                          ),
+                          e('div', { key: 'notification-icon', className: 'text-xl flex-shrink-0' }, getTypeIcon(notification.type)),
                           e('div', { key: 'notification-text', className: 'flex-1 min-w-0' }, [
-                            e('h4', { key: 'notification-title', className: 'font-medium text-gray-900 text-sm' }, notification.title),
+                            e('div', { key: 'notification-header', className: 'flex items-start justify-between gap-2 mb-1' }, [
+                              e('h4', { key: 'notification-title', className: 'font-medium text-gray-900 text-sm flex-1' }, notification.title),
+                              priorityBadge
+                            ]),
                             e('p', { key: 'notification-message', className: 'text-gray-600 text-sm mt-1' }, notification.message),
-                            e('p', { key: 'notification-time', className: 'text-gray-400 text-xs mt-1' }, 
-                              new Date(notification.createdAt).toLocaleString())
+                            e('div', { key: 'notification-footer', className: 'flex items-center justify-between mt-2' }, [
+                              e('p', { key: 'notification-time', className: 'text-gray-400 text-xs' }, 
+                                new Date(notification.createdAt).toLocaleString()),
+                              notification.actionRequired && notification.actionUrl && 
+                                e('button', {
+                                  key: 'action-button',
+                                  onClick: (e) => {
+                                    e.stopPropagation();
+                                    window.location.hash = notification.actionUrl.replace('/', '');
+                                  },
+                                  className: 'px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-full hover:bg-blue-200 transition-colors'
+                                }, notification.actionText || 'Take Action')
+                            ])
                           ])
                         ])
-                      ])
-                    )
+                      ]);
+                    })
+                ]),
+                
+                // Footer with actions
+                notifications.length > 0 && e('div', {
+                  key: 'panel-footer',
+                  className: 'px-4 py-3 border-t border-gray-200 bg-gray-50'
+                }, [
+                  e('div', { key: 'footer-actions', className: 'flex items-center justify-between' }, [
+                    e('button', {
+                      key: 'test-alerts',
+                      onClick: async () => {
+                        try {
+                          const response = await fetch('/api/notifications/test-critical-alerts', { method: 'POST' });
+                          if (response.ok) {
+                            loadNotifications();
+                            loadUnreadCount();
+                          }
+                        } catch (error) {
+                          console.error('Error creating test alerts:', error);
+                        }
+                      },
+                      className: 'text-xs text-blue-600 hover:text-blue-800 font-medium'
+                    }, 'Test Alerts'),
+                    e('button', {
+                      key: 'mark-all-read',
+                      onClick: async () => {
+                        try {
+                          const response = await fetch('/api/notifications/mark-all-read', { method: 'PUT' });
+                          if (response.ok) {
+                            loadNotifications();
+                            loadUnreadCount();
+                          }
+                        } catch (error) {
+                          console.error('Error marking all as read:', error);
+                        }
+                      },
+                      className: 'text-xs text-gray-600 hover:text-gray-800 font-medium'
+                    }, 'Mark All Read')
+                  ])
                 ])
               ])
             ]),
@@ -3514,21 +3625,38 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
             className: 'mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg'
           }, [
             e('h3', { key: 'test-title', className: 'text-sm font-medium text-yellow-800 mb-2' }, 'Development Test'),
-            e('button', {
-              key: 'test-btn',
-              onClick: async () => {
-                try {
-                  const response = await fetch('/api/notifications/test', { method: 'POST' });
-                  if (response.ok) {
-                    loadNotifications();
-                    loadUnreadCount();
+            e('div', { key: 'test-buttons', className: 'flex flex-wrap gap-2' }, [
+              e('button', {
+                key: 'test-btn',
+                onClick: async () => {
+                  try {
+                    const response = await fetch('/api/notifications/test', { method: 'POST' });
+                    if (response.ok) {
+                      loadNotifications();
+                      loadUnreadCount();
+                    }
+                  } catch (error) {
+                    console.error('Failed to create test notifications:', error);
                   }
-                } catch (error) {
-                  console.error('Failed to create test notifications:', error);
-                }
-              },
-              className: 'bg-yellow-500 text-white px-4 py-2 rounded text-sm hover:bg-yellow-600'
-            }, 'Create Test Notifications')
+                },
+                className: 'bg-yellow-500 text-white px-4 py-2 rounded text-sm hover:bg-yellow-600'
+              }, 'Test Notifications'),
+              e('button', {
+                key: 'test-critical-btn',
+                onClick: async () => {
+                  try {
+                    const response = await fetch('/api/notifications/test-critical-alerts', { method: 'POST' });
+                    if (response.ok) {
+                      loadNotifications();
+                      loadUnreadCount();
+                    }
+                  } catch (error) {
+                    console.error('Error creating critical alerts:', error);
+                  }
+                },
+                className: 'bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700'
+              }, 'Test Critical Alerts')
+            ])
           ]),
 
           // Mobile-First Horizontal Carousel - Financial Overview Cards
