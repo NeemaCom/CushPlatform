@@ -1624,19 +1624,59 @@ function SignInPage() {
       
       console.log('Starting Google Sign-In process...');
       
-      const { signInWithRedirect, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
       
-      console.log('Using redirect method for reliable authentication...');
+      console.log('Using popup method with enhanced error handling...');
       console.log('Current window location:', window.location.href);
       console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
       
-      // Use redirect instead of popup for better reliability
-      await signInWithRedirect(window.firebaseAuth, provider);
-      return; // Exit here as redirect will handle the rest
+      try {
+        const result = await signInWithPopup(window.firebaseAuth, provider);
+        const user = result.user;
+        
+        console.log('Google sign-in successful:', user.email);
+        
+        // Show success message
+        const successMessage = document.createElement('div');
+        successMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          z-index: 10000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          font-family: system-ui, -apple-system, sans-serif;
+        `;
+        successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
+        document.body.appendChild(successMessage);
+        
+        // Sync with backend
+        await handleFirebaseUserDirectly(user);
+        
+        // Remove success message after redirect
+        setTimeout(() => {
+          if (successMessage.parentNode) {
+            successMessage.remove();
+          }
+        }, 3000);
+        
+      } catch (popupError) {
+        console.error('Google sign-in popup error:', popupError);
+        if (popupError.code === 'auth/popup-closed-by-user') {
+          throw new Error('Sign-in cancelled. Please try again.');
+        } else if (popupError.code === 'auth/popup-blocked') {
+          throw new Error('Popup blocked by browser. Please allow popups for this site and try again.');
+        } else {
+          throw new Error(`Sign-in failed: ${popupError.message}`);
+        }
+      }
       
       console.log('Google sign-in successful:', user.email);
       
@@ -5583,15 +5623,22 @@ function App() {
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
         const { getAuth, onAuthStateChanged, getRedirectResult } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
         
+        // Use the actual domain we're running on for development
+        const currentDomain = window.location.hostname;
+        const isDevelopment = currentDomain.includes('replit.dev') || currentDomain.includes('localhost');
+        
         const firebaseConfig = {
           apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "portal.we-cush.com",
+          authDomain: isDevelopment ? `${currentDomain}` : "portal.we-cush.com",
           projectId: "cushportal",
           storageBucket: "cushportal.firebasestorage.app",
           messagingSenderId: "304174661302",
           appId: "1:304174661302:web:8bc1e5f413aae91336f017",
           measurementId: "G-VGYNJNCJ2F"
         };
+        
+        console.log('Firebase config - authDomain:', firebaseConfig.authDomain);
+        console.log('Current domain:', currentDomain, 'isDevelopment:', isDevelopment);
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -5729,6 +5776,55 @@ function App() {
       } catch (error) {
         console.error('Firebase sync error:', error);
         checkBackendAuth();
+      }
+    };
+
+    // Direct Firebase user handling for popup authentication
+    const handleFirebaseUserDirectly = async (firebaseUser) => {
+      try {
+        console.log('Handling Firebase user directly:', firebaseUser.email);
+        
+        const response = await fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            emailVerified: firebaseUser.emailVerified,
+            firstName: firebaseUser.displayName ? firebaseUser.displayName.split(' ')[0] : '',
+            lastName: firebaseUser.displayName ? firebaseUser.displayName.split(' ').slice(1).join(' ') : '',
+            acceptTerms: true,
+            acceptPrivacy: true,
+            isNewUser: true
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+          setIsLoading(false);
+          console.log('Firebase user synced successfully via direct handler');
+          
+          // Force redirect to dashboard for authenticated users
+          if (data.user) {
+            console.log('Direct handler: Redirecting to dashboard');
+            setTimeout(() => {
+              window.location.hash = 'dashboard';
+              window.dispatchEvent(new Event('hashchange'));
+            }, 1500); // Small delay to let success message show
+          }
+        } else {
+          console.error('Firebase sync failed via direct handler:', response.status);
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to sync with backend');
+        }
+      } catch (error) {
+        console.error('Direct Firebase sync error:', error);
+        throw error;
       }
     };
 
@@ -13620,19 +13716,65 @@ function SignUpPage() {
     setError('');
     
     try {
-      const { signInWithRedirect, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.addScope('profile');
       
-      console.log('Attempting Google sign-up with redirect...');
+      console.log('Attempting Google sign-up with popup...');
       console.log('Current window location:', window.location.href);
       console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
       
-      // Use redirect instead of popup for better reliability
-      await signInWithRedirect(window.firebaseAuth, provider);
-      return; // Exit here as redirect will handle the rest
+      try {
+        const result = await signInWithPopup(window.firebaseAuth, provider);
+        const user = result.user;
+        
+        console.log('Google sign-up successful:', user.email);
+        console.log('User details:', {
+          uid: user.uid,
+          email: user.email,
+          displayName: user.displayName,
+          emailVerified: user.emailVerified
+        });
+        
+        // Show success message
+        const successMessage = document.createElement('div');
+        successMessage.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #10b981;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          z-index: 10000;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          font-family: system-ui, -apple-system, sans-serif;
+        `;
+        successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
+        document.body.appendChild(successMessage);
+        
+        // Sync with backend
+        await handleFirebaseUserDirectly(user);
+        
+        // Remove success message after redirect
+        setTimeout(() => {
+          if (successMessage.parentNode) {
+            successMessage.remove();
+          }
+        }, 3000);
+        
+      } catch (popupError) {
+        console.error('Google sign-up popup error:', popupError);
+        if (popupError.code === 'auth/popup-closed-by-user') {
+          throw new Error('Sign-up cancelled. Please try again.');
+        } else if (popupError.code === 'auth/popup-blocked') {
+          throw new Error('Popup blocked by browser. Please allow popups for this site and try again.');
+        } else {
+          throw new Error(`Sign-up failed: ${popupError.message}`);
+        }
+      }
       console.log('User details:', {
         uid: user.uid,
         email: user.email,
