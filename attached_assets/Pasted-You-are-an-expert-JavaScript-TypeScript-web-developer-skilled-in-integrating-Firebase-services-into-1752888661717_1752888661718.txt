@@ -1,0 +1,34 @@
+You are an expert JavaScript/TypeScript web developer, skilled in integrating Firebase services into web applications. Your task is to implement Firebase Analytics and a utility function to track user actions, based on the provided requirements.
+Context:
+App Type: Web Application
+Language: TypeScript / JavaScript
+Firebase Project: cushportal
+Firebase Analytics ID: The user's Google Analytics 4 Measurement ID (starting with 'G-...') will be used for measurementId .
+Goal: Enable comprehensive user journey tracking.
+Tasks for You (the AI Agent):
+Firebase Analytics Initialization:
+Action: Add the necessary code to initialize Firebase Analytics within the application.
+Placement: This code should typically go near your existing initializeApp call, or in a dedicated Firebase configuration file if the project structure supports it.
+Instructions:
+Import initializeApp , getAnalytics , and logEvent from firebase/app and firebase/analytics respectively.
+Modify the firebaseConfig object (if providing a full example) to include a placeholder for measurementId: "G-YOUR_MEASUREMENT_ID" .
+Include a try...catch block for getAnalytics to handle potential initialization errors gracefully.
+Export the analytics instance if it's needed elsewhere, or ensure it's accessible within the scope where trackUserAction will be used.
+Implement trackUserAction Function:
+Action: Create a reusable function named trackUserAction that encapsulates logEvent .
+Instructions:
+The function signature should be export const trackUserAction = (eventName: string, eventParams?: { [key: string]: any }) => { ... }; .
+It should check if the analytics instance is available before calling logEvent .
+Include console.log for successful logging and console.warn if analytics is not initialized, for debugging purposes.
+Provide Example Usage:
+Action: Illustrate how trackUserAction can be used in common scenarios.
+Instructions: Provide code snippets demonstrating:
+Tracking a button click (e.g., a login or signup button).
+Tracking a form submission (e.g., a signup form).
+Tracking a custom event with specific context (e.g., a product view or an onboarding step).
+Use generic HTML element IDs or placeholders for simplicity (e.g., loginButton , signupForm ).
+General Requirements:
+Use TypeScript syntax if providing a full example, otherwise, clear JavaScript.
+Use placeholders for sensitive Firebase configuration values ( apiKey , projectId , appId , measurementId , etc.) and explicitly state that the user needs to replace these with their actual values.
+Ensure the code is self-contained and easy to understand.
+Remind the user that measurementId (G-XXXXXXX) is crucial for Google Analytics 4

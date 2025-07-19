@@ -95,6 +95,11 @@
       if (userData.exists) {
         console.log('User already exists, showing sign-in message');
         
+        // Track returning user Google attempt
+        if (window.trackAuthEvent) {
+          window.trackAuthEvent('google', 'existing_user_redirect');
+        }
+        
         // Show existing user message and redirect to sign-in
         window.showSuccessNotification('Welcome back! Redirecting to sign-in page...');
         
@@ -138,6 +143,11 @@
         }
         
         console.log('New user account created successfully');
+        
+        // Track successful Google sign-up
+        if (window.trackAuthEvent) {
+          window.trackAuthEvent('google', 'sign_up');
+        }
         
         // Show account created success message
         window.showSuccessNotification('Account created successfully! Redirecting to sign-in page...');
@@ -354,6 +364,11 @@
       }
       
       console.log('User account created successfully');
+      
+      // Track successful email sign-up
+      if (window.trackAuthEvent) {
+        window.trackAuthEvent('email', 'sign_up');
+      }
       
       // Show success message
       window.showSuccessNotification('Account created successfully! Welcome to CushGlobal!');

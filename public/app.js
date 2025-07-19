@@ -1282,6 +1282,12 @@ function SignInPage() {
   const handleLogin = async (e) => {
     e.preventDefault();
     console.log('handleLogin called');
+    
+    // Track login attempt
+    if (window.trackFormSubmission) {
+      window.trackFormSubmission('login_form', 'authentication', false);
+    }
+    
     setLoading(true);
     setAuthError('');
     setValidationErrors({});
@@ -1320,6 +1326,11 @@ function SignInPage() {
           
           // Set user in global state
           setUser(userData);
+          
+          // Track successful email sign-in
+          if (window.trackAuthEvent) {
+            window.trackAuthEvent('email', 'sign_in');
+          }
           
           // Show success message briefly
           setSuccessMessage('Successfully signed in!');
@@ -1368,6 +1379,11 @@ function SignInPage() {
         // Get the user info
         const user = userCredential.user;
         console.log('Firebase login successful:', user.email);
+        
+        // Track successful Firebase sign-in
+        if (window.trackAuthEvent) {
+          window.trackAuthEvent('email', 'firebase_sign_in');
+        }
         
         // Create/update user in our backend
         const syncResponse = await fetch('/api/auth/firebase-sync', {
@@ -1533,6 +1549,11 @@ function SignInPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    // Track Google sign-in attempt
+    if (window.trackButtonClick) {
+      window.trackButtonClick('google_signin', 'authentication');
+    }
+    
     setLoading(true);
     setAuthError('');
     
@@ -1568,6 +1589,11 @@ function SignInPage() {
         const user = result.user;
         
         console.log('Google sign-in successful:', user.email);
+        
+        // Track successful Google sign-in
+        if (window.trackAuthEvent) {
+          window.trackAuthEvent('google', 'sign_in');
+        }
         
         // Show success message
         const successMessage = document.createElement('div');
@@ -5551,6 +5577,7 @@ function App() {
         // Import Firebase from the CDN
         const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
         const { getAuth, onAuthStateChanged, getRedirectResult } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        const { getAnalytics, logEvent } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js');
         
         // Use the actual domain we're running on for development
         const currentDomain = window.location.hostname;
@@ -5572,9 +5599,19 @@ function App() {
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         
+        // Initialize Firebase Analytics
+        let analytics = null;
+        try {
+          analytics = getAnalytics(app);
+          console.log('Firebase Analytics initialized successfully');
+        } catch (analyticsError) {
+          console.warn('Firebase Analytics initialization failed:', analyticsError.message);
+        }
+        
         // Store Firebase instances globally
         window.firebaseApp = app;
         window.firebaseAuth = auth;
+        window.firebaseAnalytics = analytics;
         
         console.log('Firebase initialized successfully');
         
@@ -5864,6 +5901,11 @@ function App() {
     try {
       window.isSigningOut = true;
       console.log('Starting enhanced sign-out process...');
+      
+      // Track sign-out attempt
+      if (window.trackAuthEvent) {
+        window.trackAuthEvent('manual', 'sign_out');
+      }
       
       // Step 1: Firebase sign-out
       if (window.firebaseAuth) {
@@ -6775,15 +6817,43 @@ function AppRouter({ user }) {
 
   useEffect(() => {
     const handleHashChange = () => {
-      setCurrentRoute(window.location.hash.substring(1) || 'home');
+      const newRoute = window.location.hash.substring(1) || 'home';
+      setCurrentRoute(newRoute);
+      
+      // Track page view with analytics
+      if (window.trackPageView) {
+        window.trackPageView(newRoute, {
+          user_authenticated: user ? true : false,
+          timestamp: new Date().toISOString()
+        });
+      }
     };
     
     window.addEventListener('hashchange', handleHashChange);
+    
+    // Track initial page load
+    const initialRoute = window.location.hash.substring(1) || 'home';
+    if (window.trackPageView) {
+      window.trackPageView(initialRoute, {
+        user_authenticated: user ? true : false,
+        is_initial_load: true
+      });
+    }
+    
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Global navigate function
+  // Global navigate function with analytics tracking
   window.navigate = (route) => {
+    // Track navigation event
+    if (window.trackFeatureUsage) {
+      window.trackFeatureUsage('navigation', 'page_change', {
+        from_page: window.location.hash.substring(1) || 'home',
+        to_page: route,
+        navigation_method: 'function_call'
+      });
+    }
+    
     window.location.hash = route;
     setCurrentRoute(route);
   };
