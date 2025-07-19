@@ -1558,10 +1558,10 @@ function SignInPage() {
     setAuthError('');
     
     try {
-      console.log('Starting Google Sign-In process...');
+      console.log('Starting Google Sign-In process with routing support...');
       
-      // Use the new robust Google sign-in function
-      const result = await window.performGoogleSignIn('popup');
+      // Use the new routing-aware Google sign-in function
+      const result = await window.performGoogleSignInWithRouting('popup');
       
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
@@ -1571,8 +1571,8 @@ function SignInPage() {
           window.trackAuthEvent('google', 'sign_in');
         }
         
-        // Complete the authentication flow
-        await window.completeAuthenticationFlow(result.user, false);
+        // Complete the authentication flow with routing support
+        await window.completeAuthenticationWithRouting(result.user, false);
       }
       // If result is null, it means redirect method was used
       
@@ -1580,7 +1580,8 @@ function SignInPage() {
       console.error('Google sign-in error:', error);
       
       // Use the enhanced error handler
-      const errorMessage = window.handleFirebaseAuthError(error);
+      const errorMessage = window.handleFirebaseAuthError ? 
+        window.handleFirebaseAuthError(error) : error.message;
       if (errorMessage) {
         setAuthError(errorMessage);
       }
@@ -5472,7 +5473,7 @@ function App() {
         
         console.log('Firebase initialized successfully');
         
-        // The new firebase-auth-fix.js module handles redirect results
+        // The new firebase-routing-fix.js module handles redirect results and routing conflicts
         
         // Listen for auth state changes
         onAuthStateChanged(auth, async (firebaseUser) => {
@@ -6596,7 +6597,7 @@ function AppRouter({ user }) {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Global navigate function with analytics tracking
+  // Global navigate function with analytics tracking and auth support
   window.navigate = (route) => {
     // Track navigation event
     if (window.trackFeatureUsage) {
@@ -6607,7 +6608,12 @@ function AppRouter({ user }) {
       });
     }
     
-    window.location.hash = route;
+    // Use auth-aware navigation if available
+    if (window.navigateWithAuthSupport) {
+      window.navigateWithAuthSupport(route);
+    } else {
+      window.location.hash = route;
+    }
     setCurrentRoute(route);
   };
 
@@ -13503,10 +13509,10 @@ function SignUpPage() {
     setError('');
     
     try {
-      console.log('Starting Google Sign-Up process...');
+      console.log('Starting Google Sign-Up process with routing support...');
       
-      // Use the new robust Google sign-in function
-      const result = await window.performGoogleSignIn('popup');
+      // Use the new routing-aware Google sign-in function
+      const result = await window.performGoogleSignInWithRouting('popup');
       
       if (result && result.user) {
         console.log('Google sign-up successful:', result.user.email);
@@ -13516,8 +13522,8 @@ function SignUpPage() {
           window.trackAuthEvent('google', 'sign_up');
         }
         
-        // Complete the authentication flow (as new user)
-        await window.completeAuthenticationFlow(result.user, true);
+        // Complete the authentication flow with routing support (as new user)
+        await window.completeAuthenticationWithRouting(result.user, true);
       }
       // If result is null, it means redirect method was used
       
@@ -13525,7 +13531,8 @@ function SignUpPage() {
       console.error('Google sign-up error:', error);
       
       // Use the enhanced error handler
-      const errorMessage = window.handleFirebaseAuthError(error);
+      const errorMessage = window.handleFirebaseAuthError ? 
+        window.handleFirebaseAuthError(error) : error.message;
       if (errorMessage) {
         setError(errorMessage);
       }
