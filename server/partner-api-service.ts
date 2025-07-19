@@ -2,7 +2,7 @@ import { db } from './db';
 import { loanPartners, loanReferrals, loanPreQualifications, loanApplications, loanProviders } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte, or } from 'drizzle-orm';
 import { generateReferralCode, generateTrackingLink } from '../utils/referral-utils';
-import { SecurityLogger } from './security-logger';
+import { SecurityLogger } from './security';
 import type { InsertLoanReferral, LoanPartner, LoanPreQualification, LoanReferral } from '@shared/schema';
 
 interface PartnerAPIResponse {

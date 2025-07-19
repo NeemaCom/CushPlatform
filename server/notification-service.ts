@@ -236,16 +236,7 @@ export class NotificationService {
     );
   }
 
-  // Create support-related notifications
-  createSupportNotification(userId: number, type: string, title: string, message: string, metadata: any) {
-    return this.createNotification(
-      userId,
-      'support',
-      title,
-      message,
-      metadata
-    );
-  }
+
 
   // Create support notifications
   createSupportNotification(userId: number, type: 'ticket_reply' | 'ticket_status' | 'feedback_response', title: string, message: string, data?: Record<string, any>) {

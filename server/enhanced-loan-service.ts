@@ -9,7 +9,7 @@ import {
 } from '@shared/schema';
 import { eq, and, desc, sql, gte, lte, or } from 'drizzle-orm';
 import { partnerApiService } from './partner-api-service';
-import { SecurityLogger } from './security-logger';
+import { SecurityLogger } from './security';
 import { generateReferralCode, generateTrackingLink, generatePartnerApplicationUrl } from '../utils/referral-utils';
 import type { 
   InsertLoanPreQualification, 
