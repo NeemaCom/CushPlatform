@@ -13547,12 +13547,21 @@ function SignUpPage() {
   };
 
   const handleCountrySelect = (country) => {
+    console.log('Country selected:', country);
     setFormData(prev => ({
       ...prev,
       countryCode: country.code
     }));
     setShowCountryDropdown(false);
     setCountrySearch('');
+    
+    // Force re-render to update display
+    setTimeout(() => {
+      const button = document.querySelector('.country-selector-button');
+      if (button) {
+        button.focus();
+      }
+    }, 0);
   };
 
   // Close dropdown when clicking outside
@@ -13571,23 +13580,50 @@ function SignUpPage() {
   const validateForm = () => {
     const newErrors = {};
     
+    // Required field validation
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     if (!formData.username.trim()) newErrors.username = 'Username is required';
     if (!formData.password) newErrors.password = 'Password is required';
-    if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
+    if (!formData.confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
     if (!formData.acceptTerms) newErrors.acceptTerms = 'You must accept the terms of service';
     if (!formData.acceptPrivacy) newErrors.acceptPrivacy = 'You must accept the privacy policy';
     
-    if (formData.email && !formData.email.includes('@')) {
+    // Email validation
+    if (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       newErrors.email = 'Please enter a valid email address';
     }
     
-    if (formData.password && formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+    // Password validation
+    if (formData.password && formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters';
     }
     
+    // Password confirmation validation
+    if (formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+    
+    // Username validation
+    if (formData.username && formData.username.length < 3) {
+      newErrors.username = 'Username must be at least 3 characters';
+    }
+    
+    if (formData.username && !formData.username.match(/^[a-zA-Z0-9_]+$/)) {
+      newErrors.username = 'Username can only contain letters, numbers, and underscores';
+    }
+    
+    // Name validation
+    if (formData.firstName && formData.firstName.length < 2) {
+      newErrors.firstName = 'First name must be at least 2 characters';
+    }
+    
+    if (formData.lastName && formData.lastName.length < 2) {
+      newErrors.lastName = 'Last name must be at least 2 characters';
+    }
+    
+    console.log('Form validation errors:', newErrors);
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -14534,7 +14570,7 @@ function SignUpPage() {
                 }, 'Phone Number (Optional)'),
                 e('div', {
                   key: 'phone-container',
-                  className: 'flex gap-2'
+                  className: 'flex gap-2 w-full'
                 }, [
                   // Country Code Selector
                   e('div', {
@@ -14545,7 +14581,7 @@ function SignUpPage() {
                       key: 'country-button',
                       type: 'button',
                       onClick: () => setShowCountryDropdown(!showCountryDropdown),
-                      className: 'flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white min-w-20'
+                      className: 'country-selector-button flex items-center gap-1 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white min-w-0 w-16 sm:w-20 flex-shrink-0'
                     }, [
                       e('span', {
                         key: 'country-flag',
@@ -14627,7 +14663,7 @@ function SignUpPage() {
                     value: formData.phoneNumber,
                     onChange: (e) => handleInputChange('phoneNumber', e.target.value),
                     placeholder: 'Phone number',
-                    className: `flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
+                    className: `flex-1 min-w-0 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${
                       fieldValidation.phoneNumber?.isValid === false ? 'border-red-300 bg-red-50' :
                       fieldValidation.phoneNumber?.isValid === true ? 'border-green-300 bg-green-50' :
                       'border-gray-300'
@@ -14741,8 +14777,31 @@ function SignUpPage() {
               key: 'submit-button',
               type: 'submit',
               disabled: loading,
-              className: `w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-bold py-3 px-4 rounded-lg transition-colors ${loading ? 'cursor-not-allowed' : ''}`
-            }, loading ? 'Creating Account...' : 'Create Account')
+              className: `w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-lg transition-colors focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${loading ? 'cursor-not-allowed' : 'cursor-pointer'}`
+            }, loading ? 'Creating Account...' : 'Create Account'),
+            
+            // Display validation errors summary
+            Object.keys(errors).length > 0 && e('div', {
+              key: 'errors-summary',
+              className: 'mt-4 p-3 bg-red-50 border border-red-200 rounded-lg'
+            }, [
+              e('p', {
+                key: 'errors-title',
+                className: 'text-sm font-medium text-red-800 mb-2'
+              }, 'Please fix the following errors:'),
+              e('ul', {
+                key: 'errors-list',
+                className: 'text-sm text-red-700 space-y-1'
+              }, Object.values(errors).map((error, index) => 
+                e('li', {
+                  key: `error-${index}`,
+                  className: 'flex items-center gap-1'
+                }, [
+                  '• ',
+                  error
+                ])
+              ))
+            ])
           ])
         ]),
 
