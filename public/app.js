@@ -1612,7 +1612,7 @@ function SignInPage() {
         successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
         document.body.appendChild(successMessage);
         
-        // Sync with backend
+        // Sync with backend and handle properly
         await handleFirebaseUserDirectly(user);
         
         // Remove success message after redirect
@@ -1624,91 +1624,21 @@ function SignInPage() {
         
       } catch (popupError) {
         console.error('Google sign-in popup error:', popupError);
+        
+        // Handle specific popup errors more gracefully
         if (popupError.code === 'auth/popup-closed-by-user') {
-          throw new Error('Sign-in cancelled. Please try again.');
+          // User closed popup - don't show error, just reset state
+          console.log('User closed Google sign-in popup');
+          return;
         } else if (popupError.code === 'auth/popup-blocked') {
           throw new Error('Popup blocked by browser. Please allow popups for this site and try again.');
+        } else if (popupError.code === 'auth/cancelled-popup-request') {
+          console.log('Popup request was cancelled');
+          return;
         } else {
           throw new Error(`Sign-in failed: ${popupError.message}`);
         }
       }
-      
-      console.log('Google sign-in successful:', user.email);
-      
-      // Create/update user in our backend
-      const syncResponse = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          emailVerified: user.emailVerified,
-          // Parse name from displayName
-          firstName: user.displayName ? user.displayName.split(' ')[0] : '',
-          lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
-          acceptTerms: true,
-          acceptPrivacy: true,
-          isNewUser: true // Allow user creation for Google sign-in
-        }),
-      });
-
-      if (!syncResponse.ok) {
-        const errorData = await syncResponse.json();
-        if (errorData.requiresSignup) {
-          // Show signup confirmation for new users
-          const userConfirmed = confirm(
-            `${errorData.message}\n\nClick OK to create a new account with ${user.email}, or Cancel to try a different email.`
-          );
-          
-          if (userConfirmed) {
-            // Retry with explicit new user flag
-            const retryResponse = await fetch('/api/auth/firebase-sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                uid: user.uid,
-                email: user.email,
-                displayName: user.displayName,
-                photoURL: user.photoURL,
-                emailVerified: user.emailVerified,
-                firstName: user.displayName ? user.displayName.split(' ')[0] : '',
-                lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
-                acceptTerms: true,
-                acceptPrivacy: true,
-                isNewUser: true
-              }),
-            });
-            
-            if (!retryResponse.ok) {
-              throw new Error('Failed to create user account');
-            }
-          } else {
-            // Sign out of Firebase if user doesn't want to create account
-            const { signOut } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-            await signOut(window.firebaseAuth);
-            return;
-          }
-        } else {
-          throw new Error(errorData.message || 'Failed to sync user');
-        }
-      }
-      
-      // Show success message and redirect
-      setAuthError('');
-      setSuccessMessage('✅ Google Sign-In successful! Welcome back to CushGlobal!');
-      
-      // Force redirect to dashboard after successful Google sign-in
-      console.log('Google sign-in successful, redirecting to dashboard');
-      setTimeout(() => {
-        window.location.hash = 'dashboard';
-        window.location.reload(); // Force reload to ensure proper state
-      }, 1500);
     } catch (error) {
       console.error('Google sign-in error:', error);
       console.error('Error code:', error.code);
@@ -5765,7 +5695,7 @@ function App() {
             lastName: firebaseUser.displayName ? firebaseUser.displayName.split(' ').slice(1).join(' ') : '',
             acceptTerms: true,
             acceptPrivacy: true,
-            isNewUser: true
+            isNewUser: false // Try existing user first
           }),
         });
 
