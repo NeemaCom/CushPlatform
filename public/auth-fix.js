@@ -50,32 +50,17 @@
     }
   };
 
-  // Enhanced Google Sign-Up handler specifically for the "Get Started" page
+  // Enhanced Google Sign-Up handler - now redirects to new module
   window.enhancedGoogleSignUpForSignUp = async () => {
-    console.log('Enhanced Google Sign-Up (Get Started) initiated');
+    console.log('Legacy Google Sign-Up redirecting to new module');
     
-    try {
-      // Check if Firebase is initialized
-      if (!window.firebaseAuth) {
-        throw new Error('Firebase not initialized. Please refresh the page and try again.');
-      }
-
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      
-      console.log('Attempting Google sign-up with popup...');
-      
-      const result = await signInWithPopup(window.firebaseAuth, provider);
-      const user = result.user;
-      
-      console.log('Google sign-up successful:', {
-        email: user.email,
-        uid: user.uid,
-        displayName: user.displayName,
-        emailVerified: user.emailVerified
+    // Use the new robust authentication module
+    if (window.performGoogleSignIn) {
+      return window.performGoogleSignIn('popup');
+    } else {
+      throw new Error('Authentication module not loaded. Please refresh the page.');
+    }
+  };
       });
 
       // Check if user already exists in our backend
@@ -199,26 +184,17 @@
     }
   };
 
-  // Enhanced Google Sign-Up handler (original) for other contexts
+  // Enhanced Google Sign-Up handler - now redirects to new module
   window.enhancedGoogleSignUp = async () => {
-    console.log('Enhanced Google Sign-Up initiated');
+    console.log('Legacy Google Sign-Up redirecting to new module');
     
-    try {
-      // Check if Firebase is initialized
-      if (!window.firebaseAuth) {
-        throw new Error('Firebase not initialized. Please refresh the page and try again.');
-      }
-
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      
-      console.log('Attempting Google sign-up with popup...');
-      
-      const result = await signInWithPopup(window.firebaseAuth, provider);
-      const user = result.user;
+    // Use the new robust authentication module
+    if (window.performGoogleSignIn) {
+      return window.performGoogleSignIn('popup');
+    } else {
+      throw new Error('Authentication module not loaded. Please refresh the page.');
+    }
+  };
       
       console.log('Google sign-up successful:', {
         email: user.email,
