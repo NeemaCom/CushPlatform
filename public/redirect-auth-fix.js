@@ -28,11 +28,17 @@
     console.log('Processing OAuth redirect...');
     
     try {
-      const auth = await window.initializeFirebaseAuth();
+      // Use the global Firebase auth that's already initialized
+      const auth = window.firebaseAuth;
+      if (!auth) {
+        console.error('Firebase auth not initialized');
+        return false;
+      }
+      
       const { getRedirectResult } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       // Wait a moment for Firebase to process
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
       const result = await getRedirectResult(auth);
       
@@ -53,9 +59,11 @@
             window.showSuccessNotification('Successfully signed in! Redirecting to dashboard...');
           }
           
-          // Clean the URL first
-          const cleanUrl = window.location.origin + '/#dashboard';
-          window.location.replace(cleanUrl);
+          // Clean the URL and redirect to dashboard
+          console.log('Redirecting to dashboard...');
+          setTimeout(() => {
+            window.location.replace(window.location.origin + '/#dashboard');
+          }, 1000);
           
           return true;
         }
@@ -78,7 +86,11 @@
   // Enhanced Google Sign-In with better redirect handling
   window.performSecureGoogleSignIn = async (method = 'popup') => {
     try {
-      const auth = await window.initializeFirebaseAuth();
+      // Use the global Firebase auth
+      let auth = window.firebaseAuth;
+      if (!auth) {
+        auth = await window.initializeFirebaseAuth();
+      }
       const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
@@ -140,16 +152,63 @@
     }
   };
   
+  // Set up auth state listener for redirect handling
+  const setupAuthRedirectListener = async () => {
+    if (isOAuthRedirect()) {
+      console.log('OAuth redirect page detected, setting up auth listener...');
+      
+      // Wait for Firebase to be initialized
+      let attempts = 0;
+      while (!window.firebaseAuth && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
+      }
+      
+      if (!window.firebaseAuth) {
+        console.error('Firebase auth not available after waiting');
+        return;
+      }
+      
+      const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      // Listen for auth state changes on redirect
+      onAuthStateChanged(window.firebaseAuth, async (user) => {
+        if (user) {
+          console.log('Auth state changed to signed in on redirect page:', user.email);
+          
+          // Sync with backend
+          const backendUser = await window.syncFirebaseUserWithBackend(user, false);
+          
+          if (backendUser) {
+            console.log('Backend sync successful, redirecting to dashboard...');
+            
+            if (window.showSuccessNotification) {
+              window.showSuccessNotification('Successfully signed in! Redirecting...');
+            }
+            
+            // Redirect to dashboard
+            setTimeout(() => {
+              window.location.replace(window.location.origin + '/#dashboard');
+            }, 1500);
+          }
+        }
+      });
+    }
+  };
+  
   // Check for redirect on page load
   const checkRedirectOnLoad = async () => {
     if (isOAuthRedirect()) {
       console.log('OAuth redirect detected, processing...');
+      
+      // Set up auth listener first
+      await setupAuthRedirectListener();
+      
+      // Also try the direct method
       const success = await window.handleOAuthRedirect();
       
       if (!success) {
-        // If redirect processing failed, go to homepage
-        console.log('Redirect processing failed, going to homepage');
-        window.location.replace(window.location.origin + '/');
+        console.log('Direct redirect processing failed, relying on auth state listener...');
       }
     }
   };
