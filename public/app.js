@@ -13671,84 +13671,28 @@ function SignUpPage() {
   };
 
   const handleGoogleSignUp = async () => {
-    // Prevent double submissions
-    if (loading) {
-      console.log('Google sign-up already in progress');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    
-    try {
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      
-      console.log('Attempting Google sign-up with popup...');
-      
-      const result = await signInWithPopup(window.firebaseAuth, provider);
-      const user = result.user;
-      
-      console.log('Google sign-up successful:', user.email);
-      console.log('User details:', {
-        uid: user.uid,
-        email: user.email,
-        displayName: user.displayName,
-        emailVerified: user.emailVerified
-      });
-      
-      // Show success message
-      const successMessage = document.createElement('div');
-      successMessage.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        font-family: system-ui, -apple-system, sans-serif;
-      `;
-      successMessage.textContent = 'Successfully signed up with Google! Redirecting to dashboard...';
-      document.body.appendChild(successMessage);
-      
-      // Use the existing Firebase user handler
-      await handleFirebaseUserDirectly(user);
-      
-      // Remove success message after redirect
-      setTimeout(() => {
-        if (successMessage.parentNode) {
-          successMessage.remove();
+    // Use the enhanced Google sign-up function from auth-fix.js
+    if (window.enhancedGoogleSignUpForSignUp) {
+      try {
+        setLoading(true);
+        setError('');
+        await window.enhancedGoogleSignUpForSignUp();
+      } catch (error) {
+        console.error('Enhanced Google sign-up error:', error);
+        
+        let errorMessage = 'An error occurred during Google sign-up. Please try again.';
+        if (error.code) {
+          errorMessage = getFirebaseErrorMessage(error.code);
+        } else if (error.message) {
+          errorMessage = error.message;
         }
-      }, 3000);
-      
-    } catch (error) {
-      console.error('Google sign-up error:', error);
-      
-      if (error.code !== 'auth/popup-closed-by-user') {
-        let errorMessage;
-        if (error.code === 'auth/unauthorized-domain') {
-          errorMessage = 'Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.';
-        } else if (error.code === 'auth/popup-blocked') {
-          errorMessage = 'Pop-up blocked by browser. Please allow pop-ups for this site and try again.';
-        } else if (error.code === 'auth/popup-closed-by-user') {
-          errorMessage = 'Sign-up cancelled. Please try again.';
-        } else if (error.code === 'auth/operation-not-allowed') {
-          errorMessage = 'Google Sign-In is not enabled. Please contact support.';
-        } else if (error.message.includes('timeout') || error.message.includes('network')) {
-          errorMessage = 'Network error. Please check your connection and try again.';
-        } else {
-          errorMessage = getFirebaseErrorMessage(error.code) || 'An error occurred during sign-up. Please try again.';
-        }
+        
         setError(errorMessage);
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
+    } else {
+      setError('Google sign-up is temporarily unavailable. Please try again or use email registration.');
     }
   };
 

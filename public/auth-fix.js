@@ -50,7 +50,129 @@
     }
   };
 
-  // Enhanced Google Sign-Up handler with better error handling and flow
+  // Enhanced Google Sign-Up handler specifically for the "Get Started" page
+  window.enhancedGoogleSignUpForSignUp = async () => {
+    console.log('Enhanced Google Sign-Up (Get Started) initiated');
+    
+    try {
+      // Check if Firebase is initialized
+      if (!window.firebaseAuth) {
+        throw new Error('Firebase not initialized. Please refresh the page and try again.');
+      }
+
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      console.log('Attempting Google sign-up with popup...');
+      
+      const result = await signInWithPopup(window.firebaseAuth, provider);
+      const user = result.user;
+      
+      console.log('Google sign-up successful:', {
+        email: user.email,
+        uid: user.uid,
+        displayName: user.displayName,
+        emailVerified: user.emailVerified
+      });
+
+      // Check if user already exists in our backend
+      const checkUserResponse = await fetch(`/api/auth/check-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          firebaseUid: user.uid,
+          email: user.email
+        }),
+      });
+
+      const userData = await checkUserResponse.json();
+      
+      if (userData.exists) {
+        console.log('User already exists, showing sign-in message');
+        
+        // Show existing user message and redirect to sign-in
+        window.showSuccessNotification('Welcome back! Redirecting to sign-in page...');
+        
+        // Sign out from Firebase to force fresh sign-in
+        await window.firebaseAuth.signOut();
+        
+        setTimeout(() => {
+          window.location.hash = 'signin';
+          // Show the "now you can sign in" message
+          setTimeout(() => {
+            window.showInfoNotification('Now you can sign in to your account.');
+          }, 500);
+        }, 1500);
+        
+      } else {
+        console.log('New user, creating account');
+        
+        // New user, create account with Firebase user data
+        const syncResponse = await fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified,
+            // Extract names from displayName if available
+            firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+            lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+            isNewUser: true,
+            signUpMethod: 'google'
+          }),
+        });
+
+        if (!syncResponse.ok) {
+          const errorData = await syncResponse.json();
+          throw new Error(errorData.error || 'Failed to create account');
+        }
+        
+        console.log('New user account created successfully');
+        
+        // Show account created success message
+        window.showSuccessNotification('Account created successfully! Redirecting to sign-in page...');
+        
+        // Sign out from Firebase to force fresh sign-in on the sign-in page
+        await window.firebaseAuth.signOut();
+        
+        // Redirect to sign-in page
+        setTimeout(() => {
+          window.location.hash = 'signin';
+          // Show the "now you can sign in" message after redirect
+          setTimeout(() => {
+            window.showInfoNotification('Now you can sign in to your account.');
+          }, 500);
+        }, 1500);
+      }
+
+    } catch (error) {
+      console.error('Enhanced Google sign-up (Get Started) error:', error);
+      
+      let errorMessage = 'An error occurred during Google sign-up. Please try again.';
+      
+      if (error.code) {
+        errorMessage = window.getEnhancedFirebaseErrorMessage(error);
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Show error to user
+      window.showErrorNotification(errorMessage);
+      throw error;
+    }
+  };
+
+  // Enhanced Google Sign-Up handler (original) for other contexts
   window.enhancedGoogleSignUp = async () => {
     console.log('Enhanced Google Sign-Up initiated');
     
@@ -265,6 +387,33 @@
       top: 20px;
       right: 20px;
       background: #10b981;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 10000;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      max-width: 300px;
+    `;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.remove();
+      }
+    }, 4000);
+  };
+
+  // Info notification helper (blue)
+  window.showInfoNotification = (message) => {
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #2563eb;
       color: white;
       padding: 16px 24px;
       border-radius: 8px;
