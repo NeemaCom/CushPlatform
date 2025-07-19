@@ -1401,7 +1401,7 @@ function SignInPage() {
         }
       } catch (error) {
         console.error('Firebase login error:', error);
-        setAuthError(getFirebaseErrorMessage(error));
+        setAuthError(window.getEnhancedFirebaseErrorMessage ? window.getEnhancedFirebaseErrorMessage(error) : (error.message || 'An error occurred during sign-up.'));
       }
     }
     
@@ -1462,100 +1462,29 @@ function SignInPage() {
 
   const handleSignUp = async (e) => {
     e.preventDefault();
-    console.log('handleSignUp called');
+    console.log('Enhanced handleSignUp called');
     setLoading(true);
     setAuthError('');
+    setSignupSuccess('');
     
-    if (signupForm.password !== signupForm.confirmPassword) {
-      setAuthError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-    
-    if (!signupForm.agreeToTerms) {
-      setAuthError('Please accept the Terms of Service and Privacy Policy');
-      setLoading(false);
-      return;
-    }
-    
-    // Always use Firebase for sign-up (new users)
     try {
-      // Wait for Firebase to be initialized
-      if (!window.firebaseAuth) {
-        console.log('Waiting for Firebase to initialize...');
-        await new Promise((resolve) => {
-          const checkFirebase = () => {
-            if (window.firebaseAuth) {
-              console.log('Firebase is ready');
-              resolve();
-            } else {
-              setTimeout(checkFirebase, 100);
-            }
-          };
-          checkFirebase();
-        });
-      }
-      
-      console.log('Attempting to create user with email:', signupForm.email);
-      const { createUserWithEmailAndPassword, updateProfile } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const userCredential = await createUserWithEmailAndPassword(
-        window.firebaseAuth, 
-        signupForm.email, 
-        signupForm.password
-      );
-      
-      // Update user profile with display name
-      await updateProfile(userCredential.user, {
-        displayName: `${signupForm.firstName} ${signupForm.lastName}`
+      // Use the enhanced email sign-up function
+      await window.enhancedEmailSignUp({
+        email: signupForm.email,
+        password: signupForm.password,
+        confirmPassword: signupForm.confirmPassword,
+        firstName: signupForm.firstName,
+        lastName: signupForm.lastName,
+        address: signupForm.address,
+        country: signupForm.country,
+        phone: signupForm.phone,
+        agreeToTerms: signupForm.agreeToTerms
       });
       
-      // Get the user info
-      const user = userCredential.user;
-      console.log('Signup successful:', user.email);
-      
-      // Create user in our backend
-      const syncResponse = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          uid: user.uid,
-          email: user.email,
-          displayName: `${signupForm.firstName} ${signupForm.lastName}`,
-          photoURL: user.photoURL,
-          emailVerified: user.emailVerified,
-          // Additional user data
-          firstName: signupForm.firstName,
-          lastName: signupForm.lastName,
-          address: signupForm.address,
-          country: signupForm.country,
-          phone: signupForm.phone,
-          acceptTerms: signupForm.agreeToTerms,
-          acceptPrivacy: signupForm.agreeToTerms,
-          isNewUser: true
-        }),
-      });
-      
-      if (syncResponse.ok) {
-        // Show success message
-        setAuthError('');
-        setSignupSuccess('🎉 Account created successfully! Welcome to CushGlobal - Financial tools for Expats!');
-        
-        // Force redirect to dashboard after successful sign-up
-        console.log('Sign-up successful, redirecting to dashboard');
-        setTimeout(() => {
-          window.location.hash = 'dashboard';
-          window.location.reload(); // Force reload to ensure proper state
-        }, 2000);
-      } else {
-        const errorData = await syncResponse.json();
-        throw new Error(errorData.error || 'Failed to sync user with backend');
-      }
+      // Success - the enhanced function handles success messaging and redirect
     } catch (error) {
-      console.error('Signup error:', error);
-      setAuthError(getFirebaseErrorMessage(error));
+      console.error('Enhanced signup error:', error);
+      setAuthError(error.message || 'An error occurred during sign-up. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -2396,7 +2325,7 @@ function SignInPage() {
               e('button', {
                 key: 'google-signup-button',
                 type: 'button',
-                onClick: handleGoogleSignUp,
+                onClick: () => window.enhancedGoogleSignUp(),
                 className: 'w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3'
               }, [
                 e('svg', {
@@ -14031,7 +13960,7 @@ function SignUpPage() {
           // Google Sign Up Button
           e('button', {
             key: 'google-signup',
-            onClick: handleGoogleSignUp,
+            onClick: () => window.enhancedGoogleSignUp(),
             className: 'w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200 mb-6'
           }, [
             e('svg', {
