@@ -1558,104 +1558,31 @@ function SignInPage() {
     setAuthError('');
     
     try {
-      // Wait for Firebase to be initialized
-      if (!window.firebaseAuth) {
-        await new Promise((resolve) => {
-          const checkFirebase = () => {
-            if (window.firebaseAuth) {
-              resolve();
-            } else {
-              setTimeout(checkFirebase, 100);
-            }
-          };
-          checkFirebase();
-        });
-      }
-      
       console.log('Starting Google Sign-In process...');
       
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      // Use the new robust Google sign-in function
+      const result = await window.performGoogleSignIn('popup');
       
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
-      
-      console.log('Using popup method with enhanced error handling...');
-      console.log('Current window location:', window.location.href);
-      console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
-      
-      try {
-        const result = await signInWithPopup(window.firebaseAuth, provider);
-        const user = result.user;
-        
-        console.log('Google sign-in successful:', user.email);
+      if (result && result.user) {
+        console.log('Google sign-in successful:', result.user.email);
         
         // Track successful Google sign-in
         if (window.trackAuthEvent) {
           window.trackAuthEvent('google', 'sign_in');
         }
         
-        // Show success message
-        const successMessage = document.createElement('div');
-        successMessage.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          z-index: 10000;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          font-family: system-ui, -apple-system, sans-serif;
-        `;
-        successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
-        document.body.appendChild(successMessage);
-        
-        // Sync with backend and handle properly
-        await handleFirebaseUserDirectly(user);
-        
-        // Remove success message after redirect
-        setTimeout(() => {
-          if (successMessage.parentNode) {
-            successMessage.remove();
-          }
-        }, 3000);
-        
-      } catch (popupError) {
-        console.error('Google sign-in popup error:', popupError);
-        
-        // Handle specific popup errors more gracefully
-        if (popupError.code === 'auth/popup-closed-by-user') {
-          // User closed popup - don't show error, just reset state
-          console.log('User closed Google sign-in popup');
-          return;
-        } else if (popupError.code === 'auth/popup-blocked') {
-          throw new Error('Popup blocked by browser. Please allow popups for this site and try again.');
-        } else if (popupError.code === 'auth/cancelled-popup-request') {
-          console.log('Popup request was cancelled');
-          return;
-        } else {
-          throw new Error(`Sign-in failed: ${popupError.message}`);
-        }
+        // Complete the authentication flow
+        await window.completeAuthenticationFlow(result.user, false);
       }
+      // If result is null, it means redirect method was used
+      
     } catch (error) {
       console.error('Google sign-in error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
       
-      if (error.code !== 'auth/popup-closed-by-user') {
-        if (error.code === 'auth/unauthorized-domain') {
-          setAuthError('Google Sign-In is temporarily unavailable. Please use email/password authentication or contact support. Domain authorization is pending.');
-        } else if (error.code === 'auth/popup-blocked') {
-          setAuthError('Google Sign-In popup was blocked by your browser. Please allow popups for this site and try again.');
-        } else if (error.code === 'auth/cancelled-popup-request') {
-          setAuthError('Google Sign-In was cancelled. Please try again.');
-        } else if (error.code === 'auth/network-request-failed') {
-          setAuthError('Network error during Google Sign-In. Please check your internet connection and try again.');
-        } else {
-          setAuthError('Google Sign-In failed: ' + (error.message || 'Unknown error. Please try again or use email/password authentication.'));
-        }
+      // Use the enhanced error handler
+      const errorMessage = window.handleFirebaseAuthError(error);
+      if (errorMessage) {
+        setAuthError(errorMessage);
       }
     } finally {
       setLoading(false);
@@ -5545,65 +5472,7 @@ function App() {
         
         console.log('Firebase initialized successfully');
         
-        // Check for redirect result first
-        try {
-          const redirectResult = await getRedirectResult(auth);
-          if (redirectResult) {
-            console.log('Firebase redirect result:', redirectResult.user.email);
-            
-            // Show success message for Google sign-in
-            const successMessage = document.createElement('div');
-            successMessage.style.cssText = `
-              position: fixed;
-              top: 20px;
-              right: 20px;
-              background: #10b981;
-              color: white;
-              padding: 12px 24px;
-              border-radius: 8px;
-              z-index: 10000;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-              font-family: system-ui, -apple-system, sans-serif;
-            `;
-            successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
-            document.body.appendChild(successMessage);
-            
-            // Handle the Firebase user and redirect
-            await handleFirebaseUser(redirectResult.user);
-            
-            // Remove success message after redirect
-            setTimeout(() => {
-              if (successMessage.parentNode) {
-                successMessage.remove();
-              }
-            }, 3000);
-          }
-        } catch (redirectError) {
-          console.error('Firebase redirect error:', redirectError);
-          
-          // Show error message if redirect failed
-          const errorMessage = document.createElement('div');
-          errorMessage.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #ef4444;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 8px;
-            z-index: 10000;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            font-family: system-ui, -apple-system, sans-serif;
-          `;
-          errorMessage.textContent = 'Google sign-in failed. Please try again.';
-          document.body.appendChild(errorMessage);
-          
-          setTimeout(() => {
-            if (errorMessage.parentNode) {
-              errorMessage.remove();
-            }
-          }, 5000);
-        }
+        // The new firebase-auth-fix.js module handles redirect results
         
         // Listen for auth state changes
         onAuthStateChanged(auth, async (firebaseUser) => {
@@ -5675,54 +5544,8 @@ function App() {
       }
     };
 
-    // Direct Firebase user handling for popup authentication
-    const handleFirebaseUserDirectly = async (firebaseUser) => {
-      try {
-        console.log('Handling Firebase user directly:', firebaseUser.email);
-        
-        const response = await fetch('/api/auth/firebase-sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email,
-            displayName: firebaseUser.displayName,
-            photoURL: firebaseUser.photoURL,
-            emailVerified: firebaseUser.emailVerified,
-            firstName: firebaseUser.displayName ? firebaseUser.displayName.split(' ')[0] : '',
-            lastName: firebaseUser.displayName ? firebaseUser.displayName.split(' ').slice(1).join(' ') : '',
-            acceptTerms: true,
-            acceptPrivacy: true,
-            isNewUser: false // Try existing user first
-          }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUser(data.user);
-          setIsLoading(false);
-          console.log('Firebase user synced successfully via direct handler');
-          
-          // Force redirect to dashboard for authenticated users
-          if (data.user) {
-            console.log('Direct handler: Redirecting to dashboard');
-            setTimeout(() => {
-              window.location.hash = 'dashboard';
-              window.dispatchEvent(new Event('hashchange'));
-            }, 1500); // Small delay to let success message show
-          }
-        } else {
-          console.error('Firebase sync failed via direct handler:', response.status);
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to sync with backend');
-        }
-      } catch (error) {
-        console.error('Direct Firebase sync error:', error);
-        throw error;
-      }
-    };
+    // Make setUser available globally for the auth fix module
+    window.setUser = setUser;
 
     const checkBackendAuth = async () => {
       try {
@@ -13671,28 +13494,43 @@ function SignUpPage() {
   };
 
   const handleGoogleSignUp = async () => {
-    // Use the enhanced Google sign-up function from auth-fix.js
-    if (window.enhancedGoogleSignUpForSignUp) {
-      try {
-        setLoading(true);
-        setError('');
-        await window.enhancedGoogleSignUpForSignUp();
-      } catch (error) {
-        console.error('Enhanced Google sign-up error:', error);
+    // Track Google sign-up attempt
+    if (window.trackButtonClick) {
+      window.trackButtonClick('google_signup', 'authentication');
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    try {
+      console.log('Starting Google Sign-Up process...');
+      
+      // Use the new robust Google sign-in function
+      const result = await window.performGoogleSignIn('popup');
+      
+      if (result && result.user) {
+        console.log('Google sign-up successful:', result.user.email);
         
-        let errorMessage = 'An error occurred during Google sign-up. Please try again.';
-        if (error.code) {
-          errorMessage = getFirebaseErrorMessage(error.code);
-        } else if (error.message) {
-          errorMessage = error.message;
+        // Track successful Google sign-up
+        if (window.trackAuthEvent) {
+          window.trackAuthEvent('google', 'sign_up');
         }
         
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
+        // Complete the authentication flow (as new user)
+        await window.completeAuthenticationFlow(result.user, true);
       }
-    } else {
-      setError('Google sign-up is temporarily unavailable. Please try again or use email registration.');
+      // If result is null, it means redirect method was used
+      
+    } catch (error) {
+      console.error('Google sign-up error:', error);
+      
+      // Use the enhanced error handler
+      const errorMessage = window.handleFirebaseAuthError(error);
+      if (errorMessage) {
+        setError(errorMessage);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
