@@ -661,6 +661,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if user exists (for Firebase sync flow)
+  app.post("/api/auth/check-user", authRateLimit, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { firebaseUid, email } = req.body;
+      
+      if (!firebaseUid && !email) {
+        return res.status(400).json({ error: "Firebase UID or email is required" });
+      }
+      
+      let user = null;
+      
+      // First try to find by Firebase UID
+      if (firebaseUid) {
+        user = await storage.getUserByFirebaseUid(firebaseUid);
+      }
+      
+      // If not found by UID, try email
+      if (!user && email) {
+        user = await storage.getUserByEmail(email);
+      }
+      
+      if (user) {
+        return res.json({ 
+          exists: true, 
+          user: createSafeUser(user) 
+        });
+      } else {
+        return res.json({ exists: false });
+      }
+    } catch (error) {
+      console.error("Check user error:", error);
+      res.status(500).json({ error: "Failed to check user" });
+    }
+  });
+
   // Get current user endpoint
   app.get("/api/auth/me", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     res.json(req.user);
