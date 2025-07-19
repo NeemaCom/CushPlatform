@@ -100,19 +100,42 @@
           window.trackAuthEvent('google', 'existing_user_redirect');
         }
         
-        // Show existing user message and redirect to sign-in
-        window.showSuccessNotification('Welcome back! Redirecting to sign-in page...');
-        
-        // Sign out from Firebase to force fresh sign-in
-        await window.firebaseAuth.signOut();
-        
-        setTimeout(() => {
-          window.location.hash = 'signin';
-          // Show the "now you can sign in" message
+        // For existing users, sync and redirect to dashboard directly
+        const syncResponse = await fetch('/api/auth/firebase-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            emailVerified: user.emailVerified,
+            firstName: user.displayName ? user.displayName.split(' ')[0] : '',
+            lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+            isNewUser: false
+          }),
+        });
+
+        if (syncResponse.ok) {
+          window.showSuccessNotification('Welcome back! Redirecting to dashboard...');
+          
           setTimeout(() => {
-            window.showInfoNotification('Now you can sign in to your account.');
-          }, 500);
-        }, 1500);
+            window.location.hash = 'dashboard';
+            window.dispatchEvent(new Event('hashchange'));
+          }, 1500);
+        } else {
+          // Fallback to sign-in page if sync fails
+          window.showSuccessNotification('Welcome back! Redirecting to sign-in page...');
+          
+          setTimeout(() => {
+            window.location.hash = 'signin';
+            setTimeout(() => {
+              window.showInfoNotification('Now you can sign in to your account.');
+            }, 500);
+          }, 1500);
+        }
         
       } else {
         console.log('New user, creating account');
@@ -150,18 +173,12 @@
         }
         
         // Show account created success message
-        window.showSuccessNotification('Account created successfully! Redirecting to sign-in page...');
+        window.showSuccessNotification('Account created successfully! Redirecting to dashboard...');
         
-        // Sign out from Firebase to force fresh sign-in on the sign-in page
-        await window.firebaseAuth.signOut();
-        
-        // Redirect to sign-in page
+        // Redirect to dashboard directly for new users
         setTimeout(() => {
-          window.location.hash = 'signin';
-          // Show the "now you can sign in" message after redirect
-          setTimeout(() => {
-            window.showInfoNotification('Now you can sign in to your account.');
-          }, 500);
+          window.location.hash = 'dashboard';
+          window.dispatchEvent(new Event('hashchange'));
         }, 1500);
       }
 
