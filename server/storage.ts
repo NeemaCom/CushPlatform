@@ -208,14 +208,9 @@ export interface IStorage {
   getLoanApplicationsByUserId(userId: number): Promise<LoanReferral[]>;
   
   // Admin user management
-  getAllUsers(limit?: number, offset?: number): Promise<User[]>;
-  getUsersCount(): Promise<number>;
-  searchUsers(query: string): Promise<User[]>;
-
-
-  // Admin-specific methods
   getAllUsers(limit?: number, offset?: number, searchQuery?: string): Promise<User[]>;
   getUsersCount(searchQuery?: string): Promise<number>;
+  searchUsers(query: string): Promise<User[]>;
   getAllTransactions(limit?: number, offset?: number): Promise<Transaction[]>;
   getTransactionsByUserId(userId: number): Promise<Transaction[]>;
   getTransactionsCount(): Promise<number>;
@@ -1264,27 +1259,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async searchUsers(query: string): Promise<User[]> {
-    return await db.select().from(users).where(
-      or(
-        ilike(users.email, `%${query}%`),
-        ilike(users.firstName, `%${query}%`),
-        ilike(users.lastName, `%${query}%`),
-        ilike(users.username, `%${query}%`)
-      )
-    );
-  }
-
-  // Admin-specific methods implementation
-  async getAllUsers(limit: number = 50, offset: number = 0): Promise<User[]> {
-    return await db
-      .select()
-      .from(users)
-      .orderBy(desc(users.createdAt))
-      .limit(limit)
-      .offset(offset);
-  }
-
-  async searchUsers(query: string): Promise<User[]> {
     return await db
       .select()
       .from(users)
@@ -1317,12 +1291,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(transactions.date));
   }
 
-  async getUsersCount(): Promise<number> {
-    const result = await db
-      .select({ count: sql<number>`count(*)` })
-      .from(users);
-    return result[0]?.count || 0;
-  }
+
 
   async getTransactionsCount(): Promise<number> {
     const result = await db
