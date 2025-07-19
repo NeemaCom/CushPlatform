@@ -155,6 +155,15 @@
   // Enhanced email sign-up handler
   window.enhancedEmailSignUp = async (formData) => {
     console.log('Enhanced email sign-up initiated');
+    console.log('Form data received:', {
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      address: formData.address,
+      country: formData.country,
+      phone: formData.phone,
+      agreeToTerms: formData.agreeToTerms
+    });
     
     try {
       // Validate form data
@@ -204,13 +213,13 @@
           displayName: `${formData.firstName} ${formData.lastName}`,
           photoURL: user.photoURL,
           emailVerified: user.emailVerified,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          address: formData.address,
-          country: formData.country,
-          phone: formData.phone,
-          acceptTerms: formData.agreeToTerms,
-          acceptPrivacy: formData.agreeToTerms,
+          firstName: formData.firstName || 'User',
+          lastName: formData.lastName || '',
+          address: formData.address || '',
+          country: formData.country || '',
+          phone: formData.phone || '',
+          acceptTerms: formData.agreeToTerms || false,
+          acceptPrivacy: formData.agreeToTerms || false,
           isNewUser: true,
           signUpMethod: 'email'
         }),

@@ -179,13 +179,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const bcrypt = await import('bcrypt');
           const placeholderPasswordHash = await bcrypt.hash('oauth-user-no-password', 10);
           
+          // Debug logging
+          console.log('Creating new user with Firebase sync data:', {
+            firstName: firstName,
+            lastName: lastName,
+            displayName: displayName,
+            email: email,
+            isNewUser: isNewUser
+          });
+
           user = await storage.createUser({
             firebaseUid: uid,
             email,
             username: email,
             passwordHash: placeholderPasswordHash,
-            firstName: firstName || displayName?.split(' ')[0] || 'Unknown',
-            lastName: lastName || displayName?.split(' ').slice(1).join(' ') || 'User',
+            firstName: firstName || (displayName?.split(' ')[0]) || 'User',
+            lastName: lastName || (displayName?.split(' ').slice(1).join(' ') || ''),
             phoneNumber: phone || null,
             nationality: country || null,
             profilePicture: photoURL || null,
