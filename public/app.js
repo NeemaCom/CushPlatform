@@ -13759,58 +13759,11 @@ function SignUpPage() {
       provider.addScope('profile');
       
       console.log('Attempting Google sign-up with popup...');
-      console.log('Current window location:', window.location.href);
-      console.log('Firebase auth domain:', window.firebaseAuth.config.authDomain);
       
-      try {
-        const result = await signInWithPopup(window.firebaseAuth, provider);
-        const user = result.user;
-        
-        console.log('Google sign-up successful:', user.email);
-        console.log('User details:', {
-          uid: user.uid,
-          email: user.email,
-          displayName: user.displayName,
-          emailVerified: user.emailVerified
-        });
-        
-        // Show success message
-        const successMessage = document.createElement('div');
-        successMessage.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          z-index: 10000;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          font-family: system-ui, -apple-system, sans-serif;
-        `;
-        successMessage.textContent = 'Successfully signed in with Google! Redirecting to dashboard...';
-        document.body.appendChild(successMessage);
-        
-        // Sync with backend
-        await handleFirebaseUserDirectly(user);
-        
-        // Remove success message after redirect
-        setTimeout(() => {
-          if (successMessage.parentNode) {
-            successMessage.remove();
-          }
-        }, 3000);
-        
-      } catch (popupError) {
-        console.error('Google sign-up popup error:', popupError);
-        if (popupError.code === 'auth/popup-closed-by-user') {
-          throw new Error('Sign-up cancelled. Please try again.');
-        } else if (popupError.code === 'auth/popup-blocked') {
-          throw new Error('Popup blocked by browser. Please allow popups for this site and try again.');
-        } else {
-          throw new Error(`Sign-up failed: ${popupError.message}`);
-        }
-      }
+      const result = await signInWithPopup(window.firebaseAuth, provider);
+      const user = result.user;
+      
+      console.log('Google sign-up successful:', user.email);
       console.log('User details:', {
         uid: user.uid,
         email: user.email,
@@ -13818,62 +13771,35 @@ function SignUpPage() {
         emailVerified: user.emailVerified
       });
       
-      // Create/update user in our backend with timeout
-      const syncResponse = await Promise.race([
-        fetch('/api/auth/firebase-sync', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            emailVerified: user.emailVerified,
-            // Parse name from displayName
-            firstName: user.displayName ? user.displayName.split(' ')[0] : '',
-            lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
-            acceptTerms: true,
-            acceptPrivacy: true
-          }),
-        }),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Network timeout')), 15000)
-        )
-      ]);
+      // Show success message
+      const successMessage = document.createElement('div');
+      successMessage.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #10b981;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        z-index: 10000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        font-family: system-ui, -apple-system, sans-serif;
+      `;
+      successMessage.textContent = 'Successfully signed up with Google! Redirecting to dashboard...';
+      document.body.appendChild(successMessage);
       
-      if (syncResponse.ok) {
-        // Success feedback
-        const successMessage = document.createElement('div');
-        successMessage.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          z-index: 10000;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        `;
-        successMessage.textContent = 'Successfully signed in with Google! Redirecting...';
-        document.body.appendChild(successMessage);
-        
-        // Remove success message and redirect
-        setTimeout(() => {
+      // Use the existing Firebase user handler
+      await handleFirebaseUserDirectly(user);
+      
+      // Remove success message after redirect
+      setTimeout(() => {
+        if (successMessage.parentNode) {
           successMessage.remove();
-          window.location.hash = 'dashboard';
-          // Force re-render after redirect
-          window.dispatchEvent(new Event('hashchange'));
-        }, 2000);
-      } else {
-        throw new Error('Failed to sync user with backend');
-      }
+        }
+      }, 3000);
+      
     } catch (error) {
       console.error('Google sign-up error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
       
       if (error.code !== 'auth/popup-closed-by-user') {
         let errorMessage;
@@ -13881,6 +13807,8 @@ function SignUpPage() {
           errorMessage = 'Google Sign-Up is temporarily unavailable. Please use email/password registration or contact support. Domain authorization is pending.';
         } else if (error.code === 'auth/popup-blocked') {
           errorMessage = 'Pop-up blocked by browser. Please allow pop-ups for this site and try again.';
+        } else if (error.code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Sign-up cancelled. Please try again.';
         } else if (error.code === 'auth/operation-not-allowed') {
           errorMessage = 'Google Sign-In is not enabled. Please contact support.';
         } else if (error.message.includes('timeout') || error.message.includes('network')) {
