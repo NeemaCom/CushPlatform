@@ -103,12 +103,16 @@
         // Use redirect method directly
         console.log('Using redirect method...');
         
-        // Clear hash for clean redirect
+        // Clear hash for clean redirect and store intended destination
         const currentHash = window.location.hash;
-        if (currentHash) {
+        if (currentHash && currentHash !== '#signin' && currentHash !== '#signup') {
           sessionStorage.setItem(PRE_AUTH_HASH_KEY, currentHash);
-          history.replaceState(null, null, window.location.pathname + window.location.search);
+        } else {
+          // Default to dashboard for sign-in/sign-up pages
+          sessionStorage.setItem(PRE_AUTH_HASH_KEY, '#dashboard');
         }
+        // Temporarily clear hash for clean redirect
+        history.replaceState(null, null, window.location.pathname + window.location.search);
         
         await signInWithRedirect(auth, provider);
         return null;
@@ -139,10 +143,13 @@
           window.trackAuthEvent('google', 'sign_in_redirect');
         }
         
+        // Complete authentication flow immediately
+        await window.completeAuthenticationWithRouting(result.user, false);
         return result;
       }
       
       // No redirect result, resume normal routing
+      console.log('No redirect result found, resuming routing...');
       window.resumeHashRouting();
       return null;
     } catch (error) {
@@ -183,8 +190,19 @@
         // Navigate to intended destination
         setTimeout(() => {
           console.log('Redirecting to:', intendedDestination);
-          window.navigateWithAuthSupport(intendedDestination.startsWith('#') ? 
-            intendedDestination.substring(1) : intendedDestination);
+          
+          // Clean up the URL if it has auth handler params
+          if (window.location.pathname.includes('/__/auth/handler') || 
+              window.location.search.includes('apiKey')) {
+            // Replace the current URL with clean version
+            const cleanUrl = window.location.origin + '/';
+            history.replaceState(null, null, cleanUrl);
+          }
+          
+          const destination = intendedDestination.startsWith('#') ? 
+            intendedDestination.substring(1) : intendedDestination;
+          
+          window.navigateWithAuthSupport(destination);
           
           // Force hash change event
           window.dispatchEvent(new Event('hashchange'));
@@ -213,7 +231,7 @@
       // First, check for redirect result before any routing
       const redirectResult = await window.handleFirebaseRedirectWithRouting();
       if (redirectResult && redirectResult.user) {
-        await window.completeAuthenticationWithRouting(redirectResult.user);
+        // Authentication was handled in handleFirebaseRedirectWithRouting
         return;
       }
 
@@ -224,6 +242,18 @@
         console.log('Auth state changed (routing aware):', user ? user.email : 'null');
         
         if (user) {
+          // Check if this is from a redirect that we haven't processed yet
+          const urlParams = new URLSearchParams(window.location.search);
+          const hasAuthHandler = window.location.pathname.includes('/__/auth/handler') || 
+                                urlParams.has('apiKey') || 
+                                urlParams.has('authType');
+          
+          if (hasAuthHandler) {
+            console.log('Processing auth from redirect handler...');
+            await window.completeAuthenticationWithRouting(user, false);
+            return;
+          }
+          
           // User is signed in, ensure backend is synced
           try {
             const response = await fetch('/api/auth/me', {
@@ -234,6 +264,15 @@
               // Backend session missing, sync it
               console.log('Backend session missing, syncing...');
               await window.syncFirebaseUserWithBackend(user);
+              
+              // After sync, redirect to dashboard if we're not already there
+              const currentHash = window.location.hash;
+              if (!currentHash.startsWith('#dashboard')) {
+                setTimeout(() => {
+                  console.log('Redirecting authenticated user to dashboard...');
+                  window.navigate('dashboard');
+                }, 1000);
+              }
             }
           } catch (error) {
             console.error('Backend check error:', error);

@@ -1558,10 +1558,10 @@ function SignInPage() {
     setAuthError('');
     
     try {
-      console.log('Starting Google Sign-In process with routing support...');
+      console.log('Starting Google Sign-In process with secure redirect handling...');
       
-      // Use the new routing-aware Google sign-in function
-      const result = await window.performGoogleSignInWithRouting('popup');
+      // Use the new secure Google sign-in function
+      const result = await window.performSecureGoogleSignIn('popup');
       
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
@@ -1571,8 +1571,8 @@ function SignInPage() {
           window.trackAuthEvent('google', 'sign_in');
         }
         
-        // Complete the authentication flow with routing support
-        await window.completeAuthenticationWithRouting(result.user, false);
+        // Authentication completed in performSecureGoogleSignIn
+        console.log('Google sign-in completed successfully');
       }
       // If result is null, it means redirect method was used
       
@@ -13509,10 +13509,10 @@ function SignUpPage() {
     setError('');
     
     try {
-      console.log('Starting Google Sign-Up process with routing support...');
+      console.log('Starting Google Sign-Up process with secure redirect handling...');
       
-      // Use the new routing-aware Google sign-in function
-      const result = await window.performGoogleSignInWithRouting('popup');
+      // Use the new secure Google sign-in function
+      const result = await window.performSecureGoogleSignIn('popup');
       
       if (result && result.user) {
         console.log('Google sign-up successful:', result.user.email);
@@ -13522,8 +13522,8 @@ function SignUpPage() {
           window.trackAuthEvent('google', 'sign_up');
         }
         
-        // Complete the authentication flow with routing support (as new user)
-        await window.completeAuthenticationWithRouting(result.user, true);
+        // Authentication completed in performSecureGoogleSignIn (as new user)
+        console.log('Google sign-up completed successfully');
       }
       // If result is null, it means redirect method was used
       
