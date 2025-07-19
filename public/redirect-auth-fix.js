@@ -152,64 +152,116 @@
     }
   };
   
-  // Set up auth state listener for redirect handling
-  const setupAuthRedirectListener = async () => {
-    if (isOAuthRedirect()) {
-      console.log('OAuth redirect page detected, setting up auth listener...');
+  // Enhanced auth completion handler for redirects
+  const handleAuthCompletion = async () => {
+    if (!isOAuthRedirect()) return;
+    
+    console.log('Setting up comprehensive auth completion handler...');
+    
+    // Wait for Firebase to be fully initialized
+    let attempts = 0;
+    while (!window.firebaseAuth && attempts < 50) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    if (!window.firebaseAuth) {
+      console.error('Firebase auth not available after waiting 5 seconds');
+      window.location.replace(window.location.origin + '/?error=firebase_timeout');
+      return;
+    }
+    
+    try {
+      const { getRedirectResult, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
-      // Wait for Firebase to be initialized
-      let attempts = 0;
-      while (!window.firebaseAuth && attempts < 30) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        attempts++;
-      }
+      console.log('Firebase modules loaded, checking for auth completion...');
       
-      if (!window.firebaseAuth) {
-        console.error('Firebase auth not available after waiting');
-        return;
-      }
-      
-      const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      // Listen for auth state changes on redirect
-      onAuthStateChanged(window.firebaseAuth, async (user) => {
-        if (user) {
-          console.log('Auth state changed to signed in on redirect page:', user.email);
+      // Method 1: Direct getRedirectResult check
+      const checkRedirectResult = async () => {
+        try {
+          console.log('Checking getRedirectResult...');
+          const result = await getRedirectResult(window.firebaseAuth);
           
-          // Sync with backend
-          const backendUser = await window.syncFirebaseUserWithBackend(user, false);
-          
-          if (backendUser) {
-            console.log('Backend sync successful, redirecting to dashboard...');
-            
-            if (window.showSuccessNotification) {
-              window.showSuccessNotification('Successfully signed in! Redirecting...');
-            }
-            
-            // Redirect to dashboard
-            setTimeout(() => {
-              window.location.replace(window.location.origin + '/#dashboard');
-            }, 1500);
+          if (result && result.user) {
+            console.log('getRedirectResult successful:', result.user.email);
+            return result.user;
           }
+          
+          console.log('No redirect result found');
+          return null;
+        } catch (error) {
+          console.error('getRedirectResult error:', error);
+          return null;
         }
-      });
+      };
+      
+      // Method 2: Auth state listener
+      const setupAuthListener = () => {
+        return new Promise((resolve) => {
+          console.log('Setting up auth state listener...');
+          
+          const unsubscribe = onAuthStateChanged(window.firebaseAuth, (user) => {
+            if (user) {
+              console.log('Auth state listener detected user:', user.email);
+              unsubscribe();
+              resolve(user);
+            }
+          });
+          
+          // Timeout after 10 seconds
+          setTimeout(() => {
+            console.log('Auth state listener timeout');
+            unsubscribe();
+            resolve(null);
+          }, 10000);
+        });
+      };
+      
+      // Try both methods
+      const user = await checkRedirectResult() || await setupAuthListener();
+      
+      if (user) {
+        console.log('Authentication successful, syncing with backend...');
+        
+        // Sync with backend
+        const backendUser = await window.syncFirebaseUserWithBackend(user, false);
+        
+        if (backendUser) {
+          console.log('Backend sync successful, redirecting to dashboard...');
+          
+          if (window.showSuccessNotification) {
+            window.showSuccessNotification('Successfully signed in! Redirecting...');
+          }
+          
+          // Track successful authentication
+          if (window.trackAuthEvent) {
+            window.trackAuthEvent('google', 'sign_in_redirect_complete');
+          }
+          
+          // Clean redirect
+          setTimeout(() => {
+            window.location.replace(window.location.origin + '/#dashboard');
+          }, 1000);
+        } else {
+          console.error('Backend sync failed');
+          window.location.replace(window.location.origin + '/?error=backend_sync_failed');
+        }
+      } else {
+        console.error('No authentication result found after all methods');
+        window.location.replace(window.location.origin + '/?error=auth_incomplete');
+      }
+      
+    } catch (error) {
+      console.error('Auth completion handler error:', error);
+      window.location.replace(window.location.origin + '/?error=auth_handler_failed');
     }
   };
   
-  // Check for redirect on page load
+  // Main redirect checker
   const checkRedirectOnLoad = async () => {
     if (isOAuthRedirect()) {
-      console.log('OAuth redirect detected, processing...');
-      
-      // Set up auth listener first
-      await setupAuthRedirectListener();
-      
-      // Also try the direct method
-      const success = await window.handleOAuthRedirect();
-      
-      if (!success) {
-        console.log('Direct redirect processing failed, relying on auth state listener...');
-      }
+      console.log('OAuth redirect detected, starting comprehensive auth completion...');
+      await handleAuthCompletion();
     }
   };
   
