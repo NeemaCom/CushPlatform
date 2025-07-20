@@ -2054,7 +2054,7 @@ function SignInPage() {
                 e('button', {
                   key: 'signup-button',
                   type: 'button',
-                  onClick: () => setIsSignUp(true),
+                  onClick: () => window.navigate('signup'),
                   className: 'text-blue-600 font-medium hover:underline transition-all'
                 }, 'Create account')
               ])
