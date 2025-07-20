@@ -1558,10 +1558,29 @@ function SignInPage() {
     setAuthError('');
     
     try {
-      console.log('Starting Google Sign-In process with secure redirect handling...');
+      console.log('Starting Google Sign-In process...');
       
-      // Use the new secure Google sign-in function
-      const result = await window.performSecureGoogleSignIn('popup');
+      // Try popup first, fallback to redirect
+      const auth = window.firebaseAuth || await window.initializeFirebaseAuth();
+      const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
+        await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      let result;
+      try {
+        console.log('Attempting popup sign-in...');
+        result = await signInWithPopup(auth, provider);
+      } catch (error) {
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+          console.log('Popup blocked, using redirect...');
+          await signInWithRedirect(auth, provider);
+          return; // Page will redirect and OAuth handler will take over
+        }
+        throw error;
+      }
       
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
@@ -1571,8 +1590,13 @@ function SignInPage() {
           window.trackAuthEvent('google', 'sign_in');
         }
         
-        // Authentication completed in performSecureGoogleSignIn
-        console.log('Google sign-in completed successfully');
+        // Complete authentication flow
+        const backendUser = await window.syncFirebaseUserWithBackend(result.user, false);
+        
+        if (backendUser) {
+          console.log('Google sign-in completed successfully');
+          window.navigate('dashboard');
+        }
       }
       // If result is null, it means redirect method was used
       
@@ -13509,10 +13533,29 @@ function SignUpPage() {
     setError('');
     
     try {
-      console.log('Starting Google Sign-Up process with secure redirect handling...');
+      console.log('Starting Google Sign-Up process...');
       
-      // Use the new secure Google sign-in function
-      const result = await window.performSecureGoogleSignIn('popup');
+      // Try popup first, fallback to redirect  
+      const auth = window.firebaseAuth || await window.initializeFirebaseAuth();
+      const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
+        await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      let result;
+      try {
+        console.log('Attempting popup sign-up...');
+        result = await signInWithPopup(auth, provider);
+      } catch (error) {
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+          console.log('Popup blocked, using redirect...');
+          await signInWithRedirect(auth, provider);
+          return; // Page will redirect and OAuth handler will take over
+        }
+        throw error;
+      }
       
       if (result && result.user) {
         console.log('Google sign-up successful:', result.user.email);
@@ -13522,8 +13565,13 @@ function SignUpPage() {
           window.trackAuthEvent('google', 'sign_up');
         }
         
-        // Authentication completed in performSecureGoogleSignIn (as new user)
-        console.log('Google sign-up completed successfully');
+        // Complete authentication flow (as new user)
+        const backendUser = await window.syncFirebaseUserWithBackend(result.user, true);
+        
+        if (backendUser) {
+          console.log('Google sign-up completed successfully');
+          window.navigate('dashboard');
+        }
       }
       // If result is null, it means redirect method was used
       
