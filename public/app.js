@@ -14464,16 +14464,20 @@ function SignUpPage() {
 
             // Checkboxes
             e('div', { key: 'checkboxes', className: 'mb-6 space-y-3' }, [
-              e('div', { key: 'terms-checkbox', className: 'flex items-start' }, [
+              e('div', { key: 'terms-privacy-checkbox', className: 'flex items-start' }, [
                 e('input', {
-                  key: 'terms-input',
+                  key: 'terms-privacy-input',
                   type: 'checkbox',
-                  checked: formData.acceptTerms,
-                  onChange: (e) => handleInputChange('acceptTerms', e.target.checked),
+                  checked: formData.acceptTerms && formData.acceptPrivacy,
+                  onChange: (e) => {
+                    const isChecked = e.target.checked;
+                    handleInputChange('acceptTerms', isChecked);
+                    handleInputChange('acceptPrivacy', isChecked);
+                  },
                   className: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
                 }),
                 e('label', {
-                  key: 'terms-label',
+                  key: 'terms-privacy-label',
                   className: 'ml-2 text-sm text-gray-700'
                 }, [
                   'I accept the ',
@@ -14482,26 +14486,8 @@ function SignUpPage() {
                     type: 'button',
                     onClick: () => navigate('terms'),
                     className: 'text-blue-600 hover:text-blue-800 underline'
-                  }, 'Terms of Service')
-                ]),
-                errors.acceptTerms && e('p', {
-                  key: 'terms-error',
-                  className: 'mt-1 text-sm text-red-600'
-                }, errors.acceptTerms)
-              ]),
-              e('div', { key: 'privacy-checkbox', className: 'flex items-start' }, [
-                e('input', {
-                  key: 'privacy-input',
-                  type: 'checkbox',
-                  checked: formData.acceptPrivacy,
-                  onChange: (e) => handleInputChange('acceptPrivacy', e.target.checked),
-                  className: 'mt-1 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500'
-                }),
-                e('label', {
-                  key: 'privacy-label',
-                  className: 'ml-2 text-sm text-gray-700'
-                }, [
-                  'I accept the ',
+                  }, 'Terms of Service'),
+                  ' and ',
                   e('button', {
                     key: 'privacy-link',
                     type: 'button',
@@ -14509,10 +14495,10 @@ function SignUpPage() {
                     className: 'text-blue-600 hover:text-blue-800 underline'
                   }, 'Privacy Policy')
                 ]),
-                errors.acceptPrivacy && e('p', {
-                  key: 'privacy-error',
+                (errors.acceptTerms || errors.acceptPrivacy) && e('p', {
+                  key: 'terms-privacy-error',
                   className: 'mt-1 text-sm text-red-600'
-                }, errors.acceptPrivacy)
+                }, errors.acceptTerms || errors.acceptPrivacy)
               ]),
               e('div', { key: 'marketing-checkbox', className: 'flex items-start' }, [
                 e('input', {

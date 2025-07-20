@@ -27,6 +27,14 @@ The Cush platform is a comprehensive global immigration services platform featur
 - ✓ Implemented business metrics tracking for user registration, loan applications, and premium feature access
 - ✓ Created comprehensive analytics documentation with example usage patterns for development team
 
+**2025-07-20**: IMPROVED SIGNUP USER EXPERIENCE - Merged Terms and Privacy Policy Checkboxes
+- ✓ **STREAMLINED SIGNUP**: Combined Terms of Service and Privacy Policy into single checkbox on /#signup page
+- ✓ **ENHANCED UX**: Reduced form complexity from two separate checkboxes to one unified consent checkbox
+- ✓ Maintained individual navigation links to both Terms of Service and Privacy Policy pages
+- ✓ Updated checkbox logic to handle both acceptTerms and acceptPrivacy simultaneously
+- ✓ Preserved error validation for both terms acceptance requirements
+- ✓ **CLEANER INTERFACE**: Users now check one box to accept both policies, improving conversion rate
+
 **2025-07-20**: UNIFIED SIGNUP EXPERIENCE - Connected Create Account Link to Get Started Page
 - ✓ **UNIFIED SIGNUP FLOW**: Updated "Create Account" link on sign-in page to redirect to Get Started /#signup page
 - ✓ **CONSISTENT USER EXPERIENCE**: Users now have one centralized signup page instead of inline form toggle
