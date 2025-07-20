@@ -55,15 +55,31 @@
     try {
       // Wait for Firebase SDK to load
       let attempts = 0;
-      while (!window.firebaseApp && attempts < 20) {
+      while (!window.firebaseApp && attempts < 50) {
+        console.log(`Waiting for firebaseApp... attempt ${attempts + 1}`);
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
       if (!window.firebaseApp) {
-        throw new Error('Firebase failed to initialize after 2 seconds');
+        throw new Error('Firebase failed to initialize after 5 seconds');
       }
 
+      // Ensure firebaseAuth is available
+      if (!window.firebaseAuth) {
+        console.log('firebaseAuth not set, waiting...');
+        attempts = 0;
+        while (!window.firebaseAuth && attempts < 20) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+      }
+
+      if (!window.firebaseAuth) {
+        throw new Error('Firebase Auth not available after initialization');
+      }
+
+      console.log('Firebase Auth initialization successful');
       return window.firebaseAuth;
     } catch (error) {
       console.error('Firebase initialization error:', error);
