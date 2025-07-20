@@ -26,22 +26,44 @@
     console.log('OAuth return detected, processing authentication...');
 
     try {
-      // Wait for Firebase to be available
+      // Wait for Firebase to be properly initialized
+      console.log('Waiting for Firebase initialization...');
+      
+      // First wait for the Firebase initialization function to be available
       let attempts = 0;
-      while (!window.firebaseAuth && attempts < 100) {
-        console.log(`Waiting for Firebase auth... attempt ${attempts + 1}`);
+      while (!window.initializeFirebaseAuth && attempts < 50) {
+        console.log(`Waiting for Firebase init function... attempt ${attempts + 1}`);
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
-      if (!window.firebaseAuth) {
-        console.error('Firebase auth not available after 10 seconds');
-        alert('Authentication failed: Firebase not initialized. Redirecting to homepage...');
+      if (!window.initializeFirebaseAuth) {
+        console.error('Firebase initialization function not available after 5 seconds');
+        alert('Authentication failed: Firebase initialization function not loaded. Redirecting to homepage...');
         window.location.replace(window.location.origin);
         return;
       }
 
-      console.log('Firebase auth available, checking for user...');
+      // Now initialize Firebase properly
+      let firebaseAuth;
+      try {
+        console.log('Initializing Firebase...');
+        firebaseAuth = await window.initializeFirebaseAuth();
+      } catch (initError) {
+        console.error('Firebase initialization failed:', initError);
+        alert(`Authentication failed: ${initError.message}. Redirecting to homepage...`);
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      if (!firebaseAuth) {
+        console.error('Firebase auth not available after initialization');
+        alert('Authentication failed: Firebase auth not initialized. Redirecting to homepage...');
+        window.location.replace(window.location.origin);
+        return;
+      }
+
+      console.log('Firebase auth initialized, checking for user...');
 
       // Import Firebase functions
       const { getRedirectResult, onAuthStateChanged } = 
@@ -51,7 +73,7 @@
       let user = null;
       try {
         console.log('Checking getRedirectResult...');
-        const result = await getRedirectResult(window.firebaseAuth);
+        const result = await getRedirectResult(firebaseAuth);
         if (result && result.user) {
           console.log('Found user via getRedirectResult:', result.user.email);
           user = result.user;
@@ -63,7 +85,7 @@
       // Method 2: If no user found, check current auth state
       if (!user) {
         console.log('No redirect result, checking current auth state...');
-        user = window.firebaseAuth.currentUser;
+        user = firebaseAuth.currentUser;
         if (user) {
           console.log('Found current user:', user.email);
         }
@@ -74,7 +96,7 @@
         console.log('Setting up auth state listener...');
         user = await new Promise((resolve) => {
           let timeout;
-          const unsubscribe = onAuthStateChanged(window.firebaseAuth, (authUser) => {
+          const unsubscribe = onAuthStateChanged(firebaseAuth, (authUser) => {
             if (authUser) {
               console.log('Auth state changed to user:', authUser.email);
               clearTimeout(timeout);
