@@ -132,6 +132,12 @@
       if (user) {
         console.log('Authentication successful, syncing with backend...');
         
+        // Show enhanced success notification first
+        if (window.showEnhancedSuccessNotification) {
+          const displayName = user.displayName || user.email.split('@')[0];
+          window.showEnhancedSuccessNotification(displayName, 'login');
+        }
+        
         // Show loading message
         document.body.innerHTML = `
           <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: system-ui;">
@@ -153,8 +159,10 @@
             window.trackAuthEvent('google', 'oauth_redirect_complete');
           }
 
-          // Redirect to dashboard
-          window.location.replace(window.location.origin + '/#dashboard');
+          // Add delay before redirect to show notification
+          setTimeout(() => {
+            window.location.replace(window.location.origin + '/#dashboard');
+          }, 2000);
         } else {
           console.error('Backend sync failed');
           alert('Authentication failed: Could not sync with backend. Please try again.');

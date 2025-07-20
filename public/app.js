@@ -1596,6 +1596,15 @@ function SignInPage() {
         
         if (backendUser) {
           console.log('Google sign-in completed successfully');
+        
+        // Show success notification with user's name
+        if (window.showEnhancedSuccessNotification) {
+          const displayName = result.user.displayName || result.user.email.split('@')[0];
+          window.showEnhancedSuccessNotification(displayName, 'login');
+        }
+        
+        // Add a brief delay before redirect to allow notification to be seen
+        await new Promise(resolve => setTimeout(resolve, 1500));
           window.navigate('dashboard');
         }
       }
@@ -6607,25 +6616,17 @@ function AppRouter({ user }) {
           if (backendUser) {
             console.log('Auth completion successful, redirecting to dashboard');
             
-            // Show success message
-            const successMessage = document.createElement('div');
-            successMessage.style.cssText = `
-              position: fixed; top: 20px; right: 20px; z-index: 10000;
-              background: #10B981; color: white; padding: 16px 24px;
-              border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              font-family: system-ui; font-size: 14px; font-weight: 500;
-            `;
-            successMessage.textContent = 'Sign-in successful! Welcome to CushGlobal.';
-            document.body.appendChild(successMessage);
+            // Show enhanced success notification
+            if (window.showEnhancedSuccessNotification) {
+              const displayName = userData.displayName || `${userData.email.split('@')[0]}`;
+              window.showEnhancedSuccessNotification(displayName, 'login');
+            }
             
+            // Add delay before redirect to show notification
             setTimeout(() => {
-              if (document.body.contains(successMessage)) {
-                document.body.removeChild(successMessage);
-              }
-            }, 3000);
-            
-            window.location.hash = 'dashboard';
-            window.dispatchEvent(new Event('hashchange'));
+              window.location.hash = 'dashboard';
+              window.dispatchEvent(new Event('hashchange'));
+            }, 2000);
             return;
           }
         } catch (error) {
