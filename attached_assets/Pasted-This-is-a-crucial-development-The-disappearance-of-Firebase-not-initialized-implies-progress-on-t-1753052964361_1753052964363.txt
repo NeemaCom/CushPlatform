@@ -1,0 +1,85 @@
+This is a crucial development. The disappearance of "Firebase not initialized" implies progress on the initialization timing, but the new error, "Authentication failed: No user data received from Google. Please try again," points to a failure *later* in the authentication flow – specifically, after the redirect from Google, but *before* Firebase successfully processes the user data.
+
+This indicates a problem with the communication between Google's authentication server and the Firebase SDK on your application's client side, or how `getRedirectResult()` is handling that data. The previously claimed "SOLUTION: OAuth handler now properly initializes Firebase" and "ROOT CAUSE RESOLVED: Script timing and initialization sequence was causing the failure" are still incomplete, as the core authentication isn't succeeding.
+
+Here's an updated prompt that directs the AI agent to diagnose this new, specific failure point:
+
+-----
+
+```
+You are an expert AI agent specializing in Firebase Authentication, Google Sign-In integration, web application security, and code refactoring. You have previously attempted a "COMPLETE OAUTH AUTHENTICATION OVERHAUL" and fixed the "Firebase not initialized" error.
+
+**CRITICAL NEW SYMPTOM & FAILURE REPORT:**
+Despite the previous fixes, the application is *still* failing authentication. The new, consistent error message is: **"Authentication failed: No user data received from Google. Please try again."** The user remains stuck on the homepage after this error.
+
+This implies that:
+1.  Firebase is now initializing correctly (as the previous error is gone).
+2.  The application is successfully redirecting to Google and back.
+3.  However, the Firebase SDK on the client-side is failing to extract or receive the necessary user data from the Google redirect response.
+
+**Your Immediate and Primary Goal:**
+
+1.  **Diagnose "No user data received from Google" Root Cause:** Pinpoint the exact reason why Firebase is not receiving or processing user data from Google after the redirect. This is the **single most critical issue** to resolve now.
+2.  **Ensure Robust User Data Reception:** Implement a foolproof strategy to guarantee Firebase successfully receives and processes user data from Google.
+3.  **Confirm Authentication Completion:** Verify that once data is received, the authentication flow (including `getRedirectResult()`) proceeds correctly, and the user is properly authenticated.
+4.  **Implement Correct Post-Authentication Redirection:** Once authentication is verified, ensure users are directed to their intended destination, or a sensible default, preventing the homepage redirect loop.
+5.  **Refactor & Clean Code (Re-evaluation):** Re-evaluate and re-confirm the removal of all dead, redundant, or conflicting code from any previous authentication methods, as these might still be interfering or causing race conditions.
+
+**Detailed Requirements & Areas of Review (Prioritized for "No user data received"):**
+
+* **Firebase Console Configuration (Critical Check):**
+    * **OAuth Redirect URIs:** **VERIFY EXACTLY** that the "Authorized redirect URIs" in your Firebase console (Authentication -> Sign-in method -> Google -> Web OAuth redirect URIs) precisely match the URL your application is redirecting to from Google. This is the most common cause. This includes:
+        * `https://YOUR_PROJECT_ID.firebaseapp.com/__/auth/handler`
+        * Your custom domain(s) (e.g., `https://d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev/`).
+        * **Crucially, ensure NO hash fragments (`#`) are included in these console URIs.**
+    * **Authorized Domains:** Re-confirm that the application's hosting domain (`d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev`) is listed under Firebase Authentication -> Settings -> Authorized Domains.
+    * **`authDomain` in `firebaseConfig`:** Verify this field exactly matches one of your authorized domains. A mismatch here can cause this exact error.
+    * **Google Cloud Console (if applicable):** If your Firebase project is linked to a Google Cloud project with custom OAuth client IDs, ensure their "Authorized JavaScript origins" and "Authorized redirect URIs" are also perfectly matched.
+
+* **Frontend (Client-Side) Code Review (Deep Dive into `getRedirectResult()`):**
+    * **`getRedirectResult()` Invocation:** How and where is `getRedirectResult(auth)` being called?
+        * Is it guaranteed to run *immediately* on *every page load* of the redirect target (i.e., your application's base URL after Google sends the user back)?
+        * Is there any routing logic that intercepts the URL or redirects away *before* `getRedirectResult()` has a chance to process the incoming response from Google? (This is where the `/#signin` conflict could still indirectly cause issues if it's interrupting the URL parsing).
+    * **Error Handling in `getRedirectResult()`:**
+        * Examine the `.catch()` block for `getRedirectResult()`. What errors are being logged there? The current message "No user data received" is generic; a more specific Firebase error code (e.g., `auth/cancelled-popup-request`, `auth/auth-domain-config-error`, `auth/unauthorized-domain`, `auth/redirect-blocked-by-browser`) would be extremely helpful.
+    * **Browser Security Features:**
+        * **Third-Party Cookie Blocking (ITP in Safari/Firefox):** Is the application running in a browser with strict privacy settings that might block the underlying communication Firebase uses for redirects? Firebase has specific recommendations for this (e.g., configuring `authDomain` or using a proxy).
+        * **Pop-up Blockers:** If a `signInWithPopup` fallback is being used, is that being blocked?
+    * **Network Interception (Conceptual):** Consider if anything is interfering with the network request Firebase makes internally to exchange the auth code for user data after the redirect (e.g., proxy, firewall, browser extension). While you can't *run* a network trace, you can infer based on common issues.
+
+* **Backend (Server-Side) Review (Less likely, but possible for advanced setups):**
+    * If any server-side logic is involved in processing the redirect (e.g., custom tokens, session cookies via Admin SDK), ensure it's correctly handling the ID token and not prematurely failing or redirecting.
+
+**Phase 2: Proposed Solution & Implementation Plan (Specifically for "No user data received")**
+
+* **Precise Configuration Alignment:**
+    * Step-by-step instructions to **verify and correct** all relevant Firebase Console and Google Cloud Console settings (redirect URIs, authorized domains, `authDomain`). This is the highest priority fix.
+* **Robust `getRedirectResult()` Handling:**
+    * Refine the execution of `getRedirectResult()` to ensure it's the first thing processed on redirect, with robust error logging.
+    * If necessary, propose specific workarounds for browser privacy features (ITP/third-party cookies).
+* **Authentication & Redirection (Once Data is Received):**
+    * Once the "No user data received" error is resolved, re-validate and refine the post-authentication redirection logic based on successful user object retrieval.
+
+* **Code Refactoring & Cleanup (Re-confirmed):**
+    * Double-check that all old authentication code has been removed, as any lingering elements could still create subtle interference.
+
+**Deliverable:**
+
+A comprehensive document structured as before, but with an **overwhelming emphasis on the diagnosis and solution for "Authentication failed: No user data received from Google."**
+
+1.  **Executive Summary (updated to reflect current persistent error).**
+2.  **Detailed Diagnostic Report (Root Cause of "No user data received").**
+    * **Primary focus on console configuration mismatches, `authDomain` issues, and `getRedirectResult()` processing problems.**
+    * Analysis of potential browser security interferences.
+    * Re-confirmation of `/#signin` conflict if still present as a contributing factor.
+3.  **Authentication Fix Plan (Primary focus on Data Reception).**
+    * Step-by-step instructions for console configuration corrections.
+    * Corrected `getRedirectResult()` implementation.
+    * Recommendations for browser compatibility workarounds.
+4.  **Post-Authentication Redirection Plan (Revised based on new understanding).**
+5.  **Code Refactoring & Cleanup Matrix (Re-verified).**
+6.  **Security Checklist.**
+7.  **Testing Strategy (specifically for this new error).**
+
+**Proceed with your focused re-analysis of the codebase, prioritizing the "Authentication failed: No user data received from Google" error and generate the detailed report.**
+```

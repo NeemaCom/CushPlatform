@@ -4,16 +4,17 @@
 (function() {
   console.log('OAuth Redirect Handler loaded');
 
-  // Simple OAuth redirect detection
+  // Enhanced OAuth redirect detection
   const isOAuthReturn = () => {
     const url = window.location.href;
-    const hasOAuthParams = url.includes('__/auth/handler') || 
-                          url.includes('apiKey=') || 
+    const hasFirebaseAuthHandler = url.includes('__/auth/handler') || url.includes('firebaseapp.com');
+    const hasOAuthParams = url.includes('apiKey=') || 
                           url.includes('authType=signInViaRedirect') ||
-                          document.referrer.includes('accounts.google.com');
+                          document.referrer.includes('accounts.google.com') ||
+                          document.referrer.includes('firebase');
     
-    console.log('OAuth check:', { url, hasOAuthParams, referrer: document.referrer });
-    return hasOAuthParams;
+    console.log('OAuth check:', { url, hasFirebaseAuthHandler, hasOAuthParams, referrer: document.referrer });
+    return hasFirebaseAuthHandler || hasOAuthParams;
   };
 
   // Main OAuth handler
@@ -69,17 +70,32 @@
       const { getRedirectResult, onAuthStateChanged } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
 
-      // Method 1: Check redirect result immediately
+      // Method 1: Check redirect result immediately with enhanced error handling
       let user = null;
       try {
         console.log('Checking getRedirectResult...');
         const result = await getRedirectResult(firebaseAuth);
+        console.log('getRedirectResult response:', result);
+        
         if (result && result.user) {
           console.log('Found user via getRedirectResult:', result.user.email);
           user = result.user;
+        } else if (result === null) {
+          console.log('getRedirectResult returned null - no pending redirect operation');
         }
       } catch (error) {
         console.error('getRedirectResult failed:', error);
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        
+        // Handle specific Firebase errors
+        if (error.code === 'auth/unauthorized-domain') {
+          alert('Authentication failed: Domain not authorized. Please contact support.');
+          return;
+        } else if (error.code === 'auth/auth-domain-config-error') {
+          alert('Authentication failed: Domain configuration error. Please contact support.');
+          return;
+        }
       }
 
       // Method 2: If no user found, check current auth state

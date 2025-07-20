@@ -1576,8 +1576,9 @@ function SignInPage() {
       } catch (error) {
         if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
           console.log('Popup blocked, using redirect...');
+          // Redirect to Firebase auth domain for proper OAuth handling
           await signInWithRedirect(auth, provider);
-          return; // Page will redirect and OAuth handler will take over
+          return; // Page will redirect to Firebase and back
         }
         throw error;
       }
@@ -5467,7 +5468,7 @@ function App() {
         
         const firebaseConfig = {
           apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: isDevelopment ? `${currentDomain}` : "portal.we-cush.com",
+          authDomain: "cushportal.firebaseapp.com",
           projectId: "cushportal",
           storageBucket: "cushportal.firebasestorage.app",
           messagingSenderId: "304174661302",
@@ -6589,6 +6590,67 @@ function TermsOfUsePage() {
 
 // Main App Router Component
 function AppRouter({ user }) {
+  // Handle auth completion from Firebase redirect first
+  if (window.location.hash === '#auth-complete') {
+    const handleAuthCompletion = async () => {
+      const authData = sessionStorage.getItem('firebase_auth_result');
+      if (authData) {
+        try {
+          const userData = JSON.parse(authData);
+          sessionStorage.removeItem('firebase_auth_result');
+          
+          console.log('Processing Firebase auth completion:', userData.email);
+          
+          // Sync with backend
+          const backendUser = await window.syncFirebaseUserWithBackend(userData, false);
+          
+          if (backendUser) {
+            console.log('Auth completion successful, redirecting to dashboard');
+            
+            // Show success message
+            const successMessage = document.createElement('div');
+            successMessage.style.cssText = `
+              position: fixed; top: 20px; right: 20px; z-index: 10000;
+              background: #10B981; color: white; padding: 16px 24px;
+              border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              font-family: system-ui; font-size: 14px; font-weight: 500;
+            `;
+            successMessage.textContent = 'Sign-in successful! Welcome to CushGlobal.';
+            document.body.appendChild(successMessage);
+            
+            setTimeout(() => {
+              if (document.body.contains(successMessage)) {
+                document.body.removeChild(successMessage);
+              }
+            }, 3000);
+            
+            window.location.hash = 'dashboard';
+            window.dispatchEvent(new Event('hashchange'));
+            return;
+          }
+        } catch (error) {
+          console.error('Auth completion failed:', error);
+        }
+      }
+      // If auth completion failed, redirect to signin
+      window.location.hash = 'signin';
+      window.dispatchEvent(new Event('hashchange'));
+    };
+    
+    handleAuthCompletion();
+    
+    // Return loading screen while processing
+    return e('div', { 
+      className: 'flex justify-center items-center min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100' 
+    }, [
+      e('div', { key: 'loading', className: 'text-center p-8 bg-white rounded-lg shadow-lg' }, [
+        e('div', { key: 'icon', className: 'text-6xl mb-4' }, '🔐'),
+        e('h2', { key: 'title', className: 'text-2xl font-semibold mb-2' }, 'Completing Sign-In'),
+        e('p', { key: 'subtitle', className: 'text-gray-600' }, 'Processing your authentication...')
+      ])
+    ]);
+  }
+
   const [currentRoute, setCurrentRoute] = useState(() => {
     return window.location.hash.substring(1) || 'home';
   });
