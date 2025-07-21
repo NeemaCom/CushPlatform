@@ -13575,6 +13575,8 @@ function SignUpPage() {
       ]);
       
       if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        
         // Success feedback
         clearTimeout(timeoutId);
         setError('');
@@ -13676,9 +13678,9 @@ function SignUpPage() {
         }
         
         // Complete authentication flow (as new user)
-        const backendUser = await window.syncFirebaseUserWithBackend(result.user, true);
+        const backendResult = await window.syncFirebaseUserWithBackend(result.user, true);
         
-        if (backendUser) {
+        if (backendResult && backendResult.success) {
           console.log('Google sign-up completed successfully');
           
           // Show success notification for Google sign-up
@@ -13686,7 +13688,7 @@ function SignUpPage() {
             window.showSuccessNotification(result.user.displayName || result.user.email.split('@')[0], 'signup');
           }
           
-          // Redirect to sign-in page after account creation
+          // Redirect to sign-in page after account creation (not dashboard)
           setTimeout(() => {
             window.navigate('signin');
           }, 2500);

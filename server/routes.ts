@@ -189,7 +189,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
 
           user = await storage.createUser({
-            firebaseUid: uid,
             email,
             username: email,
             passwordHash: placeholderPasswordHash,
@@ -203,6 +202,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             acceptPrivacy: acceptPrivacy || false,
             role: 'customer'
           });
+          
+          // Update user with Firebase UID after creation
+          if (uid) {
+            user = await storage.updateUser(user.id, { firebaseUid: uid });
+          }
 
           // Generate default avatar if no photoURL provided
           if (!photoURL) {
@@ -240,19 +244,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Set session with proper format for authentication middleware
-      req.session.userId = user.id;
-      req.session.role = user.role || 'customer';
-      req.session.lastActivity = Date.now();
-      
-      // Update last login time
-      await storage.updateUser(user.id, { lastLoginAt: new Date() });
-      
-      const safeUser = createSafeUser(user);
-      
-      SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
-      
-      res.json({ success: true, user: safeUser });
+      // For new user registrations, don't set session (they need to sign in after account creation)
+      if (isNewUser) {
+        // Don't set session for new users - they should sign in after account creation
+        const safeUser = createSafeUser(user);
+        SecurityLogger.logAuthEvent('firebase_signup_success', user.id, true, req.ip, req.get('User-Agent'));
+        res.json({ success: true, user: safeUser, isNewUser: true, redirectTo: 'signin' });
+      } else {
+        // Set session for existing users signing in
+        req.session.userId = user.id;
+        req.session.role = user.role || 'customer';
+        req.session.lastActivity = Date.now();
+        
+        // Update last login time
+        await storage.updateUser(user.id, { lastLoginAt: new Date() });
+        
+        const safeUser = createSafeUser(user);
+        SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
+        res.json({ success: true, user: safeUser });
+      }
     } catch (error) {
       console.error('Firebase sync error:', error);
       SecurityLogger.logAuthEvent('firebase_sync_error', null, false, req.ip, req.get('User-Agent'), { error: error.message });
