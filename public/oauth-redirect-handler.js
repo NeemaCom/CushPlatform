@@ -30,31 +30,53 @@
       // Wait for Firebase to be properly initialized
       console.log('Waiting for Firebase initialization...');
       
-      // First wait for the Firebase initialization function to be available
+      // First wait for the Firebase initialization function to be available with extended timeout
       let attempts = 0;
-      while (!window.initializeFirebaseAuth && attempts < 50) {
+      while (!window.initializeFirebaseAuth && attempts < 100) {
         console.log(`Waiting for Firebase init function... attempt ${attempts + 1}`);
         await new Promise(resolve => setTimeout(resolve, 100));
         attempts++;
       }
 
       if (!window.initializeFirebaseAuth) {
-        console.error('Firebase initialization function not available after 5 seconds');
-        alert('Authentication failed: Firebase initialization function not loaded. Redirecting to homepage...');
-        window.location.replace(window.location.origin);
-        return;
+        console.error('Firebase initialization function not available after 10 seconds');
+        console.log('Attempting to check for direct Firebase availability...');
+        
+        // Check if Firebase is already initialized without the helper function
+        if (window.firebaseAuth) {
+          console.log('Firebase auth found, proceeding with authentication...');
+        } else if (window.firebaseApp) {
+          console.log('Firebase app found, initializing auth...');
+          try {
+            const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+            window.firebaseAuth = getAuth(window.firebaseApp);
+            console.log('Firebase auth initialized from existing app');
+          } catch (error) {
+            console.error('Failed to initialize Firebase auth from app:', error);
+            alert('Authentication failed: Firebase initialization timeout. Redirecting to homepage...');
+            window.location.replace(window.location.origin);
+            return;
+          }
+        } else {
+          alert('Authentication failed: Firebase initialization timeout. Redirecting to homepage...');
+          window.location.replace(window.location.origin);
+          return;
+        }
       }
 
-      // Now initialize Firebase properly
-      let firebaseAuth;
-      try {
-        console.log('Initializing Firebase...');
-        firebaseAuth = await window.initializeFirebaseAuth();
-      } catch (initError) {
-        console.error('Firebase initialization failed:', initError);
-        alert(`Authentication failed: ${initError.message}. Redirecting to homepage...`);
-        window.location.replace(window.location.origin);
-        return;
+      // Now initialize Firebase properly or use existing
+      let firebaseAuth = window.firebaseAuth;
+      
+      if (!firebaseAuth && window.initializeFirebaseAuth) {
+        try {
+          console.log('Initializing Firebase...');
+          firebaseAuth = await window.initializeFirebaseAuth();
+        } catch (initError) {
+          console.error('Firebase initialization failed:', initError);
+          alert(`Authentication failed: ${initError.message}. Redirecting to homepage...`);
+          window.location.replace(window.location.origin);
+          return;
+        }
       }
 
       if (!firebaseAuth) {
