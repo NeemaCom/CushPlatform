@@ -53,6 +53,20 @@
   // Robust Firebase initialization with fallback
   window.initializeFirebaseAuth = async () => {
     try {
+      // First, wait for the main Firebase initialization
+      if (window.firebaseInitPromise && !window.firebaseInitialized) {
+        console.log('Waiting for main Firebase initialization in auth-fix...');
+        try {
+          await Promise.race([
+            window.firebaseInitPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Main Firebase init timeout in auth-fix')), 15000))
+          ]);
+          console.log('Main Firebase initialization completed in auth-fix');
+        } catch (error) {
+          console.warn('Main Firebase init timeout in auth-fix:', error.message);
+        }
+      }
+
       // Wait for Firebase SDK to load with longer timeout
       let attempts = 0;
       while (!window.firebaseApp && attempts < 100) {

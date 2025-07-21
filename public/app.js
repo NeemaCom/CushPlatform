@@ -5528,13 +5528,32 @@ function App() {
           }
         });
         
+        console.log('Firebase initialization completed - resolving promise');
         setFirebaseInitialized(true);
+        window.firebaseInitialized = true;
+        if (window.firebaseInitResolve) {
+          window.firebaseInitResolve();
+        }
       } catch (error) {
         console.error('Firebase initialization error:', error);
+        window.firebaseInitialized = false;
+        if (window.firebaseInitReject) {
+          window.firebaseInitReject(error);
+        }
         // Fallback to backend auth check
         checkBackendAuth();
       }
     };
+
+    // Create a promise that other modules can wait for - must be created BEFORE initialization starts
+    if (!window.firebaseInitPromise) {
+      window.firebaseInitPromise = new Promise((resolve, reject) => {
+        window.firebaseInitResolve = resolve;
+        window.firebaseInitReject = reject;
+      });
+    }
+
+    initializeFirebase();
 
     const handleFirebaseUser = async (firebaseUser) => {
       try {
