@@ -173,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (!user) {
-        // For Google sign-in, check if this is a new user registration
+        // Check if this is a new user registration (includes both Google and email sign-ups)
         if (isNewUser) {
           // Create new user with Firebase data
           const bcrypt = await import('bcrypt');
@@ -194,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             username: email,
             passwordHash: placeholderPasswordHash,
             firstName: firstName || (displayName?.split(' ')[0]) || 'User',
-            lastName: lastName || (displayName?.split(' ').slice(1).join(' ') || ''),
+            lastName: lastName || (displayName?.split(' ').slice(1).join(' ')) || '',
             phoneNumber: phone || null,
             nationality: country || null,
             profilePicture: photoURL || null,
@@ -1271,11 +1271,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .reduce((sum: number, t: any) => sum + parseFloat(t.amount), 0);
       const monthlySavings = monthlyIncome - monthlyExpenses;
 
+      // Debug logging for user name display issue
+      console.log('Dashboard user data:', {
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
+        firebaseUid: user.firebaseUid
+      });
+
       const dashboardData = {
         user: {
-          name: `${user.firstName} ${user.lastName}`,
+          name: `${user.firstName || 'First'} ${user.lastName || 'Last'}`,
           email: user.email,
-          initials: `${user.firstName[0]}${user.lastName[0]}`.toUpperCase(),
+          initials: `${(user.firstName && user.firstName[0]) || 'F'}${(user.lastName && user.lastName[0]) || 'L'}`.toUpperCase(),
         },
         accounts: {
           current: parseFloat(currentAccount?.balance || "0"),
