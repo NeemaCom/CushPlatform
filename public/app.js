@@ -5477,7 +5477,7 @@ function App() {
         
         const firebaseConfig = {
           apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "cushportal.firebaseapp.com",
+          authDomain: "portal.we-cush.com",
           projectId: "cushportal",
           storageBucket: "cushportal.firebasestorage.app",
           messagingSenderId: "304174661302",
