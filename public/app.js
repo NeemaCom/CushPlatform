@@ -13565,7 +13565,8 @@ function SignUpPage() {
             nationality: formData.nationality,
             acceptTerms: formData.acceptTerms,
             acceptPrivacy: formData.acceptPrivacy,
-            marketingConsent: formData.marketingConsent
+            marketingConsent: formData.marketingConsent,
+            isNewUser: true
           }),
         }),
         new Promise((_, reject) => 
@@ -13578,27 +13579,40 @@ function SignUpPage() {
         clearTimeout(timeoutId);
         setError('');
         
-        // Show success message briefly
-        const successMessage = document.createElement('div');
-        successMessage.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #10b981;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          z-index: 10000;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        `;
-        successMessage.textContent = 'Account created successfully! Redirecting...';
-        document.body.appendChild(successMessage);
+        // Show enhanced account creation success notification
+        if (window.showSuccessNotification) {
+          window.showSuccessNotification(`${formData.firstName} ${formData.lastName}`, 'signup');
+        } else {
+          // Fallback notification
+          const successMessage = document.createElement('div');
+          successMessage.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+            color: white;
+            padding: 16px 24px;
+            border-radius: 12px;
+            z-index: 10000;
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.4);
+            font-weight: 600;
+          `;
+          successMessage.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="font-size: 24px;">✨</div>
+              <div>
+                <div style="font-size: 16px; margin-bottom: 2px;">Welcome to CushGlobal, ${formData.firstName}!</div>
+                <div style="font-size: 14px; opacity: 0.9;">Account created successfully</div>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(successMessage);
+        }
         
-        // Remove success message and redirect
+        // Redirect after showing notification
         setTimeout(() => {
-          successMessage.remove();
           window.location.hash = 'dashboard';
-        }, 2000);
+        }, 2500);
       } else {
         throw new Error('Failed to sync user with backend');
       }

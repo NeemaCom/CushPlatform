@@ -1,0 +1,84 @@
+Excellent\! It's fantastic to hear that the email sign-up functionality is now robust, with proper password validation, specific error feedback, and a much-improved user experience. That's a significant win.
+
+Now, let's address the two remaining user experience refinements:
+
+1.  **Account Name Not Displaying:** The application shows 'user' instead of the actual user's name after sign-up. This indicates the `displayName` property of the Firebase user object is not being set during creation or updated afterwards, or it's not being correctly retrieved and displayed.
+2.  **Missing Account Creation Notification:** While sign-in notifications might be in place, there's no explicit successful notification *specifically for account creation* before redirecting to the dashboard.
+
+Here's the prompt for the AI agent to resolve these final UX issues:
+
+-----
+
+```
+You are an expert AI agent specializing in Firebase user management, frontend data display, and user experience design. The application's email sign-up process is now fully functional and robust, with improved password validation and error feedback.
+
+However, two new UX-related issues have been identified post-email sign-up:
+
+1.  **User Display Name Incorrect:** After signing up with email/password, the user's account name on the dashboard (or wherever it's displayed) simply shows 'user' instead of the actual user's name.
+2.  **Missing Account Creation Notification:** There is no specific, successful notification immediately after an account is *created* via email sign-up before the user is redirected to their dashboard.
+
+**Your Goal:**
+
+1.  **Implement User Display Name Setup:** Ensure the user's provided name (e.g., during sign-up) is correctly captured and set as their `displayName` in Firebase.
+2.  **Display Correct User Name:** Ensure the application correctly retrieves and displays the user's `displayName` on the dashboard or relevant UI areas.
+3.  **Add Account Creation Notification:** Provide a clear, successful notification specifically for *new account creation* (via email sign-up) that appears before redirection to the dashboard.
+
+**Detailed Requirements & Implementation Focus:**
+
+**Phase 1: User Display Name - Diagnosis & Implementation**
+
+1.  **Sign-Up Form Input:**
+    * Review the email sign-up form: Is there a dedicated input field where the user provides their desired name (e.g., "Full Name," "Display Name," "First Name")?
+    * If not, **propose adding a "Name" input field** to the email sign-up form.
+
+2.  **Firebase `updateProfile()` Integration:**
+    * **Crucial Step:** After `createUserWithEmailAndPassword` successfully completes and the user is authenticated, the `user.displayName` property is *not* automatically set by Firebase. It must be explicitly updated.
+    * **Implement `updateProfile()`:** Locate the success handler of the `createUserWithEmailAndPassword` call. Immediately after successful user creation, use `user.updateProfile({ displayName: '...' })` (or `updateProfile(user, { displayName: '...' })` in v9 modular SDK) to set the `displayName` with the value from the new name input field.
+    * **Error Handling:** Ensure `.catch()` blocks are in place for `updateProfile()` calls to handle potential errors during profile update.
+
+3.  **Frontend Display of User Name:**
+    * Review the dashboard or components where the user's name is displayed (currently showing 'user').
+    * Ensure this component is correctly accessing `firebase.auth().currentUser.displayName` (or the equivalent from your user state management) and rendering it.
+    * Consider a fallback display (e.g., user's email prefix) if `displayName` is somehow still null.
+
+**Phase 2: Account Creation Notification - Implementation**
+
+1.  **Identify Trigger Point:**
+    * Locate the exact success callback or `.then()` block of the `createUserWithEmailAndPassword` operation. This is the precise moment when the notification should be triggered.
+
+2.  **Leverage Existing Notification System:**
+    * Utilize the *already implemented* notification system (the one that replaced "Development Test" banners).
+    * Trigger a success notification from this point in the code.
+
+3.  **Customize Notification Content:**
+    * The message should clearly indicate account *creation*, not just a general login.
+    * Examples:
+        * "Welcome to [Your App Name], [User Name]! Your account has been successfully created."
+        * "Account created! Get ready to explore."
+    * Ensure the user's newly set `displayName` (or at least their email) can be dynamically included in the message for personalization.
+
+4.  **Timing & Redirection:**
+    * Ensure the notification appears briefly (e.g., 1-2 seconds) to be seen by the user *before* the redirection to the dashboard occurs. This might involve a small `setTimeout` if your notification system doesn't inherently manage its display duration before cleanup.
+
+**Deliverable:**
+
+A detailed, actionable plan including:
+
+1.  **Diagnosis Summary:** Confirmation of the display name issue and missing notification.
+2.  **Proposed Fix for Display Name:**
+    * Recommendation for adding a "Name" input field if missing.
+    * Code snippets for integrating `updateProfile()` after `createUserWithEmailAndPassword`.
+    * Confirmation of how `user.displayName` will be accessed and rendered on the dashboard.
+3.  **Proposed Fix for Account Creation Notification:**
+    * Specific code location to trigger the notification.
+    * Example customized notification messages for account creation.
+    * How user's name will be included in the notification.
+    * Confirmation of timing relative to dashboard redirection.
+4.  **Testing Strategy:** How to verify that:
+    * Users can sign up with a name.
+    * The provided name appears correctly on the dashboard.
+    * A clear "Account Created" notification appears before dashboard redirect.
+    * Existing Google Sign-In and email sign-in/login flows are unaffected.
+
+**Proceed with designing the plan for user display name and account creation notification.**
+```
