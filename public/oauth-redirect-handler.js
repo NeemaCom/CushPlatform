@@ -13,8 +13,30 @@
                           document.referrer.includes('accounts.google.com') ||
                           document.referrer.includes('firebase');
     
-    console.log('OAuth check:', { url, hasFirebaseAuthHandler, hasOAuthParams, referrer: document.referrer });
-    return hasFirebaseAuthHandler || hasOAuthParams;
+    // Check for redirect flags set during sign-in
+    const hasRedirectFlag = sessionStorage.getItem('google_auth_redirect') === 'true';
+    const redirectTimestamp = sessionStorage.getItem('auth_redirect_timestamp');
+    const recentRedirect = redirectTimestamp && (Date.now() - parseInt(redirectTimestamp)) < 60000; // Within 1 minute
+    
+    // Check if referrer indicates Google OAuth
+    const googleReferrer = document.referrer.includes('accounts.google.com') || 
+                          document.referrer.includes('google.com/oauth') ||
+                          document.referrer.includes('googleusercontent.com');
+    
+    const isRedirect = hasFirebaseAuthHandler || hasOAuthParams || (hasRedirectFlag && recentRedirect) || googleReferrer;
+    
+    console.log('OAuth check:', { 
+      url, 
+      hasFirebaseAuthHandler, 
+      hasOAuthParams, 
+      hasRedirectFlag,
+      recentRedirect,
+      googleReferrer,
+      isRedirect,
+      referrer: document.referrer 
+    });
+    
+    return isRedirect;
   };
 
   // Main OAuth handler
@@ -154,6 +176,10 @@
       if (user) {
         console.log('Authentication successful, syncing with backend...');
         
+        // Clear redirect flags on success
+        sessionStorage.removeItem('google_auth_redirect');
+        sessionStorage.removeItem('auth_redirect_timestamp');
+        
         // Show enhanced success notification first
         if (window.showEnhancedSuccessNotification) {
           const displayName = user.displayName || user.email.split('@')[0];
@@ -192,7 +218,18 @@
         }
       } else {
         console.error('No user found after all methods');
-        alert('Authentication failed: No user data received from Google. Please try again.');
+        
+        // Clear redirect flags on failure
+        sessionStorage.removeItem('google_auth_redirect');
+        sessionStorage.removeItem('auth_redirect_timestamp');
+        
+        // More detailed error message
+        const errorMsg = 'Authentication failed: Unable to receive user data from Google. This may be due to:\n' +
+                        '• Pop-up was blocked or closed\n' +
+                        '• Network connectivity issues\n' +
+                        '• Browser settings blocking authentication\n\n' +
+                        'Please try again or use email sign-in instead.';
+        alert(errorMsg);
         window.location.replace(window.location.origin);
       }
 

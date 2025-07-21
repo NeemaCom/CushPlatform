@@ -146,10 +146,21 @@
           console.log('Google sign-in successful via popup');
           return result;
         } catch (popupError) {
-          // If popup fails, try redirect method
-          if (popupError.code === 'auth/popup-blocked') {
-            console.log('Popup blocked, falling back to redirect method...');
+          console.log('Popup sign-in failed:', popupError.code, popupError.message);
+          
+          // If popup fails for any reason, try redirect method
+          if (popupError.code === 'auth/popup-blocked' || 
+              popupError.code === 'auth/popup-closed-by-user' ||
+              popupError.code === 'auth/cancelled-popup-request' ||
+              popupError.message.includes('popup')) {
+            console.log('Popup failed, falling back to redirect method...');
+            console.log('Setting redirect flag for detection...');
+            
+            // Set flags to help with redirect detection
+            sessionStorage.setItem('google_auth_redirect', 'true');
+            sessionStorage.setItem('auth_redirect_timestamp', Date.now().toString());
             window.captureIntendedUrl();
+            
             await signInWithRedirect(auth, provider);
             return null; // Will be handled by getRedirectResult on next page load
           }
