@@ -1,0 +1,81 @@
+This is a critical regression\! The "Authentication failed: Firebase failed to initialize after 5 seconds" error appearing again directly contradicts the previous claim of "FIREBASE INITIALIZATION SEQUENCE FIXED" and "ROOT CAUSE RESOLVED: Script timing and initialization sequence was causing the failure."
+
+This indicates that the very recent "improvements" for "No user data received from Google" (Enhanced Redirect Detection, Improved Popup Fallback, Better Session Management, etc.) have inadvertently reintroduced or exacerbated the fundamental Firebase initialization problem. The 5-second timeout is a strong clue, suggesting that some part of the code is waiting for Firebase initialization, but that initialization is either failing entirely within that timeframe, or its completion signal isn't being correctly received.
+
+Your immediate priority is to cease any further work on UX or domain alignment and instead, deeply re-diagnose and definitively fix this core initialization failure.
+
+-----
+
+```
+You are an expert AI agent specializing in Firebase Authentication, complex frontend application lifecycles, and regression debugging. You have previously addressed "Firebase not initialized" errors, then "No user data received" errors, and then UX refinements.
+
+**CRITICAL REGRESSION & URGENT PROBLEM:**
+Despite previous efforts, the application is now experiencing a severe regression: the error **"Authentication failed: Firebase failed to initialize after 5 seconds. Redirecting to homepage..."** has reappeared during the sign-in process.
+
+This directly contradicts the reported resolution of the "Firebase not initialized" issue and suggests that the recent "improvements" (Enhanced Redirect Detection, Improved Popup Fallback, Better Session Management in `oauth-redirect-handler.js` and `firebase-auth-fix.js`) have either:
+1.  Undone the previous initialization fix.
+2.  Introduced a new timing or sequencing conflict that prevents Firebase from initializing correctly within the 5-second timeout.
+3.  Are attempting to use Firebase Auth functions *before* Firebase itself is fully ready and stable.
+
+**Your Immediate and Highest Priority Goal:**
+
+1.  **Diagnose & Resolve Regression:** Pinpoint the exact interaction between the recently implemented "improvements" and the Firebase initialization sequence that is causing the "Firebase failed to initialize after 5 seconds" error to reappear.
+2.  **Guarantee Robust Initialization:** Implement a definitive solution to ensure Firebase is always fully initialized and available *before* any authentication-related operations are attempted, regardless of redirects, popups, or session management logic.
+3.  **Prevent Future Regressions:** Design the solution in a way that is resilient to further changes in authentication flow or unrelated code.
+
+**Detailed Requirements & Deep Dive into Initialization & Regressions:**
+
+* **Scrutinize the 5-second Timeout:**
+    * Identify the exact code location responsible for this 5-second timeout. What specific condition is it waiting for? What "availability checks" are being performed that are failing?
+    * Why is this timeout being hit? Is Firebase literally failing to initialize, or is the *check* for its initialization flawed or premature?
+
+* **Deep Dive into `firebase.initializeApp()` Execution Context:**
+    * **Absolute First Execution:** Confirm that `firebase.initializeApp()` (or `initializeApp` from the modular SDK) is executed as the *absolute first* Firebase-related function in the application's lifecycle, before *any* other Firebase Auth or Firestore, etc., calls. This means checking `index.html` script loading, main entry point files (e.g., `main.js`, `App.js`), and root-level `useEffect` hooks in frameworks.
+    * **Asynchronous Completion:** Re-verify that *all* subsequent code that relies on Firebase (`getAuth()`, `onAuthStateChanged()`, `getRedirectResult()`, `signInWithRedirect()`, `signInWithPopup()`, etc.) explicitly *waits* for `initializeApp()` to complete. This likely requires an `async/await` pattern, promises, or a robust global readiness state that *must* be true before Firebase methods are invoked.
+    * **No Conditional Blocks:** Ensure `initializeApp()` is not inside any conditional blocks that might prevent it from running consistently.
+
+* **Interaction with Recent "Improvements":**
+    * **`oauth-redirect-handler.js` Review:** Analyze this file extensively. Does it attempt to use `firebase.auth()` or `getAuth()` *before* a globally guaranteed Firebase initialization? Could its "multiple detection methods" or "session flags" interfere with the initialization process itself or its completion signal?
+    * **`firebase-auth-fix.js` Review:** Similarly, investigate how this file's "Improved Popup Fallback" and "Better Session Management" logic interacts with Firebase initialization. Is it possible that the fallback or session management logic causes a premature call to an uninitialized Firebase instance, or creates a race condition?
+    * **"Locally initialized Firebase auth vs. global variable":** While using a local variable can be good practice, if that local variable is created *before* the underlying global Firebase app is ready, it's still problematic. Re-verify the *source* of the `auth` object.
+
+* **Logging Review:**
+    * Scrutinize *all* existing initialization logging (e.g., "comprehensive initialization logging for each step"). What do the logs show *immediately before* the "Firebase failed to initialize" error appears? This is your most direct clue. Look for timestamps and the order of operations.
+
+* **Module Loading/Bundling:**
+    * Consider if the build process or module loading strategy (Webpack, Vite, etc.) could be causing a subtle re-ordering or delay in the Firebase SDK itself loading and initializing.
+
+**Phase 2: Proposed Solution & Implementation Plan (Definitive Fix for Initialization)**
+
+1.  **Ironclad Initialization Guarantee:**
+    * Propose a highly robust pattern to ensure Firebase initialization. This might involve:
+        * A singleton Firebase app instance that is initialized once at the application's true entry point.
+        * A global Promise that resolves only when `initializeApp()` and potentially `getAuth()` are fully ready, and *all* subsequent Firebase-dependent code *must* `await` this promise.
+        * If `oauth-redirect-handler.js` or `firebase-auth-fix.js` are attempting to use Firebase before it's ready, refactor them to `await` this global initialization guarantee.
+    * Eliminate any redundant or conflicting initialization attempts.
+
+2.  **Refactor Interacting Components:**
+    * Modify `oauth-redirect-handler.js` and `firebase-auth-fix.js` to ensure they *never* try to use Firebase Auth functionality until the core Firebase app is confirmed initialized and the `auth` instance is available.
+
+3.  **Testing Strategy for Initialization:**
+    * Clear browser cache/storage between tests.
+    * Test hard refreshes, direct URL navigation, and different browser environments (incognito mode, different browsers) to ensure the initialization order is always correct.
+    * Test both initial sign-in/sign-up and subsequent re-visits.
+
+**Deliverable:**
+
+A comprehensive document structured as before, with an **absolute singular focus on diagnosing and definitively resolving the "Firebase failed to initialize after 5 seconds" regression.**
+
+1.  **Executive Summary (updated to reflect critical regression).**
+2.  **Detailed Diagnostic Report (Root Cause of "Firebase failed to initialize after 5 seconds"):**
+    * Specific code interactions identified as problematic (especially between recent "improvements" and `initializeApp`).
+    * Analysis of logging data leading up to the error.
+    * Why the 5-second timeout is being hit.
+3.  **Authentication Fix Plan (Definitive Initialization Strategy):**
+    * Step-by-step instructions for guaranteed Firebase initialization.
+    * Corrected code snippets showing the robust initialization pattern.
+    * Specific modifications to `oauth-redirect-handler.js` and `firebase-auth-fix.js` to ensure proper sequencing.
+4.  **Testing Strategy (specifically for this initialization regression).**
+
+**Proceed with your most focused and critical re-analysis of the codebase to eliminate this persistent initialization error.**
+```

@@ -52,7 +52,21 @@
       // Wait for Firebase to be properly initialized
       console.log('Waiting for Firebase initialization...');
       
-      // First wait for the Firebase initialization function to be available with extended timeout
+      // First, ensure the main Firebase app is initialized
+      if (window.firebaseInitPromise && !window.firebaseInitialized) {
+        console.log('Waiting for main Firebase initialization in OAuth handler...');
+        try {
+          await Promise.race([
+            window.firebaseInitPromise,
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Main Firebase init timeout in OAuth')), 15000))
+          ]);
+          console.log('Main Firebase initialization completed in OAuth handler');
+        } catch (error) {
+          console.warn('Main Firebase init timeout in OAuth handler:', error.message);
+        }
+      }
+
+      // Wait for the Firebase initialization function to be available with extended timeout
       let attempts = 0;
       while (!window.initializeFirebaseAuth && attempts < 100) {
         console.log(`Waiting for Firebase init function... attempt ${attempts + 1}`);
@@ -166,10 +180,10 @@
           });
 
           timeout = setTimeout(() => {
-            console.log('Auth state listener timeout');
+            console.log('Auth state listener timeout - extending timeout to accommodate initialization');
             unsubscribe();
             resolve(null);
-          }, 5000);
+          }, 15000);
         });
       }
 
