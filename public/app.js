@@ -13188,6 +13188,8 @@ function SignUpPage() {
         return 'This sign-in method is not enabled';
       case 'auth/weak-password':
         return 'Password should be at least 6 characters';
+      case 'auth/password-does-not-meet-requirements':
+        return 'Password must be at least 6 characters and include a mix of letters, numbers, and special characters';
       case 'auth/email-already-in-use':
         return 'An account with this email already exists';
       case 'auth/unauthorized-domain':
@@ -13196,7 +13198,12 @@ function SignUpPage() {
         return 'Sign-in was cancelled';
       case 'auth/cancelled-popup-request':
         return 'Sign-in was cancelled';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection and try again';
+      case 'auth/invalid-credential':
+        return 'Invalid email or password. Please check your credentials and try again';
       default:
+        console.error('Unhandled Firebase error code:', errorCode);
         return 'An authentication error occurred. Please try again.';
     }
   };
@@ -13268,27 +13275,38 @@ function SignUpPage() {
 
   const calculatePasswordStrength = (password) => {
     let score = 0;
-    let feedback = '';
+    const requirements = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      number: /[0-9]/.test(password),
+      special: /[^A-Za-z0-9]/.test(password)
+    };
     
-    if (password.length >= 8) score += 25;
-    if (password.match(/[a-z]/)) score += 15;
-    if (password.match(/[A-Z]/)) score += 15;
-    if (password.match(/[0-9]/)) score += 15;
-    if (password.match(/[^A-Za-z0-9]/)) score += 30;
+    if (requirements.length) score += 25;
+    if (requirements.lowercase) score += 15;
+    if (requirements.uppercase) score += 15;
+    if (requirements.number) score += 15;
+    if (requirements.special) score += 30;
+    
+    let feedback = '';
+    let color = 'bg-gray-200';
     
     if (score < 30) {
-      feedback = 'Weak password';
-      return { score, feedback, color: 'bg-red-500' };
+      feedback = 'Very Weak - Add more characters and complexity';
+      color = 'bg-red-500';
     } else if (score < 60) {
-      feedback = 'Fair password';
-      return { score, feedback, color: 'bg-yellow-500' };
+      feedback = 'Weak - Add uppercase, numbers, and special characters';
+      color = 'bg-orange-500';
     } else if (score < 80) {
-      feedback = 'Good password';
-      return { score, feedback, color: 'bg-blue-500' };
+      feedback = 'Good - Consider adding special characters';
+      color = 'bg-yellow-500';
     } else {
-      feedback = 'Strong password';
-      return { score, feedback, color: 'bg-green-500' };
+      feedback = 'Strong - Great password!';
+      color = 'bg-green-500';
     }
+    
+    return { score, feedback, color, requirements };
   };
 
   const validateField = (field, value) => {
@@ -13338,6 +13356,21 @@ function SignUpPage() {
         if (!value) {
           validation.isValid = false;
           validation.message = 'Password is required';
+        } else if (value.length < 8) {
+          validation.isValid = false;
+          validation.message = 'Password must be at least 8 characters long';
+        } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(value)) {
+          validation.isValid = false;
+          validation.message = 'Password must include uppercase, lowercase, number, and special character';
+        }
+        break;
+      case 'confirmPassword':
+        if (!value) {
+          validation.isValid = false;
+          validation.message = 'Please confirm your password';
+        } else if (value !== formData.password) {
+          validation.isValid = false;
+          validation.message = 'Passwords do not match';
         } else if (value.length < 8) {
           validation.isValid = false;
           validation.message = 'Password must be at least 8 characters';
