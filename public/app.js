@@ -13602,16 +13602,16 @@ function SignUpPage() {
               <div style="font-size: 24px;">✨</div>
               <div>
                 <div style="font-size: 16px; margin-bottom: 2px;">Welcome to CushGlobal, ${formData.firstName}!</div>
-                <div style="font-size: 14px; opacity: 0.9;">Account created successfully</div>
+                <div style="font-size: 14px; opacity: 0.9;">Account created successfully - Please sign in to continue</div>
               </div>
             </div>
           `;
           document.body.appendChild(successMessage);
         }
         
-        // Redirect after showing notification
+        // Redirect to sign-in page after successful account creation
         setTimeout(() => {
-          window.location.hash = 'dashboard';
+          window.location.hash = 'signin';
         }, 2500);
       } else {
         throw new Error('Failed to sync user with backend');
@@ -13680,7 +13680,16 @@ function SignUpPage() {
         
         if (backendUser) {
           console.log('Google sign-up completed successfully');
-          window.navigate('dashboard');
+          
+          // Show success notification for Google sign-up
+          if (window.showSuccessNotification) {
+            window.showSuccessNotification(result.user.displayName || result.user.email.split('@')[0], 'signup');
+          }
+          
+          // Redirect to sign-in page after account creation
+          setTimeout(() => {
+            window.navigate('signin');
+          }, 2500);
         }
       }
       // If result is null, it means redirect method was used

@@ -49,7 +49,7 @@
     } else if (type === 'signup') {
       icon = '✨';
       title = userName ? `Welcome to CushGlobal, ${userName.split(' ')[0]}!` : 'Welcome to CushGlobal!';
-      subtitle = 'Account created successfully';
+      subtitle = 'Account created successfully - Please sign in to continue';
     } else {
       icon = '🔐';
       title = 'Authentication Successful';
