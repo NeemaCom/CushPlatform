@@ -158,17 +158,31 @@
     
     console.log('Setting up comprehensive auth completion handler...');
     
-    // Wait for Firebase to be fully initialized
+    // Wait for Firebase to be fully initialized with extended timeout
     let attempts = 0;
-    while (!window.firebaseAuth && attempts < 50) {
+    while (!window.firebaseAuth && attempts < 100) {
       await new Promise(resolve => setTimeout(resolve, 100));
       attempts++;
     }
     
     if (!window.firebaseAuth) {
-      console.error('Firebase auth not available after waiting 5 seconds');
-      window.location.replace(window.location.origin + '/?error=firebase_timeout');
-      return;
+      console.error('Firebase auth not available after waiting 10 seconds');
+      console.log('Attempting to initialize Firebase auth directly...');
+      
+      try {
+        const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+        if (window.firebaseApp) {
+          window.firebaseAuth = getAuth(window.firebaseApp);
+          console.log('Firebase auth initialized directly from app');
+        } else {
+          window.location.replace(window.location.origin + '/?error=firebase_timeout');
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to initialize Firebase auth:', error);
+        window.location.replace(window.location.origin + '/?error=firebase_timeout');
+        return;
+      }
     }
     
     try {
