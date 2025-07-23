@@ -52,69 +52,20 @@
       // Wait for Firebase to be properly initialized
       console.log('Waiting for Firebase initialization...');
       
-      // First, ensure the main Firebase app is initialized
-      if (window.firebaseInitPromise && !window.firebaseInitialized) {
-        console.log('Waiting for main Firebase initialization in OAuth handler...');
-        try {
-          await Promise.race([
-            window.firebaseInitPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Main Firebase init timeout in OAuth')), 15000))
-          ]);
-          console.log('Main Firebase initialization completed in OAuth handler');
-        } catch (error) {
-          console.warn('Main Firebase init timeout in OAuth handler:', error.message);
-        }
+      // Use the centralized Firebase initialization coordinator
+      let firebaseAuth;
+      try {
+        console.log('Using Firebase initialization coordinator in OAuth handler...');
+        firebaseAuth = await window.waitForFirebase('oauth-redirect-handler', 30000);
+        console.log('Firebase successfully initialized for OAuth handler');
+      } catch (error) {
+        console.error('Firebase initialization failed in OAuth handler:', error.message);
+        alert(`Authentication failed: ${error.message}. Redirecting to homepage...`);
+        window.location.replace(window.location.origin);
+        return;
       }
 
-      // Wait for the Firebase initialization function to be available with extended timeout
-      let attempts = 0;
-      while (!window.initializeFirebaseAuth && attempts < 100) {
-        console.log(`Waiting for Firebase init function... attempt ${attempts + 1}`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!window.initializeFirebaseAuth) {
-        console.error('Firebase initialization function not available after 10 seconds');
-        console.log('Attempting to check for direct Firebase availability...');
-        
-        // Check if Firebase is already initialized without the helper function
-        if (window.firebaseAuth) {
-          console.log('Firebase auth found, proceeding with authentication...');
-        } else if (window.firebaseApp) {
-          console.log('Firebase app found, initializing auth...');
-          try {
-            const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-            window.firebaseAuth = getAuth(window.firebaseApp);
-            console.log('Firebase auth initialized from existing app');
-          } catch (error) {
-            console.error('Failed to initialize Firebase auth from app:', error);
-            alert('Authentication failed: Firebase initialization timeout. Redirecting to homepage...');
-            window.location.replace(window.location.origin);
-            return;
-          }
-        } else {
-          alert('Authentication failed: Firebase initialization timeout. Redirecting to homepage...');
-          window.location.replace(window.location.origin);
-          return;
-        }
-      }
-
-      // Now initialize Firebase properly or use existing
-      let firebaseAuth = window.firebaseAuth;
-      
-      if (!firebaseAuth && window.initializeFirebaseAuth) {
-        try {
-          console.log('Initializing Firebase...');
-          firebaseAuth = await window.initializeFirebaseAuth();
-        } catch (initError) {
-          console.error('Firebase initialization failed:', initError);
-          alert(`Authentication failed: ${initError.message}. Redirecting to homepage...`);
-          window.location.replace(window.location.origin);
-          return;
-        }
-      }
-
+      // Verify Firebase auth is available
       if (!firebaseAuth) {
         console.error('Firebase auth not available after initialization');
         alert('Authentication failed: Firebase auth not initialized. Redirecting to homepage...');
