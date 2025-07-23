@@ -1,0 +1,1 @@
+console.log('Clearing OAuth flags on load'); sessionStorage.removeItem('google_auth_redirect'); sessionStorage.removeItem('auth_redirect_timestamp'); sessionStorage.removeItem('firebase_auth_result');

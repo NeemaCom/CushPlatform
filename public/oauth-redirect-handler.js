@@ -4,36 +4,37 @@
 (function() {
   console.log('OAuth Redirect Handler loaded');
 
-  // Enhanced OAuth redirect detection
+  // Enhanced OAuth redirect detection - more restrictive to prevent false positives
   const isOAuthReturn = () => {
     const url = window.location.href;
-    const hasFirebaseAuthHandler = url.includes('__/auth/handler') || url.includes('firebaseapp.com');
-    const hasOAuthParams = url.includes('apiKey=') || 
-                          url.includes('authType=signInViaRedirect') ||
-                          document.referrer.includes('accounts.google.com') ||
-                          document.referrer.includes('firebase');
     
-    // Check for redirect flags set during sign-in
+    // Only specific Firebase auth handler URLs
+    const hasFirebaseAuthHandler = url.includes('__/auth/handler');
+    
+    // Very specific OAuth params that indicate an actual redirect
+    const hasSpecificOAuthParams = url.includes('authType=signInViaRedirect') && url.includes('apiKey=');
+    
+    // Check for redirect flags - must be present and recent
     const hasRedirectFlag = sessionStorage.getItem('google_auth_redirect') === 'true';
     const redirectTimestamp = sessionStorage.getItem('auth_redirect_timestamp');
-    const recentRedirect = redirectTimestamp && (Date.now() - parseInt(redirectTimestamp)) < 60000; // Within 1 minute
+    const recentRedirect = redirectTimestamp && (Date.now() - parseInt(redirectTimestamp)) < 120000; // 2 minutes
     
-    // Check if referrer indicates Google OAuth
-    const googleReferrer = document.referrer.includes('accounts.google.com') || 
-                          document.referrer.includes('google.com/oauth') ||
-                          document.referrer.includes('googleusercontent.com');
+    // Direct referrer from Google accounts only
+    const isFromGoogleAccounts = document.referrer.includes('accounts.google.com');
     
-    const isRedirect = hasFirebaseAuthHandler || hasOAuthParams || (hasRedirectFlag && recentRedirect) || googleReferrer;
+    // Much more restrictive: require BOTH specific indicators AND recent redirect flag
+    const isRedirect = (hasFirebaseAuthHandler || hasSpecificOAuthParams || isFromGoogleAccounts) && 
+                      hasRedirectFlag && recentRedirect;
     
-    console.log('OAuth check:', { 
-      url, 
+    console.log('OAuth detection (restrictive):', { 
+      url: url.substring(0, 100) + '...', 
       hasFirebaseAuthHandler, 
-      hasOAuthParams, 
+      hasSpecificOAuthParams, 
       hasRedirectFlag,
       recentRedirect,
-      googleReferrer,
+      isFromGoogleAccounts,
       isRedirect,
-      referrer: document.referrer 
+      referrer: document.referrer.substring(0, 100) 
     });
     
     return isRedirect;
