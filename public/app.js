@@ -5487,8 +5487,29 @@ function App() {
                 checkBackendAuth();
               }
             } else {
-              // No Firebase user, check backend directly
-              checkBackendAuth();
+              console.log('Auth state changed:', 'null');
+              setUser(null);
+              setIsLoading(false);
+              
+              // If user signed out and is on a protected route, redirect to homepage
+              const currentHash = window.location.hash;
+              const isOnProtectedRoute = currentHash.startsWith('#dashboard') || 
+                                       currentHash.startsWith('#account') ||
+                                       currentHash.startsWith('#loans') ||
+                                       currentHash.startsWith('#community') ||
+                                       currentHash.startsWith('#railsr-pay') ||
+                                       currentHash.startsWith('#admin');
+              
+              if (isOnProtectedRoute) {
+                console.log('User signed out from protected route, redirecting to homepage');
+                window.location.hash = '';
+                setTimeout(() => {
+                  window.location.href = window.location.origin;
+                }, 100);
+              } else {
+                // No Firebase user, check backend directly for non-protected routes
+                checkBackendAuth();
+              }
             }
           });
           
@@ -5712,19 +5733,25 @@ function App() {
       // Step 4: Clear user state
       setUser(null);
       
-      // Step 5: Guaranteed redirection with multiple fallbacks
+      // Step 5: Guaranteed redirection to homepage (not dashboard)
       try {
-        window.location.href = '/';
+        // Clear the hash first to prevent dashboard redirect
+        window.location.hash = '';
         
+        // Force redirect to homepage
         setTimeout(() => {
-          if (window.location.hash !== '' && window.location.hash !== '#') {
-            window.location.hash = '';
-            window.location.reload();
-          }
+          window.location.href = window.location.origin;
         }, 100);
         
+        // Backup redirection methods
         setTimeout(() => {
-          window.location.replace('/');
+          window.location.replace(window.location.origin);
+        }, 300);
+        
+        setTimeout(() => {
+          if (window.location.pathname !== '/' || window.location.hash !== '') {
+            window.location.assign(window.location.origin + '/');
+          }
         }, 500);
         
       } catch (redirectError) {
@@ -5968,11 +5995,11 @@ function App() {
   const currentHash = window.location.hash;
   const shouldShowDashboard = user && (
     currentHash === '#dashboard' || 
-    currentHash === '#' || 
-    currentHash === '' || 
+    (currentHash === '#' && user) || 
+    (currentHash === '' && user) || 
     currentHash === '#home' ||
-    // If user is authenticated and no specific route is set, show dashboard
-    (user && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms'))
+    // Only show dashboard for authenticated users on specific dashboard routes
+    (user && currentHash.startsWith('#') && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms') && currentHash !== '#')
   );
   
   return e('div', { key: 'app-container' }, [
