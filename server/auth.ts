@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { SecurityLogger } from "./security";
+import { firebaseAdminService } from "./firebase-admin-service";
 import type { User, SafeUser } from "@shared/schema";
 
 declare module "express-session" {
@@ -23,7 +24,44 @@ export async function isAuthenticated(
   next: NextFunction
 ): Promise<void> {
   try {
-    const userId = req.session.userId;
+    let userId = req.session.userId;
+    let user: User | null = null;
+    
+    // First, try Firebase ID token authentication
+    const authHeader = req.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const idToken = authHeader.substring(7);
+      
+      try {
+        const decodedToken = await firebaseAdminService.verifyIdToken(idToken);
+        if (decodedToken && decodedToken.uid) {
+          console.log('🔑 Valid Firebase token received for:', decodedToken.email);
+          
+          // Find user by Firebase UID
+          user = await storage.getUserByFirebaseUid(decodedToken.uid);
+          if (user) {
+            userId = user.id;
+            
+            // Update session for future requests
+            req.session.userId = user.id;
+            req.session.role = user.role || 'customer';
+            req.session.lastActivity = Date.now();
+            
+            console.log('✅ Firebase authentication successful for user:', user.email);
+          } else {
+            console.log('❌ No user found for Firebase UID:', decodedToken.uid);
+          }
+        }
+      } catch (firebaseError) {
+        console.error('❌ Firebase token verification failed:', firebaseError);
+        // Continue to session-based authentication
+      }
+    }
+    
+    // Fallback to session-based authentication
+    if (!userId) {
+      userId = req.session.userId;
+    }
     
     if (!userId) {
       SecurityLogger.logAuthEvent(
@@ -65,8 +103,10 @@ export async function isAuthenticated(
     // Update last activity
     req.session.lastActivity = now;
 
-    // Get user data
-    const user = await storage.getUser(userId);
+    // Get user data (if not already retrieved from Firebase)
+    if (!user) {
+      user = await storage.getUser(userId);
+    }
     if (!user) {
       req.session.destroy((err) => {
         if (err) {
@@ -103,6 +143,9 @@ export async function isAuthenticated(
       acceptTerms: user.acceptTerms,
       acceptPrivacy: user.acceptPrivacy,
       marketingConsent: user.marketingConsent,
+      firebaseUid: user.firebaseUid,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
       mfaEnabled: user.mfaEnabled,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,

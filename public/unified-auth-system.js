@@ -120,7 +120,7 @@
           emailVerified: result.user.emailVerified
         };
         
-        // Sync with backend
+        // Sync with backend using token manager
         const backendUser = await window.syncFirebaseUserWithBackend(result.user, false);
         
         if (backendUser) {
@@ -132,14 +132,14 @@
             window.showEnhancedSuccessNotification(displayName, 'login');
           }
           
-          // Verify session establishment
+          // Verify session establishment with token
           let sessionVerified = false;
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
-              const meResponse = await fetch('/api/auth/me', { credentials: 'include' });
-              if (meResponse.ok) {
+              const userData = await window.checkBackendAuth();
+              if (userData) {
                 sessionVerified = true;
-                console.log('✅ Session verified');
+                console.log('✅ Session verified with token authentication');
                 break;
               }
               console.log(`⏳ Session verification attempt ${attempt + 1} failed, retrying...`);
