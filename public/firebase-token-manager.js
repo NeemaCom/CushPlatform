@@ -92,7 +92,8 @@
     };
     
     try {
-      const response = await fetch(url, enhancedOptions);
+      // Use original fetch to prevent infinite recursion
+      const response = await originalFetch(url, enhancedOptions);
       
       // If we get 401, try refreshing token once
       if (response.status === 401 && token) {
@@ -102,7 +103,7 @@
         if (refreshedToken && refreshedToken !== token) {
           console.log('🔄 Retrying request with refreshed token...');
           enhancedOptions.headers['Authorization'] = `Bearer ${refreshedToken}`;
-          return await fetch(url, enhancedOptions);
+          return await originalFetch(url, enhancedOptions);
         }
       }
       
@@ -175,6 +176,7 @@
   window.fetch = async (url, options = {}) => {
     // Only enhance API calls to our backend
     if (typeof url === 'string' && url.startsWith('/api/')) {
+      console.log('🔄 Intercepting API call:', url);
       return authenticatedFetch(url, options);
     }
     
