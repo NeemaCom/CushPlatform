@@ -50,86 +50,13 @@
     return errorMessages[error.code] || error.message || 'Authentication failed. Please try again.';
   };
 
-  // Robust Firebase initialization with fallback
+  // Use the centralized Firebase initialization coordinator
   window.initializeFirebaseAuth = async () => {
     try {
-      // First, wait for the main Firebase initialization
-      if (window.firebaseInitPromise && !window.firebaseInitialized) {
-        console.log('Waiting for main Firebase initialization in auth-fix...');
-        try {
-          await Promise.race([
-            window.firebaseInitPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Main Firebase init timeout in auth-fix')), 15000))
-          ]);
-          console.log('Main Firebase initialization completed in auth-fix');
-        } catch (error) {
-          console.warn('Main Firebase init timeout in auth-fix:', error.message);
-        }
-      }
-
-      // Wait for Firebase SDK to load with longer timeout
-      let attempts = 0;
-      while (!window.firebaseApp && attempts < 100) {
-        console.log(`Waiting for firebaseApp... attempt ${attempts + 1}`);
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!window.firebaseApp) {
-        console.error('Firebase app not available, trying to initialize directly...');
-        
-        // Try to initialize Firebase directly if the main app hasn't done it yet
-        try {
-          const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-          const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-          
-          const firebaseConfig = {
-            apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-            authDomain: "portal.we-cush.com",
-            projectId: "cushportal",
-            storageBucket: "cushportal.firebasestorage.app",
-            messagingSenderId: "304174661302",
-            appId: "1:304174661302:web:8bc1e5f413aae91336f017",
-            measurementId: "G-VGYNJNCJ2F"
-          };
-          
-          const app = initializeApp(firebaseConfig);
-          const auth = getAuth(app);
-          
-          window.firebaseApp = app;
-          window.firebaseAuth = auth;
-          
-          console.log('Firebase initialized directly in auth-fix module');
-        } catch (directInitError) {
-          throw new Error('Firebase failed to initialize after 10 seconds - ' + directInitError.message);
-        }
-      }
-
-      // Ensure firebaseAuth is available
-      if (!window.firebaseAuth) {
-        console.log('firebaseAuth not set, waiting...');
-        attempts = 0;
-        while (!window.firebaseAuth && attempts < 30) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          attempts++;
-        }
-      }
-
-      if (!window.firebaseAuth) {
-        console.error('Firebase Auth still not available, trying to get it from app...');
-        if (window.firebaseApp) {
-          const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-          window.firebaseAuth = getAuth(window.firebaseApp);
-          console.log('Firebase Auth retrieved from app');
-        } else {
-          throw new Error('Firebase Auth not available after extended initialization');
-        }
-      }
-
-      console.log('Firebase Auth initialization successful');
-      return window.firebaseAuth;
+      console.log('firebase-auth-fix using centralized coordinator...');
+      return await window.waitForFirebase('firebase-auth-fix', 25000);
     } catch (error) {
-      console.error('Firebase initialization error:', error);
+      console.error('Firebase initialization error in auth-fix:', error);
       throw error;
     }
   };

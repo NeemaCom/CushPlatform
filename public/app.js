@@ -5464,96 +5464,48 @@ function App() {
 
   // Initialize Firebase and setup authentication
   useEffect(() => {
-    const initializeFirebase = async () => {
+    const initializeApp = async () => {
       try {
-        // Import Firebase from the CDN
-        const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-        const { getAuth, onAuthStateChanged, getRedirectResult } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-        const { getAnalytics, logEvent } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js');
-        
-        // Use the actual domain we're running on for development
-        const currentDomain = window.location.hostname;
-        const isDevelopment = currentDomain.includes('replit.dev') || currentDomain.includes('localhost');
-        
-        const firebaseConfig = {
-          apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-          authDomain: "portal.we-cush.com",
-          projectId: "cushportal",
-          storageBucket: "cushportal.firebasestorage.app",
-          messagingSenderId: "304174661302",
-          appId: "1:304174661302:web:8bc1e5f413aae91336f017",
-          measurementId: "G-VGYNJNCJ2F"
-        };
-        
-        console.log('Firebase config - authDomain:', firebaseConfig.authDomain);
-        console.log('Current domain:', currentDomain, 'isDevelopment:', isDevelopment);
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        
-        // Initialize Firebase Analytics
-        let analytics = null;
-        try {
-          analytics = getAnalytics(app);
-          console.log('Firebase Analytics initialized successfully');
-        } catch (analyticsError) {
-          console.warn('Firebase Analytics initialization failed:', analyticsError.message);
-        }
-        
-        // Store Firebase instances globally
-        window.firebaseApp = app;
-        window.firebaseAuth = auth;
-        window.firebaseAnalytics = analytics;
-        
-        console.log('Firebase initialized successfully');
-        
-        // The new firebase-routing-fix.js module handles redirect results and routing conflicts
-        
-        // Listen for auth state changes
-        onAuthStateChanged(auth, async (firebaseUser) => {
-          console.log('Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
+        // Initialize Firebase using the centralized coordinator
+        if (window.initializeFirebaseOnce) {
+          const auth = await window.initializeFirebaseOnce();
+          console.log('Firebase initialization completed in App component');
           
-          if (firebaseUser) {
-            // Try to sync with backend
-            try {
-              await handleFirebaseUser(firebaseUser);
-            } catch (syncError) {
-              console.error('Firebase sync error:', syncError);
-              // Still check if user exists in backend
+          // Set up auth state listener with the initialized auth instance
+          const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+          
+          onAuthStateChanged(auth, async (firebaseUser) => {
+            console.log('Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
+            
+            if (firebaseUser) {
+              // Try to sync with backend
+              try {
+                await handleFirebaseUser(firebaseUser);
+              } catch (syncError) {
+                console.error('Firebase sync error:', syncError);
+                // Still check if user exists in backend
+                checkBackendAuth();
+              }
+            } else {
+              // No Firebase user, check backend directly
               checkBackendAuth();
             }
-          } else {
-            // No Firebase user, check backend directly
-            checkBackendAuth();
-          }
-        });
-        
-        console.log('Firebase initialization completed - resolving promise');
-        setFirebaseInitialized(true);
-        window.firebaseInitialized = true;
-        if (window.firebaseInitResolve) {
-          window.firebaseInitResolve();
+          });
+          
+          setFirebaseInitialized(true);
+          
+        } else {
+          console.warn('Firebase coordinator not loaded, falling back to backend auth');
+          checkBackendAuth();
         }
       } catch (error) {
-        console.error('Firebase initialization error:', error);
-        window.firebaseInitialized = false;
-        if (window.firebaseInitReject) {
-          window.firebaseInitReject(error);
-        }
+        console.error('Firebase initialization failed in App component:', error);
         // Fallback to backend auth check
         checkBackendAuth();
       }
     };
-
-    // Create a promise that other modules can wait for - must be created BEFORE initialization starts
-    if (!window.firebaseInitPromise) {
-      window.firebaseInitPromise = new Promise((resolve, reject) => {
-        window.firebaseInitResolve = resolve;
-        window.firebaseInitReject = reject;
-      });
-    }
-
-    initializeFirebase();
+    
+    initializeApp();
 
     const handleFirebaseUser = async (firebaseUser) => {
       try {
@@ -5628,7 +5580,6 @@ function App() {
       }
     };
 
-    initializeFirebase();
   }, []);
 
   // PWA Installation Logic
