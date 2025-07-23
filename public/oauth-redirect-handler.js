@@ -52,15 +52,36 @@
       // Wait for Firebase to be properly initialized
       console.log('Waiting for Firebase initialization...');
       
-      // Use the centralized Firebase initialization coordinator
+      // Use the centralized Firebase initialization coordinator with cross-browser support
       let firebaseAuth;
       try {
         console.log('Using Firebase initialization coordinator in OAuth handler...');
-        firebaseAuth = await window.waitForFirebase('oauth-redirect-handler', 30000);
+        
+        // Set up browser compatibility if available
+        if (window.browserCompatibilitySetup) {
+          window.browserCompatibilitySetup();
+        }
+        
+        // Use browser-specific timeout
+        const browserInfo = window.browserInfo || {};
+        const timeout = browserInfo.isSafari ? 20000 : 30000; // Shorter timeout for Safari
+        
+        firebaseAuth = await window.waitForFirebase('oauth-redirect-handler', timeout);
         console.log('Firebase successfully initialized for OAuth handler');
       } catch (error) {
         console.error('Firebase initialization failed in OAuth handler:', error.message);
-        alert(`Authentication failed: ${error.message}. Redirecting to homepage...`);
+        
+        // Browser-specific error messages
+        const browserInfo = window.browserInfo || {};
+        let errorMessage = 'Authentication failed: ' + error.message;
+        
+        if (browserInfo.isSafari) {
+          errorMessage += '\n\nSafari users: Please ensure cookies are enabled and try again.';
+        } else if (browserInfo.isFirefox) {
+          errorMessage += '\n\nFirefox users: Please check your privacy settings.';
+        }
+        
+        alert(errorMessage + ' Redirecting to homepage...');
         window.location.replace(window.location.origin);
         return;
       }
@@ -79,11 +100,20 @@
       const { getRedirectResult, onAuthStateChanged } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
 
-      // Method 1: Check redirect result immediately with enhanced error handling
+      // Method 1: Check redirect result with cross-browser compatibility
       let user = null;
       try {
-        console.log('Checking getRedirectResult...');
-        const result = await getRedirectResult(firebaseAuth);
+        console.log('Checking getRedirectResult with cross-browser support...');
+        
+        // Use cross-browser redirect handler if available
+        let result = null;
+        if (window.handleCrossBrowserRedirectResult) {
+          result = await window.handleCrossBrowserRedirectResult();
+        } else {
+          // Fallback to standard redirect result
+          result = await getRedirectResult(firebaseAuth);
+        }
+        
         console.log('getRedirectResult response:', result);
         
         if (result && result.user) {
@@ -97,12 +127,23 @@
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
         
-        // Handle specific Firebase errors
+        // Handle specific Firebase errors with cross-browser considerations
         if (error.code === 'auth/unauthorized-domain') {
           alert('Authentication failed: Domain not authorized. Please contact support.');
           return;
         } else if (error.code === 'auth/auth-domain-config-error') {
           alert('Authentication failed: Domain configuration error. Please contact support.');
+          return;
+        } else if (error.code === 'auth/network-request-failed') {
+          const browserInfo = window.browserInfo || {};
+          let message = 'Network error occurred during authentication.';
+          if (browserInfo.isSafari || browserInfo.isFirefox) {
+            message += ' This may be due to browser privacy settings blocking the request.';
+          }
+          alert(message + ' Please try again.');
+          return;
+        } else if (error.code === 'auth/internal-error') {
+          alert('Authentication service temporarily unavailable. Please try again in a moment.');
           return;
         }
       }
