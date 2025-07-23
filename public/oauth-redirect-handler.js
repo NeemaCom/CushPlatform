@@ -206,7 +206,34 @@
         const backendUser = await window.syncFirebaseUserWithBackend(user, false);
 
         if (backendUser) {
-          console.log('Backend sync successful, redirecting to dashboard...');
+          console.log('Backend sync successful, verifying session...');
+          
+          // Verify session is established by testing /api/auth/me
+          let sessionVerified = false;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const meResponse = await fetch('/api/auth/me', {
+                credentials: 'include'
+              });
+              if (meResponse.ok) {
+                sessionVerified = true;
+                console.log('Session verified successfully');
+                break;
+              }
+              console.log(`Session verification attempt ${attempt + 1} failed, retrying...`);
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
+            } catch (error) {
+              console.log(`Session verification attempt ${attempt + 1} error:`, error);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+          
+          if (!sessionVerified) {
+            console.error('Session verification failed after 3 attempts');
+            alert('Authentication completed but session verification failed. Please try signing in again.');
+            window.location.replace(window.location.origin);
+            return;
+          }
           
           // Track successful authentication
           if (window.trackAuthEvent) {

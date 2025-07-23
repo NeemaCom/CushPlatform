@@ -185,6 +185,27 @@
       const data = await response.json();
       console.log('Backend sync successful:', data.user.email);
       
+      // For sign-in (not new user), verify the session was established
+      if (!isNewUser) {
+        console.log('Verifying session establishment...');
+        // Small delay to ensure session is fully established
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Test session by calling /api/auth/me
+        try {
+          const testResponse = await fetch('/api/auth/me', {
+            credentials: 'include'
+          });
+          if (!testResponse.ok) {
+            console.warn('Session not immediately available, but sync was successful');
+          } else {
+            console.log('Session verified in sync function');
+          }
+        } catch (error) {
+          console.warn('Session verification failed in sync:', error);
+        }
+      }
+      
       // Update global user state
       if (window.setUser) {
         window.setUser(data.user);
