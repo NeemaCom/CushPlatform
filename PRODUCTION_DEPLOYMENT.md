@@ -1,9 +1,9 @@
-# Production Deployment Configuration for https://we-cush.com
+# Production Deployment Configuration for https://portal.we-cush.com
 
 ## Firebase Configuration Updates
 
 ### ✅ Completed
-- Updated Firebase `authDomain` from "cushportal.firebaseapp.com" to "we-cush.com"
+- Updated Firebase `authDomain` from "cushportal.firebaseapp.com" to "portal.we-cush.com"
 - Updated both `src/firebase.js` and `public/firebase-init-coordinator.js` configuration files
 - PWA install prompt fixed to stop appearing after installation
 
@@ -13,15 +13,15 @@
 Go to [Firebase Console](https://console.firebase.google.com/) → Project "cushportal" → Authentication → Settings → Authorized domains
 
 **Add these domains:**
-- `we-cush.com`
-- `www.we-cush.com` (optional, for www redirect)
+- `portal.we-cush.com`
+- `www.portal.we-cush.com` (optional, for www redirect)
 
 #### 2. Google Cloud Console OAuth Client Configuration
 Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → OAuth 2.0 Client IDs
 
 **Update the OAuth client with:**
-- **Authorized JavaScript Origins:** `https://we-cush.com`
-- **Authorized Redirect URIs:** `https://we-cush.com/__/auth/handler`
+- **Authorized JavaScript Origins:** `https://portal.we-cush.com`
+- **Authorized Redirect URIs:** `https://portal.we-cush.com/__/auth/handler`
 
 ## Current Status
 
@@ -38,7 +38,7 @@ Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Servi
 
 ## Post-Deployment Verification
 
-After deploying to `https://we-cush.com`, verify:
+After deploying to `https://portal.we-cush.com`, verify:
 
 1. **Google Sign-In:** Test Google authentication flow
 2. **PWA Installation:** Confirm install prompt behavior
@@ -55,4 +55,4 @@ Ensure these are set in production:
 
 ## Deployment Ready
 
-The application is now configured for production deployment at `https://we-cush.com` with proper Firebase authentication domain settings.
+The application is now configured for production deployment at `https://portal.we-cush.com` with proper Firebase authentication domain settings.
