@@ -1,0 +1,69 @@
+You are an expert AI agent specializing in Firebase Authentication integration and UI simplification. The user has explicitly requested to **revert the Google Authentication pop-up to its default, simple style and flow** to ensure a seamless sign-in experience.
+
+This involves removing any custom UI elements or complex interaction logic that currently wraps the Google Sign-In process, and ensuring a direct call to Firebase's standard popup method.
+
+**Your Immediate and Absolute Highest Priority Goal:**
+
+1.  **Simplify Google Authentication UI and Flow:** Remove all custom styling and complex client-side interaction surrounding the Google Sign-In process, replacing it with a direct trigger for Firebase's default authentication popup.
+
+---
+
+**Detailed Requirements & Action Plan:**
+
+**Phase 1: Remove Custom Google Sign-In UI Elements**
+
+1.  **Identify Custom UI Code:**
+    * **Agent Action:** Thoroughly scan the codebase (HTML, JSX components, associated CSS, and JavaScript files) to identify all elements, styles, and logic that contribute to the "sophisticated design" of the Google Sign-In button or interaction flow. This includes:
+        * Custom button elements (e.g., `<GoogleSignInButton>`, styled `<div>`s instead of a simple `<button>`).
+        * Any specific CSS classes or inline styles applied only to the Google Sign-In button/area.
+        * Any JavaScript logic that creates custom modals, animations, or intermediate steps *before* calling Firebase's `signInWithPopup` or `signInWithRedirect`.
+
+2.  **Remove Identified Customizations:**
+    * **Agent Action:** Delete or comment out these custom UI elements, styles, and complex intermediate JavaScript logic.
+
+**Phase 2: Implement Direct Default Popup Trigger**
+
+1.  **Locate Sign-In Trigger Point:**
+    * **Agent Action:** Identify the primary button or user interaction point that initiates the Google Sign-In process.
+
+2.  **Implement Direct `signInWithPopup` Call:**
+    * **Agent Action:** Ensure this trigger point directly invokes Firebase's `signInWithPopup(auth, provider)`. This should be a straightforward function call without any unnecessary wrappers or complex UI state management around it.
+    * Example (assuming `auth` and `provider` are available from your `unified-auth-system.js`):
+        ```jsx
+        // In the relevant authentication component (e.g., LoginPage.jsx)
+
+        // Assuming you have 'auth' and 'googleProvider' instances
+        // import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+        // const auth = getAuth();
+        // const googleProvider = new GoogleAuthProvider();
+
+        const handleGoogleSignInClick = async () => {
+          try {
+            // This is the core call for the default popup flow
+            await signInWithPopup(auth, googleProvider);
+            console.log("User signed in successfully via default Google popup.");
+            // Your unified-auth-system.js should then handle the post-login redirection
+          } catch (error) {
+            console.error("Google Sign-In popup failed:", error);
+            // Ensure error handling provides user-friendly feedback
+            // (e.g., display an error message on the page)
+          }
+        };
+
+        // ... within your component's render method or JSX ...
+        <button onClick={handleGoogleSignInClick} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer' }}>
+          Sign in with Google
+        </button>
+        ```
+    * **Agent Action:** Verify that the `unified-auth-system.js` correctly handles the `Promise` resolution/rejection from `signInWithPopup` for seamless post-login redirection or error display.
+
+**Deliverable:**
+
+A concise report confirming the successful reversion to the default Google Auth popup style and flow.
+
+1.  **Executive Summary:** Confirmation that the custom Google Sign-In UI has been removed and replaced with a direct default popup trigger.
+2.  **Action Log:** A summary of the specific files and code sections modified to achieve this.
+3.  **Verification Steps (for the user):**
+    * **Perform a hard browser refresh (Ctrl+Shift+R / Cmd+Shift+R).**
+    * **Click the "Sign in with Google" button:** Verify that a standard, simple Google authentication popup window appears directly (not a custom modal or complex animation).
+    * **Complete the sign-in process:** Confirm that sign-in is seamless and the user is redirected correctly to the dashboard after successful authentication via the default popup.

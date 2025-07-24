@@ -39,99 +39,55 @@
     }
   };
 
-  // Enhanced Google Sign-Up handler for Get Started page
-  window.enhancedGoogleSignUp = async () => {
-    console.log('Starting Google Sign-Up from Get Started page');
+  // Simplified Google Sign-In/Sign-Up using Firebase default popup
+  window.simpleGoogleSignIn = async () => {
+    console.log('Starting simple Google Sign-In with default Firebase popup');
     
     try {
       // Wait for Firebase initialization if needed
       if (!window.firebaseAuth) {
-        await window.waitForFirebaseAuth();
+        await window.waitForFirebase('simple-google-signin', 10000);
       }
       
-      // Use the robust Google authentication with popup
-      if (window.performGoogleSignIn) {
-        console.log('Using performGoogleSignIn for sign-up');
-        const result = await window.performGoogleSignIn('popup');
+      // Import Firebase auth modules
+      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      // Create Google Auth provider
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Direct Firebase popup sign-in (default UI)
+      console.log('Triggering Firebase default Google popup...');
+      const result = await signInWithPopup(window.firebaseAuth, provider);
+      
+      if (result && result.user) {
+        console.log('Google sign-in successful:', result.user.email);
         
-        if (result && result.user) {
-          console.log('Google sign-up successful:', result.user.email);
-          
-          // Show enhanced success notification for new sign-up
-          if (window.showEnhancedSuccessNotification) {
-            const displayName = result.user.displayName || result.user.email.split('@')[0];
-            window.showEnhancedSuccessNotification(displayName, 'signup');
-          }
-          
-          // Add delay before redirect to show notification
-          setTimeout(() => {
-            window.navigate('dashboard');
-          }, 2000);
-          
-          return result;
-        }
-      } else {
-        // Fallback to direct Firebase authentication
-        console.log('Using direct Firebase auth for sign-up');
+        // Simple success notification
+        window.showSuccessNotification(`Welcome ${result.user.displayName || result.user.email}!`);
         
-        const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js');
-        const provider = new GoogleAuthProvider();
-        provider.addScope('email');
-        provider.addScope('profile');
+        // Redirect to dashboard
+        setTimeout(() => {
+          window.location.hash = 'dashboard';
+        }, 1000);
         
-        const result = await signInWithPopup(window.firebaseAuth.auth, provider);
-        
-        if (result && result.user) {
-          console.log('Direct Google sign-up successful:', result.user.email);
-          
-          // Sync with backend
-          const backendUser = await window.syncFirebaseUserWithBackend(result.user, false);
-          
-          if (backendUser) {
-            // Show enhanced success notification
-            if (window.showEnhancedSuccessNotification) {
-              const displayName = result.user.displayName || result.user.email.split('@')[0];
-              window.showEnhancedSuccessNotification(displayName, 'signup');
-            }
-            
-            // Add delay before redirect
-            setTimeout(() => {
-              window.navigate('dashboard');
-            }, 2000);
-          }
-          
-          return result;
-        }
+        return result;
       }
     } catch (error) {
-      console.error('Google sign-up error:', error);
+      console.error('Google sign-in error:', error);
       
-      // Show user-friendly error message
-      if (window.showToastNotification) {
-        let errorMessage = 'Sign-up failed. Please try again.';
-        
-        if (error.code === 'auth/popup-blocked') {
-          errorMessage = 'Popup blocked. Please allow popups and try again.';
-        } else if (error.code === 'auth/popup-closed-by-user') {
-          errorMessage = 'Sign-up cancelled by user.';
-        } else if (error.code === 'auth/network-request-failed') {
-          errorMessage = 'Network error. Please check your connection.';
-        }
-        
-        window.showToastNotification(errorMessage, 'error');
-      }
+      // Show simple error message
+      let errorMessage = window.getEnhancedFirebaseErrorMessage(error);
+      window.showErrorNotification(errorMessage);
       
       throw error;
     }
   };
 
-  // Enhanced Google Sign-Up handler for signup page (redirects to main handler)
-  window.enhancedGoogleSignUpForSignUp = async () => {
-    console.log('Google Sign-Up for Sign-Up page - redirecting to main handler');
-    
-    // Use the main enhanced Google sign-up handler
-    return window.enhancedGoogleSignUp();
-  };
+  // Alias for backward compatibility
+  window.enhancedGoogleSignUp = window.simpleGoogleSignIn;
+  window.enhancedGoogleSignUpForSignUp = window.simpleGoogleSignIn;
 
   // Success notification helper
   window.showSuccessNotification = (message) => {
