@@ -15000,10 +15000,24 @@ function RailsrPayPage({ user, onBack }) {
 
 // Mount the application
 document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM Content Loaded - Starting React app...');
   const rootElement = document.getElementById('root');
   if (rootElement) {
+    console.log('Root element found, creating React root...');
     const root = createRoot(rootElement);
+    console.log('React root created, rendering App component...');
     root.render(e(App));
+    console.log('App component rendered successfully');
+    
+    // Add quick visual test
+    setTimeout(() => {
+      const testElement = document.querySelector('.bg-gradient-to-br');
+      if (testElement) {
+        console.log('✅ Tailwind classes are being applied correctly');
+      } else {
+        console.warn('⚠️ Tailwind gradient classes not found - possible styling issue');
+      }
+    }, 1000);
   } else {
     console.error('Root element not found');
   }
