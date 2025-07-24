@@ -5977,8 +5977,76 @@ function App() {
   );
   
   console.log('🎨 App rendering with shouldShowDashboard:', shouldShowDashboard, 'user:', user);
+  console.log('🔍 Available components check - Dashboard:', typeof Dashboard, 'AppRouter:', typeof AppRouter);
   
   try {
+    // Test if critical components are defined
+    if (typeof Dashboard === 'undefined') {
+      console.error('❌ Dashboard component is not defined');
+      return e('div', { 
+        style: {
+          minHeight: '100vh',
+          background: '#fef2f2',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'system-ui',
+          padding: '2rem'
+        }
+      }, [
+        e('div', {
+          style: { textAlign: 'center', color: '#dc2626', maxWidth: '600px' }
+        }, [
+          e('h1', { style: { fontSize: '2rem', marginBottom: '1rem' } }, 'Dashboard Component Missing'),
+          e('p', { style: { marginBottom: '1rem' } }, 'The Dashboard component is not defined. This may be causing the fallback to basic UI.'),
+          e('button', {
+            onClick: () => window.location.reload(),
+            style: {
+              background: '#dc2626',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              border: 'none',
+              borderRadius: '0.5rem',
+              cursor: 'pointer'
+            }
+          }, 'Reload Page')
+        ])
+      ]);
+    }
+    
+    if (typeof AppRouter === 'undefined') {
+      console.error('❌ AppRouter component is not defined');
+      return e('div', { 
+        style: {
+          minHeight: '100vh',
+          background: '#fef2f2',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'system-ui',
+          padding: '2rem'
+        }
+      }, [
+        e('div', {
+          style: { textAlign: 'center', color: '#dc2626', maxWidth: '600px' }
+        }, [
+          e('h1', { style: { fontSize: '2rem', marginBottom: '1rem' } }, 'AppRouter Component Missing'),
+          e('p', { style: { marginBottom: '1rem' } }, 'The AppRouter component is not defined. This may be causing the fallback to basic UI.'),
+          e('button', {
+            onClick: () => window.location.reload(),
+            style: {
+              background: '#dc2626',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              border: 'none',
+              borderRadius: '0.5rem',
+              cursor: 'pointer'
+            }
+          }, 'Reload Page')
+        ])
+      ]);
+    }
+    
     return e('div', { key: 'app-container' }, [
       // Show Dashboard for authenticated users unless on specific public pages
       shouldShowDashboard ? 
@@ -15127,7 +15195,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // First render the debug component, then auto-load the app
         root.render(DebugComponent);
         
-        // Auto-load the sophisticated app after 3 seconds for debugging
+        // Auto-load the sophisticated app after 1 second for debugging
         setTimeout(() => {
           console.log('🔄 Auto-loading sophisticated app...');
           try {
@@ -15166,7 +15234,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </div>
             `;
           }
-        }, 3000);
+        }, 1000);
         
         // Add visual verification
         setTimeout(() => {
