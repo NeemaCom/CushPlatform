@@ -4,37 +4,36 @@
 (function() {
   console.log('OAuth Redirect Handler loaded');
 
-  // Enhanced OAuth redirect detection - more restrictive to prevent false positives
+  // Enhanced OAuth redirect detection
   const isOAuthReturn = () => {
     const url = window.location.href;
+    const hasFirebaseAuthHandler = url.includes('__/auth/handler') || url.includes('firebaseapp.com');
+    const hasOAuthParams = url.includes('apiKey=') || 
+                          url.includes('authType=signInViaRedirect') ||
+                          document.referrer.includes('accounts.google.com') ||
+                          document.referrer.includes('firebase');
     
-    // Only specific Firebase auth handler URLs
-    const hasFirebaseAuthHandler = url.includes('__/auth/handler');
-    
-    // Very specific OAuth params that indicate an actual redirect
-    const hasSpecificOAuthParams = url.includes('authType=signInViaRedirect') && url.includes('apiKey=');
-    
-    // Check for redirect flags - must be present and recent
+    // Check for redirect flags set during sign-in
     const hasRedirectFlag = sessionStorage.getItem('google_auth_redirect') === 'true';
     const redirectTimestamp = sessionStorage.getItem('auth_redirect_timestamp');
-    const recentRedirect = redirectTimestamp && (Date.now() - parseInt(redirectTimestamp)) < 120000; // 2 minutes
+    const recentRedirect = redirectTimestamp && (Date.now() - parseInt(redirectTimestamp)) < 60000; // Within 1 minute
     
-    // Direct referrer from Google accounts only
-    const isFromGoogleAccounts = document.referrer.includes('accounts.google.com');
+    // Check if referrer indicates Google OAuth
+    const googleReferrer = document.referrer.includes('accounts.google.com') || 
+                          document.referrer.includes('google.com/oauth') ||
+                          document.referrer.includes('googleusercontent.com');
     
-    // Much more restrictive: require BOTH specific indicators AND recent redirect flag
-    const isRedirect = (hasFirebaseAuthHandler || hasSpecificOAuthParams || isFromGoogleAccounts) && 
-                      hasRedirectFlag && recentRedirect;
+    const isRedirect = hasFirebaseAuthHandler || hasOAuthParams || (hasRedirectFlag && recentRedirect) || googleReferrer;
     
-    console.log('OAuth detection (restrictive):', { 
-      url: url.substring(0, 100) + '...', 
+    console.log('OAuth check:', { 
+      url, 
       hasFirebaseAuthHandler, 
-      hasSpecificOAuthParams, 
+      hasOAuthParams, 
       hasRedirectFlag,
       recentRedirect,
-      isFromGoogleAccounts,
+      googleReferrer,
       isRedirect,
-      referrer: document.referrer.substring(0, 100) 
+      referrer: document.referrer 
     });
     
     return isRedirect;
@@ -53,36 +52,15 @@
       // Wait for Firebase to be properly initialized
       console.log('Waiting for Firebase initialization...');
       
-      // Use the centralized Firebase initialization coordinator with cross-browser support
+      // Use the centralized Firebase initialization coordinator
       let firebaseAuth;
       try {
         console.log('Using Firebase initialization coordinator in OAuth handler...');
-        
-        // Set up browser compatibility if available
-        if (window.browserCompatibilitySetup) {
-          window.browserCompatibilitySetup();
-        }
-        
-        // Use browser-specific timeout
-        const browserInfo = window.browserInfo || {};
-        const timeout = browserInfo.isSafari ? 20000 : 30000; // Shorter timeout for Safari
-        
-        firebaseAuth = await window.waitForFirebase('oauth-redirect-handler', timeout);
+        firebaseAuth = await window.waitForFirebase('oauth-redirect-handler', 30000);
         console.log('Firebase successfully initialized for OAuth handler');
       } catch (error) {
         console.error('Firebase initialization failed in OAuth handler:', error.message);
-        
-        // Browser-specific error messages
-        const browserInfo = window.browserInfo || {};
-        let errorMessage = 'Authentication failed: ' + error.message;
-        
-        if (browserInfo.isSafari) {
-          errorMessage += '\n\nSafari users: Please ensure cookies are enabled and try again.';
-        } else if (browserInfo.isFirefox) {
-          errorMessage += '\n\nFirefox users: Please check your privacy settings.';
-        }
-        
-        alert(errorMessage + ' Redirecting to homepage...');
+        alert(`Authentication failed: ${error.message}. Redirecting to homepage...`);
         window.location.replace(window.location.origin);
         return;
       }
@@ -101,20 +79,11 @@
       const { getRedirectResult, onAuthStateChanged } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
 
-      // Method 1: Check redirect result with cross-browser compatibility
+      // Method 1: Check redirect result immediately with enhanced error handling
       let user = null;
       try {
-        console.log('Checking getRedirectResult with cross-browser support...');
-        
-        // Use cross-browser redirect handler if available
-        let result = null;
-        if (window.handleCrossBrowserRedirectResult) {
-          result = await window.handleCrossBrowserRedirectResult();
-        } else {
-          // Fallback to standard redirect result
-          result = await getRedirectResult(firebaseAuth);
-        }
-        
+        console.log('Checking getRedirectResult...');
+        const result = await getRedirectResult(firebaseAuth);
         console.log('getRedirectResult response:', result);
         
         if (result && result.user) {
@@ -128,23 +97,12 @@
         console.error('Error code:', error.code);
         console.error('Error message:', error.message);
         
-        // Handle specific Firebase errors with cross-browser considerations
+        // Handle specific Firebase errors
         if (error.code === 'auth/unauthorized-domain') {
           alert('Authentication failed: Domain not authorized. Please contact support.');
           return;
         } else if (error.code === 'auth/auth-domain-config-error') {
           alert('Authentication failed: Domain configuration error. Please contact support.');
-          return;
-        } else if (error.code === 'auth/network-request-failed') {
-          const browserInfo = window.browserInfo || {};
-          let message = 'Network error occurred during authentication.';
-          if (browserInfo.isSafari || browserInfo.isFirefox) {
-            message += ' This may be due to browser privacy settings blocking the request.';
-          }
-          alert(message + ' Please try again.');
-          return;
-        } else if (error.code === 'auth/internal-error') {
-          alert('Authentication service temporarily unavailable. Please try again in a moment.');
           return;
         }
       }
@@ -207,34 +165,7 @@
         const backendUser = await window.syncFirebaseUserWithBackend(user, false);
 
         if (backendUser) {
-          console.log('Backend sync successful, verifying session...');
-          
-          // Verify session is established by testing /api/auth/me
-          let sessionVerified = false;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              const meResponse = await fetch('/api/auth/me', {
-                credentials: 'include'
-              });
-              if (meResponse.ok) {
-                sessionVerified = true;
-                console.log('Session verified successfully');
-                break;
-              }
-              console.log(`Session verification attempt ${attempt + 1} failed, retrying...`);
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
-            } catch (error) {
-              console.log(`Session verification attempt ${attempt + 1} error:`, error);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-          }
-          
-          if (!sessionVerified) {
-            console.error('Session verification failed after 3 attempts');
-            alert('Authentication completed but session verification failed. Please try signing in again.');
-            window.location.replace(window.location.origin);
-            return;
-          }
+          console.log('Backend sync successful, redirecting to dashboard...');
           
           // Track successful authentication
           if (window.trackAuthEvent) {

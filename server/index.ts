@@ -55,9 +55,6 @@ export async function createServer() {
   
   const httpServer = await registerRoutes(app);
 
-  // In development, serve from root. In production, serve from dist
-  const staticDir = process.env.NODE_ENV === 'production' ? 'dist' : '.';
-  
   // Serve static files from public directory first
   app.use(express.static('public', {
     setHeaders: (res, path) => {
@@ -67,48 +64,20 @@ export async function createServer() {
     }
   }));
   
-  // Serve build assets with proper headers and cache control
-  app.use(express.static(staticDir, { 
-    index: false,
-    setHeaders: (res, filePath) => {
-      // Aggressive cache busting for development
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.setHeader('Last-Modified', new Date().toUTCString());
-      
-      if (filePath.endsWith('.css')) {
-        res.setHeader('Content-Type', 'text/css');
-      }
-      if (filePath.endsWith('.js') || filePath.endsWith('.mjs')) {
-        res.setHeader('Content-Type', 'application/javascript');
-      }
-      if (filePath.endsWith('.tsx') || filePath.endsWith('.ts')) {
-        res.setHeader('Content-Type', 'application/javascript');
-      }
-      if (filePath.endsWith('.jsx')) {
-        res.setHeader('Content-Type', 'application/javascript');
-      }
-    }
-  }));
+  // Serve other static files from root
+  app.use(express.static('.', { index: false }));
 
   // Root endpoint - always serve the web application
   // Health checks should use dedicated endpoints: /health, /api/health, /ready, /live
   app.get('/', (req, res) => {
-    // Serve from dist in production, root in development
-    const htmlPath = process.env.NODE_ENV === 'production' 
-      ? path.join(process.cwd(), 'dist', 'index.html')
-      : path.join(process.cwd(), 'index.html');
-    res.sendFile(htmlPath);
+    // Always serve the SPA for all requests to root path
+    res.sendFile(path.join(process.cwd(), 'index.html'));
   });
 
   // Handle SPA routing (serve HTML for non-API paths, excluding root which is handled above)
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api/')) {
-      const htmlPath = process.env.NODE_ENV === 'production' 
-        ? path.join(process.cwd(), 'dist', 'index.html')
-        : path.join(process.cwd(), 'index.html');
-      res.sendFile(htmlPath);
+      res.sendFile(path.join(process.cwd(), 'index.html'));
     }
   });
 
