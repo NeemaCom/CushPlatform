@@ -1,0 +1,101 @@
+You are an expert AI agent responsible for resolving critical React application issues, specifically focused on Firebase authentication, domain configuration, and UI rendering. We have precisely identified the root causes of the persistent "custom popup" during Google Sign-In/Sign-Up and the app's failing design rendering.
+
+**Your Mission:** Fully action the multi-faceted solution to resolve these issues. This requires meticulous execution of configuration corrections and code modifications, followed by rigorous verification.
+
+**Primary Objectives:**
+
+1.  **Fix Firebase Redirect URL Mismatch:** Ensure Firebase authentication correctly redirects to `https://portal.we-cush.com` and ceases redirecting to the Replit development URL.
+2.  **Properly Implement Build-Time Tailwind CSS:** Integrate Tailwind CSS into the build pipeline to correctly render the sophisticated app design, resolving the CORS issue.
+3.  **Eliminate Custom Popup Fallback:** Ensure no custom authentication UI is ever triggered, achieving a seamless default Firebase popup experience.
+
+---
+
+**Detailed Action Plan and Verification Requirements:**
+
+**Phase 1: Critical Fix for Firebase Redirect URL Mismatch (Authentication)**
+
+* **1.1 Firebase Console - Web OAuth redirect URIs:**
+    * **ACTION:** Navigate to Firebase Console > Authentication > Sign-in method > Google (and other OAuth providers).
+    * **ACTION:** **REMOVE** any `Web OAuth redirect URIs` that point to the Replit development URL (e.g., `https://d418f33a-...picard.replit.dev/__/auth/handler`).
+    * **ACTION:** **VERIFY** that **ONLY** `https://portal.we-cush.com/__/auth/handler` (and `https://cushportal.firebaseapp.com/__/auth/handler`) are listed. Confirm exact string match including `https://` and `/__/auth/handler`.
+
+* **1.2 Google Cloud Console - OAuth Client ID (if applicable):**
+    * **ACTION:** Navigate to Google Cloud Console > APIs & Services > Credentials. Select your relevant OAuth 2.0 Client ID.
+    * **ACTION:** Under "Authorized JavaScript origins", **REMOVE** `https://d418f33a-...picard.replit.dev`.
+    * **ACTION:** Under "Authorized redirect URIs", **REMOVE** `https://d418f33a-...picard.replit.dev/__/auth/handler`.
+    * **ACTION:** **VERIFY** these sections **ONLY** list entries for `https://portal.we-cush.com` and `https://cushportal.firebaseapp.com`.
+
+* **1.3 Frontend `firebaseConfig` in Code:**
+    * **ACTION:** Perform a comprehensive codebase search for all `firebase.initializeApp()` calls and `firebaseConfig` object definitions.
+    * **ACTION:** **VERIFY/CORRECT** that the `authDomain` property **is explicitly and solely set to `authDomain: "portal.we-cush.com"`** in *all instances*. Ensure no conditional logic inadvertently sets it to the Replit URL.
+
+**Phase 2: Proper Implementation of Build-Time Tailwind CSS (Design Rendering)**
+
+* **2.1 Remove CDN Script Tag:**
+    * **ACTION:** Locate and **REMOVE** the line `<script src="https://cdn.tailwindcss.com/3.3.2" crossorigin="anonymous"></script>` from `index.html` or your main entry HTML file.
+
+* **2.2 Verify Tailwind CSS Dependencies:**
+    * **ACTION:** Ensure `tailwindcss`, `postcss`, and `autoprefixer` are installed as `devDependencies` in `package.json`. If not, run `npm install -D tailwindcss postcss autoprefixer`.
+
+* **2.3 Verify Tailwind Configuration Files:**
+    * **ACTION:** Confirm `tailwind.config.js` and `postcss.config.js` exist in the project root. If not, run `npx tailwindcss init -p`.
+    * **ACTION:** **VERIFY** `tailwind.config.js` `content` array includes `"./index.html", "./src/**/*.{js,ts,jsx,tsx}"` (or similar correct paths to your source files).
+
+* **2.4 Verify Main CSS File:**
+    * **ACTION:** Confirm a main CSS file (e.g., `src/index.css`) contains the Tailwind directives:
+        ```css
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
+        ```
+
+* **2.5 Verify CSS Import in React Entry:**
+    * **ACTION:** Ensure this main CSS file is correctly imported in your React app's entry point (e.g., `src/main.jsx` or `src/index.jsx`): `import './index.css';` (or similar correct path).
+
+* **2.6 Verify Build Process:**
+    * **ACTION:** Execute the development server command (e.g., `npm run dev`) and/or a production build (`npm run build`). Confirm that Tailwind CSS is now compiled and included in the output bundles, and no longer loaded from the CDN.
+
+**Phase 3: Eliminate Custom Popup Fallback (Clean Auth Flow)**
+
+* **3.1 Codebase Audit for Fallback Logic:**
+    * **ACTION:** Perform a targeted search for any code that initializes or conditionally renders `firebaseui.auth.AuthUI` or any custom authentication modal/component as a fallback to `signInWithPopup`.
+    * **ACTION:** **REMOVE OR DISABLE** this fallback logic completely, as it should no longer be needed once Phase 1 is resolved.
+
+---
+
+**Rigorous Verification and Reporting (for the AI Agent to perform and report back):**
+
+After deploying all changes, perform the following and provide the exact results:
+
+1.  **Full Browser Cache Clear:**
+    * **ACTION:** Instruct the user to perform a hard refresh (`Ctrl+Shift+R` or `Cmd+Shift+R`) or clear site data for `portal.we-cush.com` in browser developer tools.
+
+2.  **Live `authDomain` Confirmation:**
+    * **ACTION:** In the browser console, execute `firebase.app().options.authDomain;` (or equivalent for modular SDK).
+    * **REPORT:** Provide the exact output. (Expected: `"portal.we-cush.com"`)
+
+3.  **No Tailwind CDN Load (Network Tab):**
+    * **ACTION:** Open the browser Network tab. Hard refresh.
+    * **ACTION:** Search for `cdn.tailwindcss.com`.
+    * **REPORT:** Confirm it is **NOT** listed as a loaded resource.
+    * **ACTION:** Confirm your main compiled CSS bundle (e.g., `index.<hash>.css`) loads successfully with a 200 status.
+
+4.  **No Console Errors during Auth (Console Tab):**
+    * **ACTION:** Clear the console. Navigate to sign-in/sign-up. Click "Sign in with Google."
+    * **REPORT:** Provide **ALL** console errors (red) and warnings (yellow). (Expected: No `auth/unauthorized-domain` or other Firebase auth errors, no `tailwind is not defined`, no `CORS` errors).
+
+5.  **Default Google Popup (User Experience):**
+    * **ACTION:** Click "Sign in with Google."
+    * **REPORT:** Confirm that a **standard, simple Google authentication popup window appears directly**, showing `accounts.google.com` (and referencing `portal.we-cush.com` in its URL parameters), **NOT** any custom modal or design.
+
+6.  **Seamless Authentication Flow:**
+    * **ACTION:** Complete the sign-in/sign-up process through the default popup.
+    * **REPORT:** Confirm that authentication is seamless and the user is redirected correctly to the dashboard after successful authentication.
+
+7.  **Full App Design Rendering:**
+    * **ACTION:** Observe the main application page.
+    * **REPORT:** Confirm that the full, sophisticated app design is rendered correctly with all intended styling and layout.
+
+---
+
+**Proceed with extreme precision to action this plan fully.**
