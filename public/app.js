@@ -5967,14 +5967,14 @@ function App() {
   }
 
   const currentHash = window.location.hash;
-  const shouldShowDashboard = user && (
+  const shouldShowDashboard = Boolean(user && (
     currentHash === '#dashboard' || 
     (currentHash === '#' && user) || 
     (currentHash === '' && user) || 
     currentHash === '#home' ||
     // Only show dashboard for authenticated users on specific dashboard routes
     (user && currentHash.startsWith('#') && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms') && currentHash !== '#')
-  );
+  ));
   
   console.log('🎨 App rendering with shouldShowDashboard:', shouldShowDashboard, 'user:', user);
   console.log('🔍 Available components check - Dashboard:', typeof Dashboard, 'AppRouter:', typeof AppRouter);
@@ -6047,9 +6047,11 @@ function App() {
       ]);
     }
     
+    console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
+    
     return e('div', { key: 'app-container' }, [
       // Show Dashboard for authenticated users unless on specific public pages
-      shouldShowDashboard ? 
+      shouldShowDashboard === true ? 
         e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
         e(AppRouter, { key: 'router', user }),
       
