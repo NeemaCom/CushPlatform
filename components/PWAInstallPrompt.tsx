@@ -10,6 +10,16 @@ export function PWAInstallPrompt() {
   const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
+    // Check if app is already installed
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
+                       window.navigator.standalone === true ||
+                       localStorage.getItem('pwa-installed') === 'true';
+    
+    if (isInstalled) {
+      setIsDismissed(true);
+      return;
+    }
+
     // Check if user has previously dismissed the prompt
     const dismissed = localStorage.getItem('pwa-install-dismissed');
     if (dismissed) {
@@ -17,8 +27,8 @@ export function PWAInstallPrompt() {
       return;
     }
 
-    // Show prompt after a delay if installable
-    if (isInstallable) {
+    // Show prompt after a delay if installable and not installed
+    if (isInstallable && !isInstalled) {
       const timer = setTimeout(() => {
         setIsVisible(true);
       }, 3000);
@@ -30,6 +40,9 @@ export function PWAInstallPrompt() {
     try {
       await installApp();
       setIsVisible(false);
+      setIsDismissed(true);
+      // Mark as installed
+      localStorage.setItem('pwa-installed', 'true');
     } catch (error) {
       console.error('Installation failed:', error);
     }

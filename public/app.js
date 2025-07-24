@@ -5442,10 +5442,24 @@ function App() {
         });
     }
 
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || 
-        window.navigator.standalone === true) {
-      setIsInstalled(true);
+    // Enhanced check if app is already installed
+    const checkInstallationStatus = () => {
+      // Check multiple indicators of installation
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone = window.navigator.standalone === true;
+      const isInstalledFlag = localStorage.getItem('pwa-installed') === 'true';
+      
+      if (isStandalone || isIOSStandalone || isInstalledFlag) {
+        console.log('App is already installed, hiding install prompt');
+        setIsInstalled(true);
+        setShowInstallPrompt(false);
+        return true;
+      }
+      return false;
+    };
+
+    // Initial check
+    if (checkInstallationStatus()) {
       return;
     }
 
@@ -5453,11 +5467,17 @@ function App() {
     const handleBeforeInstallPrompt = (e) => {
       console.log('Before install prompt triggered');
       e.preventDefault();
+      
+      // Double-check installation status before showing prompt
+      if (checkInstallationStatus()) {
+        return;
+      }
+      
       setDeferredPrompt(e);
       
-      // Show install prompt immediately for testing, then after 3 seconds for users
+      // Show install prompt after 3 seconds only if not installed
       setTimeout(() => {
-        if (!isInstalled && !showInstallPrompt) {
+        if (!isInstalled && !showInstallPrompt && !checkInstallationStatus()) {
           console.log('Showing install prompt');
           setShowInstallPrompt(true);
         }
@@ -5470,6 +5490,8 @@ function App() {
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
+      // Store installation flag in localStorage
+      localStorage.setItem('pwa-installed', 'true');
     };
 
     // For browsers that support PWA but don't fire beforeinstallprompt immediately
@@ -5486,12 +5508,22 @@ function App() {
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
     
+    // Periodic check for installation status (every 5 seconds)
+    const installCheckInterval = setInterval(() => {
+      if (checkInstallationStatus()) {
+        clearInterval(installCheckInterval);
+      }
+    }, 5000);
+    
     // Check for installability after a delay
     checkInstallability();
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      if (installCheckInterval) {
+        clearInterval(installCheckInterval);
+      }
     };
   }, []);
 
@@ -5766,6 +5798,8 @@ function App() {
         console.log('User accepted the install prompt');
         setShowInstallPrompt(false);
         setIsInstalled(true);
+        // Store installation flag
+        localStorage.setItem('pwa-installed', 'true');
       } else {
         console.log('User dismissed the install prompt');
       }
