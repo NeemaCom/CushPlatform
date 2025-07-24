@@ -1,0 +1,70 @@
+This is a severe contradiction. Your latest report states "CRITICAL SUCCESS ACHIEVED" and confirms that the Google Sign-In/Sign-Up buttons now use "Firebase's default popup interface" with "Domain Authorization Fixed." However, the user is still reporting: **"app still using custom pop up for google sign in/sign up."**
+
+This indicates that the fix you claim to have implemented and verified has either:
+
+1.  **Not actually been fully deployed or activated** in the user's environment.
+2.  **Is incomplete**, and some part of the custom UI or the fallback mechanism was missed or re-introduced.
+3.  There's a subtle but critical **remaining configuration issue** that's causing the fallback.
+
+**Your Immediate and Absolute Highest Priority Goal:**
+
+1.  **Resolve the Contradiction:** Determine definitively *why* the user is still seeing the custom popup despite the reported "CRITICAL SUCCESS."
+2.  **Achieve True Default Firebase Popup:** Ensure the Google Sign-In/Sign-Up experience *actually* uses Firebase's standard, simple popup interface as intended.
+
+-----
+
+**Detailed Requirements & Forensic Analysis Focus:**
+
+We need an **irrefutable verification** of the deployed code and configuration.
+
+**Phase 1: Deep Verification of Deployed Code and Configuration in User's Browser (Requires User Observation/Input)**
+
+  * **1.1 Live `authDomain` Check in Browser Console:**
+
+      * **User Action:** Open browser developer tools (F12 or Cmd+Option+I), go to the "Console" tab.
+      * **Agent Action:** Provide the exact JavaScript command the user should type into the console to check the currently active Firebase `authDomain`. It should look something like:
+        ```javascript
+        firebase.app().options.authDomain;
+        // OR if using modular SDK
+        import { getAuth } from 'firebase/auth';
+        const auth = getAuth();
+        auth.app.options.authDomain;
+        ```
+      * **Expected Output:** `portal.we-cush.com`.
+      * **Report:** What is the exact output the user sees?
+
+  * **1.2 Live Code Inspection for Custom UI Removal:**
+
+      * **User Action:** In developer tools, go to the "Sources" tab. Search your main JavaScript bundle (e.g., `main.js`, `bundle.js`, `App.js` if source maps are active).
+      * **Agent Action:** Provide specific, unique string patterns or HTML/JSX fragments that represented the *custom popup UI* that you claim were removed. Ask the user to search for these patterns to confirm their *absence* in the *live, running code*.
+          * Example patterns: specific custom CSS class names, unique HTML `id`s from the custom popup, calls to `firebaseui.auth.AuthUI.start()`, or custom React component names for the auth UI.
+      * **Report:** Are these patterns found or not found in the live source code?
+
+  * **1.3 Console Errors during Sign-In Attempt (CRITICAL):**
+
+      * **User Action:** While on `portal.we-cush.com`, open the browser console and clear it. Then, click "Sign in with Google" (which currently shows the custom popup).
+      * **Agent Action:** Request **all** red error messages and yellow warning messages that appear in the console. Pay extreme attention to any Firebase `auth/` errors (e.g., `auth/unauthorized-domain`, `auth/cancelled-popup-request`, etc.) which might still be triggering a fallback.
+      * **Report:** Provide the full console output.
+
+  * **1.4 Network Tab Analysis during Sign-In:**
+
+      * **User Action:** In developer tools, go to the "Network" tab. Clear all requests. Click "Sign in with Google."
+      * **Agent Action:** Look for any requests that return a `4xx` or `5xx` status code. Specifically, look for requests to Firebase endpoints (e.g., `identitytoolkit.googleapis.com`, `securetoken.googleapis.com`) or redirects involving `__/auth/handler`.
+      * **Report:** Are there any failed requests? What are the URLs and response codes?
+
+**Phase 2: Re-evaluation of Firebase Console Configuration (If Discrepancy Found)**
+
+  * If any discrepancies are found in Phase 1 (e.g., `authDomain` is wrong in live code, `auth/unauthorized-domain` still appears), then the Firebase Console configuration itself needs a final, meticulous double-check.
+  * **Agent Action:** If AI has direct access, re-verify all steps from previous prompts regarding `Authorized Domains` and `Web OAuth redirect URIs` for `portal.we-cush.com` and `cushportal.firebaseapp.com` in both **Firebase Console** and **Google Cloud Console (OAuth Client ID)**. Provide screenshots or explicit confirmations of all correct settings.
+
+**Deliverable:**
+
+A precise diagnostic report based on concrete verification, leading to the definitive reason for the contradiction and a new, verified fix.
+
+1.  **Executive Summary:** Acknowledging the continued custom popup and the need for irrefutable verification.
+2.  **Verification Findings:** Explicitly state the results of each check from Phase 1.
+3.  **Root Cause Re-analysis:** Based on the verification findings, pinpoint the exact reason *why* the custom popup is still appearing (e.g., code not deployed, incomplete custom UI removal, lingering config issue).
+4.  **Revised Fix Plan:** Specific, targeted code modifications or deployment steps based on the re-analysis.
+5.  **Rigorous Final Verification:** Steps to confirm the default popup is truly active after the new fix.
+
+**Proceed with these detailed verification steps immediately. This contradiction must be resolved.**
