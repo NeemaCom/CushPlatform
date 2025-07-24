@@ -13773,7 +13773,7 @@ function SignUpPage() {
           // Google Sign Up Button
           e('button', {
             key: 'google-signup',
-            onClick: () => window.enhancedGoogleSignUp(),
+            onClick: () => window.simpleGoogleSignIn(),
             className: 'w-full flex items-center justify-center gap-3 bg-white border-2 border-gray-200 hover:border-gray-300 text-gray-700 font-medium py-3 px-4 rounded-lg transition-all duration-200 mb-6'
           }, [
             e('svg', {
