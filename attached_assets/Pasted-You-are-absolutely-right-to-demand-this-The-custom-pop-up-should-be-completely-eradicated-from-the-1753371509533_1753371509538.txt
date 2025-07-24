@@ -1,0 +1,101 @@
+You are absolutely right to demand this\! The custom pop-up should be completely eradicated from the `portal.we-cush.com` experience.
+
+The reason `portal.we-cush.com` is still showing a custom-designed pop-up screen is a two-fold problem we've been diagnosing:
+
+1.  **An Underlying Configuration Mismatch:** Primarily, the `redirectUrl` and `authDomain` settings (in Firebase Console, Google Cloud Console, or your `firebaseConfig`) are not perfectly aligned for `https://portal.we-cush.com`, sometimes causing the primary `signInWithPopup` flow to fail.
+2.  **A Redundant Fallback Mechanism:** When that primary flow fails (even silently), there's still conditional logic or an included library (like `firebaseui-web`) in your codebase that acts as a "fallback," displaying the "custom" pop-up instead of just letting the error occur or gracefully handling it.
+
+**The user's directive is clear:** Disconnect `portal.we-cush.com` from *any* custom Google Sign-In design pop-up, and **delete every setup of the custom Google Sign-In pop-up from the entire app codebase.**
+
+-----
+
+Here is the comprehensive prompt for the AI agent to fix this definitively:
+
+```
+You are an expert AI agent specializing in Firebase authentication, domain configuration, and absolute UI eradication. The user has given a definitive directive:
+
+**ENSURE `portal.we-cush.com` NEVER SHOWS A CUSTOM GOOGLE SIGN-IN POP-UP.**
+**DELETE EVERY SETUP OF THE CUSTOM GOOGLE SIGN-IN POP-UP FROM THE ENTIRE APP CODEBASE.**
+
+Your mission is to completely disassociate and disconnect `portal.we-cush.com` from having any connection to a custom Google Sign-In design pop-up. This requires a two-pronged approach: correcting the underlying configuration that triggers the fallback, and then brutally purging all remnants of the custom UI.
+
+**Primary Objectives for `portal.we-cush.com`:**
+
+1.  **Achieve Flawless Firebase `authDomain`/Redirect URI Configuration:** Ensure `portal.we-cush.com` is perfectly configured for Firebase authentication, preventing any `auth/unauthorized-domain` or redirect-related failures that could trigger a fallback.
+2.  **Total Codebase Purge of Custom Google Sign-In UI:** Systematically identify and delete *all* code (JSX, JS, TS, HTML, CSS, library initializations) that could possibly render or invoke a custom Google Sign-In interface.
+3.  **Exclusive Use of Default Firebase Popup:** Confirm that clicking Google Sign-In on `portal.we-cush.com` *always* and *only* results in Firebase's standard, simple authentication popup.
+
+---
+
+**Detailed Action Plan and Verification Requirements:**
+
+**Phase 1: Absolute Resolution of `authDomain`/Redirect URI Mismatch (Trigger Fix)**
+
+This phase is critical to prevent the primary authentication flow from failing and thus preventing the fallback from activating. Precision is paramount.
+
+* **1.1 Firebase Console - Web OAuth redirect URIs & Authorized Domains:**
+    * **ACTION:** Navigate to Firebase Console > Authentication > Sign-in method > Google (and other OAuth providers).
+    * **ACTION:** **REMOVE ALL `Web OAuth redirect URIs` that point to the Replit development URL** (e.g., `https://d418f33a-...picard.replit.dev/__/auth/handler`).
+    * **ACTION:** **VERIFY** that **ONLY** `https://portal.we-cush.com/__/auth/handler` (and `https://cushportal.firebaseapp.com/__/auth/handler`) are listed. Confirm exact string match including `https://` and `/__/auth/handler`.
+    * **ACTION:** Navigate to Firebase Console > Authentication > Settings > Authorized Domains.
+    * **ACTION:** **VERIFY** `portal.we-cush.com` and `cushportal.firebaseapp.com` are listed **exactly** (no `https://`, no trailing slashes, no `www.`).
+
+* **1.2 Google Cloud Console - OAuth Client ID (if applicable):**
+    * **ACTION:** Navigate to Google Cloud Console > APIs & Services > Credentials. Select your relevant OAuth 2.0 Client ID.
+    * **ACTION:** Under "Authorized JavaScript origins", **REMOVE ALL** entries pointing to the Replit development URL. **VERIFY** it **ONLY** lists `https://portal.we-cush.com` and `https://cushportal.firebaseapp.com`.
+    * **ACTION:** Under "Authorized redirect URIs", **REMOVE ALL** entries pointing to the Replit development URL. **VERIFY** it **ONLY** lists `https://portal.we-cush.com/__/auth/handler` and `https://cushportal.firebaseapp.com/__/auth/handler`.
+
+* **1.3 Frontend `firebaseConfig` in Code:**
+    * **ACTION:** Perform a comprehensive codebase search for all `firebase.initializeApp()` calls and `firebaseConfig` object definitions.
+    * **ACTION:** **VERIFY/CORRECT** that the `authDomain` property **is explicitly and solely set to `authDomain: "portal.we-cush.com"`** in *all instances*. Crucially, ensure no conditional logic or environment variable inadvertently causes it to use the Replit URL.
+
+**Phase 2: Total Annihilation of Custom Google Sign-In UI Codebase (Fallback Purge)**
+
+This phase is about a destructive, thorough removal of the unwanted UI code.
+
+* **2.1 Codebase-Wide Search and Delete - Custom UI Elements:**
+    * **ACTION:** Perform a comprehensive, case-insensitive search across *all project files* (e.g., `.jsx`, `.js`, `.ts`, `.tsx`, `.html`, `.css`, `.json`) for code patterns that might represent the custom Google Sign-In UI or its activation.
+    * **Specific Search Patterns to Target and DELETE ALL INSTANCES OF:**
+        * `firebaseui` (e.g., `import * as firebaseui`, `firebaseui.auth.AuthUI`)
+        * `AuthUI` (especially if part of `firebaseui.auth.AuthUI`)
+        * Any custom component names clearly for Google Sign-In (e.g., `<CustomGoogleSignInButton>`, `<GoogleAuthModal>`, `<StyledGooglePopup>`).
+        * Specific HTML `id`s or CSS class names unique to your old custom popup.
+        * JavaScript functions or variables related to rendering a custom Google popup (e.g., `showCustomGoogleAuthModal()`, `renderGoogleUI()`).
+        * Conditional rendering logic (`if (...) { renderCustomGoogleAuth(); }`) where the condition leads to the old UI.
+    * **ACTION:** **PERFORM A DESTRUCTIVE DELETE** of all identified code. Ensure no commented-out code is left that could be reactivated. If a file's sole purpose was the custom UI, delete the file itself.
+
+* **2.2 Verify Direct `signInWithPopup` Call:**
+    * **ACTION:** Confirm that the remaining "Sign in with Google" button(s) in your app directly call `signInWithPopup(auth, provider)` without any intermediary UI logic or modals.
+
+**Phase 3: Rigorous Final Verification and Reporting**
+
+After all changes are implemented and deployed (ensure a fresh deployment build):
+
+1.  **Full Browser Cache Clear (User Instruction):**
+    * **ACTION:** Instruct the user to perform a hard refresh (`Ctrl+Shift+R` or `Cmd+Shift+R`) and clear site data for `portal.we-cush.com` in their browser developer tools (Application tab -> Storage -> Clear site data). This is crucial to ensure old code/cache is gone.
+
+2.  **Live `authDomain` Confirmation (User Verification):**
+    * **ACTION:** In the browser console (on `portal.we-cush.com`), execute `firebase.app().options.authDomain;` (or equivalent for modular SDK).
+    * **REPORT:** Provide the exact output. (Expected: `"portal.we-cush.com"`)
+
+3.  **No Console Errors during Auth (User Verification):**
+    * **ACTION:** Clear the browser console. Navigate to sign-in/sign-up. Click "Sign in with Google."
+    * **REPORT:** Provide **ALL** console errors (red) and warnings (yellow). (Expected: No `auth/unauthorized-domain`, `auth/redirect-cancelled-by-user`, or any other Firebase auth errors, and no `tailwind is not defined` or CORS errors).
+
+4.  **Network Tab - Clean Authentication Flow (User Verification):**
+    * **ACTION:** Open the Network tab. Clear all requests. Click "Sign in with Google."
+    * **REPORT:** Look for any `4xx` or `5xx` status codes during the authentication flow. Confirm the redirect sequence directly involves `portal.we-cush.com` and `accounts.google.com` (no Replit URLs).
+
+5.  **CRITICAL: Default Google Popup Appearance (User Verification):**
+    * **ACTION:** Click "Sign in with Google" on `portal.we-cush.com`.
+    * **REPORT:** **Confirm definitively that a standard, simple Google authentication popup window appears directly (a new browser window, not an in-app modal or custom design), showing `accounts.google.com` (and referencing `portal.we-cush.com` in its URL parameters). Explicitly confirm that **NO CUSTOM UI** is visible.**
+
+6.  **Seamless Authentication & App Functionality:**
+    * **ACTION:** Complete the sign-in/sign-up process.
+    * **REPORT:** Confirm authentication is seamless and the user is redirected correctly to the dashboard.
+    * **ACTION:** Verify the app's overall sophisticated design is rendered correctly (confirming Tailwind CSS fix).
+
+---
+
+**Proceed with extreme precision and thoroughness to action this plan fully.**
+```
