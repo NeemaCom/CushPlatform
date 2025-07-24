@@ -33,7 +33,7 @@ The Cush platform is a comprehensive global immigration services platform featur
 - ✓ **SIMPLE TEXT BUTTONS ONLY**: All Google Sign-In buttons now display plain text "Sign in with Google" without any visual embellishments or icons
 - ✓ **DELETED CUSTOM AUTH FILES**: Removed firebase-auth-fix.js, firebase-routing-fix.js, redirect-auth-fix.js files containing fallback UI logic
 - ✓ **FIREBASE DEFAULT POPUP EXCLUSIVELY**: All 4 Google Sign-In instances now call simpleGoogleSignIn() function using Firebase's standard popup
-- ✓ **CUSTOM DOMAIN MAINTAINED**: Firebase authDomain correctly set to "portal.we-cush.com" for custom domain authentication
+- ✓ **FIREBASE DOMAIN FIXED**: Reverted authDomain to "cushportal.firebaseapp.com" to resolve Google OAuth authorization issues
 - ✓ **ZERO CUSTOM GOOGLE UI REMAINING**: Complete elimination verified through comprehensive file system search and cleanup
 - ✓ **CUSTOM DOMAIN CONFIGURATION**: Updated Firebase authDomain from "cushportal.firebaseapp.com" to "portal.we-cush.com"
 - ✓ **UI COMPONENTS PRESERVED**: No changes made to existing working UI components or authentication buttons
