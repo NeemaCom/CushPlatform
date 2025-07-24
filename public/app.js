@@ -6048,40 +6048,91 @@ function App() {
     }
     
     console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
-    console.log('🎯 Forcing sophisticated dashboard for testing - bypassing shouldShowDashboard logic');
+    console.log('🎯 Testing inline CSS styles for immediate fix');
     
     return e('div', { key: 'app-container' }, [
-      // Force sophisticated dashboard to test Tailwind CSS
+      // Force sophisticated dashboard to test inline CSS
       user ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
         e('div', { 
           key: 'loading-auth',
-          className: 'min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center'
+          style: {
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'system-ui, -apple-system, sans-serif'
+          }
         }, [
           e('div', {
             key: 'auth-card',
-            className: 'bg-white rounded-xl p-8 shadow-2xl max-w-md w-full mx-4'
+            style: {
+              background: '#ffffff',
+              borderRadius: '0.75rem',
+              padding: '2rem',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              maxWidth: '28rem',
+              width: '100%',
+              margin: '0 1rem'
+            }
           }, [
             e('h1', {
-              key: 'title', 
-              className: 'text-2xl font-bold text-gray-900 mb-4 text-center'
+              key: 'title',
+              style: {
+                fontSize: '1.5rem',
+                fontWeight: '700',
+                color: '#111827',
+                marginBottom: '1rem',
+                textAlign: 'center'
+              }
             }, 'Welcome to CushGlobal'),
             e('p', {
               key: 'desc',
-              className: 'text-gray-600 text-center mb-6'
+              style: {
+                color: '#4b5563',
+                textAlign: 'center',
+                marginBottom: '1.5rem'
+              }
             }, 'Please sign in to access your dashboard'),
             e('div', {
               key: 'auth-buttons',
-              className: 'space-y-3'
+              style: { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
             }, [
               e('button', {
                 key: 'google-btn',
                 onClick: () => window.performGoogleSignIn && window.performGoogleSignIn(),
-                className: 'w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors'
+                style: {
+                  width: '100%',
+                  backgroundColor: '#2563eb',
+                  color: '#ffffff',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                },
+                onMouseOver: (e) => { e.target.style.backgroundColor = '#1d4ed8'; e.target.style.transform = 'translateY(-1px)'; },
+                onMouseOut: (e) => { e.target.style.backgroundColor = '#2563eb'; e.target.style.transform = 'translateY(0)'; }
               }, 'Sign in with Google'),
               e('button', {
                 key: 'email-btn', 
                 onClick: () => window.navigate && window.navigate('signin'),
-                className: 'w-full border border-gray-300 hover:bg-gray-50 text-gray-700 py-3 px-4 rounded-lg transition-colors'
+                style: {
+                  width: '100%',
+                  backgroundColor: '#ffffff',
+                  color: '#374151',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  cursor: 'pointer',
+                  fontSize: '1rem',
+                  fontWeight: '500',
+                  transition: 'all 0.2s ease'
+                },
+                onMouseOver: (e) => { e.target.style.backgroundColor = '#f9fafb'; e.target.style.transform = 'translateY(-1px)'; },
+                onMouseOut: (e) => { e.target.style.backgroundColor = '#ffffff'; e.target.style.transform = 'translateY(0)'; }
               }, 'Sign in with Email')
             ])
           ])
