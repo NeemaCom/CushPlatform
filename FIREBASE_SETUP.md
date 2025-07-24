@@ -1,19 +1,25 @@
-# Firebase Authentication Setup Instructions
+# Firebase Authentication Setup Instructions - Production Configuration
 
-## Current Issue
-The Google Sign-In shows a 403 error with code "auth/unauthorized-domain" because the current Replit domain is not authorized in the Firebase console.
+## Production Domain Configuration
 
-## Quick Fix Required
-
-### 1. Add Current Domain to Firebase Console
+### 1. Firebase Console Configuration Required
 Go to [Firebase Console](https://console.firebase.google.com/) → Select "cushportal" project → Authentication → Settings → Authorized domains
 
-**Add this domain:** `d418f33a-f889-463a-a184-fdf2c28db37d-00-3pkopxu4lo21d.picard.replit.dev`
+**Production Configuration:**
+- **Authorized JavaScript Origins:** `https://we-cush.com`
+- **Authorized Redirect URIs:** `https://we-cush.com/__/auth/handler`
 
-### 2. Current Firebase Configuration
+### 2. Google Cloud Console OAuth Configuration Required
+Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → OAuth 2.0 Client IDs
+
+**Required Settings:**
+- **Authorized JavaScript Origins:** `https://we-cush.com`
+- **Authorized Redirect URIs:** `https://we-cush.com/__/auth/handler`
+
+### 3. Current Firebase Configuration
 - **Project ID:** cushportal
 - **API Key:** AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI
-- **Auth Domain:** cushportal.firebaseapp.com
+- **Auth Domain:** we-cush.com (Updated for production)
 - **App ID:** 1:304174661302:web:8bc1e5f413aae91336f017
 
 ### 3. What Works Now
