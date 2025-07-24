@@ -46,23 +46,50 @@
     try {
       // Wait for Firebase initialization if needed
       if (!window.firebaseAuth) {
-        await window.waitForFirebase('simple-google-signin', 10000);
+        console.log('Waiting for Firebase initialization...');
+        await window.waitForFirebase('simple-google-signin', 15000);
       }
       
       // Import Firebase auth modules
-      const { signInWithPopup, GoogleAuthProvider } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } = 
+        await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
-      // Create Google Auth provider
+      // Create Google Auth provider with additional settings
       const provider = new GoogleAuthProvider();
+      provider.addScope('openid');
       provider.addScope('email');
       provider.addScope('profile');
+      provider.setCustomParameters({
+        'prompt': 'select_account'
+      });
       
-      // Direct Firebase popup sign-in (default UI)
+      // Try popup first, then redirect as fallback
       console.log('Triggering Firebase default Google popup...');
-      const result = await signInWithPopup(window.firebaseAuth, provider);
+      let result;
+      
+      try {
+        result = await signInWithPopup(window.firebaseAuth, provider);
+      } catch (popupError) {
+        console.log('Popup failed, trying redirect method:', popupError.code);
+        
+        if (popupError.code === 'auth/popup-blocked' || 
+            popupError.code === 'auth/popup-closed-by-user' ||
+            popupError.code === 'auth/cancelled-popup-request') {
+          // Use redirect method as fallback
+          console.log('Using redirect method...');
+          await signInWithRedirect(window.firebaseAuth, provider);
+          return; // Page will redirect and come back
+        }
+        throw popupError;
+      }
       
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
+        
+        // Sync with backend if function exists
+        if (window.syncFirebaseUserWithBackend) {
+          await window.syncFirebaseUserWithBackend(result.user, false);
+        }
         
         // Simple success notification
         window.showSuccessNotification(`Welcome ${result.user.displayName || result.user.email}!`);
@@ -77,10 +104,21 @@
     } catch (error) {
       console.error('Google sign-in error:', error);
       
-      // Show simple error message
-      let errorMessage = window.getEnhancedFirebaseErrorMessage(error);
-      window.showErrorNotification(errorMessage);
+      // Enhanced error handling for common issues
+      let errorMessage;
+      if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'auth/unauthorized-domain') {
+        errorMessage = 'This domain is not authorized. Please contact support.';
+      } else if (error.code === 'auth/popup-blocked') {
+        errorMessage = 'Popup was blocked. Please allow popups and try again.';
+      } else if (error.code === 'auth/internal-error') {
+        errorMessage = 'Authentication service error. Please try again in a moment.';
+      } else {
+        errorMessage = window.getEnhancedFirebaseErrorMessage(error);
+      }
       
+      window.showErrorNotification(errorMessage);
       throw error;
     }
   };
