@@ -6048,95 +6048,12 @@ function App() {
     }
     
     console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
-    console.log('🎯 Testing inline CSS styles for immediate fix');
+    console.log('🎯 Restoring full homepage with sophisticated design');
     
     return e('div', { key: 'app-container' }, [
-      // Force sophisticated dashboard to test inline CSS
-      user ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
-        e('div', { 
-          key: 'loading-auth',
-          style: {
-            minHeight: '100vh',
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb, #1d4ed8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'system-ui, -apple-system, sans-serif'
-          }
-        }, [
-          e('div', {
-            key: 'auth-card',
-            style: {
-              background: '#ffffff',
-              borderRadius: '0.75rem',
-              padding: '2rem',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              maxWidth: '28rem',
-              width: '100%',
-              margin: '0 1rem'
-            }
-          }, [
-            e('h1', {
-              key: 'title',
-              style: {
-                fontSize: '1.5rem',
-                fontWeight: '700',
-                color: '#111827',
-                marginBottom: '1rem',
-                textAlign: 'center'
-              }
-            }, 'Welcome to CushGlobal'),
-            e('p', {
-              key: 'desc',
-              style: {
-                color: '#4b5563',
-                textAlign: 'center',
-                marginBottom: '1.5rem'
-              }
-            }, 'Please sign in to access your dashboard'),
-            e('div', {
-              key: 'auth-buttons',
-              style: { display: 'flex', flexDirection: 'column', gap: '0.75rem' }
-            }, [
-              e('button', {
-                key: 'google-btn',
-                onClick: () => window.performGoogleSignIn && window.performGoogleSignIn(),
-                style: {
-                  width: '100%',
-                  backgroundColor: '#2563eb',
-                  color: '#ffffff',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                },
-                onMouseOver: (e) => { e.target.style.backgroundColor = '#1d4ed8'; e.target.style.transform = 'translateY(-1px)'; },
-                onMouseOut: (e) => { e.target.style.backgroundColor = '#2563eb'; e.target.style.transform = 'translateY(0)'; }
-              }, 'Sign in with Google'),
-              e('button', {
-                key: 'email-btn', 
-                onClick: () => window.navigate && window.navigate('signin'),
-                style: {
-                  width: '100%',
-                  backgroundColor: '#ffffff',
-                  color: '#374151',
-                  padding: '0.75rem 1rem',
-                  borderRadius: '0.5rem',
-                  border: '1px solid #d1d5db',
-                  cursor: 'pointer',
-                  fontSize: '1rem',
-                  fontWeight: '500',
-                  transition: 'all 0.2s ease'
-                },
-                onMouseOver: (e) => { e.target.style.backgroundColor = '#f9fafb'; e.target.style.transform = 'translateY(-1px)'; },
-                onMouseOut: (e) => { e.target.style.backgroundColor = '#ffffff'; e.target.style.transform = 'translateY(0)'; }
-              }, 'Sign in with Email')
-            ])
-          ])
-        ]),
+      // Show dashboard for authenticated users, otherwise show full homepage
+      shouldShowDashboard ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
+        e(AppRouter, { key: 'app-router', user, isInstalled, deferredPrompt, installPWA }),
       
       // Show Imisi chat for authenticated users only
       user && e(ImisiChatHead, { key: 'imisi-chat' }),
