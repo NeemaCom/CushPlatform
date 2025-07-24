@@ -67,10 +67,16 @@ export async function createServer() {
     }
   }));
   
-  // Serve build assets with proper headers
+  // Serve build assets with proper headers and cache control
   app.use(express.static(staticDir, { 
     index: false,
     setHeaders: (res, filePath) => {
+      // Aggressive cache busting for development
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Last-Modified', new Date().toUTCString());
+      
       if (filePath.endsWith('.css')) {
         res.setHeader('Content-Type', 'text/css');
       }
