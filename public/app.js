@@ -1,6 +1,8 @@
 // React 18 Components for Cush Platform - Fixed Syntax
-const { useState, useEffect, createElement: e } = React;
-const { createRoot } = ReactDOM;
+// React helpers initialized after dependencies are loaded
+
+// React helpers - will be defined when React loads
+let e, useState, useEffect, useRef, createRoot;
 
 // Chart.js Configuration
 Chart.register(
@@ -14998,27 +15000,117 @@ function RailsrPayPage({ user, onBack }) {
   ]);
 }
 
+// Ensure all dependencies are available
+function waitForDependencies(callback) {
+  let attempts = 0;
+  const maxAttempts = 50; // 5 seconds max wait
+  
+  function check() {
+    attempts++;
+    if (window.React && window.ReactDOM && window.ReactDOM.createRoot) {
+      console.log('✅ All dependencies loaded successfully');
+      
+      // Define React helpers globally after React is loaded
+      window.e = React.createElement;
+      window.useState = React.useState;
+      window.useEffect = React.useEffect;
+      window.useRef = React.useRef;
+      window.createRoot = ReactDOM.createRoot;
+      
+      // Update the file-level variables
+      e = React.createElement;
+      useState = React.useState;
+      useEffect = React.useEffect;
+      useRef = React.useRef;
+      createRoot = ReactDOM.createRoot;
+      
+      callback();
+    } else if (attempts < maxAttempts) {
+      console.log(`⏳ Waiting for dependencies... (${attempts}/${maxAttempts})`);
+      setTimeout(check, 100);
+    } else {
+      console.error('❌ Failed to load React dependencies');
+      // Show error message
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        rootElement.innerHTML = `
+          <div style="min-height: 100vh; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
+            <div style="text-align: center; color: #dc2626; max-width: 600px; padding: 2rem;">
+              <h1 style="font-size: 2rem; margin-bottom: 1rem;">Loading Error</h1>
+              <p style="margin-bottom: 1rem;">The application failed to load properly. Please refresh the page.</p>
+              <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Refresh Page</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+  }
+  check();
+}
+
 // Mount the application
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('DOM Content Loaded - Starting React app...');
-  const rootElement = document.getElementById('root');
-  if (rootElement) {
-    console.log('Root element found, creating React root...');
-    const root = createRoot(rootElement);
-    console.log('React root created, rendering App component...');
-    root.render(e(App));
-    console.log('App component rendered successfully');
-    
-    // Add quick visual test
-    setTimeout(() => {
-      const testElement = document.querySelector('.bg-gradient-to-br');
-      if (testElement) {
-        console.log('✅ Tailwind classes are being applied correctly');
-      } else {
-        console.warn('⚠️ Tailwind gradient classes not found - possible styling issue');
+  console.log('🚀 DOM Content Loaded - Starting React app...');
+  
+  waitForDependencies(() => {
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      console.log('📦 Root element found, creating React root...');
+      try {
+        const root = window.createRoot(rootElement);
+        console.log('⚛️ React root created, rendering test component first...');
+        
+        // First render a simple test component to verify React is working
+        const TestComponent = React.createElement('div', {
+          style: { 
+            minHeight: '100vh', 
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb)', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            color: 'white',
+            fontFamily: 'system-ui'
+          }
+        }, React.createElement('h1', null, '🚀 CUSH Platform Loading...'));
+        
+        root.render(TestComponent);
+        console.log('✅ Test component rendered successfully');
+        
+        // Now try to render the full app after a brief delay
+        setTimeout(() => {
+          console.log('🔄 Now rendering full App component...');
+          try {
+            root.render(React.createElement(App));
+            console.log('✅ Full App component rendered successfully');
+          } catch (appError) {
+            console.error('❌ Error rendering full App:', appError);
+            // Keep the test component visible if full app fails
+          }
+        }, 1000);
+        
+        // Add visual verification
+        setTimeout(() => {
+          const testElement = document.querySelector('.bg-gradient-to-br, .min-h-screen');
+          if (testElement) {
+            console.log('✅ Tailwind classes are being applied correctly');
+          } else {
+            console.warn('⚠️ Styling may not be applied correctly');
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('❌ Error rendering React app:', error);
+        rootElement.innerHTML = `
+          <div style="min-height: 100vh; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
+            <div style="text-align: center; color: #dc2626; max-width: 600px; padding: 2rem;">
+              <h1 style="font-size: 2rem; margin-bottom: 1rem;">Render Error</h1>
+              <p style="margin-bottom: 1rem;">Error: ${error.message}</p>
+              <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Refresh Page</button>
+            </div>
+          </div>
+        `;
       }
-    }, 1000);
-  } else {
-    console.error('Root element not found');
-  }
+    } else {
+      console.error('❌ Root element not found');
+    }
+  });
 });
