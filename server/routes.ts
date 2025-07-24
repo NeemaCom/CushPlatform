@@ -253,6 +253,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const safeUser = createSafeUser(user);
         console.log('Firebase sync successful for existing user:', safeUser.email);
         SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
+        
+        // Create welcome back notification for returning users
+        const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
+        const daysSinceLastLogin = lastLogin ? Math.floor((Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        
+        if (daysSinceLastLogin > 0) {
+          createActivityNotification(user.id, 'login', { lastLoginDays: daysSinceLastLogin });
+        }
+        
         res.json({ success: true, user: safeUser });
       }
     } catch (error) {
@@ -737,6 +746,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         req.get('User-Agent'),
         { fields: Object.keys(updateData) }
       );
+      
+      // Create notification for profile update
+      createActivityNotification(userId, 'profile_updated');
       
       const safeUser = createSafeUser(updatedUser);
       res.json(safeUser);
@@ -1311,6 +1323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         financialGoals: [], // Empty for now - will be populated from database when user creates goals
       };
 
+      // Create welcome notification for first-time dashboard visitors
+      const isFirstDashboardVisit = !user.lastLoginAt || 
+        (user.lastLoginAt && Math.abs(new Date().getTime() - new Date(user.lastLoginAt).getTime()) > 24 * 60 * 60 * 1000);
+      
+      if (isFirstDashboardVisit) {
+        createActivityNotification(userId, 'dashboard_view', { firstTime: true });
+      }
+
       res.json(dashboardData);
     } catch (error) {
       console.error("Dashboard data error:", error);
@@ -1715,6 +1735,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const type = req.query.type as string;
       
       const providers = await loanService.getLoanProviders(country, type);
+      
+      // Create notification for viewing loan options
+      const userId = req.userId!;
+      if (providers.length > 0) {
+        createActivityNotification(userId, 'loan_application_viewed', { 
+          provider: providers.length > 1 ? 'multiple providers' : providers[0].name 
+        });
+      }
+      
       res.json(providers);
     } catch (error) {
       console.error("Get loan providers error:", error);
@@ -3599,56 +3628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create test critical financial alerts (demo purposes)
-  app.post('/api/notifications/test-critical-alerts', isAuthenticated, async (req: AuthenticatedRequest, res) => {
-    try {
-      const userId = req.userId!;
-      
-      // Create sample critical financial alerts
-      const alerts = [
-        notificationService.createCriticalSecurityAlert(
-          userId,
-          'Suspicious Login Detected',
-          'We detected a login attempt from an unusual location. Please verify your account security.',
-          '/account/security'
-        ),
-        notificationService.createPaymentAlert(
-          userId,
-          'failed',
-          '£500.00',
-          'GBP',
-          'LOAN-APP-001'
-        ),
-        notificationService.createLoanStatusAlert(
-          userId,
-          'loan_123',
-          'approved',
-          '£15,000',
-          'Barclays'
-        ),
-        notificationService.createCreditScoreAlert(
-          userId,
-          720,
-          695,
-          'increase'
-        ),
-        notificationService.createMigrationAlert(
-          userId,
-          'visa_expiry',
-          'Your visa expires in 30 days. Take action now to avoid status issues.',
-          30
-        )
-      ];
-      
-      res.json({ 
-        message: "Critical alerts created successfully",
-        alerts: alerts.map(a => ({ id: a.id, type: a.type, priority: a.priority, title: a.title }))
-      });
-    } catch (error) {
-      console.error('Error creating test alerts:', error);
-      res.status(500).json({ error: "Failed to create test alerts" });
-    }
-  });
+  // Live notification triggers for real user activities - automatically called by various endpoints
 
   // Create manual financial alert (admin only)
   app.post('/api/admin/notifications/financial-alert', isAuthenticated, requireAdmin, async (req: AuthenticatedRequest, res) => {
@@ -3757,27 +3737,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create test notifications (development only)
-  app.post('/api/notifications/test', isAuthenticated, async (req: AuthenticatedRequest, res) => {
-    if (process.env.NODE_ENV === 'production') {
-      return res.status(404).json({ error: 'Not found' });
-    }
-    
+  // Automatic notification triggers for real user activities
+  
+  // Helper function to create activity notifications
+  const createActivityNotification = async (userId: number, activity: string, details: any = {}) => {
     try {
-      const userId = req.userId!;
-      
-      // Create sample notifications
-      notificationService.createLoanNotification(userId, 'application', 'Test Bank');
-      notificationService.createFinancialNotification(userId, 'goal', 'You\'re 80% towards your savings goal!');
-      notificationService.createCommunityNotification(userId, 'event', 'Immigration Workshop this Friday');
-      notificationService.createAchievementNotification(userId, 'First Steps', 'Completed your first loan application');
-      
-      res.json({ message: "Test notifications created" });
+      switch (activity) {
+        case 'login':
+          notificationService.createSystemNotification(
+            userId, 
+            'Welcome Back!', 
+            `Welcome back to Cush! You last signed in ${details.lastLoginDays || 0} days ago.`,
+            'low'
+          );
+          break;
+          
+        case 'dashboard_view':
+          if (details.firstTime) {
+            notificationService.createSystemNotification(
+              userId,
+              'Getting Started',
+              'Welcome to your financial dashboard! Explore your balance, apply for loans, and connect with our community.',
+              'medium'
+            );
+          }
+          break;
+          
+        case 'loan_application_viewed':
+          notificationService.createLoanNotification(
+            userId,
+            'interest',
+            `You viewed loan options from ${details.provider || 'multiple providers'}. Ready to apply?`
+          );
+          break;
+          
+        case 'profile_updated':
+          notificationService.createSystemNotification(
+            userId,
+            'Profile Updated',
+            'Your profile information has been successfully updated.',
+            'low'
+          );
+          break;
+          
+        case 'community_engagement':
+          notificationService.createCommunityNotification(
+            userId,
+            'engagement',
+            details.message || 'Thank you for engaging with our community!'
+          );
+          break;
+          
+        case 'payment_success':
+          notificationService.createFinancialNotification(
+            userId,
+            'payment',
+            `Payment of ${details.amount || 'amount'} has been processed successfully.`,
+            'medium'
+          );
+          break;
+          
+        case 'goal_progress':
+          notificationService.createFinancialNotification(
+            userId,
+            'goal',
+            details.message || 'You\'re making great progress on your financial goals!',
+            'low'
+          );
+          break;
+      }
     } catch (error) {
-      console.error('Error creating test notifications:', error);
-      res.status(500).json({ error: "Failed to create test notifications" });
+      console.error('Error creating activity notification:', error);
     }
-  });
+  };
 
   // Get test user credentials (development only)
   app.get('/api/test-credentials', async (req: AuthenticatedRequest, res) => {
