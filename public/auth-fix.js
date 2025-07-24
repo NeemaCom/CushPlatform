@@ -161,9 +161,25 @@
         const syncResult = await window.syncFirebaseUserWithBackend(result.user, false);
         
         if (syncResult.success) {
-          // Show success notification with user name
-          const userName = result.user.displayName || result.user.email.split('@')[0];
-          window.showSuccessNotification(`Welcome back, ${userName}!`);
+          // Show success notification with user name using enhanced notification system
+          const backendUser = syncResult.user;
+          let userName;
+          
+          if (backendUser && backendUser.firstName) {
+            // Use backend user data first (has firstName/lastName)
+            userName = backendUser.firstName + (backendUser.lastName ? ' ' + backendUser.lastName : '');
+          } else if (result.user.displayName) {
+            // Fall back to Firebase displayName
+            userName = result.user.displayName;
+          } else {
+            // Final fallback to email prefix
+            userName = result.user.email.split('@')[0];
+          }
+          
+          console.log('Showing success notification for user:', userName);
+          if (typeof window.showSuccessNotification === 'function') {
+            window.showSuccessNotification(userName, 'login');
+          }
           
           // Redirect to dashboard after 1.5 seconds
           setTimeout(() => {
@@ -188,32 +204,7 @@
 
   // Removed custom function aliases - using only simpleGoogleSignIn for all Google authentication
 
-  // Success notification helper
-  window.showSuccessNotification = (message) => {
-    const notification = document.createElement('div');
-    notification.style.cssText = `
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      background: #2563eb;
-      color: white;
-      padding: 16px 24px;
-      border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      z-index: 10000;
-      font-family: system-ui, -apple-system, sans-serif;
-      font-size: 14px;
-      max-width: 300px;
-    `;
-    notification.textContent = message;
-    document.body.appendChild(notification);
-    
-    setTimeout(() => {
-      if (notification.parentNode) {
-        notification.remove();
-      }
-    }, 4000);
-  };
+  // Simple notification fallback (enhanced version loaded from success-notification.js)
 
   // Error notification helper
   window.showErrorNotification = (message) => {
