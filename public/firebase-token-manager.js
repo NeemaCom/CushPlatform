@@ -22,7 +22,7 @@
     try {
       // Wait for Firebase to be initialized
       if (!window.firebaseAuth || !window.firebaseAuth.currentUser) {
-        console.log('📋 No Firebase user available for token');
+        // Silent return for unauthenticated users
         return null;
       }
       
@@ -81,7 +81,7 @@
       headers['Authorization'] = `Bearer ${token}`;
       console.log('🔑 Added Firebase ID token to request');
     } else {
-      console.warn('⚠️ No Firebase token available, request may fail');
+      // Silent for unauthenticated users (normal for public pages)
     }
     
     // Make the request with enhanced options
