@@ -56,8 +56,73 @@
     return stored || '#dashboard';
   };
 
-  // Redirect all Google sign-in calls to simplified function
-  window.performGoogleSignInWithRouting = window.simpleGoogleSignIn;
+  // Enhanced Google Sign-In that properly handles hash routing
+  window.performGoogleSignInWithRouting = async (preferredMethod = 'popup') => {
+    try {
+      // Pause hash routing during auth
+      window.pauseHashRouting();
+      
+      const auth = await window.initializeFirebaseAuth();
+      const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
+        await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Force account selection
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      if (preferredMethod === 'popup') {
+        try {
+          console.log('Attempting Google sign-in with popup (routing paused)...');
+          const result = await signInWithPopup(auth, provider);
+          console.log('Popup sign-in successful');
+          return result;
+        } catch (popupError) {
+          if (popupError.code === 'auth/popup-blocked' || 
+              popupError.code === 'auth/popup-closed-by-user') {
+            console.log('Popup failed, falling back to redirect method...');
+            
+            // Clear any hash that might interfere with redirect
+            const currentHash = window.location.hash;
+            if (currentHash) {
+              sessionStorage.setItem(PRE_AUTH_HASH_KEY, currentHash);
+              // Temporarily clear hash for clean redirect
+              history.replaceState(null, null, window.location.pathname + window.location.search);
+            }
+            
+            await signInWithRedirect(auth, provider);
+            return null; // Will be handled by getRedirectResult on next load
+          }
+          throw popupError;
+        }
+      } else {
+        // Use redirect method directly
+        console.log('Using redirect method...');
+        
+        // Clear hash for clean redirect and store intended destination
+        const currentHash = window.location.hash;
+        if (currentHash && currentHash !== '#signin' && currentHash !== '#signup') {
+          sessionStorage.setItem(PRE_AUTH_HASH_KEY, currentHash);
+        } else {
+          // Default to dashboard for sign-in/sign-up pages
+          sessionStorage.setItem(PRE_AUTH_HASH_KEY, '#dashboard');
+        }
+        // Temporarily clear hash for clean redirect
+        history.replaceState(null, null, window.location.pathname + window.location.search);
+        
+        await signInWithRedirect(auth, provider);
+        return null;
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      window.resumeHashRouting();
+      throw error;
+    }
+  };
 
   // Enhanced redirect result handler that manages routing
   window.handleFirebaseRedirectWithRouting = async () => {

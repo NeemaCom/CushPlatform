@@ -86,12 +86,9 @@
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
         
-        // Sync with backend
-        try {
+        // Sync with backend if function exists
+        if (window.syncFirebaseUserWithBackend) {
           await window.syncFirebaseUserWithBackend(result.user, false);
-        } catch (syncError) {
-          console.error('Backend sync failed:', syncError);
-          // Continue anyway - Firebase authentication succeeded
         }
         
         // Simple success notification
@@ -185,37 +182,4 @@
   };
 
   console.log('Authentication Fix Module ready');
-  // Backend sync function for Firebase users
-  window.syncFirebaseUserWithBackend = async (firebaseUser, isNewUser = false) => {
-    console.log('Syncing Firebase user with backend:', firebaseUser.email);
-    
-    try {
-      const response = await fetch('/api/auth/firebase-sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          isNewUser: isNewUser
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Backend sync failed: ${response.status}`);
-      }
-
-      const result = await response.json();
-      console.log('Backend sync successful:', result);
-      return result;
-      
-    } catch (error) {
-      console.error('Backend sync error:', error);
-      throw error;
-    }
-  };
-
 })();

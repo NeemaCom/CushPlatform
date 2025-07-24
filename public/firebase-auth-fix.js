@@ -61,8 +61,64 @@
     }
   };
 
-  // Redirect all Google sign-in calls to simplified function
-  window.performGoogleSignIn = window.simpleGoogleSignIn;
+  // Enhanced Google Sign-In with both popup and redirect fallback
+  window.performGoogleSignIn = async (preferredMethod = 'popup') => {
+    try {
+      const auth = await window.initializeFirebaseAuth();
+      const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
+        await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
+      
+      // Force account selection
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+
+      // Store the method being used
+      sessionStorage.setItem(AUTH_METHOD_KEY, 'google');
+      
+      if (preferredMethod === 'popup') {
+        try {
+          console.log('Attempting Google sign-in with popup...');
+          const result = await signInWithPopup(auth, provider);
+          console.log('Google sign-in successful via popup');
+          return result;
+        } catch (popupError) {
+          console.log('Popup sign-in failed:', popupError.code, popupError.message);
+          
+          // If popup fails for any reason, try redirect method
+          if (popupError.code === 'auth/popup-blocked' || 
+              popupError.code === 'auth/popup-closed-by-user' ||
+              popupError.code === 'auth/cancelled-popup-request' ||
+              popupError.message.includes('popup')) {
+            console.log('Popup failed, falling back to redirect method...');
+            console.log('Setting redirect flag for detection...');
+            
+            // Set flags to help with redirect detection
+            sessionStorage.setItem('google_auth_redirect', 'true');
+            sessionStorage.setItem('auth_redirect_timestamp', Date.now().toString());
+            window.captureIntendedUrl();
+            
+            await signInWithRedirect(auth, provider);
+            return null; // Will be handled by getRedirectResult on next page load
+          }
+          throw popupError;
+        }
+      } else {
+        // Use redirect method directly
+        console.log('Using redirect method for Google sign-in...');
+        window.captureIntendedUrl();
+        await signInWithRedirect(auth, provider);
+        return null; // Will be handled by getRedirectResult on next page load
+      }
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      throw error;
+    }
+  };
 
   // Handle redirect result on page load
   window.handleFirebaseRedirectResult = async () => {
