@@ -123,9 +123,7 @@
     }
   };
 
-  // Alias for backward compatibility
-  window.enhancedGoogleSignUp = window.simpleGoogleSignIn;
-  window.enhancedGoogleSignUpForSignUp = window.simpleGoogleSignIn;
+  // Removed custom function aliases - using only simpleGoogleSignIn for all Google authentication
 
   // Success notification helper
   window.showSuccessNotification = (message) => {
