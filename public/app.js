@@ -1,24 +1,6 @@
 // React 18 Components for Cush Platform - Fixed Syntax
-// React helpers initialized after dependencies are loaded
-
-// React helpers - will be defined when React loads
-let e, useState, useEffect, useRef, createRoot;
-
-// Add global error handling for React components
-window.addEventListener('error', (event) => {
-  console.error('❌ Global JavaScript Error:', event.error);
-  console.error('Error details:', {
-    message: event.message,
-    filename: event.filename,
-    lineno: event.lineno,
-    colno: event.colno,
-    stack: event.error?.stack
-  });
-});
-
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('❌ Unhandled Promise Rejection:', event.reason);
-});
+const { useState, useEffect, createElement: e } = React;
+const { createRoot } = ReactDOM;
 
 // Chart.js Configuration
 Chart.register(
@@ -1567,21 +1549,39 @@ function SignInPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    // Track Google sign-in attempt
+    if (window.trackButtonClick) {
+      window.trackButtonClick('google_signin', 'authentication');
+    }
+    
     setLoading(true);
     setAuthError('');
     
     try {
-      console.log('Starting simple Google Sign-In popup...');
+      console.log('Starting Google Sign-In process...');
       
-      // Use simple popup approach - no fallbacks, no complex logic
+      // Try popup first, fallback to redirect
       const auth = window.firebaseAuth || await window.initializeFirebaseAuth();
-      const { signInWithPopup, GoogleAuthProvider } = 
+      const { signInWithPopup, signInWithRedirect, GoogleAuthProvider } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
       const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
       
-      // Simple popup sign-in - let Firebase handle everything
-      const result = await signInWithPopup(auth, provider);
+      let result;
+      try {
+        console.log('Attempting popup sign-in...');
+        result = await signInWithPopup(auth, provider);
+      } catch (error) {
+        if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+          console.log('Popup blocked, using redirect...');
+          // Redirect to Firebase auth domain for proper OAuth handling
+          await signInWithRedirect(auth, provider);
+          return; // Page will redirect to Firebase and back
+        }
+        throw error;
+      }
       
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
@@ -1969,23 +1969,66 @@ function SignInPage() {
               }, 'Forgot Password? Reset here')
             ]),
 
-            // Plain Google Sign-In Button (Default Popup)
+            // Google Sign In Button
             e('div', {
               key: 'google-signin-section',
-              className: 'mt-4'
+              className: 'space-y-4'
             }, [
-              e('p', {
-                key: 'or-text',
-                className: 'text-center text-gray-600 mb-3'
-              }, 'or'),
-              
+              e('div', {
+                key: 'divider',
+                className: 'relative flex items-center'
+              }, [
+                e('div', {
+                  key: 'divider-line',
+                  className: 'flex-grow border-t border-gray-300'
+                }),
+                e('span', {
+                  key: 'divider-text',
+                  className: 'flex-shrink mx-4 text-gray-600 text-sm'
+                }, 'or continue with'),
+                e('div', {
+                  key: 'divider-line-2',
+                  className: 'flex-grow border-t border-gray-300'
+                })
+              ]),
+
               e('button', {
                 key: 'google-signin-button',
                 type: 'button',
                 onClick: handleGoogleSignIn,
                 disabled: loading,
-                className: 'w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded disabled:opacity-50'
-              }, loading ? 'Signing in...' : 'Sign in with Google')
+                className: `w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-semibold py-4 px-6 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl flex items-center justify-center gap-3 ${loading ? 'cursor-not-allowed opacity-60' : ''}`
+              }, [
+                e('svg', {
+                  key: 'google-icon',
+                  className: 'w-5 h-5',
+                  viewBox: '0 0 24 24'
+                }, [
+                  e('path', {
+                    key: 'google-path',
+                    fill: '#4285F4',
+                    d: 'M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z'
+                  }),
+                  e('path', {
+                    key: 'google-path-2',
+                    fill: '#34A853',
+                    d: 'M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z'
+                  }),
+                  e('path', {
+                    key: 'google-path-3',
+                    fill: '#FBBC05',
+                    d: 'M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z'
+                  }),
+                  e('path', {
+                    key: 'google-path-4',
+                    fill: '#EA4335',
+                    d: 'M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z'
+                  })
+                ]),
+                'Continue with Google'
+              ]),
+              
+
             ]),
             
             e('button', {
@@ -5410,13 +5453,9 @@ For personalized immigration strategy, consult with our experienced immigration 
 
 // Main App Component with Enhanced Firebase Authentication
 function App() {
-  console.log('🎯 App function called - rendering sophisticated app...');
-  
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
-  
-  console.log('🔄 App state initialized - isLoading:', isLoading, 'user:', user, 'firebaseInitialized:', firebaseInitialized);
   
   // PWA Installation State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -5436,54 +5475,20 @@ function App() {
           const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
           
           onAuthStateChanged(auth, async (firebaseUser) => {
-            console.log('🔄 Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
-            
-            // Delay processing to allow redirect result to be handled first
-            await new Promise(resolve => setTimeout(resolve, 500));
+            console.log('Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
             
             if (firebaseUser) {
-              console.log('✅ Firebase user found, syncing with backend...');
               // Try to sync with backend
               try {
                 await handleFirebaseUser(firebaseUser);
-                
-                // CRITICAL: Route authenticated users to dashboard
-                const currentHash = window.location.hash;
-                if (!currentHash || currentHash === '#' || currentHash === '#signin' || currentHash === '#signup') {
-                  console.log('🎯 Routing authenticated user to dashboard');
-                  setTimeout(() => {
-                    window.location.hash = '#dashboard';
-                  }, 1000);
-                }
               } catch (syncError) {
                 console.error('Firebase sync error:', syncError);
                 // Still check if user exists in backend
                 checkBackendAuth();
               }
             } else {
-              console.log('Auth state changed:', 'null');
-              setUser(null);
-              setIsLoading(false);
-              
-              // If user signed out and is on a protected route, redirect to homepage
-              const currentHash = window.location.hash;
-              const isOnProtectedRoute = currentHash.startsWith('#dashboard') || 
-                                       currentHash.startsWith('#account') ||
-                                       currentHash.startsWith('#loans') ||
-                                       currentHash.startsWith('#community') ||
-                                       currentHash.startsWith('#railsr-pay') ||
-                                       currentHash.startsWith('#admin');
-              
-              if (isOnProtectedRoute) {
-                console.log('User signed out from protected route, redirecting to homepage');
-                window.location.hash = '';
-                setTimeout(() => {
-                  window.location.href = window.location.origin;
-                }, 100);
-              } else {
-                // No Firebase user, check backend directly for non-protected routes
-                checkBackendAuth();
-              }
+              // No Firebase user, check backend directly
+              checkBackendAuth();
             }
           });
           
@@ -5707,25 +5712,19 @@ function App() {
       // Step 4: Clear user state
       setUser(null);
       
-      // Step 5: Guaranteed redirection to homepage (not dashboard)
+      // Step 5: Guaranteed redirection with multiple fallbacks
       try {
-        // Clear the hash first to prevent dashboard redirect
-        window.location.hash = '';
+        window.location.href = '/';
         
-        // Force redirect to homepage
         setTimeout(() => {
-          window.location.href = window.location.origin;
+          if (window.location.hash !== '' && window.location.hash !== '#') {
+            window.location.hash = '';
+            window.location.reload();
+          }
         }, 100);
         
-        // Backup redirection methods
         setTimeout(() => {
-          window.location.replace(window.location.origin);
-        }, 300);
-        
-        setTimeout(() => {
-          if (window.location.pathname !== '/' || window.location.hash !== '') {
-            window.location.assign(window.location.origin + '/');
-          }
+          window.location.replace('/');
         }, 500);
         
       } catch (redirectError) {
@@ -5967,67 +5966,23 @@ function App() {
   }
 
   const currentHash = window.location.hash;
-  const shouldShowDashboard = Boolean(user && (
+  const shouldShowDashboard = user && (
     currentHash === '#dashboard' || 
-    (currentHash === '#' && user) || 
-    (currentHash === '' && user) || 
+    currentHash === '#' || 
+    currentHash === '' || 
     currentHash === '#home' ||
-    // Only show dashboard for authenticated users on specific dashboard routes
-    (user && currentHash.startsWith('#') && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms') && currentHash !== '#')
-  ));
+    // If user is authenticated and no specific route is set, show dashboard
+    (user && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms'))
+  );
   
-  console.log('🎨 App rendering with shouldShowDashboard:', shouldShowDashboard, 'user:', user);
-  console.log('🔍 Available components check - Dashboard:', typeof Dashboard, 'AppRouter:', typeof AppRouter);
-  
-  try {
-    // Test if critical components are defined
-    if (typeof Dashboard === 'undefined') {
-      console.error('❌ Dashboard component is not defined');
-      return e('div', { 
-        style: {
-          minHeight: '100vh',
-          background: '#fef2f2',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'system-ui',
-          padding: '2rem'
-        }
-      }, [
-        e('div', {
-          style: { textAlign: 'center', color: '#dc2626', maxWidth: '600px' }
-        }, [
-          e('h1', { style: { fontSize: '2rem', marginBottom: '1rem' } }, 'Dashboard Component Missing'),
-          e('p', { style: { marginBottom: '1rem' } }, 'The Dashboard component is not defined. This may be causing the fallback to basic UI.'),
-          e('button', {
-            onClick: () => window.location.reload(),
-            style: {
-              background: '#dc2626',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer'
-            }
-          }, 'Reload Page')
-        ])
-      ]);
-    }
+  return e('div', { key: 'app-container' }, [
+    // Show Dashboard for authenticated users unless on specific public pages
+    shouldShowDashboard ? 
+      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
+      e(AppRouter, { key: 'router', user }),
     
-    // AppRouter is defined later in the file, so we skip this check
-    
-    console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
-    console.log('🎯 Restoring full homepage with sophisticated design');
-    
-    return e('div', { key: 'app-container' }, [
-      // Show dashboard for authenticated users, otherwise show full homepage
-      shouldShowDashboard ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
-        // Direct homepage render to bypass AppRouter timing issues
-        user ? e(Dashboard, { key: 'dashboard-user', user, isInstalled, deferredPrompt, installPWA }) :
-        e(Homepage, { key: 'homepage', user }),
-      
-      // Show Imisi chat for authenticated users only
-      user && e(ImisiChatHead, { key: 'imisi-chat' }),
+    // Show Imisi chat for authenticated users only
+    user && e(ImisiChatHead, { key: 'imisi-chat' }),
     
     // PWA Install Prompt
     showInstallPrompt && !isInstalled && e('div', {
@@ -6085,45 +6040,6 @@ function App() {
       ])
     ])
   ]);
-  } catch (renderError) {
-    console.error('❌ App render error:', renderError);
-    // Return a fallback simple app
-    return e('div', { 
-      style: {
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-        color: 'white',
-        fontFamily: 'system-ui',
-        padding: '2rem',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center'
-      }
-    }, [
-      e('h1', { 
-        key: 'error-title',
-        style: { fontSize: '2rem', marginBottom: '1rem' }
-      }, 'Cush Platform - Render Error'),
-      e('p', { 
-        key: 'error-message',
-        style: { marginBottom: '2rem', textAlign: 'center' }
-      }, 'Component rendering failed. Error: ' + renderError.message),
-      e('button', {
-        key: 'reload-btn',
-        onClick: () => window.location.reload(),
-        style: {
-          background: 'rgba(255, 255, 255, 0.9)',
-          color: '#1d4ed8',
-          border: 'none',
-          padding: '0.75rem 1.5rem',
-          borderRadius: '0.5rem',
-          cursor: 'pointer',
-          fontWeight: 'bold'
-        }
-      }, 'Reload Page')
-    ]);
-  }
 }
 
 // Homepage Component
@@ -15042,196 +14958,13 @@ function RailsrPayPage({ user, onBack }) {
   ]);
 }
 
-// Ensure all dependencies are available
-function waitForDependencies(callback) {
-  let attempts = 0;
-  const maxAttempts = 50; // 5 seconds max wait
-  
-  function check() {
-    attempts++;
-    if (window.React && window.ReactDOM && window.ReactDOM.createRoot) {
-      console.log('✅ All dependencies loaded successfully');
-      
-      // Define React helpers globally after React is loaded
-      window.e = React.createElement;
-      window.useState = React.useState;
-      window.useEffect = React.useEffect;
-      window.useRef = React.useRef;
-      window.createRoot = ReactDOM.createRoot;
-      
-      // Update the file-level variables
-      e = React.createElement;
-      useState = React.useState;
-      useEffect = React.useEffect;
-      useRef = React.useRef;
-      createRoot = ReactDOM.createRoot;
-      
-      callback();
-    } else if (attempts < maxAttempts) {
-      console.log(`⏳ Waiting for dependencies... (${attempts}/${maxAttempts})`);
-      setTimeout(check, 100);
-    } else {
-      console.error('❌ Failed to load React dependencies');
-      // Show error message
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        rootElement.innerHTML = `
-          <div style="min-height: 100vh; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
-            <div style="text-align: center; color: #dc2626; max-width: 600px; padding: 2rem;">
-              <h1 style="font-size: 2rem; margin-bottom: 1rem;">Loading Error</h1>
-              <p style="margin-bottom: 1rem;">The application failed to load properly. Please refresh the page.</p>
-              <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Refresh Page</button>
-            </div>
-          </div>
-        `;
-      }
-    }
-  }
-  check();
-}
-
 // Mount the application
 document.addEventListener('DOMContentLoaded', function() {
-  console.log('🚀 DOM Content Loaded - Starting React app...');
-  
-  waitForDependencies(() => {
-    const rootElement = document.getElementById('root');
-    if (rootElement) {
-      console.log('📦 Root element found, creating React root...');
-      try {
-        const root = window.createRoot(rootElement);
-        console.log('⚛️ React root created, rendering test component first...');
-        
-        // Render a simple debugging component first to verify React is working
-        console.log('🔍 Rendering debug component to verify React functionality...');
-        
-        const DebugComponent = React.createElement('div', {
-          style: {
-            minHeight: '100vh',
-            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-            color: 'white',
-            fontFamily: 'system-ui',
-            padding: '2rem',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }
-        }, [
-          React.createElement('h1', { 
-            key: 'title',
-            style: { fontSize: '2rem', marginBottom: '1rem' }
-          }, 'CUSH Platform - Debug Mode'),
-          React.createElement('p', { 
-            key: 'status',
-            style: { marginBottom: '2rem', textAlign: 'center' }
-          }, 'React is working. Now testing sophisticated app components...'),
-          React.createElement('button', {
-            key: 'load-app-btn',
-            onClick: () => {
-              console.log('🚀 Loading sophisticated App component...');
-              try {
-                // Try to render the sophisticated app
-                root.render(React.createElement(App));
-                console.log('✅ Sophisticated App loaded successfully');
-              } catch (error) {
-                console.error('❌ Sophisticated App failed to load:', error);
-                // Show specific error information
-                rootElement.innerHTML = `
-                  <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
-                    <div style="text-align: center; color: #dc2626; max-width: 900px;">
-                      <h1 style="font-size: 2rem; margin-bottom: 1rem;">Sophisticated App Rendering Failed</h1>
-                      <p style="margin-bottom: 1rem; font-weight: bold;">Component Error Details:</p>
-                      <pre style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; margin-bottom: 1rem; white-space: pre-wrap;">${error.message}</pre>
-                      <details style="margin-bottom: 1rem;">
-                        <summary style="cursor: pointer; margin-bottom: 0.5rem; font-weight: bold;">Full Error Stack</summary>
-                        <pre style="background: #f9fafb; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; font-size: 0.875rem; white-space: pre-wrap;">${error.stack}</pre>
-                      </details>
-                      <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; margin: 0.5rem;">Reload Page</button>
-                    </div>
-                  </div>
-                `;
-              }
-            },
-            style: {
-              background: 'rgba(255, 255, 255, 0.9)',
-              color: '#1d4ed8',
-              border: 'none',
-              padding: '0.75rem 1.5rem',
-              borderRadius: '0.5rem',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }
-          }, 'Load Sophisticated App')
-        ]);
-        
-        // First render the debug component, then auto-load the app
-        root.render(DebugComponent);
-        
-        // Auto-load the sophisticated app after 1 second for debugging
-        setTimeout(() => {
-          console.log('🔄 Auto-loading sophisticated app...');
-          try {
-            // Test if App is defined
-            if (typeof App === 'undefined') {
-              console.error('❌ App component is not defined');
-              rootElement.innerHTML = `
-                <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
-                  <div style="text-align: center; color: #dc2626; max-width: 600px;">
-                    <h1 style="font-size: 2rem; margin-bottom: 1rem;">App Component Missing</h1>
-                    <p>The App component is not defined. Check the JavaScript console for more details.</p>
-                    <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; margin-top: 1rem;">Reload Page</button>
-                  </div>
-                </div>
-              `;
-              return;
-            }
-            
-            console.log('✅ App component found, attempting render...');
-            root.render(React.createElement(App));
-            console.log('✅ Sophisticated app auto-loaded successfully');
-          } catch (autoLoadError) {
-            console.error('❌ Auto-load failed:', autoLoadError);
-            console.error('Error details:', autoLoadError.stack);
-            rootElement.innerHTML = `
-              <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
-                <div style="text-align: center; color: #dc2626; max-width: 800px;">
-                  <h1 style="font-size: 2rem; margin-bottom: 1rem;">App Rendering Failed</h1>
-                  <p style="margin-bottom: 1rem;">Error: ${autoLoadError.message}</p>
-                  <details style="margin-bottom: 1rem; text-align: left;">
-                    <summary style="cursor: pointer; font-weight: bold;">Error Stack</summary>
-                    <pre style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; white-space: pre-wrap;">${autoLoadError.stack}</pre>
-                  </details>
-                  <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Reload Page</button>
-                </div>
-              </div>
-            `;
-          }
-        }, 1000);
-        
-        // Add visual verification
-        setTimeout(() => {
-          const testElement = document.querySelector('.bg-gradient-to-br, .min-h-screen');
-          if (testElement) {
-            console.log('✅ Tailwind classes are being applied correctly');
-          } else {
-            console.warn('⚠️ Styling may not be applied correctly');
-          }
-        }, 1000);
-      } catch (error) {
-        console.error('❌ Error rendering React app:', error);
-        rootElement.innerHTML = `
-          <div style="min-height: 100vh; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-family: system-ui;">
-            <div style="text-align: center; color: #dc2626; max-width: 600px; padding: 2rem;">
-              <h1 style="font-size: 2rem; margin-bottom: 1rem;">Render Error</h1>
-              <p style="margin-bottom: 1rem;">Error: ${error.message}</p>
-              <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Refresh Page</button>
-            </div>
-          </div>
-        `;
-      }
-    } else {
-      console.error('❌ Root element not found');
-    }
-  });
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    const root = createRoot(rootElement);
+    root.render(e(App));
+  } else {
+    console.error('Root element not found');
+  }
 });

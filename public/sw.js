@@ -6,7 +6,9 @@ const urlsToCache = [
   '/icon-192.png',
   '/icon-512.png',
   '/favicon.ico',
-  '/apple-touch-icon.png'
+  '/apple-touch-icon.png',
+  'https://cdn.tailwindcss.com/3.3.2',
+  'https://unpkg.com/chart.js@3.9.1/dist/chart.min.js'
 ];
 
 // Install event
@@ -25,21 +27,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Return cached version or fetch from network with CORS handling
-        if (response) {
-          return response;
-        }
-        
-        // Handle CORS for external resources
-        const request = event.request.clone();
-        return fetch(request, {
-          mode: 'cors',
-          credentials: 'omit'
-        }).catch(error => {
-          console.warn('Service Worker fetch failed:', error);
-          // Return a simple response for failed requests
-          return new Response('', { status: 200 });
-        });
+        // Return cached version or fetch from network
+        return response || fetch(event.request);
       })
   );
 });
