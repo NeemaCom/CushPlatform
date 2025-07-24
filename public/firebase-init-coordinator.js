@@ -51,10 +51,10 @@
       const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       const { getAnalytics } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js');
 
-      // Firebase configuration - using standard Firebase domain for better compatibility
+      // Firebase configuration - using standard Firebase domain for Google OAuth compatibility
       const firebaseConfig = {
         apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-        authDomain: "portal.we-cush.com",
+        authDomain: "cushportal.firebaseapp.com",
         projectId: "cushportal",
         storageBucket: "cushportal.firebasestorage.app",
         messagingSenderId: "304174661302",
