@@ -24,26 +24,11 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Custom Styles -->
-    <style>
-      /* Hide scrollbar for horizontal carousel */
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-      
-      /* Smooth scrolling for carousel */
-      .scrollbar-hide {
-        scroll-behavior: smooth;
-      }
-    </style>
+    <!-- Import Tailwind CSS -->
+    <link rel="stylesheet" href="/src/index.css">
   </head>
   <body>
     <div id="root"></div>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
