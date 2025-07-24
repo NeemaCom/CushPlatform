@@ -6048,12 +6048,11 @@ function App() {
     }
     
     console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
+    console.log('🎯 Forcing sophisticated dashboard for testing - bypassing shouldShowDashboard logic');
     
     return e('div', { key: 'app-container' }, [
-      // Show Dashboard for authenticated users unless on specific public pages
-      shouldShowDashboard === true ? 
-        e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
-        e(AppRouter, { key: 'router', user }),
+      // Force sophisticated dashboard to test Tailwind CSS
+      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }),
       
       // Show Imisi chat for authenticated users only
       user && e(ImisiChatHead, { key: 'imisi-chat' }),

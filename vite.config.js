@@ -5,9 +5,17 @@ import path from 'path';
 export default defineConfig({
   plugins: [react()],
   root: '.',
+  css: {
+    postcss: './postcss.config.js',
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      input: {
+        main: path.resolve(process.cwd(), 'index.html')
+      }
+    }
   },
   server: {
     port: 3000,
