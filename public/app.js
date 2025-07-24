@@ -15127,16 +15127,46 @@ document.addEventListener('DOMContentLoaded', function() {
         // First render the debug component, then auto-load the app
         root.render(DebugComponent);
         
-        // Auto-load the sophisticated app after 2 seconds for debugging
+        // Auto-load the sophisticated app after 3 seconds for debugging
         setTimeout(() => {
           console.log('🔄 Auto-loading sophisticated app...');
           try {
+            // Test if App is defined
+            if (typeof App === 'undefined') {
+              console.error('❌ App component is not defined');
+              rootElement.innerHTML = `
+                <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
+                  <div style="text-align: center; color: #dc2626; max-width: 600px;">
+                    <h1 style="font-size: 2rem; margin-bottom: 1rem;">App Component Missing</h1>
+                    <p>The App component is not defined. Check the JavaScript console for more details.</p>
+                    <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; margin-top: 1rem;">Reload Page</button>
+                  </div>
+                </div>
+              `;
+              return;
+            }
+            
+            console.log('✅ App component found, attempting render...');
             root.render(React.createElement(App));
             console.log('✅ Sophisticated app auto-loaded successfully');
           } catch (autoLoadError) {
             console.error('❌ Auto-load failed:', autoLoadError);
+            console.error('Error details:', autoLoadError.stack);
+            rootElement.innerHTML = `
+              <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
+                <div style="text-align: center; color: #dc2626; max-width: 800px;">
+                  <h1 style="font-size: 2rem; margin-bottom: 1rem;">App Rendering Failed</h1>
+                  <p style="margin-bottom: 1rem;">Error: ${autoLoadError.message}</p>
+                  <details style="margin-bottom: 1rem; text-align: left;">
+                    <summary style="cursor: pointer; font-weight: bold;">Error Stack</summary>
+                    <pre style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; white-space: pre-wrap;">${autoLoadError.stack}</pre>
+                  </details>
+                  <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Reload Page</button>
+                </div>
+              </div>
+            `;
           }
-        }, 2000);
+        }, 3000);
         
         // Add visual verification
         setTimeout(() => {
