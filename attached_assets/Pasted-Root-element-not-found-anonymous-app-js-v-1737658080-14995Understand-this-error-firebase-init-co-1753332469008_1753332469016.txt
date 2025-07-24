@@ -1,0 +1,28 @@
+Root element not found
+(anonymous) @ app.js?v=1737658080:14995Understand this error
+firebase-init-coordinator.js?v=1737659200:136 Module "verification-test" Firebase wait failed: Firebase initialization timeout after 5000ms for module "verification-test"
+window.waitForFirebase @ firebase-init-coordinator.js?v=1737659200:136
+await in window.waitForFirebase
+(anonymous) @ deployment-verification.js?v=1737658080:48
+(anonymous) @ deployment-verification.js?v=1737658080:55Understand this error
+deployment-verification.js?v=1737658080:50    ❌ Coordinator error: Firebase initialization timeout after 5000ms for module "verification-test"
+firebase-init-coordinator.js?v=1737659200:136 Module "firebase-auth-fix" Firebase wait failed: Firebase initialization timeout after 25000ms for module "firebase-auth-fix"
+window.waitForFirebase @ firebase-init-coordinator.js?v=1737659200:136
+await in window.waitForFirebase
+window.initializeFirebaseAuth @ firebase-auth-fix.js?v=1737659200:57
+window.setupFirebaseAuthStateListener @ firebase-auth-fix.js?v=1737659200:246Understand this error
+firebase-auth-fix.js?v=1737659200:59 Firebase initialization error in auth-fix: Error: Firebase initialization timeout after 25000ms for module "firebase-auth-fix"
+    at firebase-init-coordinator.js?v=1737659200:128:35
+window.initializeFirebaseAuth @ firebase-auth-fix.js?v=1737659200:59
+await in window.initializeFirebaseAuth
+window.setupFirebaseAuthStateListener @ firebase-auth-fix.js?v=1737659200:246Understand this error
+firebase-auth-fix.js?v=1737659200:285 Auth state listener setup error: Error: Firebase initialization timeout after 25000ms for module "firebase-auth-fix"
+    at firebase-init-coordinator.js?v=1737659200:128:35
+window.setupFirebaseAuthStateListener @ firebase-auth-fix.js?v=1737659200:285Understand this error
+firebase-init-coordinator.js?v=1737659200:136 Module "oauth-redirect-handler" Firebase wait failed: Firebase initialization timeout after 30000ms for module "oauth-redirect-handler"
+window.waitForFirebase @ firebase-init-coordinator.js?v=1737659200:136
+await in window.waitForFirebase
+handleOAuthReturn @ oauth-redirect-handler.js?v=1737659200:69
+(anonymous) @ oauth-redirect-handler.js?v=1737659200:252
+(anonymous) @ oauth-redirect-handler.js?v=1737659200:259Understand this error
+oauth-redirect-handler.js?v=1737659200:72 Firebase initialization failed in OAuth handler: Firebase initialization timeout after 30000ms for module "oauth-redirect-handler"

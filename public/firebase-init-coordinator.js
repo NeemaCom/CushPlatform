@@ -46,10 +46,26 @@
     console.log('Starting master Firebase initialization...');
 
     try {
-      // Import Firebase modules
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-      const { getAuth } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      const { getAnalytics } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js');
+      // Import Firebase modules with retry mechanism
+      let firebaseModules;
+      try {
+        firebaseModules = await Promise.all([
+          import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'),
+          import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js'),
+          import('https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js')
+        ]);
+      } catch (importError) {
+        console.warn('CDN import failed, trying alternative CDN:', importError.message);
+        firebaseModules = await Promise.all([
+          import('https://firebase.googleapis.com/v9.0.0/firebase-app.js'),
+          import('https://firebase.googleapis.com/v9.0.0/firebase-auth.js'),
+          import('https://firebase.googleapis.com/v9.0.0/firebase-analytics.js')
+        ]);
+      }
+      
+      const { initializeApp } = firebaseModules[0];
+      const { getAuth } = firebaseModules[1];
+      const { getAnalytics } = firebaseModules[2];
 
       // Firebase configuration - using custom domain (properly authorized)
       const firebaseConfig = {
