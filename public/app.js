@@ -5410,9 +5410,13 @@ For personalized immigration strategy, consult with our experienced immigration 
 
 // Main App Component with Enhanced Firebase Authentication
 function App() {
+  console.log('🎯 App function called - rendering sophisticated app...');
+  
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
+  
+  console.log('🔄 App state initialized - isLoading:', isLoading, 'user:', user, 'firebaseInitialized:', firebaseInitialized);
   
   // PWA Installation State
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -5972,14 +5976,17 @@ function App() {
     (user && currentHash.startsWith('#') && !currentHash.startsWith('#signin') && !currentHash.startsWith('#signup') && !currentHash.startsWith('#about') && !currentHash.startsWith('#mentors') && !currentHash.startsWith('#privacy') && !currentHash.startsWith('#terms') && currentHash !== '#')
   );
   
-  return e('div', { key: 'app-container' }, [
-    // Show Dashboard for authenticated users unless on specific public pages
-    shouldShowDashboard ? 
-      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
-      e(AppRouter, { key: 'router', user }),
-    
-    // Show Imisi chat for authenticated users only
-    user && e(ImisiChatHead, { key: 'imisi-chat' }),
+  console.log('🎨 App rendering with shouldShowDashboard:', shouldShowDashboard, 'user:', user);
+  
+  try {
+    return e('div', { key: 'app-container' }, [
+      // Show Dashboard for authenticated users unless on specific public pages
+      shouldShowDashboard ? 
+        e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
+        e(AppRouter, { key: 'router', user }),
+      
+      // Show Imisi chat for authenticated users only
+      user && e(ImisiChatHead, { key: 'imisi-chat' }),
     
     // PWA Install Prompt
     showInstallPrompt && !isInstalled && e('div', {
@@ -6037,6 +6044,45 @@ function App() {
       ])
     ])
   ]);
+  } catch (renderError) {
+    console.error('❌ App render error:', renderError);
+    // Return a fallback simple app
+    return e('div', { 
+      style: {
+        minHeight: '100vh',
+        background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+        color: 'white',
+        fontFamily: 'system-ui',
+        padding: '2rem',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }
+    }, [
+      e('h1', { 
+        key: 'error-title',
+        style: { fontSize: '2rem', marginBottom: '1rem' }
+      }, 'Cush Platform - Render Error'),
+      e('p', { 
+        key: 'error-message',
+        style: { marginBottom: '2rem', textAlign: 'center' }
+      }, 'Component rendering failed. Error: ' + renderError.message),
+      e('button', {
+        key: 'reload-btn',
+        onClick: () => window.location.reload(),
+        style: {
+          background: 'rgba(255, 255, 255, 0.9)',
+          color: '#1d4ed8',
+          border: 'none',
+          padding: '0.75rem 1.5rem',
+          borderRadius: '0.5rem',
+          cursor: 'pointer',
+          fontWeight: 'bold'
+        }
+      }, 'Reload Page')
+    ]);
+  }
 }
 
 // Homepage Component
@@ -15015,44 +15061,82 @@ document.addEventListener('DOMContentLoaded', function() {
         const root = window.createRoot(rootElement);
         console.log('⚛️ React root created, rendering test component first...');
         
-        // Add comprehensive error handling for sophisticated app rendering
-        try {
-          console.log('🎨 Attempting to render sophisticated App component...');
-          root.render(React.createElement(App));
-          console.log('✅ Sophisticated App component rendered successfully');
-          
-          // Verify the app actually rendered content
-          setTimeout(() => {
-            const appContent = document.querySelector('#root > *');
-            if (appContent) {
-              console.log('✅ App content detected in DOM');
-              console.log('App content preview:', appContent.tagName, appContent.className);
-            } else {
-              console.error('❌ No app content found in DOM after render attempt');
+        // Render a simple debugging component first to verify React is working
+        console.log('🔍 Rendering debug component to verify React functionality...');
+        
+        const DebugComponent = React.createElement('div', {
+          style: {
+            minHeight: '100vh',
+            background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
+            color: 'white',
+            fontFamily: 'system-ui',
+            padding: '2rem',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }
+        }, [
+          React.createElement('h1', { 
+            key: 'title',
+            style: { fontSize: '2rem', marginBottom: '1rem' }
+          }, 'CUSH Platform - Debug Mode'),
+          React.createElement('p', { 
+            key: 'status',
+            style: { marginBottom: '2rem', textAlign: 'center' }
+          }, 'React is working. Now testing sophisticated app components...'),
+          React.createElement('button', {
+            key: 'load-app-btn',
+            onClick: () => {
+              console.log('🚀 Loading sophisticated App component...');
+              try {
+                // Try to render the sophisticated app
+                root.render(React.createElement(App));
+                console.log('✅ Sophisticated App loaded successfully');
+              } catch (error) {
+                console.error('❌ Sophisticated App failed to load:', error);
+                // Show specific error information
+                rootElement.innerHTML = `
+                  <div style="min-height: 100vh; background: #fef2f2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
+                    <div style="text-align: center; color: #dc2626; max-width: 900px;">
+                      <h1 style="font-size: 2rem; margin-bottom: 1rem;">Sophisticated App Rendering Failed</h1>
+                      <p style="margin-bottom: 1rem; font-weight: bold;">Component Error Details:</p>
+                      <pre style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; margin-bottom: 1rem; white-space: pre-wrap;">${error.message}</pre>
+                      <details style="margin-bottom: 1rem;">
+                        <summary style="cursor: pointer; margin-bottom: 0.5rem; font-weight: bold;">Full Error Stack</summary>
+                        <pre style="background: #f9fafb; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; font-size: 0.875rem; white-space: pre-wrap;">${error.stack}</pre>
+                      </details>
+                      <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; margin: 0.5rem;">Reload Page</button>
+                    </div>
+                  </div>
+                `;
+              }
+            },
+            style: {
+              background: 'rgba(255, 255, 255, 0.9)',
+              color: '#1d4ed8',
+              border: 'none',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '0.5rem',
+              cursor: 'pointer',
+              fontWeight: 'bold'
             }
-          }, 500);
-          
-        } catch (renderError) {
-          console.error('❌ CRITICAL: Error rendering sophisticated App component:', renderError);
-          console.error('Error stack:', renderError.stack);
-          
-          // Show detailed error to user
-          rootElement.innerHTML = `
-            <div style="min-height: 100vh; background: #fee2e2; display: flex; align-items: center; justify-content: center; font-family: system-ui; padding: 2rem;">
-              <div style="text-align: center; color: #dc2626; max-width: 800px;">
-                <h1 style="font-size: 2rem; margin-bottom: 1rem;">React Rendering Error</h1>
-                <p style="margin-bottom: 1rem; font-weight: bold;">The sophisticated app failed to render:</p>
-                <pre style="background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; margin-bottom: 1rem;">${renderError.message}</pre>
-                <details style="margin-bottom: 1rem;">
-                  <summary style="cursor: pointer; margin-bottom: 0.5rem;">Full Stack Trace</summary>
-                  <pre style="background: #f9fafb; padding: 1rem; border-radius: 0.5rem; text-align: left; overflow-x: auto; font-size: 0.875rem;">${renderError.stack}</pre>
-                </details>
-                <button onclick="window.location.reload()" style="background: #dc2626; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer; margin-right: 1rem;">Refresh Page</button>
-                <button onclick="window.location.href='/'" style="background: #3b82f6; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 0.5rem; cursor: pointer;">Go to Homepage</button>
-              </div>
-            </div>
-          `;
-        }
+          }, 'Load Sophisticated App')
+        ]);
+        
+        // First render the debug component, then auto-load the app
+        root.render(DebugComponent);
+        
+        // Auto-load the sophisticated app after 2 seconds for debugging
+        setTimeout(() => {
+          console.log('🔄 Auto-loading sophisticated app...');
+          try {
+            root.render(React.createElement(App));
+            console.log('✅ Sophisticated app auto-loaded successfully');
+          } catch (autoLoadError) {
+            console.error('❌ Auto-load failed:', autoLoadError);
+          }
+        }, 2000);
         
         // Add visual verification
         setTimeout(() => {
