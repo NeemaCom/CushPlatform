@@ -3,10 +3,10 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
-// Your web app's Firebase configuration - Production ready for we-cush.com
+// Your web app's Firebase configuration - Production ready for portal.we-cush.com
 const firebaseConfig = {
   apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-  authDomain: "we-cush.com",
+  authDomain: "portal.we-cush.com",
   projectId: "cushportal",
   storageBucket: "cushportal.firebasestorage.app",
   messagingSenderId: "304174661302",
