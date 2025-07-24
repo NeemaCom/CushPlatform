@@ -118,12 +118,12 @@
       console.log('Syncing Firebase user with backend:', firebaseUser.email);
       
       const userData = {
-        firebase_uid: firebaseUser.uid,
+        uid: firebaseUser.uid,
         email: firebaseUser.email,
-        display_name: firebaseUser.displayName,
-        photo_url: firebaseUser.photoURL,
-        email_verified: firebaseUser.emailVerified,
-        is_new_user: isNewUser
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL,
+        emailVerified: firebaseUser.emailVerified,
+        isNewUser: isNewUser
       };
       
       const response = await fetch('/api/auth/firebase-sync', {
@@ -135,7 +135,9 @@
       });
       
       if (!response.ok) {
-        throw new Error(`Backend sync failed: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Backend sync failed:', response.status, errorText);
+        throw new Error(`Backend sync failed: ${response.status} - ${errorText}`);
       }
       
       const result = await response.json();

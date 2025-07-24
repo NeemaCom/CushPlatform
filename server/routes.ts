@@ -160,9 +160,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Firebase sync endpoint
   app.post("/api/auth/firebase-sync", async (req, res) => {
     try {
+      console.log('Firebase sync request received:', req.body);
       const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, address, country, phone, acceptTerms, acceptPrivacy, isNewUser } = req.body;
       
       if (!uid || !email) {
+        console.error('Missing required fields:', { uid: !!uid, email: !!email });
         return res.status(400).json({ error: "UID and email are required" });
       }
       
@@ -208,20 +210,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             user = await storage.updateUser(user.id, { firebaseUid: uid });
           }
 
-          // Generate default avatar if no photoURL provided
-          if (!photoURL) {
-            try {
-              await avatarService.ensureUserHasAvatar(user.id);
-              // Get updated user with avatar
-              const refreshedUser = await storage.getUser(user.id);
-              if (refreshedUser && refreshedUser.profilePicture) {
-                user.profilePicture = refreshedUser.profilePicture;
-              }
-            } catch (avatarError) {
-              console.error('Avatar generation failed for Firebase user:', avatarError);
-              // Don't fail registration if avatar generation fails
-            }
-          }
+          // Skip avatar generation for now to avoid dependencies issues
+          console.log('User created successfully without avatar generation');
         } else {
           // User doesn't exist, return error for sign-in attempt
           return res.status(404).json({ 
@@ -252,6 +242,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({ success: true, user: safeUser, isNewUser: true, redirectTo: 'signin' });
       } else {
         // Set session for existing users signing in
+        console.log('Setting session for user:', { userId: user.id, email: user.email });
         req.session.userId = user.id;
         req.session.role = user.role || 'customer';
         req.session.lastActivity = Date.now();
@@ -260,6 +251,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUser(user.id, { lastLoginAt: new Date() });
         
         const safeUser = createSafeUser(user);
+        console.log('Firebase sync successful for existing user:', safeUser.email);
         SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
         res.json({ success: true, user: safeUser });
       }
