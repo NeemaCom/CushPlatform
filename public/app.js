@@ -3391,45 +3391,7 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
         currentView === 'health-radar' ? e(FinancialHealthRadar, { key: 'health-radar', onBack: () => setCurrentView('dashboard') }) :
         // Modern Financial Dashboard
         e('div', { key: 'dashboard-content', className: 'space-y-4 sm:space-y-6 pb-8' }, [
-          // Test Notification Button (Development Only)
-          e('div', {
-            key: 'test-notifications',
-            className: 'mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg'
-          }, [
-            e('h3', { key: 'test-title', className: 'text-sm font-medium text-yellow-800 mb-2' }, 'Development Test'),
-            e('div', { key: 'test-buttons', className: 'flex flex-wrap gap-2' }, [
-              e('button', {
-                key: 'test-btn',
-                onClick: async () => {
-                  try {
-                    const response = await fetch('/api/notifications/test', { method: 'POST' });
-                    if (response.ok) {
-                      loadNotifications();
-                      loadUnreadCount();
-                    }
-                  } catch (error) {
-                    console.error('Failed to create test notifications:', error);
-                  }
-                },
-                className: 'bg-yellow-500 text-white px-4 py-2 rounded text-sm hover:bg-yellow-600'
-              }, 'Test Notifications'),
-              e('button', {
-                key: 'test-critical-btn',
-                onClick: async () => {
-                  try {
-                    const response = await fetch('/api/notifications/test-critical-alerts', { method: 'POST' });
-                    if (response.ok) {
-                      loadNotifications();
-                      loadUnreadCount();
-                    }
-                  } catch (error) {
-                    console.error('Error creating critical alerts:', error);
-                  }
-                },
-                className: 'bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700'
-              }, 'Test Critical Alerts')
-            ])
-          ]),
+
 
           // Mobile-First Horizontal Carousel - Financial Overview Cards
           e('div', {
