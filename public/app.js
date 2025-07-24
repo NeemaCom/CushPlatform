@@ -5475,12 +5475,25 @@ function App() {
           const { onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
           
           onAuthStateChanged(auth, async (firebaseUser) => {
-            console.log('Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
+            console.log('🔄 Firebase auth state changed:', firebaseUser ? firebaseUser.email : 'null');
+            
+            // Delay processing to allow redirect result to be handled first
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             if (firebaseUser) {
+              console.log('✅ Firebase user found, syncing with backend...');
               // Try to sync with backend
               try {
                 await handleFirebaseUser(firebaseUser);
+                
+                // CRITICAL: Route authenticated users to dashboard
+                const currentHash = window.location.hash;
+                if (!currentHash || currentHash === '#' || currentHash === '#signin' || currentHash === '#signup') {
+                  console.log('🎯 Routing authenticated user to dashboard');
+                  setTimeout(() => {
+                    window.location.hash = '#dashboard';
+                  }, 1000);
+                }
               } catch (syncError) {
                 console.error('Firebase sync error:', syncError);
                 // Still check if user exists in backend

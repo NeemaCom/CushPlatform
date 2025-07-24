@@ -151,10 +151,40 @@
           }
           
           if (sessionVerified) {
-            // Redirect to dashboard
+            // CRITICAL: Force navigation to dashboard after successful Firebase authentication
+            console.log('🎯 FORCING NAVIGATION TO DASHBOARD after successful authentication');
+            
+            // Update global user state immediately
+            if (window.setUser && userData) {
+              console.log('📝 Setting global user state');
+              window.setUser(userData);
+            }
+            
+            // Clear any existing auth flags to prevent confusion
+            sessionStorage.removeItem('google_auth_redirect');
+            sessionStorage.removeItem('firebase_auth_result');
+            
+            // Multiple navigation attempts to ensure success
+            console.log('🔄 Attempting dashboard navigation...');
+            
+            // Method 1: Direct hash change
+            window.location.hash = '#dashboard';
+            
+            // Method 2: Navigate function if available
+            if (window.navigate) {
+              setTimeout(() => {
+                console.log('🔄 Using navigate function for dashboard');
+                window.navigate('dashboard');
+              }, 500);
+            }
+            
+            // Method 3: Force page reload with dashboard hash as final fallback
             setTimeout(() => {
-              window.location.replace(window.location.origin + '/#dashboard');
-            }, 2000);
+              console.log('🔄 Force reload to dashboard as final fallback');
+              window.location.href = window.location.origin + '/#dashboard';
+            }, 1500);
+            
+            return; // Exit to prevent further processing
           } else {
             throw new Error('Session verification failed after 3 attempts');
           }
@@ -196,8 +226,8 @@
     
     // Check if this is a Firebase auth redirect
     if (isRealFirebaseAuthRedirect()) {
-      console.log('🔄 Firebase auth redirect detected, processing...');
-      await processFirebaseRedirect();
+      console.log('🔄 Firebase auth redirect detected, delegating to redirect handler...');
+      // Let the redirect handler process this
       return;
     }
     
