@@ -180,7 +180,7 @@ export function ImisiChatHead() {
         } w-80 sm:w-96 max-w-[calc(100vw-2rem)]`}>
           <div className="h-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl">
+            <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl chat-header-mobile">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm flex-shrink-0">
                   <span className="text-base sm:text-lg">🤖</span>
@@ -189,7 +189,7 @@ export function ImisiChatHead() {
                   <h3 className="font-semibold text-base sm:text-lg truncate">Imisi 2.0</h3>
                   <p className="text-xs sm:text-sm opacity-90 truncate">AI Migration Concierge</p>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 mobile-button-group">
                   <div className="flex items-center gap-1">
                     <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
                     <span className="text-xs font-medium hidden sm:inline">Online</span>
@@ -199,6 +199,12 @@ export function ImisiChatHead() {
                     className="w-7 h-7 sm:w-8 sm:h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors"
                   >
                     {isMinimized ? <Bot className="h-3 w-3 sm:h-4 sm:w-4" /> : <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                  </button>
+                  <button
+                    onClick={closeChat}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors"
+                  >
+                    <X className="h-3 w-3 sm:h-4 sm:w-4" />
                   </button>
                 </div>
               </div>
@@ -211,58 +217,6 @@ export function ImisiChatHead() {
               </div>
             )}
           </div>
-        </div>
-      )}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Bot className="w-5 h-5" />
-                  <CardTitle className="text-lg">Imisi 2.0</CardTitle>
-                  {subscriptionStatus?.hasActiveSubscription ? (
-                    <Badge variant="secondary" className="text-xs bg-yellow-500/90 text-yellow-900">
-                      <Crown className="w-3 h-3 mr-1" />
-                      Premium
-                    </Badge>
-                  ) : (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setLocation('/subscribe')}
-                      className="text-xs bg-white/20 hover:bg-white/30 text-white px-2 py-1 h-6"
-                    >
-                      <Crown className="w-3 h-3 mr-1" />
-                      Upgrade
-                    </Button>
-                  )}
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsMinimized(!isMinimized)}
-                    className="text-white hover:bg-white/20 p-1 h-7 w-7"
-                  >
-                    <Minimize2 className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsOpen(false)}
-                    className="text-white hover:bg-white/20 p-1 h-7 w-7"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            
-            {!isMinimized && (
-              <CardContent className="p-0 flex flex-col h-[432px]">
-                <ImisiChatInterface 
-                  proactiveSuggestion={proactiveSuggestion?.suggestion}
-                />
-              </CardContent>
-            )}
-          </Card>
         </div>
       )}
     </>
@@ -496,19 +450,19 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
       </div>
 
       {/* Input Area */}
-      <div className="flex-shrink-0 border-t border-gray-200 p-3 sm:p-4 bg-white dark:bg-gray-800">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
+      <div className="flex-shrink-0 border-t border-gray-200 p-3 sm:p-4 bg-white dark:bg-gray-800 safe-bottom">
+        <form onSubmit={handleSendMessage} className="flex gap-2 items-center">
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ask Imisi anything..."
             disabled={sendMessageMutation.isPending}
-            className="flex-1 min-w-0 chat-input-focus transition-all duration-200 hover:border-blue-300 focus:border-blue-500 text-sm"
+            className="flex-1 min-w-0 chat-input-focus transition-all duration-200 hover:border-blue-300 focus:border-blue-500 text-sm h-10"
           />
           <Button 
             type="submit" 
             disabled={!message.trim() || sendMessageMutation.isPending}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 chat-button-hover hover:scale-105 transition-all duration-200 flex-shrink-0 w-10 h-10 p-0"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 chat-button-hover hover:scale-105 transition-all duration-200 flex-shrink-0 w-10 h-10 p-0 z-10"
           >
             {sendMessageMutation.isPending ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

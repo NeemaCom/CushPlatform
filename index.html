@@ -54,7 +54,7 @@
       /* Mobile chat adjustments */
       @media (max-width: 640px) {
         .fixed.bottom-24.right-6 {
-          bottom: 1rem;
+          bottom: 6rem;
           right: 1rem;
           left: 1rem;
           width: auto !important;
@@ -64,6 +64,22 @@
         .fixed.bottom-6.right-6 {
           bottom: 1rem;
           right: 1rem;
+        }
+        
+        /* Ensure input area is accessible */
+        .safe-bottom {
+          padding-bottom: 1rem;
+          margin-bottom: env(safe-area-inset-bottom);
+        }
+        
+        /* Prevent header buttons from overlapping */
+        .chat-header-mobile {
+          padding-right: 0.5rem;
+        }
+        
+        /* Better mobile button spacing */
+        .mobile-button-group {
+          gap: 0.25rem;
         }
       }
       
