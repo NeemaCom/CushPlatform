@@ -175,38 +175,42 @@ export function ImisiChatHead() {
 
       {/* Enhanced Chat Interface */}
       {isOpen && (
-        <div className={`fixed bottom-24 right-6 z-40 w-96 bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col transition-all duration-300 ${
-          isMinimized ? 'h-12' : 'h-[600px]'
-        }`}>
-          {/* Header */}
-          <div className="p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                <span className="text-lg">🤖</span>
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg">Imisi 2.0</h3>
-                <p className="text-sm opacity-90">AI Migration Concierge</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span className="text-xs font-medium">Online</span>
+        <div className={`fixed bottom-24 right-6 z-40 transition-all duration-300 ${
+          isMinimized ? 'h-12' : 'h-[500px] sm:h-[600px]'
+        } w-80 sm:w-96 max-w-[calc(100vw-2rem)]`}>
+          <div className="h-full bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="flex-shrink-0 p-3 sm:p-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-xl">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white bg-opacity-20 rounded-full flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+                  <span className="text-base sm:text-lg">🤖</span>
                 </div>
-                <button
-                  onClick={() => setIsMinimized(!isMinimized)}
-                  className="w-8 h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors"
-                >
-                  {isMinimized ? <Bot className="h-4 w-4" /> : <Minimize2 className="h-4 w-4" />}
-                </button>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-base sm:text-lg truncate">Imisi 2.0</h3>
+                  <p className="text-xs sm:text-sm opacity-90 truncate">AI Migration Concierge</p>
+                </div>
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span className="text-xs font-medium hidden sm:inline">Online</span>
+                  </div>
+                  <button
+                    onClick={() => setIsMinimized(!isMinimized)}
+                    className="w-7 h-7 sm:w-8 sm:h-8 bg-white bg-opacity-20 rounded-full flex items-center justify-center hover:bg-opacity-30 transition-colors"
+                  >
+                    {isMinimized ? <Bot className="h-3 w-3 sm:h-4 sm:w-4" /> : <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Chat Content */}
-          {!isMinimized && (
-            <ImisiChatInterface />
-          )}
+            {/* Chat Content */}
+            {!isMinimized && (
+              <div className="flex-1 min-h-0 flex flex-col">
+                <ImisiChatInterface />
+              </div>
+            )}
+          </div>
         </div>
       )}
               <div className="flex items-center justify-between">
@@ -378,129 +382,133 @@ function ImisiChatInterface({ proactiveSuggestion }: { proactiveSuggestion?: str
   return (
     <>
       {/* Messages Area */}
-      <ScrollArea className="flex-1 p-4">
-        <div className="space-y-4">
-          {messages.length === 0 && !proactiveSuggestion && (
-            <div className="text-center text-gray-500 py-8">
-              <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-sm">Hi! I'm Imisi 2.0, your AI assistant.</p>
-              <p className="text-xs mt-1">Ask me about your finances, immigration help, or anything else!</p>
-            </div>
-          )}
-          
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'} ${
-              msg.type === 'ai' ? 'chat-message-ai' : 'chat-message-user'
-            }`} style={{ animationDelay: `${index * 0.1}s` }}>
-              {msg.type === 'ai' && (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 chat-bot-thinking">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-              )}
-              
-              <div className={`max-w-[80%] ${msg.type === 'user' ? 'order-1' : ''}`}>
-                <div className={`
-                  rounded-lg px-4 py-2 text-sm transition-all duration-200 hover:shadow-md
-                  ${msg.type === 'user' 
-                    ? 'bg-blue-500 text-white ml-auto hover:bg-blue-600' 
-                    : 'bg-gray-100 text-gray-900 hover:bg-gray-50'
-                  }
-                `}>
-                  {msg.content}
-                </div>
-                
-                {/* AI Suggestions */}
-                {msg.type === 'ai' && msg.suggestions && (
-                  <div className="mt-2 space-y-1">
-                    {msg.suggestions.map((suggestion, i) => (
-                      <Button
-                        key={i}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="text-xs h-auto py-1 px-2 block w-full text-left chat-button-hover hover:border-blue-300 hover:bg-blue-50 transition-all duration-200"
-                        style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
-                      >
-                        <Sparkles className="w-3 h-3 mr-1 inline animate-pulse" />
-                        {suggestion}
-                      </Button>
-                    ))}
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea className="h-full">
+          <div className="p-3 sm:p-4 space-y-3 sm:space-y-4">
+            {messages.length === 0 && !proactiveSuggestion && (
+              <div className="text-center text-gray-500 py-8">
+                <Bot className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                <p className="text-sm">Hi! I'm Imisi 2.0, your AI assistant.</p>
+                <p className="text-xs mt-1">Ask me about your finances, immigration help, or anything else!</p>
+              </div>
+            )}
+            
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex gap-2 sm:gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'} ${
+                msg.type === 'ai' ? 'chat-message-ai' : 'chat-message-user'
+              }`} style={{ animationDelay: `${index * 0.1}s` }}>
+                {msg.type === 'ai' && (
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 chat-bot-thinking">
+                    <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                   </div>
                 )}
                 
-                {/* AI Actions */}
-                {msg.type === 'ai' && msg.actions && (
-                  <div className="mt-2 space-y-1">
-                    {msg.actions.map((action, i) => (
-                      <Button
-                        key={i}
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleActionClick(action)}
-                        className="text-xs h-auto py-1 px-2 mr-1 chat-button-hover hover:scale-105 transition-all duration-200"
-                        style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
-                      >
-                        {action.label}
-                      </Button>
-                    ))}
+                <div className={`min-w-0 ${msg.type === 'user' ? 'max-w-[85%] order-1' : 'max-w-[85%]'}`}>
+                  <div className={`
+                    rounded-lg px-3 py-2 sm:px-4 sm:py-2 text-sm transition-all duration-200 hover:shadow-md break-words overflow-wrap-anywhere
+                    ${msg.type === 'user' 
+                      ? 'bg-blue-500 text-white ml-auto hover:bg-blue-600' 
+                      : 'bg-gray-100 text-gray-900 hover:bg-gray-50'
+                    }
+                  `}>
+                    <div className="whitespace-pre-wrap word-break-keep-all overflow-hidden">
+                      {msg.content}
+                    </div>
                   </div>
-                )}
+                
+                  {/* AI Suggestions */}
+                  {msg.type === 'ai' && msg.suggestions && (
+                    <div className="mt-2 space-y-1">
+                      {msg.suggestions.map((suggestion, i) => (
+                        <Button
+                          key={i}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSuggestionClick(suggestion)}
+                          className="text-xs h-auto py-1 px-2 block w-full text-left chat-button-hover hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 break-words whitespace-normal"
+                          style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
+                        >
+                          <Sparkles className="w-3 h-3 mr-1 inline animate-pulse flex-shrink-0" />
+                          <span className="break-words">{suggestion}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* AI Actions */}
+                  {msg.type === 'ai' && msg.actions && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {msg.actions.map((action, i) => (
+                        <Button
+                          key={i}
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleActionClick(action)}
+                          className="text-xs h-auto py-1 px-2 chat-button-hover hover:scale-105 transition-all duration-200 break-words"
+                          style={{ animationDelay: `${(index + 1) * 0.1 + i * 0.05}s` }}
+                        >
+                          <span className="truncate">{action.label}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  )}
 
-                {/* Premium Upgrade Button - Show for non-premium users after AI responses */}
-                {msg.type === 'ai' && !subscriptionStatus?.hasActiveSubscription && (
-                  <div className="mt-3 pt-2 border-t border-gray-200 chat-message-enter" style={{ animationDelay: `${(index + 1) * 0.1 + 0.3}s` }}>
-                    <Button
-                      onClick={() => setLocation('/subscribe')}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs py-2 px-3 rounded-md shadow-sm transition-all duration-200 upgrade-button-glow hover:scale-[1.02] hover:shadow-lg"
-                    >
-                      <Crown className="w-3 h-3 mr-2 animate-pulse" />
-                      Upgrade to Premium
-                    </Button>
+                  {/* Premium Upgrade Button - Show for non-premium users after AI responses */}
+                  {msg.type === 'ai' && !subscriptionStatus?.hasActiveSubscription && (
+                    <div className="mt-3 pt-2 border-t border-gray-200 chat-message-enter" style={{ animationDelay: `${(index + 1) * 0.1 + 0.3}s` }}>
+                      <Button
+                        onClick={() => setLocation('/subscribe')}
+                        className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white text-xs py-2 px-3 rounded-md shadow-sm transition-all duration-200 upgrade-button-glow hover:scale-[1.02] hover:shadow-lg"
+                      >
+                        <Crown className="w-3 h-3 mr-2 animate-pulse flex-shrink-0" />
+                        <span className="truncate">Upgrade to Premium</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                
+                {msg.type === 'user' && (
+                  <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
+                    <User className="w-3 h-3 sm:w-4 sm:h-4 text-gray-600" />
                   </div>
                 )}
               </div>
-              
-              {msg.type === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                  <User className="w-4 h-4 text-gray-600" />
+            ))}
+            
+            {sendMessageMutation.isPending && (
+              <div className="flex gap-2 sm:gap-3 justify-start chat-message-ai">
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center chat-bot-thinking">
+                  <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
                 </div>
-              )}
-            </div>
-          ))}
-          
-          {sendMessageMutation.isPending && (
-            <div className="flex gap-3 justify-start chat-message-ai">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center chat-bot-thinking">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
-              <div className="bg-gray-100 rounded-lg px-4 py-2 text-sm message-shimmer">
-                <div className="typing-indicator">
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
-                  <div className="typing-dot"></div>
+                <div className="bg-gray-100 rounded-lg px-3 py-2 sm:px-4 sm:py-2 text-sm message-shimmer">
+                  <div className="typing-indicator">
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        </ScrollArea>
+      </div>
 
       {/* Input Area */}
-      <div className="border-t p-4">
+      <div className="flex-shrink-0 border-t border-gray-200 p-3 sm:p-4 bg-white dark:bg-gray-800">
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <Input
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="Ask Imisi anything..."
             disabled={sendMessageMutation.isPending}
-            className="flex-1 chat-input-focus transition-all duration-200 hover:border-blue-300 focus:border-blue-500"
+            className="flex-1 min-w-0 chat-input-focus transition-all duration-200 hover:border-blue-300 focus:border-blue-500 text-sm"
           />
           <Button 
             type="submit" 
             disabled={!message.trim() || sendMessageMutation.isPending}
-            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 chat-button-hover hover:scale-105 transition-all duration-200"
+            className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 chat-button-hover hover:scale-105 transition-all duration-200 flex-shrink-0 w-10 h-10 p-0"
           >
             {sendMessageMutation.isPending ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
