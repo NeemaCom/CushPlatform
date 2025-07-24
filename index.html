@@ -24,18 +24,37 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
     
-    <!-- Import Tailwind CSS -->
-    <link rel="stylesheet" href="/src/index.css">
+    <!-- Custom Styles -->
+    <style>
+      /* Hide scrollbar for horizontal carousel */
+      .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+      }
+      
+      /* Smooth scrolling for carousel */
+      .scrollbar-hide {
+        scroll-behavior: smooth;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/success-notification.js"></script>
-    <script src="/firebase-init-coordinator.js"></script>
     <script src="/auth-fix.js"></script>
+    <script src="/firebase-init-coordinator.js"></script>
+    <script src="/firebase-auth-fix.js"></script>
     <script src="/firebase-analytics.js"></script>
+    <script src="/firebase-redirect-fix.js"></script>
+    <script src="/success-notification.js"></script>
+    <script src="/oauth-redirect-handler.js"></script>
+    <script src="/analytics-examples.js"></script>
     <script src="/app.js"></script>
   </body>
 </html>
