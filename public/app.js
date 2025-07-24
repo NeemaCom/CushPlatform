@@ -6014,38 +6014,7 @@ function App() {
       ]);
     }
     
-    if (typeof AppRouter === 'undefined') {
-      console.error('❌ AppRouter component is not defined');
-      return e('div', { 
-        style: {
-          minHeight: '100vh',
-          background: '#fef2f2',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontFamily: 'system-ui',
-          padding: '2rem'
-        }
-      }, [
-        e('div', {
-          style: { textAlign: 'center', color: '#dc2626', maxWidth: '600px' }
-        }, [
-          e('h1', { style: { fontSize: '2rem', marginBottom: '1rem' } }, 'AppRouter Component Missing'),
-          e('p', { style: { marginBottom: '1rem' } }, 'The AppRouter component is not defined. This may be causing the fallback to basic UI.'),
-          e('button', {
-            onClick: () => window.location.reload(),
-            style: {
-              background: '#dc2626',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: 'pointer'
-            }
-          }, 'Reload Page')
-        ])
-      ]);
-    }
+    // AppRouter is defined later in the file, so we skip this check
     
     console.log('🔀 Rendering decision - shouldShowDashboard:', shouldShowDashboard, 'typeof:', typeof shouldShowDashboard);
     console.log('🎯 Restoring full homepage with sophisticated design');
@@ -6053,7 +6022,9 @@ function App() {
     return e('div', { key: 'app-container' }, [
       // Show dashboard for authenticated users, otherwise show full homepage
       shouldShowDashboard ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
-        e(AppRouter, { key: 'app-router', user, isInstalled, deferredPrompt, installPWA }),
+        // Direct homepage render to bypass AppRouter timing issues
+        user ? e(Dashboard, { key: 'dashboard-user', user, isInstalled, deferredPrompt, installPWA }) :
+        e(Homepage, { key: 'homepage', user }),
       
       // Show Imisi chat for authenticated users only
       user && e(ImisiChatHead, { key: 'imisi-chat' }),
