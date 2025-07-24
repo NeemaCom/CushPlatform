@@ -86,18 +86,7 @@
       if (result && result.user) {
         console.log('Google sign-in successful:', result.user.email);
         
-        // Sync with backend if function exists
-        if (window.syncFirebaseUserWithBackend) {
-          await window.syncFirebaseUserWithBackend(result.user, false);
-        }
-        
-        // Simple success notification
-        window.showSuccessNotification(`Welcome ${result.user.displayName || result.user.email}!`);
-        
-        // Redirect to dashboard
-        setTimeout(() => {
-          window.location.hash = 'dashboard';
-        }, 1000);
+        // This will be handled by the enhanced simpleGoogleSignIn wrapper above
         
         return result;
       }
@@ -119,6 +108,78 @@
       }
       
       window.showErrorNotification(errorMessage);
+      throw error;
+    }
+  };
+
+  // Backend sync function for Firebase users
+  window.syncFirebaseUserWithBackend = async (firebaseUser, isNewUser = false) => {
+    try {
+      console.log('Syncing Firebase user with backend:', firebaseUser.email);
+      
+      const userData = {
+        firebase_uid: firebaseUser.uid,
+        email: firebaseUser.email,
+        display_name: firebaseUser.displayName,
+        photo_url: firebaseUser.photoURL,
+        email_verified: firebaseUser.emailVerified,
+        is_new_user: isNewUser
+      };
+      
+      const response = await fetch('/api/auth/firebase-sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(userData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Backend sync failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Backend sync successful:', result);
+      
+      return { success: true, user: result.user };
+    } catch (error) {
+      console.error('Backend sync error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Enhanced simpleGoogleSignIn with proper backend sync and redirect
+  const originalSimpleGoogleSignIn = window.simpleGoogleSignIn;
+  window.simpleGoogleSignIn = async () => {
+    try {
+      const result = await originalSimpleGoogleSignIn();
+      
+      if (result && result.user) {
+        // Sync with backend
+        const syncResult = await window.syncFirebaseUserWithBackend(result.user, false);
+        
+        if (syncResult.success) {
+          // Show success notification with user name
+          const userName = result.user.displayName || result.user.email.split('@')[0];
+          window.showSuccessNotification(`Welcome back, ${userName}!`);
+          
+          // Redirect to dashboard after 1.5 seconds
+          setTimeout(() => {
+            if (typeof window.navigate === 'function') {
+              window.navigate('dashboard');
+            } else {
+              window.location.hash = 'dashboard';
+            }
+          }, 1500);
+        } else {
+          throw new Error('Failed to sync with backend');
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Enhanced Google sign-in failed:', error);
+      window.showErrorNotification(error.message || 'Sign-in failed. Please try again.');
       throw error;
     }
   };
