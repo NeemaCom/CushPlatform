@@ -6052,7 +6052,40 @@ function App() {
     
     return e('div', { key: 'app-container' }, [
       // Force sophisticated dashboard to test Tailwind CSS
-      e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }),
+      user ? e(Dashboard, { key: 'dashboard', user, isInstalled, deferredPrompt, installPWA }) :
+        e('div', { 
+          key: 'loading-auth',
+          className: 'min-h-screen bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 flex items-center justify-center'
+        }, [
+          e('div', {
+            key: 'auth-card',
+            className: 'bg-white rounded-xl p-8 shadow-2xl max-w-md w-full mx-4'
+          }, [
+            e('h1', {
+              key: 'title', 
+              className: 'text-2xl font-bold text-gray-900 mb-4 text-center'
+            }, 'Welcome to CushGlobal'),
+            e('p', {
+              key: 'desc',
+              className: 'text-gray-600 text-center mb-6'
+            }, 'Please sign in to access your dashboard'),
+            e('div', {
+              key: 'auth-buttons',
+              className: 'space-y-3'
+            }, [
+              e('button', {
+                key: 'google-btn',
+                onClick: () => window.performGoogleSignIn && window.performGoogleSignIn(),
+                className: 'w-full bg-blue-600 hover:bg-blue-700 text-white py-3 px-4 rounded-lg transition-colors'
+              }, 'Sign in with Google'),
+              e('button', {
+                key: 'email-btn', 
+                onClick: () => window.navigate && window.navigate('signin'),
+                className: 'w-full border border-gray-300 hover:bg-gray-50 text-gray-700 py-3 px-4 rounded-lg transition-colors'
+              }, 'Sign in with Email')
+            ])
+          ])
+        ]),
       
       // Show Imisi chat for authenticated users only
       user && e(ImisiChatHead, { key: 'imisi-chat' }),
