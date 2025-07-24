@@ -715,9 +715,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get current user endpoint
-  app.get("/api/auth/me", isAuthenticated, async (req: AuthenticatedRequest, res) => {
-    res.json(req.user);
+  // Get current user endpoint - handles both authenticated and unauthenticated users
+  app.get("/api/auth/me", async (req: AuthenticatedRequest, res) => {
+    try {
+      let userId = req.session.userId;
+      let user = null;
+      
+      // First, try Firebase ID token authentication
+      const authHeader = req.get('Authorization');
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const idToken = authHeader.substring(7);
+        
+        try {
+          const { firebaseAdminService } = await import("./firebase-admin-service");
+          const decodedToken = await firebaseAdminService.verifyIdToken(idToken);
+          if (decodedToken && decodedToken.uid) {
+            // Find user by Firebase UID
+            user = await storage.getUserByFirebaseUid(decodedToken.uid);
+            if (user) {
+              userId = user.id;
+              // Update session for future requests
+              req.session.userId = user.id;
+              req.session.role = user.role || 'customer';
+              req.session.lastActivity = Date.now();
+            }
+          }
+        } catch (firebaseError) {
+          console.log('Firebase token verification failed, checking session...');
+        }
+      }
+      
+      // Fallback to session-based user lookup
+      if (!user && userId) {
+        user = await storage.getUserById(userId);
+      }
+      
+      if (user) {
+        res.json(createSafeUser(user));
+      } else {
+        // Return null for unauthenticated users (not an error)
+        res.json(null);
+      }
+    } catch (error) {
+      console.error("Get current user error:", error);
+      res.json(null); // Return null instead of error for graceful handling
+    }
   });
 
   // Update user profile endpoint

@@ -38,7 +38,7 @@ export async function isAuthenticated(
           console.log('🔑 Valid Firebase token received for:', decodedToken.email);
           
           // Find user by Firebase UID
-          user = await storage.getUserByFirebaseUid(decodedToken.uid);
+          user = await storage.getUserByFirebaseUid(decodedToken.uid) || null;
           if (user) {
             userId = user.id;
             
@@ -105,7 +105,7 @@ export async function isAuthenticated(
 
     // Get user data (if not already retrieved from Firebase)
     if (!user) {
-      user = await storage.getUser(userId);
+      user = await storage.getUser(userId) || null;
     }
     if (!user) {
       req.session.destroy((err) => {
@@ -143,6 +143,9 @@ export async function isAuthenticated(
       acceptTerms: user.acceptTerms,
       acceptPrivacy: user.acceptPrivacy,
       marketingConsent: user.marketingConsent,
+      firebaseUid: user.firebaseUid,
+      stripeCustomerId: user.stripeCustomerId,
+      stripeSubscriptionId: user.stripeSubscriptionId,
       firebaseUid: user.firebaseUid,
       stripeCustomerId: user.stripeCustomerId,
       stripeSubscriptionId: user.stripeSubscriptionId,
