@@ -6052,7 +6052,8 @@ function App() {
           className: 'flex-1 bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium py-2 px-3 rounded-md hover:bg-gray-200 transition-colors'
         }, 'Later')
       ])
-    ])
+    ]);
+    })()
   ]);
 }
 
