@@ -3,10 +3,10 @@ import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, signInWithPopup, GoogleAuthProvider, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 
-// Your web app's Firebase configuration - Production ready for portal.we-cush.com
+// Your web app's Firebase configuration - Using Firebase domain
 const firebaseConfig = {
   apiKey: "AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI",
-  authDomain: "portal.we-cush.com",
+  authDomain: "cushportal.firebaseapp.com",
   projectId: "cushportal",
   storageBucket: "cushportal.firebasestorage.app",
   messagingSenderId: "304174661302",
@@ -19,15 +19,14 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 
-// Configure Google provider with optimal settings for custom domain
+// Configure Google provider with standard settings
 const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('openid');
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
-// Ensure account selection prompt for better UX with custom domain
+// Standard provider configuration
 googleProvider.setCustomParameters({
-  'prompt': 'select_account',
-  'access_type': 'online'
+  'prompt': 'select_account'
 });
 
 export { auth, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged };
