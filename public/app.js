@@ -312,68 +312,73 @@ function HeroSection({ user }) {
       className: 'container mx-auto px-4 sm:px-6 py-16 sm:py-20 relative z-10'
     }, [
       e('div', {
-        key: 'content',
-        className: 'text-center max-w-4xl mx-auto'
+        key: 'hero-layout',
+        className: 'grid lg:grid-cols-2 gap-12 items-center min-h-[70vh]'
       }, [
-        // Hero Content
+        // Left side - Content
         e('div', {
-          key: 'hero-content',
-          className: 'mb-8'
+          key: 'content',
+          className: 'text-left lg:text-left order-2 lg:order-1'
         }, [
+          // Hero Content
           e('div', {
-            key: 'hero-badge',
-            className: 'inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-6'
+            key: 'hero-content',
+            className: 'mb-6'
           }, [
-            e('span', { key: 'dot', className: 'w-2 h-2 bg-green-400 rounded-full mr-2' }),
-            'Trusted by 50,000+ immigrants worldwide'
-          ])
-        ]),
-        
-        // Main headline
-        e('h1', { 
-          key: 'headline',
-          className: 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-6 sm:mb-8 leading-tight'
-        }, [
-          e('span', { key: 'line1', className: 'block' }, 'Your Gateway to'),
-          e('span', { 
-            key: 'line2', 
-            className: 'block bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent'
-          }, 'Global Success')
-        ]),
-        
-        // Subtitle
-        e('p', { 
-          key: 'subtitle',
-          className: 'text-xl md:text-2xl text-blue-100 mb-12 max-w-3xl mx-auto leading-relaxed font-light'
-        }, 'Empowering your immigration journey with AI-driven insights, expert guidance, and comprehensive financial solutions. Transform your dreams into reality with Cush.'),
-        
-        // Stats row
-        e('div', {
-          key: 'stats',
-          className: 'grid grid-cols-2 md:grid-cols-4 gap-8 mb-12 max-w-4xl mx-auto'
-        }, [
-          { number: '50K+', label: 'Success Stories', color: 'from-green-400 to-emerald-500' },
-          { number: '180+', label: 'Countries', color: 'from-blue-400 to-cyan-500' },
-          { number: '95%', label: 'Success Rate', color: 'from-purple-400 to-pink-500' },
-          { number: '24/7', label: 'AI Support', color: 'from-orange-400 to-red-500' }
-        ].map((stat, index) =>
-          e('div', { key: index, className: 'text-center' }, [
             e('div', {
-              key: 'number',
-              className: `text-3xl md:text-4xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent mb-2`
-            }, stat.number),
-            e('div', {
-              key: 'label',
-              className: 'text-blue-200 text-sm md:text-base font-medium'
-            }, stat.label)
-          ])
-        )),
-        
-        // CTA Buttons
-        e('div', {
-          key: 'cta-buttons',
-          className: 'flex flex-col sm:flex-row gap-4 justify-center items-center'
-        }, [
+              key: 'hero-badge',
+              className: 'inline-flex items-center px-4 py-2 bg-white/20 backdrop-blur-sm rounded-full text-white/90 text-sm font-medium mb-6'
+            }, [
+              e('span', { key: 'dot', className: 'w-2 h-2 bg-green-400 rounded-full mr-2' }),
+              'Trusted by 50,000+ immigrants worldwide'
+            ])
+          ]),
+          
+          // Main headline
+          e('h1', { 
+            key: 'headline',
+            className: 'text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl font-bold text-white mb-6 leading-tight'
+          }, [
+            e('span', { key: 'line1', className: 'block' }, 'Your Gateway to'),
+            e('span', { 
+              key: 'line2', 
+              className: 'block bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300 bg-clip-text text-transparent'
+            }, 'Global Success')
+          ]),
+          
+          // Subtitle
+          e('p', { 
+            key: 'subtitle',
+            className: 'text-lg md:text-xl text-blue-100 mb-8 leading-relaxed font-light max-w-xl'
+          }, 'Empowering your immigration journey with AI-driven insights, expert guidance, and comprehensive financial solutions. Transform your dreams into reality with Cush.'),
+          
+          // Stats row
+          e('div', {
+            key: 'stats',
+            className: 'grid grid-cols-2 gap-6 mb-8 max-w-md'
+          }, [
+            { number: '50K+', label: 'Success Stories', color: 'from-green-400 to-emerald-500' },
+            { number: '180+', label: 'Countries', color: 'from-blue-400 to-cyan-500' },
+            { number: '95%', label: 'Success Rate', color: 'from-purple-400 to-pink-500' },
+            { number: '24/7', label: 'AI Support', color: 'from-orange-400 to-red-500' }
+          ].map((stat, index) =>
+            e('div', { key: index, className: 'text-left' }, [
+              e('div', {
+                key: 'number',
+                className: `text-2xl md:text-3xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent mb-1`
+              }, stat.number),
+              e('div', {
+                key: 'label',
+                className: 'text-blue-200 text-sm font-medium'
+              }, stat.label)
+            ])
+          )),
+          
+          // CTA Buttons
+          e('div', {
+            key: 'cta-buttons',
+            className: 'flex flex-col sm:flex-row gap-4 items-start'
+          }, [
           user ? 
             e('button', {
               key: 'dashboard',
@@ -408,6 +413,37 @@ function HeroSection({ user }) {
             className: 'bg-white/10 backdrop-blur-md hover:bg-white/20 text-white font-semibold px-10 py-4 rounded-full border border-white/30 transition-all duration-300 hover:border-white/50 hover:shadow-lg',
             onClick: () => scrollToSection('services-section')
           }, 'Explore Features')
+        ])
+        ]),
+        
+        // Right side - Professional Woman Image
+        e('div', {
+          key: 'hero-image',
+          className: 'relative order-1 lg:order-2 flex justify-center lg:justify-end'
+        }, [
+          e('div', {
+            key: 'image-container',
+            className: 'relative w-full max-w-lg lg:max-w-xl'
+          }, [
+            // Main image with transparency effect
+            e('img', {
+              key: 'professional-woman',
+              src: '/attached_assets/image_1753415874735.jpg',
+              alt: 'Professional woman working on laptop - Your gateway to global success',
+              className: 'w-full h-auto object-cover rounded-2xl shadow-2xl opacity-90 hover:opacity-100 transition-opacity duration-300'
+            }),
+            
+            // Floating elements for visual enhancement
+            e('div', {
+              key: 'floating-badge',
+              className: 'absolute -top-6 -left-6 bg-gradient-to-r from-green-400 to-emerald-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg animate-pulse'
+            }, '✓ AI-Powered'),
+            
+            e('div', {
+              key: 'floating-badge-2',
+              className: 'absolute -bottom-4 -right-4 bg-gradient-to-r from-purple-400 to-pink-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg'
+            }, 'Expert Guidance')
+          ])
         ])
       ])
     ])
