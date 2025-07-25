@@ -54,7 +54,7 @@
       const { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
-      // Create Google Auth provider optimized for custom domain
+      // Create Google Auth provider with standard configuration
       const provider = new GoogleAuthProvider();
       provider.addScope('openid');
       provider.addScope('email');
@@ -65,12 +65,12 @@
         'include_granted_scopes': 'true'
       });
       
-      // Primary: signInWithPopup (optimal for custom domain and browser policies)
-      console.log('Triggering Firebase Google popup with custom domain optimization...');
+      // Primary: signInWithPopup (optimal for browser compatibility)
+      console.log('Triggering Firebase Google popup...');
       let result;
       
       try {
-        // Set popup configuration for better compatibility with custom domain
+        // Set popup configuration for better browser compatibility
         const popupOptions = {
           width: 500,
           height: 600,
@@ -83,7 +83,7 @@
         };
         
         result = await signInWithPopup(window.firebaseAuth, provider);
-        console.log('✅ signInWithPopup successful with custom domain');
+        console.log('✅ signInWithPopup successful');
         
       } catch (popupError) {
         console.log('⚠️ Popup method failed, implementing redirect fallback:', popupError.code);
