@@ -1,0 +1,21 @@
+Your task is to analyze and propose modifications to a Firebase web application's JavaScript/TypeScript codebase. The goal is to ensure that Firebase Authentication flows correctly leverage a custom domain and are robust against browser third-party storage restrictions.
+Here are the specific instructions:
+Locate Firebase Initialization: Identify the section in the codebase where the Firebase application is initialized, typically involving initializeApp() from firebase/app .
+Set authDomain : Within the firebaseConfig object passed to initializeApp() , ensure the authDomain property is explicitly set to 'portal.we-cush.com' . If this property is missing or set to a different value (e.g., 'cushportal.firebaseapp.com' ), update it accordingly.
+Example target:
+const firebaseConfig = {
+  // ... other config properties ...
+  authDomain: "portal.we-cush.com", // Ensure this line exists and has this value
+  // ... rest of the config ...
+};
+Expand
+Authentication Method Review: Scan the codebase for instances where Firebase Authentication sign-in methods are invoked, specifically looking for signInWithRedirect() .
+Conditional Action: If signInWithRedirect() is found for social providers (like Google, Facebook, etc.), propose changing these calls to signInWithPopup() .
+Justification: Explain that signInWithPopup() is generally more resilient to modern browser policies (like Intelligent Tracking Prevention in Safari or similar features in Chrome) that might block third-party storage access, especially when a custom authDomain is used, as it keeps the authentication flow within the context of the main application window.
+Provide Example Transformation: Show a 'before' and 'after' code snippet for how to change from signInWithRedirect to signInWithPopup for a typical provider (e.g., GoogleAuthProvider).
+Assumptions:
+The application is a web application.
+The primary language used for the Firebase integration is JavaScript or TypeScript.
+The Firebase JavaScript SDK v9 (modular syntax) is preferred, but identify and adapt if v8 (compat syntax) is in use.
+Output:
+Provide clear code snippets for the firebaseConfig modification and any proposed changes to authentication method calls, along with concise explanations for each change."

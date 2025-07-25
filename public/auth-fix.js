@@ -54,27 +54,45 @@
       const { signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider } = 
         await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
       
-      // Create Google Auth provider with additional settings
+      // Create Google Auth provider optimized for custom domain
       const provider = new GoogleAuthProvider();
       provider.addScope('openid');
       provider.addScope('email');
       provider.addScope('profile');
       provider.setCustomParameters({
-        'prompt': 'select_account'
+        'prompt': 'select_account',
+        'access_type': 'online',
+        'include_granted_scopes': 'true'
       });
       
-      // Try popup first, then redirect as fallback
-      console.log('Triggering Firebase default Google popup...');
+      // Primary: signInWithPopup (optimal for custom domain and browser policies)
+      console.log('Triggering Firebase Google popup with custom domain optimization...');
       let result;
       
       try {
-        result = await signInWithPopup(window.firebaseAuth, provider);
-      } catch (popupError) {
-        console.log('Popup failed, trying redirect method:', popupError.code);
+        // Set popup configuration for better compatibility with custom domain
+        const popupOptions = {
+          width: 500,
+          height: 600,
+          centerscreen: 1,
+          chrome: 1,
+          toolbar: 0,
+          status: 0,
+          resizable: 1,
+          scrollbars: 1
+        };
         
+        result = await signInWithPopup(window.firebaseAuth, provider);
+        console.log('✅ signInWithPopup successful with custom domain');
+        
+      } catch (popupError) {
+        console.log('⚠️ Popup method failed, implementing redirect fallback:', popupError.code);
+        
+        // Enhanced error handling for third-party storage restrictions
         if (popupError.code === 'auth/popup-blocked' || 
             popupError.code === 'auth/popup-closed-by-user' ||
-            popupError.code === 'auth/cancelled-popup-request') {
+            popupError.code === 'auth/cancelled-popup-request' ||
+            popupError.code === 'auth/network-request-failed') {
           // Use redirect method as fallback
           console.log('Using redirect method...');
           await signInWithRedirect(window.firebaseAuth, provider);

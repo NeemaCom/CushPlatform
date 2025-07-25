@@ -19,9 +19,15 @@ const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 const auth = getAuth(app);
 
-// Configure Google provider
+// Configure Google provider with optimal settings for custom domain
 const googleProvider = new GoogleAuthProvider();
+googleProvider.addScope('openid');
 googleProvider.addScope('email');
 googleProvider.addScope('profile');
+// Ensure account selection prompt for better UX with custom domain
+googleProvider.setCustomParameters({
+  'prompt': 'select_account',
+  'access_type': 'online'
+});
 
 export { auth, googleProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged };
