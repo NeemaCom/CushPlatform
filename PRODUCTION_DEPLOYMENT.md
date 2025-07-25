@@ -16,6 +16,18 @@ Go to [Firebase Console](https://console.firebase.google.com/) → Project "cush
 - `portal.we-cush.com`
 - `www.portal.we-cush.com` (optional, for www redirect)
 
+#### 1.1 Firebase Custom Domain Setup (For Custom Popup URL)
+To display "portal.we-cush.com" in Google Sign-In popup instead of "cushportal.firebase.com":
+
+Go to [Firebase Console](https://console.firebase.google.com/) → Project "cushportal" → Hosting → Custom domain
+
+**Steps:**
+1. Add custom domain: `portal.we-cush.com`
+2. Complete DNS verification (TXT record)
+3. Add A and AAAA records to DNS
+4. Wait for SSL certificate provisioning (up to 24 hours)
+5. Firebase will serve authentication flows from custom domain
+
 #### 2. Google Cloud Console OAuth Client Configuration
 Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → OAuth 2.0 Client IDs
 
@@ -34,6 +46,8 @@ Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Servi
 
 ### ⏳ Pending Manual Setup
 - Google OAuth authorization (requires Firebase Console and Google Cloud Console updates)
+- Firebase Custom Domain setup for portal.we-cush.com (to show custom domain in popup)
+- DNS configuration for custom domain pointing to Firebase
 - Production domain SSL certificate (handled by deployment platform)
 
 ## Post-Deployment Verification
@@ -41,10 +55,11 @@ Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Servi
 After deploying to `https://portal.we-cush.com`, verify:
 
 1. **Google Sign-In:** Test Google authentication flow
-2. **PWA Installation:** Confirm install prompt behavior
-3. **Analytics:** Check Firebase Analytics data collection
-4. **Mobile Responsiveness:** Test on various devices
-5. **SSL Certificate:** Ensure HTTPS is working properly
+2. **Custom Domain in Popup:** Confirm popup shows portal.we-cush.com URL
+3. **PWA Installation:** Confirm install prompt behavior
+4. **Analytics:** Check Firebase Analytics data collection
+5. **Mobile Responsiveness:** Test on various devices
+6. **SSL Certificate:** Ensure HTTPS is working properly
 
 ## Environment Variables
 

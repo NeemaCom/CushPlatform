@@ -9,6 +9,18 @@ Go to [Firebase Console](https://console.firebase.google.com/) → Select "cushp
 - **Authorized JavaScript Origins:** `https://portal.we-cush.com`
 - **Authorized Redirect URIs:** `https://portal.we-cush.com/__/auth/handler`
 
+### 1.1 Firebase Custom Domain Setup (Required for Custom URL in Popup)
+To show "portal.we-cush.com" instead of "cushportal.firebase.com" in the Google Sign-In popup:
+
+Go to [Firebase Console](https://console.firebase.google.com/) → Project "cushportal" → Hosting → Custom domain
+
+**Add Custom Domain:**
+1. Click "Add custom domain"
+2. Enter: `portal.we-cush.com`
+3. Follow DNS verification steps (add TXT record to your domain DNS)
+4. Add A and AAAA records provided by Firebase to point portal.we-cush.com to Firebase hosting
+5. Wait for SSL certificate provisioning (can take up to 24 hours)
+
 ### 2. Google Cloud Console OAuth Configuration Required
 Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → OAuth 2.0 Client IDs
 
