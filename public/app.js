@@ -419,37 +419,37 @@ function HeroSection({ user }) {
         // Right side - Blended Professional Woman Image
         e('div', {
           key: 'hero-image',
-          className: 'relative order-1 lg:order-2 flex justify-center lg:justify-end items-center'
+          className: 'relative order-1 lg:order-2 flex justify-center lg:justify-end items-center h-full'
         }, [
           e('div', {
             key: 'image-container',
-            className: 'relative w-64 h-80 lg:w-80 lg:h-96 overflow-hidden'
+            className: 'relative w-full h-full max-w-md lg:max-w-lg xl:max-w-xl min-h-[400px] lg:min-h-[500px] overflow-hidden'
           }, [
             // Blended background image with transparency
             e('div', {
               key: 'image-blend',
-              className: 'absolute inset-0 bg-cover bg-center bg-no-repeat opacity-20 mix-blend-soft-light',
+              className: 'absolute inset-0 bg-cover bg-center bg-no-repeat opacity-30 mix-blend-soft-light',
               style: {
                 backgroundImage: 'url(/attached_assets/image_1753415874735.jpg)',
-                filter: 'saturate(0.7) contrast(1.1)'
+                filter: 'saturate(0.8) contrast(1.2)'
               }
             }),
             
-            // Subtle overlay for better text readability
+            // Subtle overlay for better integration with blue background
             e('div', {
               key: 'overlay',
-              className: 'absolute inset-0 bg-gradient-to-br from-blue-500/10 via-transparent to-blue-700/20'
+              className: 'absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-blue-700/15'
             }),
             
             // Floating elements for visual enhancement - repositioned
             e('div', {
               key: 'floating-badge',
-              className: 'absolute top-4 left-4 bg-gradient-to-r from-green-400/80 to-emerald-500/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg'
+              className: 'absolute top-8 left-6 bg-gradient-to-r from-green-400/70 to-emerald-500/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg'
             }, '✓ AI-Powered'),
             
             e('div', {
               key: 'floating-badge-2',
-              className: 'absolute bottom-6 right-4 bg-gradient-to-r from-purple-400/80 to-pink-500/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg'
+              className: 'absolute bottom-8 right-6 bg-gradient-to-r from-purple-400/70 to-pink-500/70 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg'
             }, 'Expert Guidance')
           ])
         ])
