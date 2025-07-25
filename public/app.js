@@ -3251,16 +3251,29 @@ function Dashboard({ user, isInstalled, deferredPrompt, installPWA }) {
                 className: 'absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400'
               }, '🔍')
             ]),
-            // PWA Install Button
-            (!isInstalled && (deferredPrompt || !window.matchMedia('(display-mode: standalone)').matches)) && e('button', {
-              key: 'pwa-install',
-              onClick: installPWA,
-              className: 'hidden sm:flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors',
-              title: 'Install Cush App'
-            }, [
-              e('span', { key: 'install-icon' }, '📱'),
-              e('span', { key: 'install-text' }, 'Install')
-            ]),
+            // PWA Install Button - Enhanced detection
+            (() => {
+              const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+              const isIOSStandalone = window.navigator.standalone === true;
+              const isInstalledFlag = localStorage.getItem('pwa-installed') === 'true';
+              const isMinimalUI = window.matchMedia('(display-mode: minimal-ui)').matches;
+              const isFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
+              const isAppMode = window.chrome && window.chrome.app && window.chrome.app.isInstalled;
+              
+              const isPWAInstalled = isStandalone || isIOSStandalone || isInstalledFlag || 
+                                   isMinimalUI || isFullscreen || isAppMode;
+              
+              // Only show install button if not installed and we have a deferred prompt
+              return (!isPWAInstalled && deferredPrompt) && e('button', {
+                key: 'pwa-install',
+                onClick: installPWA,
+                className: 'hidden sm:flex items-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors',
+                title: 'Install Cush App'
+              }, [
+                e('span', { key: 'install-icon' }, '📱'),
+                e('span', { key: 'install-text' }, 'Install')
+              ]);
+            })(),
             // Notification Bell
             e('div', {
               key: 'notification-container',
@@ -5504,10 +5517,25 @@ function App() {
       const isIOSStandalone = window.navigator.standalone === true;
       const isInstalledFlag = localStorage.getItem('pwa-installed') === 'true';
       
-      if (isStandalone || isIOSStandalone || isInstalledFlag) {
-        console.log('App is already installed, hiding install prompt');
+      // Additional checks for different browsers and installation methods
+      const isMinimalUI = window.matchMedia('(display-mode: minimal-ui)').matches;
+      const isFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
+      const hasRelatedApps = navigator.getInstalledRelatedApps && window.location.origin.includes('we-cush.com');
+      
+      // Chrome/Edge: Check if running in app mode
+      const isAppMode = window.chrome && window.chrome.app && window.chrome.app.isInstalled;
+      
+      // Enhanced detection for PWA installation
+      const isPWAInstalled = isStandalone || isIOSStandalone || isInstalledFlag || 
+                            isMinimalUI || isFullscreen || isAppMode;
+      
+      if (isPWAInstalled) {
+        console.log('App is already installed, hiding install prompt permanently');
         setIsInstalled(true);
         setShowInstallPrompt(false);
+        setDeferredPrompt(null);
+        // Ensure the flag is set for future sessions
+        localStorage.setItem('pwa-installed', 'true');
         return true;
       }
       return false;
@@ -5528,6 +5556,19 @@ function App() {
         return;
       }
       
+      // Check if user has dismissed the prompt recently
+      const dismissedTime = localStorage.getItem('pwa-install-dismissed-time');
+      if (dismissedTime) {
+        const dismissedDate = new Date(dismissedTime);
+        const hoursSinceDismissed = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60);
+        
+        // Don't show prompt again for 24 hours after dismissal
+        if (hoursSinceDismissed < 24) {
+          console.log('Install prompt recently dismissed, waiting...');
+          return;
+        }
+      }
+      
       setDeferredPrompt(e);
       
       // Show install prompt after 3 seconds only if not installed
@@ -5541,18 +5582,30 @@ function App() {
 
     // Listen for appinstalled event
     const handleAppInstalled = () => {
-      console.log('App installed');
+      console.log('App installed successfully');
       setIsInstalled(true);
       setShowInstallPrompt(false);
       setDeferredPrompt(null);
-      // Store installation flag in localStorage
+      // Store installation flag and timestamp
       localStorage.setItem('pwa-installed', 'true');
+      localStorage.setItem('pwa-install-date', new Date().toISOString());
+      // Clear any dismissed flags since app is now installed
+      localStorage.removeItem('pwa-install-dismissed-time');
     };
 
     // For browsers that support PWA but don't fire beforeinstallprompt immediately
     const checkInstallability = () => {
       setTimeout(() => {
-        if (!isInstalled && !deferredPrompt && !showInstallPrompt) {
+        // Check dismissal status before showing fallback prompt
+        const dismissedTime = localStorage.getItem('pwa-install-dismissed-time');
+        let recentlyDismissed = false;
+        if (dismissedTime) {
+          const dismissedDate = new Date(dismissedTime);
+          const hoursSinceDismissed = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60);
+          recentlyDismissed = hoursSinceDismissed < 24;
+        }
+        
+        if (!isInstalled && !deferredPrompt && !showInstallPrompt && !recentlyDismissed && !checkInstallationStatus()) {
           // Show fallback prompt for browsers that support PWA but don't fire the event
           console.log('Showing fallback install prompt');
           setShowInstallPrompt(true);
@@ -5853,15 +5906,22 @@ function App() {
         console.log('User accepted the install prompt');
         setShowInstallPrompt(false);
         setIsInstalled(true);
-        // Store installation flag
+        // Store installation flag and timestamp
         localStorage.setItem('pwa-installed', 'true');
+        localStorage.setItem('pwa-install-date', new Date().toISOString());
+        // Clear any dismissed flags since app is now installed
+        localStorage.removeItem('pwa-install-dismissed-time');
       } else {
         console.log('User dismissed the install prompt');
+        // Store dismissal timestamp to prevent showing again for 24 hours
+        localStorage.setItem('pwa-install-dismissed-time', new Date().toISOString());
       }
       
       setDeferredPrompt(null);
     } else {
       console.log('No deferred prompt available');
+      // Store dismissal to prevent showing fallback prompt repeatedly
+      localStorage.setItem('pwa-install-dismissed-time', new Date().toISOString());
       // For browsers that don't support beforeinstallprompt
       alert('To install this app:\n\n' +
             'Chrome/Edge: Click the menu button (⋮) then "Install Cush"\n' +
@@ -5873,12 +5933,9 @@ function App() {
   // Dismiss install prompt
   const dismissInstallPrompt = () => {
     setShowInstallPrompt(false);
-    // Show again after 24 hours
-    setTimeout(() => {
-      if (!isInstalled && deferredPrompt) {
-        setShowInstallPrompt(true);
-      }
-    }, 24 * 60 * 60 * 1000);
+    // Store dismissal timestamp to prevent showing again for 24 hours
+    localStorage.setItem('pwa-install-dismissed-time', new Date().toISOString());
+    console.log('PWA install prompt dismissed, will not show again for 24 hours');
   };
 
   if (isLoading) {
@@ -5920,11 +5977,32 @@ function App() {
     // Show Imisi chat for authenticated users only
     user && e(ImisiChatHead, { key: 'imisi-chat' }),
     
-    // PWA Install Prompt
-    showInstallPrompt && !isInstalled && e('div', {
-      key: 'pwa-install-prompt',
-      className: 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 max-w-sm mx-auto md:mx-0'
-    }, [
+    // PWA Install Prompt - Enhanced detection to prevent intrusive prompts
+    (() => {
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+      const isIOSStandalone = window.navigator.standalone === true;
+      const isInstalledFlag = localStorage.getItem('pwa-installed') === 'true';
+      const isMinimalUI = window.matchMedia('(display-mode: minimal-ui)').matches;
+      const isFullscreen = window.matchMedia('(display-mode: fullscreen)').matches;
+      const isAppMode = window.chrome && window.chrome.app && window.chrome.app.isInstalled;
+      
+      const isPWAInstalled = isStandalone || isIOSStandalone || isInstalledFlag || 
+                            isMinimalUI || isFullscreen || isAppMode;
+      
+      // Check if user dismissed recently (within 24 hours)
+      const dismissedTime = localStorage.getItem('pwa-install-dismissed-time');
+      let recentlyDismissed = false;
+      if (dismissedTime) {
+        const dismissedDate = new Date(dismissedTime);
+        const hoursSinceDismissed = (Date.now() - dismissedDate.getTime()) / (1000 * 60 * 60);
+        recentlyDismissed = hoursSinceDismissed < 24;
+      }
+      
+      // Only show if: app not installed, prompt enabled, not recently dismissed
+      return (showInstallPrompt && !isPWAInstalled && !recentlyDismissed) && e('div', {
+        key: 'pwa-install-prompt',
+        className: 'fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 p-4 max-w-sm mx-auto md:mx-0'
+      }, [
       e('div', {
         key: 'install-content',
         className: 'flex items-start gap-3'
