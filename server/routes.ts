@@ -5,6 +5,7 @@ import Stripe from "stripe";
 import session from "express-session";
 import passport from "passport";
 import { storage } from "./storage";
+import * as memStore from "./mem-store";
 
 import { aiAnalyticsService } from "./ai-analytics-service";
 import { analyzeFinancialMood, type FinancialMoodData } from './mood-analyzer';
@@ -80,6 +81,7 @@ import { walletService } from "./wallet-service";
 import { remittanceService } from "./remittance-service";
 import { cymonzService } from "./cymonz-service";
 import { railsrService } from "./railsr-service";
+import { registerPassportRoutes } from "./passport-routes";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -155,40 +157,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
-
+  // ── Cush Passport V1 routes (registered after session middleware) ──────────
+  registerPassportRoutes(app);
 
   // Firebase sync endpoint
   app.post("/api/auth/firebase-sync", async (req, res) => {
     try {
-      console.log('Firebase sync request received:', req.body);
-      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, address, country, phone, acceptTerms, acceptPrivacy, isNewUser } = req.body;
+      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, country, phone, acceptTerms, acceptPrivacy, isNewUser } = req.body;
       
       if (!uid || !email) {
-        console.error('Missing required fields:', { uid: !!uid, email: !!email });
         return res.status(400).json({ error: "UID and email are required" });
       }
-      
-      // Check if user exists by Firebase UID or email
-      let user = await storage.getUserByFirebaseUid(uid);
-      if (!user) {
-        user = await storage.getUserByEmail(email);
+
+      // ── Try database first; fall back to in-memory store ──────────────────
+      let user: any = null;
+      let usingMemStore = false;
+
+      try {
+        user = await storage.getUserByFirebaseUid(uid);
+        if (!user) user = await storage.getUserByEmail(email);
+      } catch (_dbErr) {
+        usingMemStore = true;
+      }
+
+      if (usingMemStore) {
+        // Database is unavailable — use in-memory store for auth
+        const memUser = memStore.createOrUpdateUserFromFirebase({
+          firebaseUid: uid,
+          email,
+          firstName: firstName || displayName?.split(' ')[0] || 'User',
+          lastName: lastName || displayName?.split(' ').slice(1).join(' ') || '',
+          displayName,
+        });
+
+        req.session.userId = memUser.id;
+        req.session.role = memUser.role;
+        req.session.lastActivity = Date.now();
+
+        return res.json({ success: true, user: memUser });
       }
       
       if (!user) {
-        // Check if this is a new user registration (includes both Google and email sign-ups)
         if (isNewUser) {
-          // Create new user with Firebase data
           const bcrypt = await import('bcrypt');
           const placeholderPasswordHash = await bcrypt.hash('oauth-user-no-password', 10);
-          
-          // Debug logging
-          console.log('Creating new user with Firebase sync data:', {
-            firstName: firstName,
-            lastName: lastName,
-            displayName: displayName,
-            email: email,
-            isNewUser: isNewUser
-          });
 
           user = await storage.createUser({
             email,
@@ -205,23 +217,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             role: 'customer'
           });
           
-          // Update user with Firebase UID after creation
           if (uid) {
             user = await storage.updateUser(user.id, { firebaseUid: uid });
           }
-
-          // Skip avatar generation for now to avoid dependencies issues
-          console.log('User created successfully without avatar generation');
         } else {
-          // User doesn't exist, return error for sign-in attempt
           return res.status(404).json({ 
             error: "No account found", 
-            message: "No account found with this email address. Would you like to create a new account?",
             requiresSignup: true
           });
         }
       } else {
-        // Update existing user with Firebase UID if not set
         if (!user.firebaseUid && uid) {
           user = await storage.updateUser(user.id, {
             firebaseUid: uid,
@@ -234,39 +239,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // For new user registrations, don't set session (they need to sign in after account creation)
       if (isNewUser) {
-        // Don't set session for new users - they should sign in after account creation
         const safeUser = createSafeUser(user);
         SecurityLogger.logAuthEvent('firebase_signup_success', user.id, true, req.ip, req.get('User-Agent'));
-        res.json({ success: true, user: safeUser, isNewUser: true, redirectTo: 'signin' });
-      } else {
-        // Set session for existing users signing in
-        console.log('Setting session for user:', { userId: user.id, email: user.email });
-        req.session.userId = user.id;
-        req.session.role = user.role || 'customer';
-        req.session.lastActivity = Date.now();
-        
-        // Update last login time
-        await storage.updateUser(user.id, { lastLoginAt: new Date() });
-        
-        const safeUser = createSafeUser(user);
-        console.log('Firebase sync successful for existing user:', safeUser.email);
-        SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
-        
-        // Create welcome back notification for returning users
-        const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt) : null;
-        const daysSinceLastLogin = lastLogin ? Math.floor((Date.now() - lastLogin.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-        
-        if (daysSinceLastLogin > 0) {
-          createActivityNotification(user.id, 'login', { lastLoginDays: daysSinceLastLogin });
-        }
-        
-        res.json({ success: true, user: safeUser });
+        return res.json({ success: true, user: safeUser, isNewUser: true, redirectTo: 'signin' });
       }
+
+      req.session.userId = user.id;
+      req.session.role = user.role || 'customer';
+      req.session.lastActivity = Date.now();
+      
+      try { await storage.updateUser(user.id, { lastLoginAt: new Date() }); } catch (_) {}
+      
+      const safeUser = createSafeUser(user);
+      SecurityLogger.logAuthEvent('firebase_sync_success', user.id, true, req.ip, req.get('User-Agent'));
+      return res.json({ success: true, user: safeUser });
     } catch (error) {
       console.error('Firebase sync error:', error);
-      SecurityLogger.logAuthEvent('firebase_sync_error', null, false, req.ip, req.get('User-Agent'), { error: error.message });
+      SecurityLogger.logAuthEvent('firebase_sync_error', null, false, req.ip, req.get('User-Agent'), { error: error instanceof Error ? error.message : String(error) });
       res.status(500).json({ error: "Failed to sync Firebase user" });
     }
   });
