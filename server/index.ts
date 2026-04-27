@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createServer as createHttpServer } from "http";
 import { registerRoutes } from "./routes";
 import path from "path";
+import { createServer as createViteServer } from "vite";
 
 const app = express();
 
@@ -55,31 +56,23 @@ export async function createServer() {
   
   const httpServer = await registerRoutes(app);
 
-  // Serve static files from public directory first
-  app.use(express.static('public', {
-    setHeaders: (res, path) => {
-      if (path.endsWith('.js')) {
-        res.setHeader('Content-Type', 'application/javascript');
+  if (process.env.NODE_ENV !== 'production') {
+    // Development: use Vite middleware for the React app (hot module replacement)
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  } else {
+    // Production: serve the pre-built Vite output
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req: Request, res: Response) => {
+      if (!req.path.startsWith('/api/')) {
+        res.sendFile(path.join(distPath, 'index.html'));
       }
-    }
-  }));
-  
-  // Serve other static files from root
-  app.use(express.static('.', { index: false }));
-
-  // Root endpoint - always serve the web application
-  // Health checks should use dedicated endpoints: /health, /api/health, /ready, /live
-  app.get('/', (req, res) => {
-    // Always serve the SPA for all requests to root path
-    res.sendFile(path.join(process.cwd(), 'index.html'));
-  });
-
-  // Handle SPA routing (serve HTML for non-API paths, excluding root which is handled above)
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api/')) {
-      res.sendFile(path.join(process.cwd(), 'index.html'));
-    }
-  });
+    });
+  }
 
   // Error handling middleware (must be last)
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

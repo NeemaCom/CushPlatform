@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { SecurityLogger } from "./security";
 import type { User, SafeUser } from "@shared/schema";
+import * as memStore from "./mem-store";
 
 declare module "express-session" {
   interface SessionData {
@@ -65,8 +66,22 @@ export async function isAuthenticated(
     // Update last activity
     req.session.lastActivity = now;
 
-    // Get user data
-    const user = await storage.getUser(userId);
+    // Get user data — try DB first, fall back to in-memory store
+    let user: any = null;
+    try {
+      user = await storage.getUser(userId);
+    } catch (_dbErr) {
+      // DB unavailable — fall back to in-memory user store
+    }
+
+    // Fall back to mem-store (used when DB is unavailable)
+    if (!user) {
+      const memUser = memStore.getUser(userId);
+      if (memUser) {
+        user = memUser;
+      }
+    }
+
     if (!user) {
       req.session.destroy((err) => {
         if (err) {

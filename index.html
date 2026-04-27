@@ -3,164 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CushGlobal - Financial tools for Expats</title>
-    <meta name="description" content="Financial tools for Expats - comprehensive immigration services platform with AI-powered assistance, financial tools, and community support" />
-    <meta name="google-site-verification" content="8UAtVxcUuedvTxVUPOrkAmCgnU2E5zdARAmMgOEMxYo" />
-    
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#4f46e5" />
+    <title>Cush Passport — Global Credit Identity</title>
+    <meta name="description" content="Your global financial identity passport. Prove your creditworthiness to landlords and institutions worldwide using PPP-normalized scoring." />
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="CushGlobal" />
-    <meta name="msapplication-TileColor" content="#4f46e5" />
-    <meta name="msapplication-config" content="/browserconfig.xml" />
-    
-    <!-- Icons -->
-    <link rel="icon" href="/favicon.ico" type="image/x-icon" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
-    
-    <!-- PWA Manifest -->
+    <meta name="apple-mobile-web-app-title" content="Cush Passport" />
     <link rel="manifest" href="/manifest.json" />
-    
-    <!-- Custom Styles -->
+    <link rel="icon" href="/favicon.ico" type="image/x-image" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
     <style>
-      /* Hide scrollbar for horizontal carousel */
-      .scrollbar-hide {
-        -ms-overflow-style: none;
-        scrollbar-width: none;
-      }
-      .scrollbar-hide::-webkit-scrollbar {
-        display: none;
-      }
-      
-      /* Smooth scrolling for carousel */
-      .scrollbar-hide {
-        scroll-behavior: smooth;
-      }
-      
-      /* Enhanced Chat Interface Styles */
-      .word-break-keep-all {
-        word-break: break-word;
-        overflow-wrap: break-word;
-        hyphens: auto;
-      }
-      
-      .overflow-wrap-anywhere {
-        overflow-wrap: anywhere;
-      }
-      
-      /* Mobile chat adjustments */
-      @media (max-width: 640px) {
-        .fixed.bottom-24.right-6 {
-          bottom: 6rem;
-          right: 1rem;
-          left: 1rem;
-          width: auto !important;
-          max-width: none !important;
-        }
-        
-        .fixed.bottom-6.right-6 {
-          bottom: 1rem;
-          right: 1rem;
-        }
-        
-        /* Ensure input area is accessible */
-        .safe-bottom {
-          padding-bottom: 1rem;
-          margin-bottom: env(safe-area-inset-bottom);
-        }
-        
-        /* Prevent header buttons from overlapping */
-        .chat-header-mobile {
-          padding-right: 0.5rem;
-        }
-        
-        /* Better mobile button spacing */
-        .mobile-button-group {
-          gap: 0.25rem;
-        }
-      }
-      
-      /* Chat animations */
-      .chat-message-ai {
-        animation: slideInLeft 0.3s ease-out forwards;
-        opacity: 0;
-      }
-      
-      .chat-message-user {
-        animation: slideInRight 0.3s ease-out forwards;
-        opacity: 0;
-      }
-      
-      @keyframes slideInLeft {
-        from {
-          opacity: 0;
-          transform: translateX(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      @keyframes slideInRight {
-        from {
-          opacity: 0;
-          transform: translateX(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-      
-      /* Typing indicator */
-      .typing-indicator {
-        display: flex;
-        gap: 2px;
-        align-items: center;
-      }
-      
-      .typing-dot {
-        width: 4px;
-        height: 4px;
-        border-radius: 50%;
-        background-color: #6b7280;
-        animation: typing 1.4s infinite ease-in-out;
-      }
-      
-      .typing-dot:nth-child(1) {
-        animation-delay: -0.32s;
-      }
-      
-      .typing-dot:nth-child(2) {
-        animation-delay: -0.16s;
-      }
-      
-      @keyframes typing {
-        0%, 80%, 100% {
-          transform: scale(0.8);
-          opacity: 0.5;
-        }
-        40% {
-          transform: scale(1);
-          opacity: 1;
-        }
-      }
+      *, *::before, *::after { box-sizing: border-box; }
+      body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
+      #root { min-height: 100vh; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
     </style>
   </head>
   <body>
     <div id="root"></div>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="/firebase-init-coordinator.js"></script>
-    <script src="/auth-fix.js"></script>
-    <script src="/firebase-analytics.js"></script>
-    <script src="/success-notification.js"></script>
-    <script src="/app.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
