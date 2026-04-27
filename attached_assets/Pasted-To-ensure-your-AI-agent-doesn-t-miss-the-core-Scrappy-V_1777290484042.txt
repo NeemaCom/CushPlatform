@@ -1,0 +1,62 @@
+To ensure your AI agent doesn't miss the core "Scrappy V1" principles while building this advanced math, we need to bridge the **Strategic Guardrails** (from your initial blueprint) with the **Technical Specs** (the normalization and dual-mode logic).
+
+Here is the finalized, high-octane **Part 2 Master Prompt**. I have injected the missing "Confidence Indicators," "Timestamping," and "Verification Tiering" from your original blueprint to ensure the build remains credible.
+
+---
+
+### **Final Master Prompt: Cush V1 Implementation (Global Identity Engine)**
+
+**Role:** You are a Senior Fintech Engineer. Having completed the audit, you are now implementing **Cush Passport V1** from a "Fresh Start" perspective.
+
+**1. Database & Trust Architecture (Drizzle ORM):**
+Refine the schema to prioritize **Traceability** and **Verification Tiers**.
+- **`financial_signals` table:** Store `raw_amount`, `currency_code`, and `normalized_value` (calculated via the Normalization Service). 
+- **`passports` table:** Include `score`, `confidence_score` (0-100), `generated_at` (timestamp), and `share_token`.
+- **`evidence_vault` table:** Track document status: `SELF_REPORTED`, `PENDING_REVIEW`, `VERIFIED`.
+
+**2. Global Power Normalization (The Brain):**
+Implement a `NormalizationService` using **Relative Economic Strength** rather than Forex.
+- **Benchmarks (2026):** - Nigeria (NGN): Median = ₦100,000 | PPP Multiplier = 4.5x
+  - UK (GBP): Median = £2,350 | PPP Multiplier = 1.0x
+- **Formula:** - `LocalStrength = UserIncome / CountryMedianIncome`
+  - `GlobalScore = LocalStrength * PPP_Multiplier * 20` (Cap at 100).
+- **Peak Capacity:** Apply this same normalization to the **Max Single Transfer** signal to show "Global Asset Power."
+
+**3. Dual-Mode UX (Pre-Arrival & Post-Arrival):**
+- **PRE_ARRIVAL:** Onboarding focuses on home-country historical integrity and relocation fund accumulation.
+- **POST_ARRIVAL:** Focuses on bridging home-country history with local integration (income continuity).
+- **Toggle:** Users can switch status, but shifting to Post-Arrival requires a "Proof of Residency" upload.
+
+**4. The Credit-Building Checklist (Gamified Verification):**
+Implement a dynamic `ChecklistComponent`.
+- Each item must show a **"Score Boost"** (e.g., "Verify Payslip: +15 pts").
+- **Tier 1 Items:** Manual entry (Fastest to ship).
+- **Tier 2 Items:** Document uploads (Triggers 'Verification' status).
+- **Visuals:** Use a "Passport Strength" progress bar that moves as the user completes the checklist.
+
+**5. Public Passport View (`/passport/:token`):**
+A read-only, high-trust page for Landlords.
+- **Hero Section:** Large Cush Score + **Confidence Indicator** (e.g., "High Confidence - 90% Verified").
+- **The Explainer:** Include a "Landlord Info" tooltip: *"We measure financial discipline relative to local cost-of-living to prove global reliability."*
+- **Reason Codes:** Generate 3-5 specific factors: *"Top 5% local earner," "Consistent 40% monthly surplus," "Proven high-value asset transfer history."*
+
+**6. Implementation Guardrails (From V1 Blueprint):**
+- **Safety First:** Store all currency in **Cents/Minor Units (BigInt)** to prevent floating-point errors.
+- **Deterministic First:** Use the weighted rules-based model we defined (Income 40%, Max Surplus 30%, Stability 30%). Do **NOT** use black-box ML yet.
+- **Timestamping:** Every Passport must show "Last Updated: [Date]" to ensure the landlord sees fresh data.
+
+**Style & Palette:**
+- **Primary:** Professional Slate (#0f172a) and Trust Blue (#2563eb).
+- **Success:** Emerald (#10b981) for verified badges.
+- **UX:** Minimalist, fast, and mobile-first.
+
+**Next Action:** Initialize the `NormalizationService` and the `EvidenceVault` schema. Let's build the foundation of trust.
+
+---
+
+### **Why this is now complete:**
+* **Verification:** It now includes the **"Confidence Level"** and **"Timestamp"** from your original blueprint, which are essential for landlord trust.
+* **Traceability:** It ensures the database stores the *raw* data alongside the *normalized* data, so you can always prove how a score was calculated.
+* **Actionability:** The checklist is now the "engine" of the app, driving users to provide the documents you need for the Gemini AI to eventually parse.
+
+**You are ready to paste this into Replit Agent. Do you want me to write the "Success Criteria" for you to check once the agent finishes the first build?**
