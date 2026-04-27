@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, varchar, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
@@ -1999,4 +1999,118 @@ export type UserRestriction = typeof userRestrictions.$inferSelect;
 export type SystemMetric = typeof systemMetrics.$inferSelect;
 export type AdminUserUpdate = z.infer<typeof adminUserUpdateSchema>;
 export type RestrictUser = z.infer<typeof restrictUserSchema>;
+
+// ===== CUSH PASSPORT V1 — CREDIT IDENTITY ENGINE =====
+
+export const passports = pgTable("passports", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  score: integer("score").notNull().default(0),
+  confidenceScore: integer("confidence_score").notNull().default(0),
+  mode: text("mode").notNull().default("pre_arrival"), // pre_arrival | post_arrival
+  shareToken: text("share_token").unique(),
+  scoreBreakdown: json("score_breakdown").$type<{
+    incomeScore: number;
+    surplusScore: number;
+    stabilityScore: number;
+  }>(),
+  reasonCodes: text("reason_codes").array(),
+  generatedAt: timestamp("generated_at"),
+  lastUpdated: timestamp("last_updated").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const financialSignals = pgTable("financial_signals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  passportId: integer("passport_id").notNull().references(() => passports.id, { onDelete: "cascade" }),
+  signalType: text("signal_type").notNull(), // income | surplus | transfer | stability
+  label: text("label").notNull(),
+  rawAmountCents: bigint("raw_amount_cents", { mode: "number" }).notNull(),
+  currencyCode: text("currency_code").notNull(),
+  normalizedValue: decimal("normalized_value", { precision: 10, scale: 4 }),
+  country: text("country").notNull(),
+  verificationStatus: text("verification_status").notNull().default("SELF_REPORTED"), // SELF_REPORTED | PENDING_REVIEW | VERIFIED
+  period: text("period").default("monthly"), // monthly | annual
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const evidenceVault = pgTable("evidence_vault", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  passportId: integer("passport_id").notNull().references(() => passports.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(), // payslip | bank_statement | proof_of_residency | tax_return | employment_contract | transfer_receipt
+  label: text("label").notNull(),
+  status: text("status").notNull().default("SELF_REPORTED"), // SELF_REPORTED | PENDING_REVIEW | VERIFIED
+  tier: integer("tier").notNull().default(1), // 1 = manual entry, 2 = document upload
+  scoreBoost: integer("score_boost").notNull().default(0),
+  fileData: text("file_data"), // base64 encoded document
+  fileName: text("file_name"),
+  adminNotes: text("admin_notes"),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Passport Relations
+export const passportsRelations = relations(passports, ({ one, many }) => ({
+  user: one(users, { fields: [passports.userId], references: [users.id] }),
+  signals: many(financialSignals),
+  evidence: many(evidenceVault),
+}));
+
+export const financialSignalsRelations = relations(financialSignals, ({ one }) => ({
+  user: one(users, { fields: [financialSignals.userId], references: [users.id] }),
+  passport: one(passports, { fields: [financialSignals.passportId], references: [passports.id] }),
+}));
+
+export const evidenceVaultRelations = relations(evidenceVault, ({ one }) => ({
+  user: one(users, { fields: [evidenceVault.userId], references: [users.id] }),
+  passport: one(passports, { fields: [evidenceVault.passportId], references: [passports.id] }),
+}));
+
+// Passport Schemas
+export const insertPassportSchema = createInsertSchema(passports).omit({
+  id: true, createdAt: true, lastUpdated: true, generatedAt: true,
+});
+
+export const insertFinancialSignalSchema = createInsertSchema(financialSignals).omit({
+  id: true, createdAt: true, updatedAt: true, normalizedValue: true,
+});
+
+export const insertEvidenceVaultSchema = createInsertSchema(evidenceVault).omit({
+  id: true, createdAt: true, updatedAt: true, reviewedAt: true,
+});
+
+export const addSignalSchema = z.object({
+  signalType: z.enum(["income", "surplus", "transfer", "stability"]),
+  label: z.string().min(1, "Label is required"),
+  rawAmountCents: z.number().int().positive("Amount must be positive"),
+  currencyCode: z.string().length(3, "Currency code must be 3 characters"),
+  country: z.string().min(2, "Country code required"),
+  period: z.enum(["monthly", "annual"]).default("monthly"),
+});
+
+export const addEvidenceSchema = z.object({
+  documentType: z.enum(["payslip", "bank_statement", "proof_of_residency", "tax_return", "employment_contract", "transfer_receipt"]),
+  label: z.string().min(1),
+  tier: z.number().int().min(1).max(2),
+  fileData: z.string().optional(),
+  fileName: z.string().optional(),
+});
+
+export const updatePassportModeSchema = z.object({
+  mode: z.enum(["pre_arrival", "post_arrival"]),
+});
+
+// Passport Types
+export type Passport = typeof passports.$inferSelect;
+export type InsertPassport = z.infer<typeof insertPassportSchema>;
+export type FinancialSignal = typeof financialSignals.$inferSelect;
+export type InsertFinancialSignal = z.infer<typeof insertFinancialSignalSchema>;
+export type EvidenceItem = typeof evidenceVault.$inferSelect;
+export type InsertEvidenceItem = z.infer<typeof insertEvidenceVaultSchema>;
+export type AddSignal = z.infer<typeof addSignalSchema>;
+export type AddEvidence = z.infer<typeof addEvidenceSchema>;
 export type AdminActionLogData = z.infer<typeof adminActionLogSchema>;

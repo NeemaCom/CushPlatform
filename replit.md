@@ -1,17 +1,76 @@
-# Cush Platform - Global Immigration Services
+# Cush Passport V1 — Global Credit Identity Engine
 
 ## Project Overview
-The Cush platform is a comprehensive global immigration services platform featuring user management, financial services (loan referrals), job discovery, achievement tracking, and AI-powered migration assistance through the Imisi 2.0 chatbot. The project has been migrated from Next.js to Vite architecture with Express backend.
+Cush Passport V1 is a lean Credit Identity engine that builds a PPP-normalized financial score (0–1000) for immigrants and migrants. The score is deterministic and weighted: Income 40%, Surplus 30%, Stability 30%. Users build an Evidence Vault and share a public landlord-facing passport page via a share link.
 
 ## Current Architecture
-- **Frontend**: React 18 with Vite (served via CDN for simplified deployment)
-- **Backend**: Express.js with TypeScript
-- **Database**: PostgreSQL (Replit built-in Neon-backed)
-- **Authentication**: Firebase Authentication with Google Sign-In and email/password
-- **AI Services**: Google Gemini AI for predictive analytics and immigration assistance
-- **Styling**: Tailwind CSS with custom utility classes
+- **Frontend**: React 18 + Vite (served via Express middleware in development, `dist/` in production)
+- **Backend**: Express.js with TypeScript on port 5000
+- **Database**: PostgreSQL (Neon-backed) — currently unavailable (stale credentials); all passport data uses in-memory storage via `server/mem-store.ts`
+- **Authentication**: Firebase Authentication (Google Sign-In + email/password) → backend session via `/api/auth/firebase-sync`
+- **Session Store**: In-memory express-session (24-hour sessions)
+- **Scoring Engine**: Deterministic PPP-normalized weighted model in `server/normalization-service.ts`
+- **Styling**: Tailwind CSS (content path: `./index.html`, `./src/**`)
+
+## Key Files
+- `server/mem-store.ts` — In-memory store for users, passports, signals, evidence
+- `server/normalization-service.ts` — PPP benchmarks (10 countries), score calculation, confidence
+- `server/passport-routes.ts` — 9 REST endpoints under `/api/passport/*`
+- `src/pages/CreditPassport.tsx` — Authenticated passport dashboard (score ring, checklist, signals)
+- `src/pages/PublicPassport.tsx` — Unauthenticated landlord-facing share view at `/passport/:token`
+- `src/pages/Login.tsx` — Firebase-powered login (Google + email/password) with tab UI
+- `src/App.tsx` — wouter routing: `/` and `/passport` → CreditPassport (auth), `/passport/:token` → PublicPassport
+
+## Scoring Model
+- **Scale**: 0–1000
+- **Weights**: Income (40%), Surplus (30%), Stability (30%)
+- **PPP Normalization**: Raw amounts divided by PPP multiplier before scoring, relative to median income benchmark
+- **Confidence**: Based on count of VERIFIED evidence items (0–100%)
+- **Evidence boosts**: payslip (+40pts), tax return (+50pts), employment contract (+35pts), bank statement (+30pts)
+
+## API Endpoints
+- `GET /api/passport/me` — fetch or create user's passport with signals and evidence
+- `POST /api/passport/signals` — add a financial signal (income/surplus/transfer/stability)
+- `DELETE /api/passport/signals/:id` — remove a signal
+- `POST /api/passport/evidence` — add evidence item (with optional file upload)
+- `DELETE /api/passport/evidence/:id` — remove evidence item
+- `PUT /api/passport/mode` — toggle pre_arrival/post_arrival mode
+- `POST /api/passport/generate-token` — create public share token
+- `GET /api/passport/public/:token` — unauthenticated public passport view
+- `GET /api/passport/benchmarks` — PPP country benchmarks
+
+## Auth Flow
+1. User authenticates with Firebase (Google popup or email/password)
+2. Frontend calls `POST /api/auth/firebase-sync` with Firebase user data
+3. Backend checks DB (fails gracefully) → creates/updates user in in-memory store
+4. Backend sets session (`req.session.userId`)
+5. `useAuth` hook calls `GET /api/auth/me` → auth middleware resolves user from mem-store
+6. User sees CreditPassport dashboard
+
+## Known Issues
+- **Database unavailable**: Neon PostgreSQL credentials are stale (password auth fails). All data is stored in-memory and resets on server restart. This is the expected fallback for V1 development.
+- The Cymonz and Railsr services log startup errors (pre-existing, unrelated to passport features)
+
+## Environment
+- Firebase Project: `cushportal` (authDomain: `cushportal.firebaseapp.com`)
+- Stripe key: configured
+- Gemini API: configured for AI features
 
 ## Recent Changes
+**2026-04-27**: Cush Passport V1 Implementation
+- ✓ Migrated from old SPA (public/app.js) to React 18 + Vite architecture
+- ✓ Fixed Tailwind CSS content path (`./src/**` instead of `./client/src/**`)
+- ✓ Created `server/mem-store.ts` — complete in-memory store for users, passports, signals, evidence
+- ✓ Rewrote `server/passport-routes.ts` — all 9 endpoints now use in-memory store (no DB required)
+- ✓ Updated `server/auth.ts` — falls back to mem-store when DB is unavailable
+- ✓ Updated `server/db.ts` — switched from neon-http to node-postgres with SSL support
+- ✓ Updated `server/routes.ts` — firebase-sync uses mem-store fallback; removed passport migrations
+- ✓ Rewrote `src/pages/Login.tsx` — Firebase-powered (Google + email/password) with Sign In / Create Account tabs
+- ✓ Created `src/pages/CreditPassport.tsx` — score ring, PPP breakdown bars, evidence checklist, signal form
+- ✓ Created `src/pages/PublicPassport.tsx` — dark hero score gauge, breakdown, evidence table for landlords
+- ✓ Created `server/normalization-service.ts` — PPP model for 10 countries, deterministic scoring
+
+## Previous Changes
 **2025-07-19**: Implemented Comprehensive Firebase Analytics Integration with User Tracking
 - ✓ Added Firebase Analytics initialization with measurement ID "G-VGYNJNCJ2F" for comprehensive user journey tracking
 - ✓ Created firebase-analytics.js utility file with trackUserAction function and specialized tracking methods
