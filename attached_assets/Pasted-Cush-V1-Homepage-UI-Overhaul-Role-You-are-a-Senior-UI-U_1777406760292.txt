@@ -1,0 +1,63 @@
+Cush V1 Homepage & UI Overhaul
+Role: You are a Senior UI/UX Designer specializing in High-Trust Fintech (e.g., Stripe, Mercury, or Revolut).
+
+Objective: Redesign the Cush homepage and dashboard to reflect our new focus: The Global Credit Identity Layer. The design must communicate "Security," "Global Mobility," and "Financial Power."
+
+1. Visual Identity & Theme:
+
+Color Palette: - Base: Deep Slate/Dark Navy (#0f172a) for text and depth.
+
+Action: Vibrant Trust Blue (#2563eb) for primary buttons.
+
+Success: Emerald Green (#10b981) for verification badges and score increases.
+
+Background: Use a clean, light-gray/white background with subtle gradients or a "mesh" effect to feel modern and airy.
+
+Typography: Use a clean, high-readability sans-serif (Inter or Geist). Headlines should be bold with tight letter spacing.
+
+2. Hero Section (Above the Fold):
+
+The Headline: "Your Financial Reputation, Now Borderless."
+
+The Sub-headline: "The Cush Passport turns your global income and assets into a verified credit score that travels with you. Prove your reliability to landlords and lenders—before or after you land."
+
+Primary CTA: "Get Your Passport Score" (Primary Blue Button).
+
+Secondary CTA: "View a Sample Passport" (Ghost/Outline Button).
+
+Visual Asset: A high-fidelity mockup of the Cush Passport Card showing a score of 785, a "Verified" badge, and a "High Capacity" label.
+
+3. The "Dual-Mode" Entry Point:
+
+Create a two-column "Choose Your Journey" section:
+
+Left Side: "Preparing to Move? (Pre-Arrival)" – Focus on building a score from home.
+
+Right Side: "Recently Arrived? (Post-Arrival)" – Focus on bridging your global history to your new home.
+
+4. The "Trust Signal" Feature Grid (3-Columns):
+
+Icon 1 (Global Signal): "More than a Credit Score. We measure your 'Peak Capacity' and global asset history."
+
+Icon 2 (Privacy First): "Bank-Grade Security. Share your score without exposing your raw bank transactions."
+
+Icon 3 (Day Zero Ready): "Instant Trust. Send your verified link to landlords to bypass 6-month rent deposits."
+
+5. Dashboard UI (Post-Login):
+
+The Score Center: A large, circular gauge or a clean "Premium Card" design displaying the user's current Cush Score.
+
+The Roadmap (Checklist): A sleek, interactive sidebar or list showing "Ways to Boost Your Score." Items should look like "tasks" with +10/+20 point indicators.
+
+The Share Panel: A prominent section with a "Copy Public Link" button and a toggle to "Revoke Access" at any time.
+
+6. Mobile Responsiveness:
+
+Ensure the Passport Card looks like a physical card on mobile (Apple Wallet style).
+
+Buttons must be full-width and "thumb-friendly" on mobile devices.
+
+Constraint: Avoid generic stock photos. Use clean SVG icons, high-quality component shadows, and data-driven visualizations.
+
+Success Tip for the AI Agent:
+When you run this, tell the agent: "Use Lucide-React for icons and Shadcn/UI for the components. Ensure the spacing follows a strict 4px/8px grid system for a 'tight' professional feel."
