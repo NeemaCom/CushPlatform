@@ -57,6 +57,25 @@ Cush Passport V1 is a lean Credit Identity engine that builds a PPP-normalized f
 - Gemini API: configured for AI features
 
 ## Recent Changes
+**2026-04-28**: Homepage & UI Overhaul (Stripe/Mercury aesthetic)
+- ✓ Created `src/pages/Home.tsx` — full public landing page with:
+  - Hero section: "Your Financial Reputation, Now Borderless." + CTAs, animated Passport Card mockup (score 785, Verified badge, High Capacity label, dark navy gradient card)
+  - Dual-Mode section: Pre-Arrival vs Post-Arrival two-column cards
+  - Trust Signal 3-column grid: Global Signal, Privacy First, Day Zero Ready
+  - How It Works 3-step section (dark navy background)
+  - Footer with links
+- ✓ Created `src/pages/SamplePassport.tsx` — public demo passport at `/sample` with full dark hero score gauge, breakdown, evidence, and CTA
+- ✓ Rewrote `src/pages/CreditPassport.tsx` — premium dashboard:
+  - Score Ring with Excellent/Good/Fair/Building labels + confidence
+  - Mode toggle (Pre/Post Arrival) with icons
+  - Gamified Score Roadmap checklist with +pts indicators (e.g. +40 pts, +30 pts)
+  - Financial Signals tab with add/delete signal flow
+  - Share Panel with Copy Public Link, eye-mask link preview, Revoke Access toggle
+  - Score Stats grid in right sidebar
+  - Quick Wins tips panel
+- ✓ Updated `src/App.tsx` — proper routing: `/` → Home (public), `/login` → Login, `/sample` → SamplePassport, `/dashboard` and `/passport` → CreditPassport (auth-gated), `/passport/:token` → PublicPassport
+- ✓ Color palette applied: Base `#0f172a`, Action `#2563eb`, Success `#10b981`, clean slate-50 backgrounds
+
 **2026-04-27**: Cush Passport V1 Implementation
 - ✓ Migrated from old SPA (public/app.js) to React 18 + Vite architecture
 - ✓ Fixed Tailwind CSS content path (`./src/**` instead of `./client/src/**`)
