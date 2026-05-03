@@ -1,4 +1,4 @@
-import { Router, Route, Switch } from 'wouter'
+import { Router, Route, Switch, useLocation } from 'wouter'
 import { QueryProvider } from '@/lib/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -13,6 +13,7 @@ import { useAuth } from '@/hooks/useAuth'
 
 function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
+  const [, setLocation] = useLocation()
 
   if (isLoading) {
     return (
@@ -26,6 +27,26 @@ function AuthRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function HomeRoute() {
+  const { user, isLoading } = useAuth()
+  const [, setLocation] = useLocation()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-7 h-7 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (user) {
+    setLocation('/dashboard')
+    return null
+  }
+
+  return <Home />
+}
+
 function App() {
   return (
     <ThemeProvider defaultTheme="light" enableSystem={false}>
@@ -33,8 +54,8 @@ function App() {
         <Router>
           <div className="min-h-screen bg-white">
             <Switch>
-              {/* Public landing page */}
-              <Route path="/" component={Home} />
+              {/* Public landing page — redirects authenticated users to /dashboard */}
+              <Route path="/" component={HomeRoute} />
               <Route path="/login" component={Login} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />

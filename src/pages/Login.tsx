@@ -44,7 +44,7 @@ export default function Login() {
 
   async function afterLogin() {
     await qc.invalidateQueries({ queryKey: ['/api/auth/me'] })
-    setLocation('/')
+    setLocation('/dashboard')
   }
 
   async function handleGoogle() {
