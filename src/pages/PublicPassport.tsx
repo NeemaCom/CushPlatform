@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
 
@@ -71,6 +72,15 @@ export default function PublicPassport() {
       }),
     retry: false,
   });
+
+  // Write view timestamp so the owner's dashboard can show "Recently viewed"
+  useEffect(() => {
+    if (data && token) {
+      try {
+        localStorage.setItem(`passport_viewed_${token}`, Date.now().toString());
+      } catch {}
+    }
+  }, [data, token]);
 
   if (isLoading) {
     return (
