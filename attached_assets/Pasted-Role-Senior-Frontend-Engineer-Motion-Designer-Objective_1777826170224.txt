@@ -1,0 +1,37 @@
+Role: Senior Frontend Engineer & Motion Designer.
+
+Objective: Implement high-polish UI interactions for the Cush Passport to make the "Credit Building" process feel rewarding and responsive.
+
+1. The "Score Pulse" Animation:
+
+When a user first lands on the dashboard, the Cush Score should not just appear. It should count up from 0 to the current value over 1.5 seconds with a "spring" easing.
+
+Visual Feedback: The color of the score should transition from a neutral gray to its final color (e.g., Emerald for High-Capacity) as it reaches the final number.
+
+2. The "Checklist Completion" Celebration:
+
+When a user uploads a document or completes a checklist item:
+
+The "Check": The checkbox should have a satisfying "pop" animation.
+
+The "Boost": A small floating indicator (e.g., +25) should drift upward from the checklist item and disappear.
+
+The "Recalculation": The main Cush Score should "pulse" and count up to its new value. Use a subtle confetti burst (CSS-only) if a user moves into a new Trust Tier (e.g., from Emerging to Stable).
+
+3. The "Evidence Vault" Interaction:
+
+Drag & Drop: The upload zone should have a subtle "glow" when a file is hovered over it.
+
+Processing State: While the AI (Gemini) is parsing the document, show a "Scanning" light bar moving across the document icon to communicate that the engine is working, not just loading.
+
+4. The "Share Link" Haptic/Visual Feed:
+
+When the user clicks "Copy Passport Link," change the button text to "Copied!" and turn it green for 2 seconds before reverting.
+
+Add a "Live View" indicator on the dashboard that pulses when someone (e.g., a landlord) has recently viewed their Passport link.
+
+5. Navigation Transitions:
+
+Use Framer Motion or View Transitions API to ensure that switching between the "Pre-Arrival" and "Post-Arrival" modes feels like a smooth slide, not a hard page refresh.
+
+Technical Constraint: Use framer-motion for React. Keep animations under 300ms to ensure the app feels "snappy" and professional, not sluggish.
