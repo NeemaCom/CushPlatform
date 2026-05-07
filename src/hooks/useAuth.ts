@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 interface User {
   id: number;
   username: string;
@@ -14,7 +16,7 @@ export function useAuth() {
     queryKey: ["/api/auth/me"],
     retry: false,
     queryFn: async () => {
-      const response = await fetch("/api/auth/me");
+      const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
       if (!response.ok) {
         if (response.status === 401) {
           return null;
