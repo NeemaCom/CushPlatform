@@ -15,8 +15,10 @@ import {
   createUserWithEmailAndPassword,
 } from '@/firebase.js'
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 async function firebaseSync(fbUser: { uid: string; email: string | null; displayName: string | null }, extra?: Record<string, unknown>) {
-  const res = await fetch('/api/auth/firebase-sync', {
+  const res = await fetch(`${API_BASE}/api/auth/firebase-sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
