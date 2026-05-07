@@ -58,8 +58,10 @@ const CONFETTI_COLORS = ["#2563eb","#10b981","#7c3aed","#f59e0b","#ef4444","#06b
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const API_BASE = import.meta.env.VITE_API_URL || '';
+
 function apiRequest(method: string, url: string, body?: unknown) {
-  return fetch(url, {
+  return fetch(`${API_BASE}${url}`, {
     method, headers: { "Content-Type": "application/json" }, credentials: "include",
     body: body ? JSON.stringify(body) : undefined,
   }).then(async (r) => {
