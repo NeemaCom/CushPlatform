@@ -13,7 +13,7 @@ export function generateReferralCode(): string {
  * Generate a tracking link for a referral code
  */
 export function generateTrackingLink(referralCode: string): string {
-  const baseUrl = process.env.REPLIT_DOMAIN || 'https://cushglobal.replit.app';
+  const baseUrl = (process.env.APP_URL || 'https://app.we-cush.com').replace(/\/$/, '');
   return `${baseUrl}/referral/${referralCode}`;
 }
 
