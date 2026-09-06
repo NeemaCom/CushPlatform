@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { ThemeProvider as NextThemesProvider, type ThemeProviderProps as NextThemesProviderProps } from "next-themes"
+import type { ThemeProviderProps as NextThemesProviderProps } from "next-themes"
 
 type ThemeProviderProps = NextThemesProviderProps
 
