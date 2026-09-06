@@ -31,11 +31,11 @@ The following environment variables are configured for Google OAuth:
 #### Required Settings:
 1. **Authorized JavaScript Origins**:
    - Development: `http://localhost:5000`
-   - Production: `https://[your-domain].replit.app`
+   - Production: `https://app.we-cush.com`
 
 2. **Authorized Redirect URIs**:
    - Development: `http://localhost:5000/api/auth/google/callback`
-   - Production: `https://[your-domain].replit.app/api/auth/google/callback`
+   - Production: `https://app.we-cush.com/api/auth/google/callback`
 
 ## Integration Points
 
