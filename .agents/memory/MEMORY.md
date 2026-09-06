@@ -1,0 +1,1 @@
+- [Package firewall compatibility](package-firewall-compatibility.md) — imported lockfiles may need compatible transitive security updates before dependencies can install.
