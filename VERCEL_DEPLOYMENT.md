@@ -36,7 +36,8 @@ STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
 
 #### Frontend Variables (VITE_ prefix)
 ```
-VITE_API_BASE_URL=https://your-domain.vercel.app
+# Leave empty for same-origin /api requests.
+VITE_API_URL=
 VITE_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 ```
@@ -73,7 +74,7 @@ npm run db:push
 
 ### Step 5: Domain Configuration
 1. Configure custom domain in Vercel dashboard
-2. Update VITE_API_BASE_URL to match your domain
+2. Leave `VITE_API_URL` empty for same-origin API requests, or set it to `https://cush-platform.vercel.app` for cross-origin requests
 3. Update Google OAuth redirect URLs
 4. Update Stripe webhook endpoints
 
