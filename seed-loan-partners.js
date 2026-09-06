@@ -242,7 +242,7 @@ async function seedLoanPartners() {
       `, [
         prequalId,
         partnerId,
-        `https://cushglobal.replit.app/referral/${referralCodes[i]}`,
+        `${(process.env.APP_URL || 'https://app.we-cush.com').replace(/\/$/, '')}/referral/${referralCodes[i]}`,
         referralCodes[i],
         i === 0 ? 'approved' : 'applied',
         i === 0 ? 750 : 0, // $750 commission for approved referral
