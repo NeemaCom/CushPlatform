@@ -104,6 +104,7 @@ export async function isAuthenticated(
     // Create safe user object (without sensitive data)
     const safeUser: SafeUser = {
       id: user.id,
+      firebaseUid: user.firebaseUid,
       username: user.username,
       email: user.email,
       role: user.role,
@@ -200,6 +201,7 @@ export function getCurrentUser(req: AuthenticatedRequest): SafeUser | null {
 export function createSafeUser(user: User): SafeUser {
   return {
     id: user.id,
+    firebaseUid: user.firebaseUid,
     username: user.username,
     email: user.email,
     role: user.role,
