@@ -43,6 +43,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     throw new Error("SESSION_SECRET must be set to a unique, random value of at least 32 characters");
   }
   ensureFirebaseConfigured();
+  const crossSiteCookies = process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SAME_SITE === "none";
 
   // ── Health checks ─────────────────────────────────────────────────────────
   app.get("/api/health", (_req, res) => res.json({ status: "healthy", uptime: process.uptime(), timestamp: new Date().toISOString() }));
@@ -60,10 +61,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SAME_SITE === "none",
+      secure: crossSiteCookies,
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24, // 24 hours
-      sameSite: process.env.SESSION_COOKIE_SAME_SITE === "none" ? "none" : "strict",
+      sameSite: crossSiteCookies ? "none" : "strict",
     },
   }));
 
@@ -198,8 +199,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const userId = req.session.userId;
     res.clearCookie("connect.sid", {
       path: "/", httpOnly: true,
-      secure: process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SAME_SITE === "none",
-      sameSite: process.env.SESSION_COOKIE_SAME_SITE === "none" ? "none" : "strict",
+      secure: crossSiteCookies,
+      sameSite: crossSiteCookies ? "none" : "strict",
     });
     req.session.destroy(() => {
       SecurityLogger.logAuthEvent("logout_success", userId || null, true, req.ip, req.get("User-Agent"));
