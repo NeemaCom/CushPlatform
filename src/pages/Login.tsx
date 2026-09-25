@@ -17,15 +17,14 @@ import {
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
-async function firebaseSync(fbUser: { uid: string; email: string | null; displayName: string | null }, extra?: Record<string, unknown>) {
+async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra?: Record<string, unknown>) {
+  const idToken = await fbUser.getIdToken()
   const res = await fetch(`${API_BASE}/api/auth/firebase-sync`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
     body: JSON.stringify({
-      uid: fbUser.uid,
-      email: fbUser.email,
-      displayName: fbUser.displayName,
+      idToken,
       ...extra,
     }),
   })
@@ -54,12 +53,7 @@ export default function Login() {
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
-      await firebaseSync(fbUser, {
-        firstName: fbUser.displayName?.split(' ')[0] ?? '',
-        lastName: fbUser.displayName?.split(' ').slice(1).join(' ') ?? '',
-        photoURL: fbUser.photoURL,
-        emailVerified: fbUser.emailVerified,
-      })
+      await firebaseSync(fbUser)
       await afterLogin()
     } catch (err: any) {
       toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
@@ -73,7 +67,7 @@ export default function Login() {
     setLoading(true)
     try {
       const result = await signInWithEmailAndPassword(auth, form.email, form.password)
-      await firebaseSync(result.user, { emailVerified: result.user.emailVerified })
+      await firebaseSync(result.user)
       await afterLogin()
     } catch (err: any) {
       const msg =
@@ -96,8 +90,6 @@ export default function Login() {
       await firebaseSync(result.user, {
         firstName: form.firstName,
         lastName: form.lastName,
-        emailVerified: false,
-        isNewUser: false, // create session immediately
       })
       toast({ title: 'Account created!', description: 'Welcome to Cush Passport.' })
       await afterLogin()

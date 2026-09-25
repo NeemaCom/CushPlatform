@@ -53,6 +53,7 @@ const firebaseUser = {
   displayName: "Test User",
   photoURL: null,
   emailVerified: true,
+  getIdToken: vi.fn().mockResolvedValue("verified-id-token"),
 };
 
 function deferred<T>() {
@@ -124,7 +125,7 @@ describe("Login", () => {
       }),
     );
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual(
-      expect.objectContaining({ uid: firebaseUser.uid, email: firebaseUser.email }),
+      { idToken: "verified-id-token" },
     );
     expect(mocks.toast).not.toHaveBeenCalled();
   });
@@ -205,13 +206,7 @@ describe("Login", () => {
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual(
-      expect.objectContaining({
-        uid: firebaseUser.uid,
-        email: firebaseUser.email,
-        firstName: "Test",
-        lastName: "User",
-        emailVerified: true,
-      }),
+      { idToken: "verified-id-token" },
     );
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
     expect(mocks.toast).not.toHaveBeenCalled();
@@ -297,13 +292,7 @@ describe("Login", () => {
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual(
-      expect.objectContaining({
-        uid: firebaseUser.uid,
-        firstName: "Test",
-        lastName: "User",
-        emailVerified: false,
-        isNewUser: false,
-      }),
+      { idToken: "verified-id-token", firstName: "Test", lastName: "User" },
     );
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Account created!" }),
