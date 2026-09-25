@@ -25,8 +25,8 @@ The package lockfile is intentionally not checked in because the previous one co
 
 The browser calls same-origin `/api/...` by default. Set `VITE_API_URL` **at build time** only if the API is hosted at another origin; do not add `/api` to its value. Set `FRONTEND_ORIGIN` on the API to a comma-separated list of exact allowed frontend origins for credentialed cross-origin requests. Development also allows `http://localhost:3000` and `http://localhost:5000` (and their `127.0.0.1` equivalents).
 
-Sessions default to `SameSite=Strict`; for a frontend and API on different *sites*, set `SESSION_COOKIE_SAME_SITE=none` and serve both over HTTPS. The Firebase popup flow has no server-side OAuth callback or redirect URI; configure the deployed frontend hostname as an authorized domain in Firebase Authentication. See `FIREBASE_AUTH_SETUP.md`.
+Production sessions always use `SameSite=None; Secure`, so serve the API over HTTPS. Development defaults to `SameSite=Strict`; use `SESSION_COOKIE_SAME_SITE=none` only for HTTPS cross-site development. The Firebase popup flow has no server-side OAuth callback or redirect URI; configure the deployed frontend hostname as an authorized domain in Firebase Authentication. See `FIREBASE_AUTH_SETUP.md`.
 
-For a single Node deployment, serve the built frontend and `/api` from the same process using `npm run build` then `npm run start`. See `DEPLOYMENT.md`. Static-only hosting will not run this API.
+For a single Node deployment, serve the built frontend and `/api` from the same process using `npm run build` then `npm run start`. For a split deployment, `vercel.json` builds only the static Vite frontend and rewrites SPA paths; deploy the Node API separately and set `VITE_API_URL` and `FRONTEND_ORIGIN`. See `DEPLOYMENT.md`. Static-only hosting will not run this API.
 
 Passport and evidence data, as well as Express sessions, are still process-local; this prototype is not ready for multi-instance or restart-safe production data.
