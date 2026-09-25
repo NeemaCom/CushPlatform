@@ -13,7 +13,8 @@ export function generateReferralCode(): string {
  * Generate a tracking link for a referral code
  */
 export function generateTrackingLink(referralCode: string): string {
-  const baseUrl = (process.env.APP_URL || 'https://app.we-cush.com').replace(/\/$/, '');
+  const baseUrl = (process.env.APP_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000')).replace(/\/$/, '');
+  if (!baseUrl) throw new Error('APP_URL is required to generate referral links in production');
   return `${baseUrl}/referral/${referralCode}`;
 }
 
