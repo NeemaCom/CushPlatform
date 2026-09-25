@@ -11,7 +11,7 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
 import { useAuth } from '@/hooks/useAuth'
 
-function AuthRoute({ children }: { children: React.ReactNode }) {
+export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const [, setLocation] = useLocation()
 
