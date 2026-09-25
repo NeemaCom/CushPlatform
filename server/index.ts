@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -31,18 +32,12 @@ const allowedOrigins = new Set([
 
 app.use("/api", (req, res, next) => {
   const origin = req.get("Origin");
-  res.vary("Origin");
-  if (origin && allowedOrigins.has(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-  }
-  if (req.method === "OPTIONS") {
-    return res.sendStatus(origin && allowedOrigins.has(origin) ? 204 : 403);
+  if (req.method === "OPTIONS" && (!origin || !allowedOrigins.has(origin))) {
+    res.vary("Origin");
+    return res.sendStatus(403);
   }
   next();
-});
+}, cors({ origin: [...allowedOrigins], credentials: true }));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
