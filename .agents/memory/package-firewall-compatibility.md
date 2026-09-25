@@ -8,3 +8,5 @@ When an imported npm lockfile is blocked by the package firewall, update the blo
 **Why:** The imported project could not install until several compatible transitive packages were moved off blocked releases; bypassing the firewall would undermine the environment's dependency safety checks.
 
 **How to apply:** Inspect the blocked package's dependency range and registry metadata, prefer a same-major compatible release, update package overrides when needed, and rerun `npm ci`.
+
+Some firewall-served package copies may also omit declaration files while their package metadata still advertises them. Inspect the installed tarball before adding local type shims; resolve the dependency artifact or upgrade path instead.
