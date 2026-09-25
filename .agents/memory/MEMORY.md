@@ -1,1 +1,2 @@
 - [Package firewall compatibility](package-firewall-compatibility.md) — imported lockfiles may need compatible transitive security updates before dependencies can install.
+- [Firebase account linking](firebase-account-linking.md) — only a verified Firebase UID may identify an account; matching email is not sufficient to attach a legacy account.
