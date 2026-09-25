@@ -1,6 +1,6 @@
 # Dependency audit
 
-Historical review from September 6, 2026 with `npm audit` after a clean `npm ci --ignore-scripts`. This is not a current audit: the environment-specific lockfile was subsequently removed for portability. Regenerate a portable lockfile and rerun `npm audit` before release.
+Historical review from September 6, 2026 with `npm audit` after a clean `npm ci --ignore-scripts`. This is not a current audit: the lockfile was later regenerated for a standard npm registry. Rerun `npm audit` before release.
 
 ## Result
 

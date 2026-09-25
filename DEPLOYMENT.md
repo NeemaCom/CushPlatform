@@ -2,7 +2,7 @@
 
 Run the React frontend and Express API together on any Node.js 20+ host:
 
-1. Install dependencies with `npm install`.
+1. Install pinned dependencies with `npm ci`.
 2. Set `DATABASE_URL`, `FIREBASE_PROJECT_ID`, and a unique random `SESSION_SECRET` (at least 32 characters) in the host's private environment settings. Set `PORT` and `HOST` if the host requires them.
 3. Apply the database schema with `npm run db:push` when appropriate.
 4. Run `npm run lint`, `npm test`, and `npm run build`.
