@@ -1,6 +1,6 @@
 # Dependency audit
 
-Reviewed September 6, 2026 with `npm audit` after a clean `npm ci --ignore-scripts`.
+Historical review from September 6, 2026 with `npm audit` after a clean `npm ci --ignore-scripts`. This is not a current audit: the environment-specific lockfile was subsequently removed for portability. Regenerate a portable lockfile and rerun `npm audit` before release.
 
 ## Result
 
@@ -16,8 +16,8 @@ Reviewed September 6, 2026 with `npm audit` after a clean `npm ci --ignore-scrip
 - Updated express-session and allowed the lockfile to resolve the patched Express 4.22.2, body-parser, and route-parser dependencies.
 - Updated `@google/genai` to the current 1.x line, which removes the vulnerable gaxios 6 / uuid 9 chain.
 - Added a `qs` override at `6.16.0`, which is API-compatible with the Express 4 request parser and removes the remaining qs/body-parser advisories.
-- Updated `@tailwindcss/vite` to `4.3.3`. Besides staying on the Tailwind 4 line, this replaces the package-firewall-blocked 4.1.10 optional native bundle with an installable lockfile resolution.
-- Safe transitive updates in the lockfile resolve the original high-severity advisories in brace-expansion, browserslist, glob, jws, lodash, minimatch, path-to-regexp, picomatch, and Rollup.
+- Updated `@tailwindcss/vite` to `4.3.3`, replacing an older optional native bundle.
+- Safe transitive updates resolved the original high-severity advisories in brace-expansion, browserslist, glob, jws, lodash, minimatch, path-to-regexp, picomatch, and Rollup.
 
 ## Accepted remaining advisories
 
