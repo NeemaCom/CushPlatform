@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { API_BASE } from "@/lib/api-base";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
@@ -58,7 +59,6 @@ const CONFETTI_COLORS = ["#2563eb","#10b981","#7c3aed","#f59e0b","#ef4444","#06b
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
 
 function apiRequest(method: string, url: string, body?: unknown) {
   return fetch(`${API_BASE}${url}`, {
@@ -707,7 +707,7 @@ export default function CreditPassport() {
   });
 
   async function handleLogout() {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+    await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
     await qc.clear();
     setLocation("/");
   }

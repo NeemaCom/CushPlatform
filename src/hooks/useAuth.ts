@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { API_BASE } from "@/lib/api-base";
 
 interface User {
   id: number;
