@@ -8,6 +8,8 @@ const client = new Client({
 
 async function seedLoanPartners() {
   try {
+    const appUrl = (process.env.APP_URL || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000')).replace(/\/$/, '');
+    if (!appUrl) throw new Error('APP_URL is required to generate referral links in production');
     await client.connect();
     console.log('Connected to database');
 
@@ -242,7 +244,7 @@ async function seedLoanPartners() {
       `, [
         prequalId,
         partnerId,
-        `${(process.env.APP_URL || 'https://app.we-cush.com').replace(/\/$/, '')}/referral/${referralCodes[i]}`,
+        `${appUrl}/referral/${referralCodes[i]}`,
         referralCodes[i],
         i === 0 ? 'approved' : 'applied',
         i === 0 ? 750 : 0, // $750 commission for approved referral

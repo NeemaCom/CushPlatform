@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { createServer as createHttpServer } from "http";
 import { registerRoutes } from "./routes";
 import path from "path";
 import { createServer as createViteServer } from "vite";
@@ -20,6 +19,30 @@ export function log(message: string, source = "express") {
 
 // Express configuration
 app.set('trust proxy', 1);
+
+const localOrigins = [
+  "http://localhost:3000", "http://127.0.0.1:3000",
+  "http://localhost:5000", "http://127.0.0.1:5000",
+];
+const allowedOrigins = new Set([
+  ...(process.env.NODE_ENV === "production" ? [] : localOrigins),
+  ...(process.env.FRONTEND_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
+]);
+
+app.use("/api", (req, res, next) => {
+  const origin = req.get("Origin");
+  res.vary("Origin");
+  if (origin && allowedOrigins.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
+  }
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(origin && allowedOrigins.has(origin) ? 204 : 403);
+  }
+  next();
+});
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
@@ -49,12 +72,9 @@ app.use((req, res, next) => {
   next();
 });
 
-// Export server creation function for Vercel and Cloud Run
+// Serve the API and frontend from the same Node process.
 export async function createServer() {
-  // Debug environment variables
-  log(`Google OAuth Environment Check: CLIENT_ID=${process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.substring(0, 15) + '...' : 'MISSING'}, CLIENT_SECRET=${process.env.GOOGLE_CLIENT_SECRET ? 'PRESENT' : 'MISSING'}`);
-  
-  const httpServer = await registerRoutes(app);
+  const server = await registerRoutes(app);
 
   if (process.env.NODE_ENV !== 'production') {
     // Development: use Vite middleware for the React app (hot module replacement)
@@ -83,16 +103,10 @@ export async function createServer() {
     res.status(status).json({ message });
   });
 
-  const server = createHttpServer(app);
-
-  // Enhanced port configuration for different deployment environments
-  if (!process.env.VERCEL) {
-    // Cloud Run and deployment platforms use PORT environment variable
-    // Default to 5000 for Cloud Run compatibility (critical for deployment)
-    const port = process.env.PORT || 5000;
-    const host = '0.0.0.0'; // Always bind to all interfaces for Cloud Run compatibility
+  const port = Number(process.env.PORT || 5000);
+  const host = process.env.HOST || '0.0.0.0';
     
-    server.listen(Number(port), host, () => {
+    server.listen(port, host, () => {
       log(`Server successfully started on ${host}:${port}`);
       log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       log(`Health checks available at: /health, /ready, /live, /startup, /api/health, /`);
@@ -101,14 +115,14 @@ export async function createServer() {
       if (process.env.NODE_ENV === 'production') {
         log(`🚀 PRODUCTION DEPLOYMENT READY`);
         log(`📊 Health endpoints responding correctly`);
-        log(`🔧 Cloud Run compatibility: PORT=${port}, HOST=${host}`);
+        log(`Listening on ${host}:${port}`);
         log(`⚡ Server uptime tracking enabled`);
       } else {
         log(`🔧 Development mode - local development server ready`);
       }
     });
 
-    // Handle server errors with deployment-friendly error handling
+    // Handle server errors
     server.on('error', (err: any) => {
       if (err.code === 'EADDRINUSE') {
         log(`Error: Port ${port} is already in use`);
@@ -168,10 +182,9 @@ export async function createServer() {
         gracefulShutdown();
       });
     }
-  }
 
   return server;
 }
 
-// Always start the server - required for all environments including Cloud Run
+// Start the server for npm run dev and npm run start.
 createServer();

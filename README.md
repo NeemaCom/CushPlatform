@@ -1,51 +1,32 @@
-# Cush Financial Platform
+# Cush Passport
 
-A comprehensive financial management platform built with Next.js, TypeScript, and PostgreSQL.
+A mobile-first credit-passport prototype built with React, Vite, TypeScript, Express, PostgreSQL, Drizzle, and Firebase Authentication. Users can enter financial signals, receive a PPP-normalized score, and share a public passport link.
 
-## Features
+## Run locally
 
-- **User Authentication**: Secure login and registration system
-- **Dashboard**: Overview of accounts, transactions, and financial metrics
-- **Account Management**: Multiple account types (current, savings, investment)
-- **Transaction Tracking**: Record and categorize financial transactions
-- **Data Visualization**: Charts and graphs for balance history and spending patterns
-- **Responsive Design**: Mobile-first responsive interface
-- **Enterprise Security**: Helmet.js security headers, CORS protection, session management
+Requires Node.js 20+, npm, and a PostgreSQL database with the schema from `shared/schema.ts`.
 
-## Tech Stack
+1. Run `npm install`.
+2. Provide `DATABASE_URL`, a unique random `SESSION_SECRET` (at least 32 characters), and `FIREBASE_PROJECT_ID` in the server process environment. See `.env.example`; the example file is not automatically loaded. For the bundled Firebase client project, the project ID is `cushportal`.
+3. Set up the database schema with `npm run db:push` if necessary.
+4. Run `npm run dev` and open `http://localhost:5000`.
 
-### Frontend
-- Next.js 14
-- React 18
-- TypeScript
-- Tailwind CSS
-- shadcn/ui components
-- Recharts for data visualization
-- React Hook Form with Zod validation
-- TanStack Query for API state management
+The package lockfile is intentionally not checked in because the previous one contained environment-specific package registry URLs. To restore reproducible installs, generate and commit a lockfile using a standard public or company-managed npm registry outside this workspace.
 
-### Backend
-- Node.js with Express.js
-- TypeScript
-- Drizzle ORM
-- PostgreSQL
-- Helmet.js for security
-- Express Session for authentication
-- bcrypt for password hashing
-- Zod for schema validation
+## Scripts
 
-## Getting Started
+- `npm run dev` — Express API with Vite development middleware.
+- `npm run build` — compile browser assets and bundle the Express server.
+- `npm run start` — run the built server with `NODE_ENV=production`.
+- `npm run lint` — TypeScript static check.
+- `npm test` — automated tests.
 
-### Prerequisites
+## Configuration
 
-- Node.js 18+
-- PostgreSQL database
-- npm or yarn
+The browser calls same-origin `/api/...` by default. Set `VITE_API_URL` **at build time** only if the API is hosted at another origin; do not add `/api` to its value. Set `FRONTEND_ORIGIN` on the API to a comma-separated list of exact allowed frontend origins for credentialed cross-origin requests. Development also allows `http://localhost:3000` and `http://localhost:5000` (and their `127.0.0.1` equivalents).
 
-### Installation
+Sessions default to `SameSite=Strict`; for a frontend and API on different *sites*, set `SESSION_COOKIE_SAME_SITE=none` and serve both over HTTPS. The Firebase popup flow has no server-side OAuth callback or redirect URI; configure the deployed frontend hostname as an authorized domain in Firebase Authentication. See `FIREBASE_AUTH_SETUP.md`.
 
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   
+For a single Node deployment, serve the built frontend and `/api` from the same process using `npm run build` then `npm run start`. See `DEPLOYMENT.md`. Static-only hosting will not run this API.
+
+Passport and evidence data, as well as Express sessions, are still process-local; this prototype is not ready for multi-instance or restart-safe production data.

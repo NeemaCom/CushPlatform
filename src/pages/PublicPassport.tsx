@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
+import { API_BASE } from "@/lib/api-base";
 
 interface PublicPassportData {
   score: number;
@@ -66,7 +67,7 @@ export default function PublicPassport() {
   const { data, isLoading, isError } = useQuery<PublicPassportData>({
     queryKey: ["/api/passport/public", token],
     queryFn: () =>
-      fetch(`/api/passport/public/${token}`, { credentials: "omit" }).then((r) => {
+      fetch(`${API_BASE}/api/passport/public/${encodeURIComponent(token)}`, { credentials: "omit" }).then((r) => {
         if (!r.ok) throw new Error("Not found");
         return r.json();
       }),

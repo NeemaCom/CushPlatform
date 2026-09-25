@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
+import { API_BASE } from '@/lib/api-base'
 import {
   auth,
   googleProvider,
@@ -14,8 +15,6 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from '@/firebase.js'
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
 
 async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra?: Record<string, unknown>) {
   const idToken = await fbUser.getIdToken()
