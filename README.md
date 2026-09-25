@@ -6,12 +6,12 @@ A mobile-first credit-passport prototype built with React, Vite, TypeScript, Exp
 
 Requires Node.js 20+, npm, and a PostgreSQL database with the schema from `shared/schema.ts`.
 
-1. Run `npm install`.
+1. Run `npm ci` to install the pinned dependencies.
 2. Provide `DATABASE_URL`, a unique random `SESSION_SECRET` (at least 32 characters), and `FIREBASE_PROJECT_ID` in the server process environment. See `.env.example`; the example file is not automatically loaded. For the bundled Firebase client project, the project ID is `cushportal`.
 3. Set up the database schema with `npm run db:push` if necessary.
 4. Run `npm run dev` and open `http://localhost:5000`.
 
-The package lockfile is intentionally not checked in because the previous one contained environment-specific package registry URLs. To restore reproducible installs, generate and commit a lockfile using a standard public or company-managed npm registry outside this workspace.
+The checked-in `package-lock.json` uses the public npm registry rather than a workspace-specific package registry.
 
 ## Scripts
 
