@@ -2,7 +2,6 @@ import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { SecurityLogger } from "./security";
 import type { User, SafeUser } from "@shared/schema";
-import * as memStore from "./mem-store";
 
 declare module "express-session" {
   interface SessionData {
@@ -66,20 +65,13 @@ export async function isAuthenticated(
     // Update last activity
     req.session.lastActivity = now;
 
-    // Get user data — try DB first, fall back to in-memory store
-    let user: any = null;
+    // Never resolve an in-memory user ID against a database user after an outage.
+    let user: User | undefined;
     try {
       user = await storage.getUser(userId);
-    } catch (_dbErr) {
-      // DB unavailable — fall back to in-memory user store
-    }
-
-    // Fall back to mem-store (used when DB is unavailable)
-    if (!user) {
-      const memUser = memStore.getUser(userId);
-      if (memUser) {
-        user = memUser;
-      }
+    } catch {
+      res.status(503).json({ error: "Authentication temporarily unavailable" });
+      return;
     }
 
     if (!user) {

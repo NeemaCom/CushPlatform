@@ -2,16 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
-  getMemUser: vi.fn(),
   logAuthEvent: vi.fn(),
 }));
 
 vi.mock("../server/storage", () => ({
   storage: { getUser: mocks.getUser },
-}));
-
-vi.mock("../server/mem-store", () => ({
-  getUser: mocks.getMemUser,
 }));
 
 vi.mock("../server/security", () => ({
@@ -51,7 +46,6 @@ describe("server authentication middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getUser.mockResolvedValue(storedUser);
-    mocks.getMemUser.mockReturnValue(undefined);
   });
 
   it("rejects requests without a session user", async () => {
@@ -100,6 +94,18 @@ describe("server authentication middleware", () => {
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith({ error: "Invalid session" });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the database is unavailable", async () => {
+    mocks.getUser.mockRejectedValue(new Error("database unavailable"));
+    const req = requestWithSession({ userId: storedUser.id, lastActivity: Date.now() });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(503);
     expect(next).not.toHaveBeenCalled();
   });
 });

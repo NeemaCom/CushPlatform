@@ -1,6 +1,6 @@
 import { users, type User, type InsertUser } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 // ─── Storage Interface ────────────────────────────────────────────────────────
 
@@ -8,6 +8,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByEmailCaseInsensitive(email: string): Promise<User | undefined>;
   getUserByFirebaseUid(firebaseUid: string): Promise<User | undefined>;
   getUserByResetToken(token: string): Promise<User | undefined>;
   createUser(data: Partial<InsertUser> & { email: string; username: string; passwordHash: string; firstName: string; lastName: string; acceptTerms: boolean; acceptPrivacy: boolean }): Promise<User>;
@@ -32,6 +33,11 @@ class DatabaseStorage implements IStorage {
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user;
+  }
+
+  async getUserByEmailCaseInsensitive(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email.toLowerCase()}`);
     return user;
   }
 

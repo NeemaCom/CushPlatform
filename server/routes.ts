@@ -1,8 +1,10 @@
-import type { Express, Response } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { randomBytes } from "crypto";
 import session from "express-session";
 import { storage } from "./storage";
-import * as memStore from "./mem-store";
+import type { User } from "@shared/schema";
+import { ensureFirebaseConfigured, verifyFirebaseIdentity } from "./firebase-auth";
 import {
   registerSchema,
   loginSchema,
@@ -27,7 +29,20 @@ import {
 import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
 
+async function createLoginSession(req: Request, user: Pick<User, "id" | "role">): Promise<void> {
+  await new Promise<void>((resolve, reject) => req.session.regenerate((err) => err ? reject(err) : resolve()));
+  req.session.userId = user.id;
+  req.session.role = user.role || "customer";
+  req.session.lastActivity = Date.now();
+  await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret || sessionSecret.length < 32 || sessionSecret === "your-super-secret-session-key-here") {
+    throw new Error("SESSION_SECRET must be set to a unique, random value of at least 32 characters");
+  }
+  ensureFirebaseConfigured();
 
   // ── Health checks ─────────────────────────────────────────────────────────
   app.get("/api/health", (_req, res) => res.json({ status: "healthy", uptime: process.uptime(), timestamp: new Date().toISOString() }));
@@ -41,7 +56,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(sanitizeRequest);
 
   app.use(session({
-    secret: process.env.SESSION_SECRET || "cush-passport-secret-key",
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -56,70 +71,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerPassportRoutes(app);
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
-  app.post("/api/auth/firebase-sync", async (req, res) => {
+  app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {
+    if (typeof req.body?.idToken !== "string" || !req.body.idToken) {
+      return res.status(401).json({ error: "Firebase ID token required" });
+    }
+    let identity: Awaited<ReturnType<typeof verifyFirebaseIdentity>>;
     try {
-      const { uid, email, displayName, photoURL, emailVerified, firstName, lastName, country, phone, acceptTerms, acceptPrivacy, isNewUser } = req.body;
+      identity = await verifyFirebaseIdentity(req.body.idToken);
+    } catch {
+      return res.status(401).json({ error: "Invalid Firebase ID token" });
+    }
 
-      if (!uid || !email) return res.status(400).json({ error: "UID and email are required" });
-
-      let user: any = null;
-      let usingMem = false;
-
-      try {
-        user = await storage.getUserByFirebaseUid(uid);
-        if (!user) user = await storage.getUserByEmail(email);
-      } catch {
-        usingMem = true;
-      }
-
-      if (usingMem) {
-        const memUser = memStore.createOrUpdateUserFromFirebase({
-          firebaseUid: uid, email,
-          firstName: firstName || displayName?.split(" ")[0] || "User",
-          lastName: lastName || displayName?.split(" ").slice(1).join(" ") || "",
-          displayName,
-        });
-        req.session.userId = memUser.id;
-        req.session.role = memUser.role;
-        req.session.lastActivity = Date.now();
-        return res.json({ success: true, user: memUser });
-      }
-
+    try {
+      const { uid, email, displayName, photoURL, emailVerified } = identity;
+      const { firstName, lastName } = req.body;
+      let user = await storage.getUserByFirebaseUid(uid);
       if (!user) {
-        if (!isNewUser) return res.status(404).json({ error: "No account found", requiresSignup: true });
+        // Matching email alone does not prove ownership of a legacy account.
+        if (await storage.getUserByEmailCaseInsensitive(email)) {
+          return res.status(409).json({ error: "An account with this email already exists. Sign in using its original method." });
+        }
         const bcrypt = await import("bcrypt");
-        const hash = await bcrypt.hash("oauth-user-no-password", 10);
+        const hash = await bcrypt.hash(randomBytes(32).toString("hex"), 10);
+        const nameParts = displayName?.split(" ") ?? [];
         user = await storage.createUser({
           email, username: email,
           passwordHash: hash,
-          firstName: firstName || displayName?.split(" ")[0] || "User",
-          lastName: lastName || displayName?.split(" ").slice(1).join(" ") || "",
-          phoneNumber: phone || null,
-          nationality: country || null,
+          firebaseUid: uid,
+          firstName: typeof firstName === "string" && firstName.trim() ? firstName.trim().slice(0, 100) : nameParts[0] || "User",
+          lastName: typeof lastName === "string" ? lastName.trim().slice(0, 100) : nameParts.slice(1).join(" ").slice(0, 100),
           profilePicture: photoURL || null,
-          isEmailVerified: emailVerified || false,
-          acceptTerms: acceptTerms || false,
-          acceptPrivacy: acceptPrivacy || false,
+          isEmailVerified: emailVerified,
+          acceptTerms: req.body.acceptTerms === true,
+          acceptPrivacy: req.body.acceptPrivacy === true,
           role: "customer",
         });
-        if (uid) user = await storage.updateUser(user.id, { firebaseUid: uid });
+        await createLoginSession(req, user);
         SecurityLogger.logAuthEvent("firebase_signup_success", user.id, true, req.ip, req.get("User-Agent"));
-        return res.json({ success: true, user: createSafeUser(user), isNewUser: true, redirectTo: "signin" });
+        return res.json({ success: true, user: createSafeUser(user), isNewUser: true });
       }
 
-      if (!user.firebaseUid && uid) {
-        user = await storage.updateUser(user.id, {
-          firebaseUid: uid, email,
-          firstName: firstName || displayName?.split(" ")[0] || user.firstName,
-          lastName: lastName || displayName?.split(" ").slice(1).join(" ") || user.lastName,
-          profilePicture: photoURL || user.profilePicture,
-          isEmailVerified: emailVerified || user.isEmailVerified,
-        });
-      }
-
-      req.session.userId = user.id;
-      req.session.role = user.role || "customer";
-      req.session.lastActivity = Date.now();
+      await createLoginSession(req, user);
       try { await storage.updateUser(user.id, { lastLoginAt: new Date() }); } catch {}
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });
@@ -153,9 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         marketingConsent: data.marketingConsent || false,
       });
 
-      req.session.userId = user.id;
-      req.session.role = user.role || "customer";
-      req.session.lastActivity = Date.now();
+      await createLoginSession(req, user);
 
       SecurityLogger.logAuthEvent("user_registration", user.id, true, req.ip, req.get("User-Agent"));
       return res.status(201).json(createSafeUser(user));
@@ -180,13 +170,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) user = await storage.getUserByUsername(id!).catch(() => null);
       if (!user) return res.status(401).json({ error: "Invalid credentials" });
 
+      // Older Firebase signups used a publicly known placeholder password.
+      // Never accept it as a password for those accounts.
+      const bcrypt = await import("bcrypt");
+      if (await bcrypt.compare("oauth-user-no-password", user.passwordHash)) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
       const ok = await EncryptionService.verifyPassword(password, user.passwordHash);
       if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
       await storage.updateUser(user.id, { lastLoginAt: new Date() }).catch(() => {});
-      req.session.userId = user.id;
-      req.session.role = user.role || "customer";
-      req.session.lastActivity = Date.now();
+      await createLoginSession(req, user);
 
       SecurityLogger.logAuthEvent("login_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json(createSafeUser(user));
@@ -211,12 +205,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── Check user (Firebase flow) ────────────────────────────────────────────
   app.post("/api/auth/check-user", authRateLimit, async (req, res) => {
+    if (typeof req.body?.idToken !== "string" || !req.body.idToken) {
+      return res.status(401).json({ error: "Firebase ID token required" });
+    }
+    let identity: Awaited<ReturnType<typeof verifyFirebaseIdentity>>;
     try {
-      const { firebaseUid, email } = req.body;
-      if (!firebaseUid && !email) return res.status(400).json({ error: "firebaseUid or email required" });
-      let user = firebaseUid ? await storage.getUserByFirebaseUid(firebaseUid).catch(() => null) : null;
-      if (!user && email) user = await storage.getUserByEmail(email).catch(() => null);
-      return res.json(user ? { exists: true, user: createSafeUser(user) } : { exists: false });
+      identity = await verifyFirebaseIdentity(req.body.idToken);
+    } catch {
+      return res.status(401).json({ error: "Invalid Firebase ID token" });
+    }
+    try {
+      const user = await storage.getUserByFirebaseUid(identity.uid);
+      return res.json({ exists: !!user });
     } catch {
       res.status(500).json({ error: "Failed to check user" });
     }
