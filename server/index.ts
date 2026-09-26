@@ -99,7 +99,7 @@ export async function createServer() {
   });
 
   const port = Number(process.env.PORT || 5000);
-  const host = process.env.HOST || '0.0.0.0';
+  const host = '0.0.0.0';
     
     server.listen(port, host, () => {
       log(`Server successfully started on ${host}:${port}`);
