@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { API_BASE } from "@/lib/api-base";
+import { API_BASE_URL } from "@/lib/api-base";
 
 interface User {
   id: number;
@@ -16,7 +16,7 @@ export function useAuth() {
     queryKey: ["/api/auth/me"],
     retry: false,
     queryFn: async () => {
-      const response = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: "include" });
       if (!response.ok) {
         if (response.status === 401) {
           return null;
