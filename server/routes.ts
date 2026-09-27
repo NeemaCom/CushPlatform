@@ -79,8 +79,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     let identity: Awaited<ReturnType<typeof verifyFirebaseIdentity>>;
     try {
       identity = await verifyFirebaseIdentity(req.body.idToken);
-    } catch {
-      return res.status(401).json({ error: "Invalid Firebase ID token" });
+    } catch (error) {
+      console.error("[Firebase Sync Error]:", error);
+      return res.status(401).json({
+        message: "Failed to sync firebase user",
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     try {
@@ -117,8 +121,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });
     } catch (error) {
-      console.error("Firebase sync error:", error);
-      res.status(500).json({ error: "Failed to sync Firebase user" });
+      console.error("[Firebase Sync Error]:", error);
+      return res.status(500).json({
+        message: "Failed to sync firebase user",
+        error: "Failed to sync Firebase user",
+      });
     }
   });
 
