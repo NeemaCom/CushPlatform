@@ -7,4 +7,4 @@ A connected GitHub integration does not necessarily repair the workspace's HTTPS
 
 **Why:** In this workspace, the connected integration could read and write repository objects while Git's HTTPS authentication remained invalid and SSH had no usable key. Large object data must not be taken from a truncated tool-output string.
 
-**How to apply:** Prefer a working normal Git push. If REST is necessary, confirm the remote base, verify GitHub returns the exact local SHA for every uploaded object, then update the ref with `force: false` only after all commits match. Confirm the remote tip afterward.
+**How to apply:** Prefer a working normal Git push. If REST is necessary, confirm the remote base, verify GitHub returns the exact local SHA for every uploaded object, then update the ref with `force: false` only after all commits match. Confirm the remote tip afterward. For merge histories, a new commit's first parent can already exist on GitHub without appearing in the list of commits to upload; fetch any unknown parent's tree from GitHub rather than assuming only the initial remote base needs lookup.
