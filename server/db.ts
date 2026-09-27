@@ -8,22 +8,22 @@ if (!process.env.DATABASE_URL && !process.env.PGHOST) {
   );
 }
 
-// Use individual PG* env vars if available (fresher than embedded DATABASE_URL credentials),
-// otherwise fall back to the full DATABASE_URL connection string.
-const pool = process.env.PGHOST
+// Prefer the same DATABASE_URL that drizzle-kit push uses so the app reads the
+// schema created during the build. PG* remains a fallback when no URL is set.
+const pool = process.env.DATABASE_URL
   ? new Pool({
-      host: process.env.PGHOST,
-      port: parseInt(process.env.PGPORT ?? "5432"),
-      user: process.env.PGUSER,
-      password: process.env.PGPASSWORD,
-      database: process.env.PGDATABASE,
+      connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     })
   : new Pool({
-      connectionString: process.env.DATABASE_URL,
+      host: process.env.PGHOST,
+      port: parseInt(process.env.PGPORT ?? "5432"),
+      user: process.env.PGUSER,
+      password: process.env.PGPASSWORD,
+      database: process.env.PGDATABASE,
       ssl: { rejectUnauthorized: false },
       max: 10,
       idleTimeoutMillis: 30000,

@@ -126,9 +126,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });
     } catch (error) {
-      console.error("[Firebase Sync Server Error]:", error);
+      console.error("[Firebase Sync Raw Error]:", error);
       if (error instanceof Error && error.stack) {
-        console.error("[Firebase Sync Server Error Stack]:", error.stack);
+        console.error("[Firebase Sync Raw Error Stack]:", error.stack);
       }
       return res.status(500).json({
         message: "Failed to sync firebase user",
