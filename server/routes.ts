@@ -117,14 +117,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await createLoginSession(req, user);
-      try { await storage.updateUser(user.id, { lastLoginAt: new Date() }); } catch {}
+      try {
+        await storage.updateUser(user.id, { lastLoginAt: new Date() });
+      } catch (error) {
+        // Last-login tracking is best effort; keep sign-in working but make failures visible.
+        console.error("[Firebase Sync Last Login Update Error]:", error);
+      }
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });
     } catch (error) {
-      console.error("[Firebase Sync Error]:", error);
+      console.error("[Firebase Sync Server Error]:", error);
+      if (error instanceof Error && error.stack) {
+        console.error("[Firebase Sync Server Error Stack]:", error.stack);
+      }
       return res.status(500).json({
         message: "Failed to sync firebase user",
-        error: "Failed to sync Firebase user",
+        error: error instanceof Error ? error.message : String(error),
       });
     }
   });
