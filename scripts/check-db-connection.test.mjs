@@ -24,6 +24,7 @@ function fixture({ connectError, queryError, endError, badResult = false } = {})
     get config() { return config; },
     options: {
       connectionString,
+      caFile: null,
       logger: { log: (line) => lines.push(line), error: (line) => lines.push(line) },
       clientFactory: (options) => {
         config = options;
@@ -130,4 +131,20 @@ test("URL query values and nested causes are also redacted", () => {
   assert.ok(!output.includes(password));
   assert.ok(!output.includes("synthetic-query-secret"));
   assert.ok(output.includes("[REDACTED]"));
+});
+
+test("a supplied CA forces full verification even when the URI requests weaker TLS", async () => {
+  const f = fixture();
+  const unsafeUrl = `${connectionString}?sslmode=no-verify&uselibpqcompat=true&sslrootcert=wrong.pem`;
+  assert.equal(await checkDatabaseConnection({
+    ...f.options,
+    connectionString: unsafeUrl,
+    caFile: "/tmp/synthetic-ca.pem",
+  }), 0);
+  const actual = new URL(f.config.connectionString);
+  assert.equal(actual.searchParams.get("sslmode"), "verify-full");
+  assert.equal(actual.searchParams.get("sslrootcert"), "/tmp/synthetic-ca.pem");
+  assert.equal(actual.searchParams.has("uselibpqcompat"), false);
+  assert.equal(f.config.ssl, undefined);
+  assert.ok(!f.lines.join("\n").includes(password));
 });
