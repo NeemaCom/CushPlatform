@@ -56,7 +56,7 @@ export const passports = pgTable("passports", {
   generatedAt: timestamp("generated_at"),
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}).enableRLS();
 
 // ─── Financial Signals ────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ export const financialSignals = pgTable("financial_signals", {
   period: text("period").default("monthly"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}).enableRLS();
 
 // ─── Evidence Vault ───────────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ export const evidenceVault = pgTable("evidence_vault", {
   reviewedAt: timestamp("reviewed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}).enableRLS();
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 

@@ -80,10 +80,16 @@ The runner checks the SQL against the current code schema before connecting,
 uses verified TLS, takes a transaction-scoped advisory lock, and executes all
 DDL in one transaction with bounded statement and lock timeouts. Before
 committing, it verifies new column types, defaults, nullability, primary keys,
-unique constraints, and foreign keys. It also compares the existing tables'
+unique constraints, foreign keys, and RLS flags. It also compares the existing tables'
 identities, column definitions, own constraints, indexes, ACLs, and RLS flags.
 New inbound foreign keys add PostgreSQL internal reference triggers on `users`;
 that is expected, not a rename or change to its columns or rows.
+
+All three new tables have row-level security enabled, matching
+`shared/schema.ts`. There are currently no client policies, so `anon` and
+`authenticated` requests are denied by default even where table grants exist.
+The server database owner can bypass RLS. Do not add policies or expose a
+service-role credential to clients until ownership rules are explicitly designed.
 
 Failures before commit trigger rollback. A lost connection during commit has
 an uncertain outcome and must be inspected before retrying. A separate read-only

@@ -7,6 +7,7 @@ import {
   createdTables, preservedTables, loadMigrationContract,
   validateMigrationSql, verifyNewTables,
 } from "./passport-migration-contract.mjs";
+import { generateMigration } from "drizzle-kit/api";
 
 const contractPromise = loadMigrationContract();
 const sqlPromise = readFile(new URL("../migrations/manual/create-passport-tables.sql", import.meta.url), "utf8");
@@ -15,7 +16,7 @@ function syntheticNewRows(contract) {
   return createdTables.map((name) => {
     const expected = contract.tables[`public.${name}`];
     return {
-      name, oid: "test-" + name, rls: false, force_rls: false, acl: null, indexes: [],
+      name, oid: "test-" + name, rls_enabled: expected.isRLSEnabled, force_rls: false, acl: null, indexes: [],
       columns: Object.values(expected.columns).map((column) => ({
         name: column.name,
         type: column.type === "serial" ? "integer" : column.type === "timestamp" ? "timestamp without time zone" : column.type,
@@ -40,7 +41,7 @@ async function fixture(options = {}) {
   const contract = await contractPromise;
   const sql = await sqlPromise;
   const before = preservedTables.map((name) => ({
-    name, oid: "old-" + name, columns: [], constraints: [], indexes: [], rls: false, force_rls: false, acl: null,
+    name, oid: "old-" + name, columns: [], constraints: [], indexes: [], rls_enabled: false, force_rls: false, acl: null,
   }));
   const after = [...structuredClone(before), ...syntheticNewRows(contract)].sort((a, b) => a.name.localeCompare(b.name));
   if (options.mutateAfter) options.mutateAfter(after);
@@ -76,10 +77,20 @@ async function fixture(options = {}) {
 
 test("reviewed SQL matches generated code schema and only creates approved tables", async () => {
   const statements = validateMigrationSql(await sqlPromise, await contractPromise);
-  assert.equal(statements.length, 8);
+  assert.equal(statements.length, 11);
   assert.equal(statements.filter((sql) => sql.startsWith("CREATE TABLE")).length, 3);
+  assert.equal(statements.filter((sql) => sql.includes("ENABLE ROW LEVEL SECURITY")).length, 3);
   assert.ok(!statements.some((sql) => /^(DROP|DELETE|TRUNCATE|UPDATE|INSERT)\b/.test(sql)));
   assert.ok(!statements.some((sql) => /^ALTER TABLE "public"\."(users|cush|session)"/.test(sql)));
+});
+
+test("future Drizzle diffs retain the live RLS-enabled state", async () => {
+  const contract = await contractPromise;
+  for (const name of createdTables) {
+    assert.equal(contract.tables[`public.${name}`].isRLSEnabled, true);
+  }
+  const changes = await generateMigration(contract.snapshot, contract.snapshot);
+  assert.ok(!changes.some((statement) => /DISABLE ROW LEVEL SECURITY/i.test(statement)));
 });
 
 test("schema drift or appended destructive SQL fails before connecting", async () => {
@@ -136,6 +147,7 @@ test("incorrect new column types/defaults/nullability and constraints are reject
   const contract = await contractPromise;
   for (const mutate of [
     (rows) => { rows[0].columns[0].type = "text"; },
+    (rows) => { rows[0].rls_enabled = false; },
     (rows) => { rows[0].columns[1].notNull = false; },
     (rows) => { rows[0].columns.find((c) => c.name === "status").default = "'OTHER'"; },
     (rows) => { rows[0].constraints.pop(); },
