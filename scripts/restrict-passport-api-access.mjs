@@ -10,14 +10,28 @@ import {
 const normalize = (value) => value.replace(/\s+/g, " ").trim().replace(/;$/, "");
 
 export function expectedRevokes() {
-  return sensitiveTables.map((table) =>
+  return expectedRevokesForTables(sensitiveTables);
+}
+
+export const legacyClientTables = ["cush", "session", "users"];
+const revocableTables = new Set([...sensitiveTables, ...legacyClientTables]);
+
+export function expectedRevokesForTables(tableNames) {
+  assert.ok(Array.isArray(tableNames) && tableNames.length > 0
+    && tableNames.every((table) => revocableTables.has(table)),
+  "Only explicitly approved public tables can be targeted.");
+  return tableNames.map((table) =>
     `REVOKE ALL PRIVILEGES ON TABLE "public"."${table}" FROM PUBLIC, "anon", "authenticated"`);
 }
 
 export function validateRevokes(sql) {
+  return validateRevokesForTables(sql, sensitiveTables);
+}
+
+export function validateRevokesForTables(sql, tableNames) {
   const statements = sql.split(";").map((statement) => statement.trim()).filter(Boolean);
-  assert.deepEqual(statements.map(normalize), expectedRevokes(),
-    "Privilege changes differ from the approved three-table client-access restriction.");
+  assert.deepEqual(statements.map(normalize), expectedRevokesForTables(tableNames),
+    "Privilege changes differ from the approved client-access restriction.");
   return statements;
 }
 
@@ -31,10 +45,11 @@ const serverPrivilegeSql = `
   WHERE n.nspname = 'public' AND c.relname = ANY($1::text[])
 `;
 
-export async function restrictPassportApiAccess({
+export async function restrictApiTableAccess({
   connectionString = process.env.DATABASE_URL,
   caFile = process.env.DATABASE_CA_CERT_FILE,
   sqlLoader = () => readFile(new URL("../migrations/manual/revoke-passport-api-role-grants.sql", import.meta.url), "utf8"),
+  tableNames = sensitiveTables,
   clientFactory,
   logger = console,
 } = {}) {
@@ -51,7 +66,7 @@ export async function restrictPassportApiAccess({
   let transaction = false;
   let code = 0;
   try {
-    const statements = validateRevokes(await sqlLoader());
+    const statements = validateRevokesForTables(await sqlLoader(), tableNames);
     url.searchParams.set("sslrootcert", caFile);
     url.searchParams.set("sslmode", "verify-full");
     url.searchParams.delete("uselibpqcompat");
@@ -64,7 +79,7 @@ export async function restrictPassportApiAccess({
       connectionTimeoutMillis: 10_000,
       query_timeout: 30_000,
       statement_timeout: 15_000,
-      application_name: "cush-restrict-passport-api-grants",
+      application_name: "cush-restrict-api-table-grants",
     });
     await client.connect();
     await client.query("BEGIN");
@@ -72,9 +87,9 @@ export async function restrictPassportApiAccess({
     await client.query("SET LOCAL lock_timeout = '10s'");
     await client.query("SELECT pg_advisory_xact_lock(723812, 1)");
 
-    const beforeResult = await client.query(auditSql, [sensitiveTables, [...clientRoles, ...serverRoles]]);
+    const beforeResult = await client.query(auditSql, [tableNames, [...clientRoles, ...serverRoles]]);
     const before = summarizeAccess(beforeResult.rows);
-    assert.equal(before.tables.length, sensitiveTables.length, "All three target tables must exist.");
+    assert.equal(before.tables.length, tableNames.length, "All target tables must exist.");
     for (const table of before.tables) {
       assert.equal(table.rlsEnabled, true, `RLS must remain enabled on ${table.table}.`);
       assert.equal(table.rowLevelPolicies.length, 0, `Unexpected client policies on ${table.table}; refusing to alter access.`);
@@ -83,7 +98,7 @@ export async function restrictPassportApiAccess({
     const apiBefore = await client.query(apiConfigSql);
     const schemaSetting = summarizeApiConfig(apiBefore.rows);
 
-    const ownerCheck = await client.query(serverPrivilegeSql, [sensitiveTables]);
+    const ownerCheck = await client.query(serverPrivilegeSql, [tableNames]);
     assert.equal(ownerCheck.rows.length, sensitiveTables.length, "Application database role must retain access to every target table.");
     for (const row of ownerCheck.rows) {
       assert.ok(row.can_select && row.can_insert && row.can_update && row.can_delete,
@@ -92,13 +107,13 @@ export async function restrictPassportApiAccess({
 
     for (const statement of statements) await client.query(statement);
 
-    const ownerAfter = await client.query(serverPrivilegeSql, [sensitiveTables]);
+    const ownerAfter = await client.query(serverPrivilegeSql, [tableNames]);
     assert.equal(ownerAfter.rows.length, sensitiveTables.length, "Server role must retain access to all target tables.");
     for (const row of ownerAfter.rows) {
       assert.ok(row.can_select && row.can_insert && row.can_update && row.can_delete,
         "Server database role lost privileges; refusing to commit.");
     }
-    const afterResult = await client.query(auditSql, [sensitiveTables, [...clientRoles, ...serverRoles]]);
+    const afterResult = await client.query(auditSql, [tableNames, [...clientRoles, ...serverRoles]]);
     const after = summarizeAccess(afterResult.rows);
     for (const table of after.tables) {
       assert.equal(table.rlsEnabled, true, `RLS changed on ${table.table}.`);
@@ -118,7 +133,7 @@ export async function restrictPassportApiAccess({
     }
     await client.query("COMMIT");
     transaction = false;
-    logger.log("PASSPORT_API_ACCESS_RESTRICTED: Revoked PUBLIC, anon, and authenticated table privileges from all three passport tables. RLS remains enabled with no policies; server-role access is unchanged.");
+    logger.log(`API_TABLE_ACCESS_RESTRICTED: Revoked PUBLIC, anon, and authenticated table privileges from ${tableNames.join(", ")}. RLS remains enabled with no policies; server-role access is unchanged.`);
     logger.log("PostgREST schema-setting audit: " + JSON.stringify(schemaSetting));
   } catch (error) {
     code = 1;
@@ -140,6 +155,10 @@ export async function restrictPassportApiAccess({
     }
   }
   return code;
+}
+
+export async function restrictPassportApiAccess(options = {}) {
+  return restrictApiTableAccess({ ...options, tableNames: sensitiveTables });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -1,0 +1,60 @@
+name: Restrict Preserved Tables Data API Access
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Enter REVOKE_PRESERVED_API_ACCESS to remove client table grants'
+        required: true
+        type: string
+
+concurrency:
+  group: passport-tables-migration
+  cancel-in-progress: false
+
+jobs:
+  restrict-access:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm access restriction
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = "REVOKE_PRESERVED_API_ACCESS"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Test access audit and restriction
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/audit-db-access.test.mjs scripts/restrict-passport-api-access.test.mjs
+      - name: Prepare trusted Supabase CA certificate
+        env:
+          SUPABASE_CA_CERT: ${{ secrets.SUPABASE_CA_CERT }}
+        run: node scripts/prepare-db-ca.mjs
+      - name: Check database connection (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-db-connection.mjs
+      - name: Revoke client access in a verified transaction
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/restrict-legacy-api-access.mjs
+      - name: Verify effective role privileges on all public tables
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AUDIT_ALL_PUBLIC_TABLES: "true"
+        run: node scripts/audit-db-access.mjs
+      - name: Remove temporary CA certificate
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [ -n "${DATABASE_CA_CERT_FILE:-}" ]; then
+            rm -f -- "$DATABASE_CA_CERT_FILE"
+          fi

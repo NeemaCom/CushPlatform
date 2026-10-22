@@ -3,8 +3,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "vitest";
 import {
-  expectedRevokes, restrictPassportApiAccess, validateRevokes,
+  expectedRevokes, expectedRevokesForTables, legacyClientTables,
+  restrictPassportApiAccess, validateRevokes, validateRevokesForTables,
 } from "./restrict-passport-api-access.mjs";
+import { restrictLegacyApiAccess } from "./restrict-legacy-api-access.mjs";
 import { clientRoles, sensitiveTables, serverRoles } from "./audit-db-access.mjs";
 
 const roleRows = (clientAccess) => [
@@ -16,7 +18,7 @@ const roleRows = (clientAccess) => [
     role, schemaUsage: true, select: true, insert: true, update: true, delete: true, bypassRls: true,
   })),
 ];
-const tableRows = (clientAccess) => sensitiveTables.map((name) => ({
+const tableRows = (clientAccess, tableNames = sensitiveTables) => tableNames.map((name) => ({
   table_name: name, rls_enabled: true, force_rls: false, acl: [],
   effective_roles: roleRows(clientAccess), policies: [],
 }));
@@ -27,6 +29,7 @@ function fixture(options = {}) {
   let closed = false;
   let config;
   let auditCount = 0;
+  const tableNames = options.tableNames ?? sensitiveTables;
   const client = {
     connect: async () => {},
     query: async (sql, params) => {
@@ -36,13 +39,13 @@ function fixture(options = {}) {
         || sql.startsWith("SET LOCAL") || sql.includes("pg_advisory_xact_lock")
         || sql.startsWith("REVOKE ")) return { rows: [] };
       if (sql.includes("has_table_privilege(current_user")) {
-        return { rows: sensitiveTables.map((name) => ({
+        return { rows: tableNames.map((name) => ({
           name, can_select: true, can_insert: true, can_update: true, can_delete: true,
         })) };
       }
       if (sql.includes("pg_catalog.pg_class")) {
         auditCount += 1;
-        return { rows: tableRows(auditCount === 1 || Boolean(options.keepClientAccess)) };
+        return { rows: tableRows(auditCount === 1 || Boolean(options.keepClientAccess), tableNames) };
       }
       if (sql.includes("pg_db_role_setting")) return { rows: [] };
       throw new Error("Unexpected query in synthetic migration test.");
@@ -54,7 +57,7 @@ function fixture(options = {}) {
     options: {
       connectionString: "postgresql://synthetic_owner:synthetic_password@invalid.example/db?sslmode=no-verify",
       caFile: "/tmp/public-test-ca.pem",
-      sqlLoader: () => readFile(new URL("../migrations/manual/revoke-passport-api-role-grants.sql", import.meta.url), "utf8"),
+      sqlLoader: options.sqlLoader ?? (() => readFile(new URL("../migrations/manual/revoke-passport-api-role-grants.sql", import.meta.url), "utf8")),
       clientFactory: (value) => { config = value; return client; },
       logger: { log: (line) => logs.push(line), error: (line) => logs.push(line) },
     },
@@ -80,7 +83,24 @@ test("commits revocations after proving RLS and server access remain intact", as
   const url = new URL(f.config().connectionString);
   assert.equal(url.searchParams.get("sslmode"), "verify-full");
   assert.equal(url.searchParams.get("sslrootcert"), "/tmp/public-test-ca.pem");
-  assert.ok(f.logs.some((line) => line.startsWith("PASSPORT_API_ACCESS_RESTRICTED:")));
+  assert.ok(f.logs.some((line) => line.startsWith("API_TABLE_ACCESS_RESTRICTED:")));
+});
+
+test("the preserved-table restriction is limited to users, cush, and session", async () => {
+  const sql = await readFile(new URL("../migrations/manual/revoke-preserved-api-role-grants.sql", import.meta.url), "utf8");
+  assert.deepEqual(legacyClientTables, ["cush", "session", "users"]);
+  assert.deepEqual(validateRevokesForTables(sql, legacyClientTables).map((x) => x.replace(/\s+/g, " ").trim()),
+    expectedRevokesForTables(legacyClientTables));
+  assert.throws(() => validateRevokesForTables(sql + "\nREVOKE ALL ON passports FROM PUBLIC;", legacyClientTables));
+
+  const f = fixture({
+    tableNames: legacyClientTables,
+    sqlLoader: () => readFile(new URL("../migrations/manual/revoke-preserved-api-role-grants.sql", import.meta.url), "utf8"),
+  });
+  assert.equal(await restrictLegacyApiAccess(f.options), 0, f.logs.join("\n"));
+  assert.deepEqual(f.queries.filter((q) => q.sql.startsWith("REVOKE ")).map((q) => q.sql), expectedRevokesForTables(legacyClientTables));
+  assert.equal(f.queries.at(-1).sql, "COMMIT");
+  assert.ok(f.logs.some((line) => line.includes("cush, session, users")));
 });
 
 test("unexpected policies, disabled RLS, or a missing Supabase role cause rollback before revokes", async () => {
@@ -118,7 +138,7 @@ test("failed post-check rolls back all privilege changes and reports no commit",
   assert.equal(f.queries.filter((q) => q.sql.startsWith("REVOKE ")).length, 3);
   assert.equal(f.queries.at(-1).sql, "ROLLBACK");
   assert.ok(!f.logs.join("\n").includes("synthetic_password"));
-  assert.ok(!f.logs.some((line) => line.startsWith("PASSPORT_API_ACCESS_RESTRICTED:")));
+  assert.ok(!f.logs.some((line) => line.startsWith("API_TABLE_ACCESS_RESTRICTED:")));
 });
 
 test("bad configuration or unexpected SQL fails before connecting", async () => {
