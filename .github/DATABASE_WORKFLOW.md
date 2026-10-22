@@ -39,3 +39,24 @@ Do not resolve TLS failures using `no-verify` or
 
 Diagnostic messages redact connection URIs and credentials. Never copy secret
 values into issues or chat.
+
+## Schema decisions and accurate failure reporting
+
+The push runs through a non-interactive guard using the installed Drizzle CLI.
+It supplies no answers and does not allocate a terminal. A zero exit code alone
+is insufficient: the guard also requires Drizzle's explicit **Changes applied**
+or **No changes detected** message and rejects errors, aborted operations,
+signals, timeouts, and interactive prompts. Output is credential-redacted.
+
+Drizzle's `--force` skips data-loss approval, **not** create-versus-rename
+decisions. When live tables are absent from the code schema and code tables are
+absent from the live database, Drizzle may ask whether to create or rename them.
+CI must fail rather than guess, since a wrong choice can destroy data.
+
+For that failure, compare the intended schema with the intended Supabase
+database, including any existing tables owned by other services. Decide which
+tables are new and which represent genuine renames. Resolve these choices in
+a reviewed migration or an attended terminal session with a current backup.
+Do not pipe `yes`, auto-select the first option, or emulate a terminal in CI.
+If a push fails after execution has begun, inspect for partial changes before
+retrying; the guard cannot roll them back.
