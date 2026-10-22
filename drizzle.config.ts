@@ -5,10 +5,11 @@ if (!process.env.DATABASE_URL) {
 }
 
 const databaseUrl = new URL(process.env.DATABASE_URL);
-if (process.env.NODE_ENV === "production") {
-  // Drizzle Kit's URL credentials ignore a separate `ssl` field. The pg driver
-  // interprets this URL option as { rejectUnauthorized: false }.
-  databaseUrl.searchParams.set("sslmode", "no-verify");
+if (process.env.DATABASE_CA_CERT_FILE) {
+  // Keep the schema push's TLS policy identical to the read-only preflight.
+  databaseUrl.searchParams.set("sslrootcert", process.env.DATABASE_CA_CERT_FILE);
+  databaseUrl.searchParams.set("sslmode", "verify-full");
+  databaseUrl.searchParams.delete("uselibpqcompat");
 }
 
 export default defineConfig({

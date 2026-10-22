@@ -11,9 +11,9 @@ const hints = {
   "28000": "Database authentication was rejected. Check the database username and connection settings.",
   "3D000": "The requested database does not exist.",
   "57P03": "The database is not currently accepting connections.",
-  DEPTH_ZERO_SELF_SIGNED_CERT: "TLS certificate verification failed. Check the database's certificate requirements.",
-  SELF_SIGNED_CERT_IN_CHAIN: "TLS certificate verification failed. Check the database's certificate requirements.",
-  UNABLE_TO_VERIFY_LEAF_SIGNATURE: "TLS certificate verification failed. Check the database's certificate requirements.",
+  DEPTH_ZERO_SELF_SIGNED_CERT: "TLS certificate verification failed. Configure the correct Supabase CA certificate in SUPABASE_CA_CERT.",
+  SELF_SIGNED_CERT_IN_CHAIN: "TLS certificate verification failed. Configure the correct Supabase CA certificate in SUPABASE_CA_CERT.",
+  UNABLE_TO_VERIFY_LEAF_SIGNATURE: "TLS certificate verification failed. Configure the correct Supabase CA certificate in SUPABASE_CA_CERT.",
   CERT_HAS_EXPIRED: "The database TLS certificate has expired.",
 };
 
@@ -82,6 +82,7 @@ export function describeErrors(error, redact, depth = 0) {
 
 export async function checkDatabaseConnection({
   connectionString = process.env.DATABASE_URL,
+  caFile = process.env.DATABASE_CA_CERT_FILE,
   clientFactory,
   logger = console,
 } = {}) {
@@ -98,6 +99,12 @@ export async function checkDatabaseConnection({
     host: url.hostname,
     port: url.port || "5432",
   }));
+  if (caFile) {
+    // pg gives URL TLS parameters precedence over a separate ssl object.
+    url.searchParams.set("sslrootcert", caFile);
+    url.searchParams.set("sslmode", "verify-full");
+    url.searchParams.delete("uselibpqcompat");
+  }
   let client;
   let exitCode = 0;
   try {
@@ -106,7 +113,7 @@ export async function checkDatabaseConnection({
       clientFactory = (config) => new pg.Client(config);
     }
     client = clientFactory({
-      connectionString,
+      connectionString: url.toString(),
       connectionTimeoutMillis: 10_000,
       query_timeout: 10_000,
       statement_timeout: 10_000,

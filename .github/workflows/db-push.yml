@@ -28,7 +28,12 @@ jobs:
         run: npm ci
 
       - name: Verify diagnostic credential redaction
-        run: npx --no-install vitest run scripts/check-db-connection.test.mjs
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs
+
+      - name: Prepare trusted Supabase CA certificate
+        env:
+          SUPABASE_CA_CERT: ${{ secrets.SUPABASE_CA_CERT }}
+        run: node scripts/prepare-db-ca.mjs
 
       - name: Check database connection (read-only)
         env:
@@ -40,3 +45,11 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx drizzle-kit push --force
+
+      - name: Remove temporary CA certificate
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [ -n "${DATABASE_CA_CERT_FILE:-}" ]; then
+            rm -f -- "$DATABASE_CA_CERT_FILE"
+          fi
