@@ -51,6 +51,7 @@ test("distinguishes table grants from schema USAGE and PUBLIC grants", () => {
 
 test("audits all intended tables and does not include customer-data queries", () => {
   assert.deepEqual(sensitiveTables, ["evidence_vault", "financial_signals", "passports"]);
+  assert.match(auditSql, /\(\$1::text\[\] IS NULL OR c\.relname = ANY\(\$1::text\[\]\)\)/);
   assert.match(auditSql, /pg_catalog\.pg_roles/);
   assert.match(auditSql, /has_table_privilege/);
   assert.match(auditSql, /pg_catalog\.pg_policy/);
@@ -119,6 +120,30 @@ test("runs only a read-only catalog query with full TLS verification and closes"
   ] });
   assert.equal(await auditDatabaseAccess(withSetting.options), 0);
   assert.ok(withSetting.logs.some((line) => line.includes("\"publicSchemaExposureConfigured\":true")));
+});
+
+test("all-public mode requests every public table without reading rows", async () => {
+  const rows = [
+    ...sensitiveTables.map((name) => baseRow(name)),
+    baseRow("users"),
+    baseRow("cush"),
+    baseRow("session"),
+  ].sort((a, b) => a.table_name.localeCompare(b.table_name));
+  const f = fixture({ rows });
+  assert.equal(await auditDatabaseAccess({ ...f.options, allPublicTables: true }), 0);
+  assert.equal(f.queries[1].params[0], null);
+  const reportLine = f.logs.find((line) => line.startsWith("ACCESS_AUDIT "));
+  const report = JSON.parse(reportLine.slice("ACCESS_AUDIT ".length));
+  assert.equal(report.auditScope, "All public tables");
+  assert.deepEqual(report.tables.map((table) => table.table), [
+    "public.cush",
+    "public.evidence_vault",
+    "public.financial_signals",
+    "public.passports",
+    "public.session",
+    "public.users",
+  ]);
+  assert.equal(f.queries.at(-1).sql, "ROLLBACK");
 });
 
 test("missing tables or catalog errors fail without a misleading report and redact credentials", async () => {

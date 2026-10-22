@@ -20,7 +20,9 @@ export const auditSql = `
       ), '[]'::jsonb) AS acl
     FROM pg_catalog.pg_class c
     JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = ANY($1::text[]) AND c.relkind IN ('r', 'p')
+    WHERE n.nspname = 'public'
+      AND ($1::text[] IS NULL OR c.relname = ANY($1::text[]))
+      AND c.relkind IN ('r', 'p')
   )
   SELECT checked.table_name, checked.rls_enabled, checked.force_rls, checked.acl,
     COALESCE((
@@ -114,6 +116,7 @@ export function summarizeApiConfig(rows) {
 export async function auditDatabaseAccess({
   connectionString = process.env.DATABASE_URL,
   caFile = process.env.DATABASE_CA_CERT_FILE,
+  allPublicTables = false,
   clientFactory,
   logger = console,
 } = {}) {
@@ -148,16 +151,18 @@ export async function auditDatabaseAccess({
     await client.connect();
     await client.query("BEGIN READ ONLY");
     const result = await client.query(auditSql, [
-      sensitiveTables,
+      allPublicTables ? null : sensitiveTables,
       [...clientRoles, ...serverRoles],
     ]);
-    if (result.rows.length !== sensitiveTables.length
+    if ((!allPublicTables && result.rows.length !== sensitiveTables.length)
+      || result.rows.length < sensitiveTables.length
       || sensitiveTables.some((name) => !result.rows.some((row) => row.table_name === name))) {
       throw new Error("One or more expected sensitive tables are missing; no complete access report can be produced.");
     }
     const apiConfig = await client.query(apiConfigSql);
     report = {
       ...summarizeAccess(result.rows),
+      auditScope: allPublicTables ? "All public tables" : "Sensitive passport tables",
       dataApiConfiguration: summarizeApiConfig(apiConfig.rows),
     };
     await client.query("ROLLBACK");
@@ -180,5 +185,8 @@ export async function auditDatabaseAccess({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await auditDatabaseAccess();
+  process.exitCode = await auditDatabaseAccess({
+    allPublicTables: process.argv.includes("--all-public-tables")
+      || process.env.AUDIT_ALL_PUBLIC_TABLES === "true",
+  });
 }
