@@ -28,7 +28,7 @@ jobs:
         run: npm ci
 
       - name: Verify diagnostic credential redaction
-        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/push-db-schema.test.mjs
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/push-db-schema.test.mjs scripts/compare-db-tables.test.mjs
 
       - name: Prepare trusted Supabase CA certificate
         env:
@@ -45,6 +45,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node scripts/push-db-schema.mjs
+
+      - name: Compare table names (read-only)
+        if: ${{ inputs.diagnostics_only }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/compare-db-tables.mjs
 
       - name: Remove temporary CA certificate
         if: ${{ always() }}
