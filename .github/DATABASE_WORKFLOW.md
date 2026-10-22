@@ -63,3 +63,29 @@ a reviewed migration or an attended terminal session with a current backup.
 Do not pipe `yes`, auto-select the first option, or emulate a terminal in CI.
 If a push fails after execution has begun, inspect for partial changes before
 retrying; the guard cannot roll them back.
+
+## Additive passport tables migration
+
+**Apply Passport Tables Migration** is a separate manual workflow for the
+approved addition of `passports`, `financial_signals`, and `evidence_vault`.
+Its reviewed SQL is `migrations/manual/create-passport-tables.sql`.
+Enter `CREATE_PASSPORT_TABLES` in the confirmation input.
+
+This workflow does not run a forced schema push. It requires the previously
+identified `users`, `cush`, and `session` tables to exist and all three target
+tables to be absent. It refuses partial or repeated application rather than
+silently skipping existing objects.
+
+The runner checks the SQL against the current code schema before connecting,
+uses verified TLS, takes a transaction-scoped advisory lock, and executes all
+DDL in one transaction with bounded statement and lock timeouts. Before
+committing, it verifies new column types, defaults, nullability, primary keys,
+unique constraints, and foreign keys. It also compares the existing tables'
+identities, column definitions, own constraints, indexes, ACLs, and RLS flags.
+New inbound foreign keys add PostgreSQL internal reference triggers on `users`;
+that is expected, not a rename or change to its columns or rows.
+
+Failures before commit trigger rollback. A lost connection during commit has
+an uncertain outcome and must be inspected before retrying. A separate read-only
+catalog comparison runs after commit. No customer records are read, changed, or
+deleted by this migration, and no existing tables are dropped or renamed.

@@ -1,0 +1,59 @@
+name: Apply Passport Tables Migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Enter CREATE_PASSPORT_TABLES to create only the three missing tables'
+        required: true
+        type: string
+
+concurrency:
+  group: passport-tables-migration
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Confirm additive migration
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: test "$CONFIRMATION" = "CREATE_PASSPORT_TABLES"
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+      - name: Test migration safety and database diagnostics
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/compare-db-tables.test.mjs scripts/apply-passport-migration.test.mjs
+      - name: Prepare trusted Supabase CA certificate
+        env:
+          SUPABASE_CA_CERT: ${{ secrets.SUPABASE_CA_CERT }}
+        run: node scripts/prepare-db-ca.mjs
+      - name: Check database connection (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-db-connection.mjs
+      - name: Apply approved additive migration transaction
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/apply-passport-migration.mjs
+      - name: Verify committed table and column names (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/compare-db-tables.mjs
+      - name: Remove temporary CA certificate
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [ -n "${DATABASE_CA_CERT_FILE:-}" ]; then
+            rm -f -- "$DATABASE_CA_CERT_FILE"
+          fi
