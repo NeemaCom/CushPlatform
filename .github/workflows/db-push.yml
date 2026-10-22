@@ -7,6 +7,10 @@ on:
         description: 'Only check connectivity; do not push database schema'
         type: boolean
         default: false
+      audit_all_public_tables:
+        description: 'Read-only access audit of every table in the public schema'
+        type: boolean
+        default: false
 
 jobs:
   db-push:
@@ -56,6 +60,7 @@ jobs:
         if: ${{ inputs.diagnostics_only }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AUDIT_ALL_PUBLIC_TABLES: ${{ inputs.audit_all_public_tables }}
         run: node scripts/audit-db-access.mjs
 
       - name: Remove temporary CA certificate
