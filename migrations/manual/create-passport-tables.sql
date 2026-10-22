@@ -14,6 +14,7 @@ CREATE TABLE "public"."evidence_vault" (
   "created_at" timestamp DEFAULT now(),
   "updated_at" timestamp DEFAULT now()
 );
+ALTER TABLE "public"."evidence_vault" ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE "public"."financial_signals" (
   "id" serial PRIMARY KEY NOT NULL,
@@ -30,6 +31,7 @@ CREATE TABLE "public"."financial_signals" (
   "created_at" timestamp DEFAULT now(),
   "updated_at" timestamp DEFAULT now()
 );
+ALTER TABLE "public"."financial_signals" ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE "public"."passports" (
   "id" serial PRIMARY KEY NOT NULL,
@@ -45,6 +47,7 @@ CREATE TABLE "public"."passports" (
   "created_at" timestamp DEFAULT now(),
   CONSTRAINT "passports_share_token_unique" UNIQUE("share_token")
 );
+ALTER TABLE "public"."passports" ENABLE ROW LEVEL SECURITY;
 
 ALTER TABLE "public"."evidence_vault" ADD CONSTRAINT "evidence_vault_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
 ALTER TABLE "public"."evidence_vault" ADD CONSTRAINT "evidence_vault_passport_id_passports_id_fk" FOREIGN KEY ("passport_id") REFERENCES "public"."passports"("id") ON DELETE cascade ON UPDATE no action;

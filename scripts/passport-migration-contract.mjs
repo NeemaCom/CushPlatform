@@ -11,7 +11,7 @@ export async function loadMigrationContract() {
   const after = generateDrizzleJson(schema);
   const generated = await generateMigration(before, after);
   const qualify = (sql) => sql.replace(/^(CREATE TABLE|ALTER TABLE) "/, '$1 "public"."');
-  return { statements: generated.map(qualify), tables: after.tables };
+  return { statements: generated.map(qualify), tables: after.tables, snapshot: after };
 }
 
 const normalize = (sql) => sql.replace(/\s+/g, " ").trim().replace(/;$/, "");
@@ -25,7 +25,11 @@ export function validateMigrationSql(sql, contract) {
     const match = /^(CREATE TABLE|ALTER TABLE) "public"\."([^"]+)"/.exec(statement);
     assert.ok(match && createdTables.includes(match[2]), "Migration may only change the three approved new tables.");
     if (match[1] === "CREATE TABLE") created.push(match[2]);
-    else assert.match(statement, /^ALTER TABLE "public"\."[^"]+" ADD CONSTRAINT "[^"]+" FOREIGN KEY /);
+    else if (/^ALTER TABLE "public"\."[^"]+" ADD CONSTRAINT "[^"]+" FOREIGN KEY /.test(statement)) {
+      continue;
+    } else {
+      assert.match(statement, /^ALTER TABLE "public"\."[^"]+" ENABLE ROW LEVEL SECURITY$/);
+    }
   }
   assert.deepEqual(created.sort(), createdTables);
   return statements;
@@ -67,6 +71,8 @@ export function verifyNewTables(rows, contract) {
     const actual = rows.find((row) => row.name === name);
     const expected = contract.tables[`public.${name}`];
     assert.ok(actual && expected, `Missing migration table: ${name}`);
+    assert.equal(actual.rls_enabled, expected.isRLSEnabled, `RLS mismatch for ${name}`);
+    assert.equal(actual.force_rls, false, `Unexpected forced RLS setting for ${name}`);
     assert.deepEqual(actual.columns.map((c) => c.name).sort(), Object.keys(expected.columns).sort(),
       `Column names differ for ${name}`);
     for (const column of Object.values(expected.columns)) {
