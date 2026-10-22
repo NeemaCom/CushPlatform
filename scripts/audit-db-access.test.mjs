@@ -1,0 +1,107 @@
+// @vitest-environment node
+import assert from "node:assert/strict";
+import { test } from "vitest";
+import { auditDatabaseAccess, auditSql, summarizeAccess } from "./audit-db-access.mjs";
+import { sensitiveTables } from "./audit-db-access.mjs";
+
+const baseRow = (table_name, overrides = {}) => ({
+  table_name,
+  rls_enabled: false,
+  force_rls: false,
+  acl: [],
+  effective_roles: [
+    { role: "anon", schemaUsage: true, select: true, insert: true, update: true, delete: true, bypassRls: false },
+    { role: "authenticated", schemaUsage: true, select: true, insert: true, update: true, delete: true, bypassRls: false },
+    { role: "service_role", schemaUsage: true, select: true, insert: true, update: true, delete: true, bypassRls: true },
+  ],
+  policies: [],
+  ...overrides,
+});
+
+test("reports effective client roles with unprotected privileges when RLS is disabled", () => {
+  const report = summarizeAccess([baseRow("evidence_vault")]);
+  assert.deepEqual(report.tables[0].unprotectedClientAccess, ["anon", "authenticated"]);
+  assert.equal(report.summary.length, 2);
+  assert.equal(report.tables[0].effectiveRolePrivileges.find((r) => r.role === "service_role").bypassRls, true);
+});
+
+test("does not label RLS-protected roles as unprotected or infer policy access", () => {
+  const row = baseRow("passports", {
+    rls_enabled: true,
+    policies: [{ name: "passport_owner_select", command: "r", permissive: true, roles: ["authenticated"] }],
+  });
+  const report = summarizeAccess([row]);
+  assert.deepEqual(report.tables[0].unprotectedClientAccess, []);
+  assert.deepEqual(report.tables[0].rowLevelPolicies, row.policies);
+  assert.match(report.scope, /policy expressions and Supabase API configuration are not evaluated/);
+});
+
+test("distinguishes table grants from schema USAGE and PUBLIC grants", () => {
+  const row = baseRow("financial_signals", {
+    acl: [{ grantee: "PUBLIC", privilege: "SELECT", grantable: false }],
+    effective_roles: [{ role: "anon", schemaUsage: false, select: false, insert: false, update: false, delete: false, bypassRls: false }],
+  });
+  const report = summarizeAccess([row], ["anon", "authenticated"]);
+  assert.equal(report.summary.length, 0);
+  assert.deepEqual(report.tables[0].explicitPublicAcl, row.acl);
+  assert.deepEqual(report.tables[0].rolesNotPresent, ["authenticated"]);
+});
+
+test("audits all intended tables and does not include customer-data queries", () => {
+  assert.deepEqual(sensitiveTables, ["evidence_vault", "financial_signals", "passports"]);
+  assert.match(auditSql, /pg_catalog\.pg_roles/);
+  assert.match(auditSql, /has_table_privilege/);
+  assert.match(auditSql, /pg_catalog\.pg_policy/);
+  assert.doesNotMatch(auditSql, /\b(SELECT|FROM)\s+(public\.)?(users|passports|financial_signals|evidence_vault)\b/i);
+  assert.doesNotMatch(auditSql, /^\s*(INSERT|UPDATE|DELETE|ALTER|GRANT|REVOKE|DROP|CREATE)\b/im);
+});
+
+function fixture(options = {}) {
+  const queries = [];
+  const logs = [];
+  let closed = false;
+  let config;
+  const rows = options.rows ?? sensitiveTables.map((name) => baseRow(name));
+  const client = {
+    connect: async () => {},
+    query: async (sql, params) => {
+      queries.push({ sql, params });
+      if (options.error) throw new Error(options.error);
+      return { rows: sql.includes("pg_catalog.pg_class") ? rows : [] };
+    },
+    end: async () => { closed = true; },
+  };
+  return {
+    queries, logs, closed: () => closed, config: () => config,
+    options: {
+      connectionString: "postgresql://synthetic_user:synthetic_password@invalid.example/db?sslmode=no-verify",
+      caFile: "/tmp/test-public-ca.pem",
+      clientFactory: (value) => { config = value; return client; },
+      logger: { log: (line) => logs.push(line), error: (line) => logs.push(line) },
+    },
+  };
+}
+
+test("runs only a read-only catalog query with full TLS verification and closes", async () => {
+  const f = fixture();
+  assert.equal(await auditDatabaseAccess(f.options), 0);
+  assert.equal(f.queries[0].sql, "BEGIN READ ONLY");
+  assert.match(f.queries[1].sql, /pg_catalog\.pg_policy/);
+  assert.deepEqual(f.queries[1].params[0], sensitiveTables);
+  assert.equal(f.queries[2].sql, "ROLLBACK");
+  const url = new URL(f.config().connectionString);
+  assert.equal(url.searchParams.get("sslmode"), "verify-full");
+  assert.equal(url.searchParams.get("sslrootcert"), "/tmp/test-public-ca.pem");
+  assert.equal(f.closed(), true);
+  assert.ok(f.logs.some((line) => line.startsWith("ACCESS_AUDIT ")));
+});
+
+test("missing tables or catalog errors fail without a misleading report and redact credentials", async () => {
+  const absent = fixture({ rows: [baseRow("passports")] });
+  assert.equal(await auditDatabaseAccess(absent.options), 1);
+  assert.ok(!absent.logs.some((line) => line.startsWith("ACCESS_AUDIT ")));
+  const failed = fixture({ error: "synthetic failure synthetic_password" });
+  assert.equal(await auditDatabaseAccess(failed.options), 1);
+  assert.ok(!failed.logs.join("\n").includes("synthetic_password"));
+  assert.ok(!failed.logs.some((line) => line.startsWith("ACCESS_AUDIT ")));
+});
