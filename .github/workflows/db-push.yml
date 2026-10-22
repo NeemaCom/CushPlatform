@@ -2,10 +2,18 @@ name: Push Database Schema
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnostics_only:
+        description: 'Only check connectivity; do not push database schema'
+        type: boolean
+        default: false
 
 jobs:
   db-push:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,7 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify diagnostic credential redaction
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs
+
+      - name: Check database connection (read-only)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/check-db-connection.mjs
+
       - name: Push Schema to Database
+        if: ${{ !inputs.diagnostics_only }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npx drizzle-kit push --force
