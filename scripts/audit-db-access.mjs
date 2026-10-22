@@ -51,6 +51,21 @@ export const auditSql = `
   ORDER BY checked.table_name
 `;
 
+// Supabase/PostgREST normally stores exposed schemas on the authenticator role.
+// Return only that setting, never unrelated role/database settings.
+export const apiConfigSql = `
+  SELECT COALESCE(r.rolname, 'ALL_ROLES') AS role,
+    s.setdatabase <> 0 AS database_specific,
+    regexp_replace(setting.value, '^[^=]+=','') AS exposed_schemas
+  FROM pg_catalog.pg_db_role_setting s
+  LEFT JOIN pg_catalog.pg_roles r ON r.oid = s.setrole
+  JOIN pg_catalog.pg_database d ON d.oid = s.setdatabase OR s.setdatabase = 0
+  CROSS JOIN LATERAL unnest(s.setconfig) AS setting(value)
+  WHERE d.datname = current_database()
+    AND (s.setrole = 0 OR r.rolname = 'authenticator')
+    AND split_part(setting.value, '=', 1) = 'pgrst.db_schemas'
+`;
+
 export function summarizeAccess(rows, rolesExpected = [...clientRoles, ...serverRoles]) {
   const tables = rows.map((row) => {
     const roles = row.effective_roles ?? [];
@@ -77,6 +92,22 @@ export function summarizeAccess(rows, rolesExpected = [...clientRoles, ...server
       table.unprotectedClientAccess.map((role) => `${role} has schema access and table privileges while RLS is disabled on ${table.table}`),
     ),
     scope: "System catalogs only; no customer records read. Checks effective Postgres privileges, schema USAGE, RLS flags, and policy names/commands. RLS policy expressions and Supabase API configuration are not evaluated.",
+  };
+}
+
+export function summarizeApiConfig(rows) {
+  const settings = rows.map((row) => ({
+    role: row.role,
+    databaseSpecific: row.database_specific,
+    exposedSchemas: String(row.exposed_schemas ?? "")
+      .split(",").map((schema) => schema.trim()).filter(Boolean).sort(),
+  }));
+  return {
+    settings,
+    publicSchemaExposureConfigured: settings.some((setting) => setting.exposedSchemas.includes("public")),
+    status: settings.length
+      ? "Read from PostgreSQL role/database settings. Verify this matches the Supabase Dashboard Data API settings."
+      : "No pgrst.db_schemas value was visible in PostgreSQL role/database settings. Dashboard/API configuration could not be confirmed from this database connection.",
   };
 }
 
@@ -124,7 +155,11 @@ export async function auditDatabaseAccess({
       || sensitiveTables.some((name) => !result.rows.some((row) => row.table_name === name))) {
       throw new Error("One or more expected sensitive tables are missing; no complete access report can be produced.");
     }
-    report = summarizeAccess(result.rows);
+    const apiConfig = await client.query(apiConfigSql);
+    report = {
+      ...summarizeAccess(result.rows),
+      dataApiConfiguration: summarizeApiConfig(apiConfig.rows),
+    };
     await client.query("ROLLBACK");
   } catch (error) {
     code = 1;

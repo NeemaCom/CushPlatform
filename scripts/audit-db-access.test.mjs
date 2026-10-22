@@ -1,7 +1,9 @@
 // @vitest-environment node
 import assert from "node:assert/strict";
 import { test } from "vitest";
-import { auditDatabaseAccess, auditSql, summarizeAccess } from "./audit-db-access.mjs";
+import {
+  apiConfigSql, auditDatabaseAccess, auditSql, summarizeAccess, summarizeApiConfig,
+} from "./audit-db-access.mjs";
 import { sensitiveTables } from "./audit-db-access.mjs";
 
 const baseRow = (table_name, overrides = {}) => ({
@@ -54,6 +56,21 @@ test("audits all intended tables and does not include customer-data queries", ()
   assert.match(auditSql, /pg_catalog\.pg_policy/);
   assert.doesNotMatch(auditSql, /\b(SELECT|FROM)\s+(public\.)?(users|passports|financial_signals|evidence_vault)\b/i);
   assert.doesNotMatch(auditSql, /^\s*(INSERT|UPDATE|DELETE|ALTER|GRANT|REVOKE|DROP|CREATE)\b/im);
+  assert.match(apiConfigSql, /pgrst\.db_schemas/);
+  assert.doesNotMatch(apiConfigSql, /password|secret|service_role.*setconfig/i);
+});
+
+test("reports exposed schemas only when the PostgREST role setting is visible", () => {
+  assert.deepEqual(summarizeApiConfig([
+    { role: "authenticator", database_specific: true, exposed_schemas: "public, graphql_public" },
+  ]), {
+    settings: [{ role: "authenticator", databaseSpecific: true, exposedSchemas: ["graphql_public", "public"] }],
+    publicSchemaExposureConfigured: true,
+    status: "Read from PostgreSQL role/database settings. Verify this matches the Supabase Dashboard Data API settings.",
+  });
+  const unknown = summarizeApiConfig([]);
+  assert.equal(unknown.publicSchemaExposureConfigured, false);
+  assert.match(unknown.status, /could not be confirmed/);
 });
 
 function fixture(options = {}) {
@@ -67,7 +84,9 @@ function fixture(options = {}) {
     query: async (sql, params) => {
       queries.push({ sql, params });
       if (options.error) throw new Error(options.error);
-      return { rows: sql.includes("pg_catalog.pg_class") ? rows : [] };
+      if (sql.includes("pg_catalog.pg_class")) return { rows };
+      if (sql.includes("pg_db_role_setting")) return { rows: options.settings ?? [] };
+      return { rows: [] };
     },
     end: async () => { closed = true; },
   };
@@ -88,12 +107,18 @@ test("runs only a read-only catalog query with full TLS verification and closes"
   assert.equal(f.queries[0].sql, "BEGIN READ ONLY");
   assert.match(f.queries[1].sql, /pg_catalog\.pg_policy/);
   assert.deepEqual(f.queries[1].params[0], sensitiveTables);
-  assert.equal(f.queries[2].sql, "ROLLBACK");
+  assert.equal(f.queries.at(-1).sql, "ROLLBACK");
   const url = new URL(f.config().connectionString);
   assert.equal(url.searchParams.get("sslmode"), "verify-full");
   assert.equal(url.searchParams.get("sslrootcert"), "/tmp/test-public-ca.pem");
   assert.equal(f.closed(), true);
   assert.ok(f.logs.some((line) => line.startsWith("ACCESS_AUDIT ")));
+  assert.ok(f.logs.some((line) => line.includes("could not be confirmed")));
+  const withSetting = fixture({ settings: [
+    { role: "authenticator", database_specific: true, exposed_schemas: "public" },
+  ] });
+  assert.equal(await auditDatabaseAccess(withSetting.options), 0);
+  assert.ok(withSetting.logs.some((line) => line.includes("\"publicSchemaExposureConfigured\":true")));
 });
 
 test("missing tables or catalog errors fail without a misleading report and redact credentials", async () => {
