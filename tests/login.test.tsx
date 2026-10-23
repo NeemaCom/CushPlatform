@@ -302,6 +302,7 @@ describe("Login", () => {
         lastName: "User",
         acceptTerms: true,
         acceptPrivacy: true,
+        marketingConsent: false,
       },
     );
     expect(mocks.toast).toHaveBeenCalledWith(
@@ -381,6 +382,52 @@ describe("Login", () => {
     );
   });
 
+  it("allows email signup with required policies accepted but marketing left unchecked", async () => {
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+    );
+
+    renderLogin();
+    openSignUpForm();
+    fillSignUpForm();
+
+    const marketingCheckbox = screen.getByRole("checkbox", {
+      name: /Email me product updates and offers/,
+    });
+    expect(marketingCheckbox).not.toBeChecked();
+    expect(marketingCheckbox).not.toBeRequired();
+
+    submitSignUpForm();
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
+      acceptTerms: true,
+      acceptPrivacy: true,
+      marketingConsent: false,
+    });
+  });
+
+  it("sends marketing consent when the user opts in during email signup", async () => {
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+    );
+
+    renderLogin();
+    openSignUpForm();
+    fillSignUpForm();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Email me product updates and offers/ }));
+    submitSignUpForm();
+
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
+      acceptTerms: true,
+      acceptPrivacy: true,
+      marketingConsent: true,
+    });
+  });
+
   it("sends consent for new Google accounts when using the create-account tab", async () => {
     mocks.signInWithPopup.mockResolvedValue({ user: firebaseUser });
     vi.mocked(fetch).mockResolvedValue(
@@ -398,6 +445,7 @@ describe("Login", () => {
       idToken: "verified-id-token",
       acceptTerms: true,
       acceptPrivacy: true,
+      marketingConsent: false,
     });
   });
 

@@ -40,7 +40,7 @@ export default function Login() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
-  const [consent, setConsent] = useState({ terms: false, privacy: false })
+  const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
 
   function hasRequiredConsent() {
@@ -67,7 +67,13 @@ export default function Login() {
       const fbUser = result.user
       await firebaseSync(
         fbUser,
-        tab === 'signup' ? { acceptTerms: true, acceptPrivacy: true } : undefined,
+        tab === 'signup'
+          ? {
+              acceptTerms: true,
+              acceptPrivacy: true,
+              marketingConsent: consent.marketing,
+            }
+          : undefined,
       )
       await afterLogin()
     } catch (err: any) {
@@ -109,6 +115,7 @@ export default function Login() {
         lastName: form.lastName,
         acceptTerms: true,
         acceptPrivacy: true,
+        marketingConsent: consent.marketing,
       })
       toast({ title: 'Account created!', description: 'Welcome to Cush Passport.' })
       await afterLogin()
@@ -185,7 +192,7 @@ export default function Login() {
 
             {tab === 'signup' && (
               <fieldset className="space-y-3 rounded-md border border-slate-200 p-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
-                <legend className="sr-only">Required account agreements</legend>
+                <legend className="sr-only">Required agreements and optional marketing preference</legend>
                 <label htmlFor="accept-terms" className="flex cursor-pointer items-start gap-2 leading-relaxed">
                   <input
                     id="accept-terms"
@@ -220,6 +227,24 @@ export default function Login() {
                     </a>.
                   </span>
                 </label>
+                <div className="border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <label htmlFor="marketing-consent" className="flex cursor-pointer items-start gap-2 leading-relaxed">
+                    <input
+                      id="marketing-consent"
+                      type="checkbox"
+                      checked={consent.marketing}
+                      disabled={loading}
+                      onChange={(e) => setConsent({ ...consent, marketing: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                    />
+                    <span>
+                      Email me product updates and offers.{' '}
+                      <span className="text-slate-500 dark:text-slate-400">
+                        Optional; this does not affect account creation.
+                      </span>
+                    </span>
+                  </label>
+                </div>
               </fieldset>
             )}
 

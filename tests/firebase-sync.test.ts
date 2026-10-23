@@ -129,11 +129,16 @@ describe("Firebase session sync", () => {
 
   it("creates a UID-bound account and rotates session IDs on sign-in", async () => {
     mocks.getByUid.mockResolvedValueOnce(undefined);
-    const first = await sync({ idToken: "valid", acceptTerms: true, acceptPrivacy: true });
+    const first = await sync({
+      idToken: "valid",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      marketingConsent: true,
+    });
     expect(first.status).toBe(200);
     expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       firebaseUid: "trusted-uid", email: "owner@example.com", isEmailVerified: true,
-      acceptTerms: true, acceptPrivacy: true,
+      acceptTerms: true, acceptPrivacy: true, marketingConsent: true,
     }));
     const firstCookie = first.headers.get("set-cookie")?.split(";")[0];
     expect(firstCookie).toContain("connect.sid=");
@@ -189,6 +194,7 @@ describe("Firebase session sync", () => {
     expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       firebaseUid: "trusted-uid",
       email: "owner@example.com",
+      marketingConsent: false,
     }));
     expect(res.headers.get("set-cookie")).toContain("connect.sid=");
   });

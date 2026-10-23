@@ -129,6 +129,7 @@ export async function registerRoutes(
           isEmailVerified: emailVerified,
           acceptTerms: true,
           acceptPrivacy: true,
+          marketingConsent: req.body.marketingConsent === true,
           role: "customer",
         });
         await createLoginSession(req, user);
