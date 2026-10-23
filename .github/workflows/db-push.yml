@@ -70,7 +70,7 @@ jobs:
           CONFIRM_DB_SCHEMA_PUSH: ${{ inputs.confirm_schema_push }}
         run: node scripts/push-db-schema.mjs
 
-      - name: Compare table names and RLS flags (read-only)
+      - name: Compare declared schema metadata and policies (read-only)
         if: ${{ inputs.diagnostics_only }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
