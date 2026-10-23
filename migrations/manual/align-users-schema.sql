@@ -130,8 +130,11 @@ ALTER TABLE public.users
   ALTER COLUMN accept_terms SET NOT NULL,
   ALTER COLUMN accept_privacy SET NOT NULL;
 
+-- Keep the production database default role as 'user'. The current signup
+-- service explicitly assigns 'customer'; this statement affects inserts that
+-- omit role and intentionally preserves the requested database default.
 ALTER TABLE public.users
-  ALTER COLUMN role SET DEFAULT 'customer',
+  ALTER COLUMN role SET DEFAULT 'user',
   ALTER COLUMN accept_terms DROP DEFAULT,
   ALTER COLUMN accept_privacy DROP DEFAULT;
 
