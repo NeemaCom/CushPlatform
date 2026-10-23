@@ -34,11 +34,11 @@ Do not resolve TLS failures using `no-verify` or
 
 1. Run **Push Database Schema** on `main` with **diagnostics_only checked**.
 2. Confirm the CA setup and read-only query succeed. The schema-push step must be
-   skipped. The read-only table comparison reports table and column names plus
-   row-level-security flags from the code-declared schemas using PostgreSQL
-   system catalogs only. It reads no customer records. It does not compare types,
-   defaults, constraints, indexes, or policy expressions. Undeclared live tables
-   are not deletion recommendations; matching names do not prove full compatibility.
+   skipped. The read-only comparison checks code-declared tables, column types,
+   nullability, defaults, primary keys, constraints, indexes, RLS settings, and
+   policy roles and expressions using PostgreSQL system catalogs only. It reads
+   no customer records. Undeclared live tables are reported, not treated as
+   deletion recommendations. A mismatch is diagnostic only; it never changes the database.
 3. Before a real push, verify the target, review the schema changes, and take an
    appropriate backup. Only then uncheck **diagnostics_only** and enter
    `APPLY_SCHEMA_CHANGES`. `drizzle-kit push --force` can alter or remove data.
