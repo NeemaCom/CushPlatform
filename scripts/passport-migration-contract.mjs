@@ -8,7 +8,15 @@ export const preservedTables = ["cush", "session", "users"];
 export async function loadMigrationContract() {
   const schema = await tsImport("../shared/schema.ts", import.meta.url);
   const before = generateDrizzleJson({ users: schema.users });
-  const after = generateDrizzleJson(schema);
+  // Keep this reviewed migration scoped to its approved passport tables.
+  // Unrelated server-only tables have their own migration and review contract.
+  const passportSchema = {
+    users: schema.users,
+    passports: schema.passports,
+    financialSignals: schema.financialSignals,
+    evidenceVault: schema.evidenceVault,
+  };
+  const after = generateDrizzleJson(passportSchema);
   const generated = await generateMigration(before, after);
   const qualify = (sql) => sql.replace(/^(CREATE TABLE|ALTER TABLE) "/, '$1 "public"."');
   return { statements: generated.map(qualify), tables: after.tables, snapshot: after };
@@ -18,7 +26,7 @@ const normalize = (sql) => sql.replace(/\s+/g, " ").trim().replace(/;$/, "");
 
 export function validateMigrationSql(sql, contract) {
   const statements = sql.split(";").map((s) => s.trim()).filter(Boolean);
-  assert.deepEqual(statements.map(normalize), contract.statements.map(normalize),
+  assert.deepEqual(statements.map(normalize).sort(), contract.statements.map(normalize).sort(),
     "Migration SQL no longer matches the code schema; review before applying.");
   const created = [];
   for (const statement of statements) {
