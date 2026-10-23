@@ -1,7 +1,7 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, bigint, check, index, unique } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,25 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
+
+export type ConsentPolicyType = "terms" | "privacy";
+
+export const userConsentRecords = pgTable("user_consent_records", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  policyType: text("policy_type").$type<ConsentPolicyType>().notNull(),
+  policyVersion: text("policy_version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  policyTypeCheck: check(
+    "user_consent_records_policy_type_check",
+    sql`${table.policyType} in ('terms', 'privacy')`,
+  ),
+  oneRecordPerPolicyVersion: unique("user_consent_records_user_policy_version_unique")
+    .on(table.userId, table.policyType, table.policyVersion),
+  userAcceptedAtIndex: index("user_consent_records_user_accepted_at_idx")
+    .on(table.userId, table.acceptedAt),
+})).enableRLS();
 
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,

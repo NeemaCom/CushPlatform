@@ -12,4 +12,6 @@ For a separate Vercel frontend and Node API, `vercel.json` runs `vite build`, pu
 
 Before deploying the PostgreSQL-backed session store, apply `migrations/manual/create-cush-sessions-table.sql` to the intended database. The store uses the dedicated `public.cush_sessions` table and deliberately does not alter or reuse the existing `public.session` table. Production startup checks that the new table exists. Local development explicitly uses the in-memory store and logs that it is not durable.
 
+Before deploying consent-record writes, apply `migrations/manual/create-user-consent-records.sql` to the intended database. It creates a server-only `public.user_consent_records` table with RLS enabled and direct Data API access revoked. Existing users are not backfilled; new acceptance records are written atomically with account creation. Apply the migration before deploying the code.
+
 This build requires a reachable PostgreSQL database and a matching schema. Do not treat a successful build as proof of durable production behavior.

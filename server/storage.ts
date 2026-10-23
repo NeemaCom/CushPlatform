@@ -1,6 +1,7 @@
-import { users, type User, type InsertUser } from "@shared/schema";
+import { users, userConsentRecords, type User, type InsertUser } from "@shared/schema";
 import { db } from "./db";
 import { eq, sql } from "drizzle-orm";
+import { createConsentAcceptanceRecords } from "./consent-policy";
 
 // ─── Storage Interface ────────────────────────────────────────────────────────
 
@@ -52,23 +53,35 @@ class DatabaseStorage implements IStorage {
   }
 
   async createUser(data: Partial<InsertUser> & { email: string; username: string; passwordHash: string; firstName: string; lastName: string; acceptTerms: boolean; acceptPrivacy: boolean }): Promise<User> {
-    const [user] = await db.insert(users).values({
-      username: data.username,
-      email: data.email,
-      passwordHash: data.passwordHash,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      phoneNumber: data.phoneNumber ?? null,
-      nationality: data.nationality ?? null,
-      profilePicture: data.profilePicture ?? null,
-      firebaseUid: data.firebaseUid ?? null,
-      role: data.role ?? "customer",
-      isEmailVerified: data.isEmailVerified ?? false,
-      acceptTerms: data.acceptTerms,
-      acceptPrivacy: data.acceptPrivacy,
-      marketingConsent: data.marketingConsent ?? false,
-    }).returning();
-    return user;
+    const acceptedAt = new Date();
+    const consentRecords = createConsentAcceptanceRecords(data, acceptedAt);
+
+    return db.transaction(async (tx) => {
+      const [user] = await tx.insert(users).values({
+        username: data.username,
+        email: data.email,
+        passwordHash: data.passwordHash,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        phoneNumber: data.phoneNumber ?? null,
+        nationality: data.nationality ?? null,
+        profilePicture: data.profilePicture ?? null,
+        firebaseUid: data.firebaseUid ?? null,
+        role: data.role ?? "customer",
+        isEmailVerified: data.isEmailVerified ?? false,
+        acceptTerms: data.acceptTerms,
+        acceptPrivacy: data.acceptPrivacy,
+        marketingConsent: data.marketingConsent ?? false,
+      }).returning();
+
+      if (consentRecords.length > 0) {
+        await tx.insert(userConsentRecords).values(
+          consentRecords.map((record) => ({ ...record, userId: user.id })),
+        );
+      }
+
+      return user;
+    });
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
