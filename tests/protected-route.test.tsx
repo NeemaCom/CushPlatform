@@ -1,11 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthRoute } from "@/App";
 
-const useAuthMock = vi.hoisted(() => vi.fn());
+const mocks = vi.hoisted(() => ({
+  useAuth: vi.fn(),
+  setLocation: vi.fn(),
+}));
 
 vi.mock("@/hooks/useAuth", () => ({
-  useAuth: useAuthMock,
+  useAuth: mocks.useAuth,
+}));
+
+vi.mock("wouter", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("wouter")>()),
+  useLocation: () => ["/dashboard", mocks.setLocation],
 }));
 
 vi.mock("@/pages/Login", () => ({
@@ -18,7 +26,7 @@ describe("AuthRoute", () => {
   });
 
   it("keeps the protected content behind a loading state", () => {
-    useAuthMock.mockReturnValue({ user: undefined, isLoading: true });
+    mocks.useAuth.mockReturnValue({ user: undefined, isLoading: true });
 
     render(
       <AuthRoute>
@@ -32,7 +40,7 @@ describe("AuthRoute", () => {
   });
 
   it("renders protected content for an authenticated session", () => {
-    useAuthMock.mockReturnValue({
+    mocks.useAuth.mockReturnValue({
       user: { id: 1, email: "user@example.com" },
       isLoading: false,
     });
@@ -47,8 +55,8 @@ describe("AuthRoute", () => {
     expect(screen.queryByTestId("login-screen")).not.toBeInTheDocument();
   });
 
-  it("returns unauthenticated visitors to the sign-in screen", () => {
-    useAuthMock.mockReturnValue({ user: null, isLoading: false });
+  it("returns unauthenticated visitors to the sign-in screen", async () => {
+    mocks.useAuth.mockReturnValue({ user: null, isLoading: false });
 
     render(
       <AuthRoute>
@@ -58,5 +66,6 @@ describe("AuthRoute", () => {
 
     expect(screen.getByTestId("login-screen")).toBeInTheDocument();
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/login"));
   });
 });

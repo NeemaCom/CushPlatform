@@ -157,6 +157,32 @@ describe("Firebase session sync", () => {
     expect(second.headers.get("set-cookie")?.split(";")[0]).not.toBe(firstCookie);
   });
 
+  it("logs out successfully, expires the cookie, and rejects the old session", async () => {
+    mocks.getByUid.mockResolvedValueOnce(undefined);
+    const signIn = await sync({
+      idToken: "valid",
+      acceptTerms: true,
+      acceptPrivacy: true,
+    });
+    expect(signIn.status).toBe(200);
+    const cookie = signIn.headers.get("set-cookie")?.split(";")[0];
+    expect(cookie).toContain("connect.sid=");
+
+    const logout = await fetch(`${baseUrl}/api/auth/logout`, {
+      method: "POST",
+      headers: { Cookie: cookie! },
+    });
+    expect(logout.status).toBe(200);
+    expect(await logout.json()).toEqual({ message: "Logged out successfully" });
+    expect(logout.headers.get("set-cookie")).toMatch(/connect\.sid=;.*Expires=Thu, 01 Jan 1970/i);
+
+    const currentUser = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Cookie: cookie! },
+    });
+    expect(currentUser.status).toBe(401);
+    expect(await currentUser.json()).toEqual({ error: "Authentication required" });
+  });
+
   it("does not create a fallback account or session when storage fails", async () => {
     mocks.getByUid.mockRejectedValue(new Error("database unavailable"));
     const res = await sync({ idToken: "valid" });
