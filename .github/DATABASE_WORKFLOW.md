@@ -25,7 +25,7 @@ the certificate to a private temporary file, exports only the file path, and
 removes the file at the end of the job. Missing or invalid CA material stops the
 job before any database connection or schema push.
 
-Both the preflight and Drizzle explicitly use the supplied CA with
+The connection checks and Drizzle explicitly use the supplied CA with
 `sslmode=verify-full`. This checks the certificate chain **and** the hostname.
 Do not resolve TLS failures using `no-verify` or
 `NODE_TLS_REJECT_UNAUTHORIZED=0`.
@@ -39,7 +39,12 @@ Do not resolve TLS failures using `no-verify` or
    policy roles and expressions using PostgreSQL system catalogs only. It reads
    no customer records. Undeclared live tables are reported, not treated as
    deletion recommendations. A mismatch is diagnostic only; it never changes the database.
-3. Before a real push, verify the target, review the schema changes, and take an
+3. The separate users-data preflight runs in a read-only transaction and writes
+   aggregate counts only: null/empty required account fields, false consent
+   flags, and exact or case/whitespace-normalized duplicate username/email
+   groups and extra rows. It never outputs identifiers, hashes, names, or other
+   individual account values.
+4. Before a real push, verify the target, review the schema changes, and take an
    appropriate backup. Only then uncheck **diagnostics_only** and enter
    `APPLY_SCHEMA_CHANGES`. `drizzle-kit push --force` can alter or remove data.
    The local `npm run db:push` command uses the same guard and requires
