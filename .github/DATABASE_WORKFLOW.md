@@ -1,8 +1,10 @@
 # Database workflow: verified TLS
 
 The **Push Database Schema** workflow validates connectivity before running
-Drizzle. Choose **diagnostics_only** in the manual dispatch form to perform only
-the read-only check. Leave it selected when investigating connection problems.
+Drizzle. **diagnostics_only** defaults to checked, so a manual run is read-only
+unless explicitly switched off. A real push also requires entering
+`APPLY_SCHEMA_CHANGES` in **confirm_schema_push**. Passport migrations and schema
+pushes share one concurrency lock so they cannot modify the database at once.
 
 ## GitHub Actions secrets
 
@@ -32,13 +34,16 @@ Do not resolve TLS failures using `no-verify` or
 
 1. Run **Push Database Schema** on `main` with **diagnostics_only checked**.
 2. Confirm the CA setup and read-only query succeed. The schema-push step must be
-   skipped. The read-only table comparison then reports table and column names
-   from the code-declared schemas using PostgreSQL system catalogs only. It
-   reads no customer records. Undeclared live tables are not deletion
-   recommendations, and matching names do not prove type or constraint compatibility.
+   skipped. The read-only table comparison reports table and column names plus
+   row-level-security flags from the code-declared schemas using PostgreSQL
+   system catalogs only. It reads no customer records. It does not compare types,
+   defaults, constraints, indexes, or policy expressions. Undeclared live tables
+   are not deletion recommendations; matching names do not prove full compatibility.
 3. Before a real push, verify the target, review the schema changes, and take an
-   appropriate backup. Only then run with **diagnostics_only unchecked**.
-   `drizzle-kit push --force` can alter or remove data.
+   appropriate backup. Only then uncheck **diagnostics_only** and enter
+   `APPLY_SCHEMA_CHANGES`. `drizzle-kit push --force` can alter or remove data.
+   The local `npm run db:push` command uses the same guard and requires
+   `CONFIRM_DB_SCHEMA_PUSH=APPLY_SCHEMA_CHANGES`.
 
 Diagnostic messages redact connection URIs and credentials. Never copy secret
 values into issues or chat.
@@ -63,6 +68,10 @@ a reviewed migration or an attended terminal session with a current backup.
 Do not pipe `yes`, auto-select the first option, or emulate a terminal in CI.
 If a push fails after execution has begun, inspect for partial changes before
 retrying; the guard cannot roll them back.
+
+The `cush_sessions` table is managed by the server's session-store migration,
+not Drizzle. Other undeclared tables such as `cush` and `session` must remain
+untouched until their ownership and purpose are verified.
 
 ## Additive passport tables migration
 
