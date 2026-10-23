@@ -256,13 +256,34 @@ test("reports extra policies and changed constraint or index definitions", () =>
   });
   const result = compareTables([declared], [live]);
   assert.deepEqual(result.constraintDifferences[0].different.map((item) => item.key), [
-    "u:records_id_unique",
+    "u:id",
   ]);
   assert.deepEqual(result.indexDifferences[0].different.map((item) => item.key), [
     "records_id_idx",
   ]);
   assert.deepEqual(result.policyDifferences[0].extra, ["unexpected_policy"]);
   assert.equal(result.declaredSchemaMatches, false);
+});
+
+test("distinguishes a constraint-name difference from a missing constraint", () => {
+  const expectedConstraint = {
+    type: "u",
+    name: "users_firebase_uid_unique",
+    columns: ["firebase_uid"],
+    nullsNotDistinct: false,
+  };
+  const liveConstraint = {
+    ...expectedConstraint,
+    name: "users_firebase_uid_key",
+  };
+  const result = compareTables(
+    [table("users", [], { constraints: [expectedConstraint] })],
+    [table("users", [], { constraints: [liveConstraint] })],
+  );
+  assert.deepEqual(result.constraintDifferences[0].missing, []);
+  assert.deepEqual(result.constraintDifferences[0].extra, []);
+  assert.equal(result.constraintDifferences[0].different[0].expected.name, "users_firebase_uid_unique");
+  assert.equal(result.constraintDifferences[0].different[0].actual.name, "users_firebase_uid_key");
 });
 
 test("normalizes PostgreSQL-rendered expressions without folding string literal case", () => {
