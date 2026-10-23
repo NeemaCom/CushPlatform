@@ -16,6 +16,19 @@ export interface AuthenticatedRequest extends Request {
   userId?: number;
 }
 
+export function clearAuthSessionCookie(req: Request, res: Response): void {
+  const cookie = req.session.cookie;
+  res.clearCookie("connect.sid", {
+    path: cookie?.path || "/",
+    httpOnly: cookie?.httpOnly ?? true,
+    ...(cookie?.domain ? { domain: cookie.domain } : {}),
+    ...(cookie?.secure !== undefined
+      ? { secure: cookie.secure === true || (cookie.secure === "auto" && req.secure) }
+      : {}),
+    ...(cookie?.sameSite !== undefined ? { sameSite: cookie.sameSite } : {}),
+  });
+}
+
 // Authentication middleware
 export async function isAuthenticated(
   req: AuthenticatedRequest,
@@ -26,6 +39,7 @@ export async function isAuthenticated(
     const userId = req.session.userId;
     
     if (!userId) {
+      clearAuthSessionCookie(req, res);
       SecurityLogger.logAuthEvent(
         'unauthorized_access_attempt',
         null,
@@ -44,6 +58,7 @@ export async function isAuthenticated(
     const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 
     if (now - lastActivity > SESSION_TIMEOUT) {
+      clearAuthSessionCookie(req, res);
       req.session.destroy((err) => {
         if (err) {
           console.error('Session destruction error:', err);
@@ -75,6 +90,7 @@ export async function isAuthenticated(
     }
 
     if (!user) {
+      clearAuthSessionCookie(req, res);
       req.session.destroy((err) => {
         if (err) {
           console.error('Session destruction error:', err);

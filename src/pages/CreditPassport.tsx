@@ -708,8 +708,9 @@ export default function CreditPassport() {
 
   async function handleLogout() {
     await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+    await qc.cancelQueries();
     await qc.clear();
-    setLocation("/");
+    setLocation("/login");
   }
 
   if (isLoading) {

@@ -1,4 +1,5 @@
 import { Router, Route, Switch, useLocation } from 'wouter'
+import { useEffect } from 'react'
 import { QueryProvider } from '@/lib/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -14,6 +15,10 @@ import { useAuth } from '@/hooks/useAuth'
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const [, setLocation] = useLocation()
+
+  useEffect(() => {
+    if (!isLoading && !user) setLocation('/login')
+  }, [isLoading, user, setLocation])
 
   if (isLoading) {
     return (

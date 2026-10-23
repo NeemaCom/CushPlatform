@@ -25,6 +25,7 @@ import {
 } from "./security";
 import {
   isAuthenticated,
+  clearAuthSessionCookie,
   createSafeUser,
   type AuthenticatedRequest,
 } from "./auth";
@@ -233,14 +234,14 @@ export async function registerRoutes(
   // ── Logout ────────────────────────────────────────────────────────────────
   app.post("/api/auth/logout", async (req: AuthenticatedRequest, res) => {
     const userId = req.session.userId;
-    res.clearCookie("connect.sid", {
-      path: "/", httpOnly: true,
-      secure: crossSiteCookies,
-      sameSite: crossSiteCookies ? "none" : "strict",
-    });
-    req.session.destroy(() => {
+    clearAuthSessionCookie(req, res);
+    req.session.destroy((error) => {
+      if (error) {
+        console.error("[Logout Session Destruction Error]:", error);
+        return res.status(500).json({ error: "Failed to log out" });
+      }
       SecurityLogger.logAuthEvent("logout_success", userId || null, true, req.ip, req.get("User-Agent"));
-      res.json({ message: "Logged out successfully" });
+      return res.json({ message: "Logged out successfully" });
     });
   });
 
