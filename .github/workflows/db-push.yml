@@ -4,13 +4,22 @@ on:
   workflow_dispatch:
     inputs:
       diagnostics_only:
-        description: 'Only check connectivity; do not push database schema'
+        description: 'Run read-only diagnostics only; do not push database schema'
         type: boolean
-        default: false
+        default: true
       audit_all_public_tables:
         description: 'Read-only access audit of every table in the public schema'
         type: boolean
-        default: false
+        default: true
+      confirm_schema_push:
+        description: 'For a real push, enter APPLY_SCHEMA_CHANGES; diagnostics do not require it'
+        type: string
+        required: true
+        default: 'NO'
+
+concurrency:
+  group: supabase-schema-changes
+  cancel-in-progress: false
 
 jobs:
   db-push:
@@ -19,6 +28,16 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Require explicit confirmation for a schema push
+        if: ${{ !inputs.diagnostics_only }}
+        env:
+          CONFIRM_DB_SCHEMA_PUSH: ${{ inputs.confirm_schema_push }}
+        run: |
+          if [ "$CONFIRM_DB_SCHEMA_PUSH" != "APPLY_SCHEMA_CHANGES" ]; then
+            echo "::error::Schema push blocked. Set confirm_schema_push to APPLY_SCHEMA_CHANGES after reviewing the target and backup."
+            exit 1
+          fi
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -48,9 +67,10 @@ jobs:
         if: ${{ !inputs.diagnostics_only }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          CONFIRM_DB_SCHEMA_PUSH: ${{ inputs.confirm_schema_push }}
         run: node scripts/push-db-schema.mjs
 
-      - name: Compare table names (read-only)
+      - name: Compare table names and RLS flags (read-only)
         if: ${{ inputs.diagnostics_only }}
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}

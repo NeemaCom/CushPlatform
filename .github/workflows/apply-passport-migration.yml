@@ -9,7 +9,7 @@ on:
         type: string
 
 concurrency:
-  group: passport-tables-migration
+  group: supabase-schema-changes
   cancel-in-progress: false
 
 jobs:

@@ -1,17 +1,18 @@
 import { pathToFileURL } from "node:url";
-import { is } from "drizzle-orm";
-import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
+import { generateDrizzleJson } from "drizzle-kit/api";
 import { tsImport } from "tsx/esm/api";
 import { createRedactor, describeErrors, parseDatabaseUrl } from "./check-db-connection.mjs";
 
 export async function loadExpectedTables() {
   const exports = await tsImport("../shared/schema.ts", import.meta.url);
-  const tables = Object.values(exports).filter((value) => is(value, PgTable)).map((table) => {
-    const config = getTableConfig(table);
+  const snapshot = generateDrizzleJson(exports);
+  const tables = Object.entries(snapshot.tables).map(([qualifiedName, table]) => {
+    const separator = qualifiedName.indexOf(".");
     return {
-      schema: config.schema ?? "public",
-      name: config.name,
-      columns: config.columns.map((column) => column.name).sort(),
+      schema: separator === -1 ? "public" : qualifiedName.slice(0, separator),
+      name: separator === -1 ? qualifiedName : qualifiedName.slice(separator + 1),
+      columns: Object.values(table.columns).map((column) => column.name).sort(),
+      rlsEnabled: table.isRLSEnabled,
     };
   });
   if (!tables.length) throw new Error("No expected tables were found in the code schema.");
@@ -33,6 +34,13 @@ export function compareTables(expected, live) {
     return missingColumns.length || extraColumns.length
       ? [{ table: label(table), missingColumns, extraColumns }] : [];
   }).sort((a, b) => a.table.localeCompare(b.table));
+  const rlsDifferences = shared.flatMap((table) => {
+    const actual = liveMap.get(key(table));
+    return typeof table.rlsEnabled === "boolean" && typeof actual.rlsEnabled === "boolean"
+      && table.rlsEnabled !== actual.rlsEnabled
+      ? [{ table: label(table), expected: table.rlsEnabled, actual: actual.rlsEnabled }]
+      : [];
+  }).sort((a, b) => a.table.localeCompare(b.table));
   return {
     expectedTables: expected.map(label).sort(),
     liveTables: live.map(label).sort(),
@@ -40,8 +48,9 @@ export function compareTables(expected, live) {
     missingTables,
     notDeclaredInCode,
     columnDifferences,
+    rlsDifferences,
     possibleCreateRenameConflict: missingTables.length > 0 && notDeclaredInCode.length > 0,
-    scope: "Table and column names only, in code-declared schemas. Not a type, constraint, index, or full schema validation. Undeclared tables are not deletion recommendations.",
+    scope: "Table names, column names, and row-level-security flags only, in code-declared schemas. Not a type, default, constraint, index, policy-expression, or full schema validation. Undeclared tables are not deletion recommendations.",
   };
 }
 
@@ -87,7 +96,8 @@ export async function inspectDatabaseTables({
     await client.query("BEGIN READ ONLY");
     // System catalog metadata only. No application table rows, counts, or secrets.
     const result = await client.query(`
-      SELECT n.nspname AS schema, c.relname AS name, a.attname AS column_name
+      SELECT n.nspname AS schema, c.relname AS name,
+        c.relrowsecurity AS rls_enabled, a.attname AS column_name
       FROM pg_catalog.pg_class c
       JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
       LEFT JOIN pg_catalog.pg_attribute a
@@ -100,7 +110,14 @@ export async function inspectDatabaseTables({
     const tables = new Map();
     for (const row of result.rows) {
       const key = JSON.stringify([row.schema, row.name]);
-      if (!tables.has(key)) tables.set(key, { schema: row.schema, name: row.name, columns: [] });
+       if (!tables.has(key)) {
+         tables.set(key, {
+           schema: row.schema,
+           name: row.name,
+           columns: [],
+           rlsEnabled: row.rls_enabled,
+         });
+       }
       if (row.column_name !== null) tables.get(key).columns.push(row.column_name);
     }
     report = compareTables(expected, [...tables.values()]);
