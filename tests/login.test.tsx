@@ -80,7 +80,7 @@ function submitSignUpForm() {
   fireEvent.click(getSignUpSubmitButton());
 }
 
-function fillSignUpForm() {
+function fillSignUpForm(includeConsent = true) {
   fireEvent.change(screen.getByLabelText("First Name"), {
     target: { value: "Test" },
   });
@@ -93,6 +93,10 @@ function fillSignUpForm() {
   fireEvent.change(screen.getByLabelText("Password"), {
     target: { value: "ValidPass123!" },
   });
+  if (includeConsent) {
+    fireEvent.click(screen.getByRole("checkbox", { name: /Terms of Service/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Privacy Policy/ }));
+  }
 }
 
 describe("Login", () => {
@@ -292,7 +296,13 @@ describe("Login", () => {
       expect.objectContaining({ method: "POST", credentials: "include" }),
     );
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual(
-      { idToken: "verified-id-token", firstName: "Test", lastName: "User" },
+      {
+        idToken: "verified-id-token",
+        firstName: "Test",
+        lastName: "User",
+        acceptTerms: true,
+        acceptPrivacy: true,
+      },
     );
     expect(mocks.toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: "Account created!" }),
@@ -336,6 +346,59 @@ describe("Login", () => {
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.setLocation).not.toHaveBeenCalled();
     expect(getSignUpSubmitButton()).toBeEnabled();
+  });
+
+  it("requires both agreements before creating an email account", async () => {
+    renderLogin();
+    openSignUpForm();
+    fillSignUpForm(false);
+    submitSignUpForm();
+
+    expect(mocks.createUserWithEmailAndPassword).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Consent required",
+        description: expect.stringContaining("accept the Terms of Service and Privacy Policy"),
+        variant: "destructive",
+      }),
+    );
+  });
+
+  it("requires both agreements before Google account creation", async () => {
+    renderLogin();
+    openSignUpForm();
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    expect(mocks.signInWithPopup).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Consent required",
+        variant: "destructive",
+      }),
+    );
+  });
+
+  it("sends consent for new Google accounts when using the create-account tab", async () => {
+    mocks.signInWithPopup.mockResolvedValue({ user: firebaseUser });
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(200, { success: true, user: { id: 1 }, isNewUser: true }) as Response,
+    );
+
+    renderLogin();
+    openSignUpForm();
+    fireEvent.click(screen.getByRole("checkbox", { name: /Terms of Service/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Privacy Policy/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual({
+      idToken: "verified-id-token",
+      acceptTerms: true,
+      acceptPrivacy: true,
+    });
   });
 
   it("does not redirect when account creation succeeds but session sync fails", async () => {

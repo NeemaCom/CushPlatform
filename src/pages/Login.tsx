@@ -40,7 +40,18 @@ export default function Login() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
+  const [consent, setConsent] = useState({ terms: false, privacy: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
+
+  function hasRequiredConsent() {
+    if (consent.terms && consent.privacy) return true
+    toast({
+      title: 'Consent required',
+      description: 'Please accept the Terms of Service and Privacy Policy to create an account.',
+      variant: 'destructive',
+    })
+    return false
+  }
 
   async function afterLogin() {
     await qc.invalidateQueries({ queryKey: ['/api/auth/me'] })
@@ -48,11 +59,16 @@ export default function Login() {
   }
 
   async function handleGoogle() {
+    if (tab === 'signup' && !hasRequiredConsent()) return
+
     setLoading(true)
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
-      await firebaseSync(fbUser)
+      await firebaseSync(
+        fbUser,
+        tab === 'signup' ? { acceptTerms: true, acceptPrivacy: true } : undefined,
+      )
       await afterLogin()
     } catch (err: any) {
       toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
@@ -83,12 +99,16 @@ export default function Login() {
 
   async function handleEmailSignUp(e: React.FormEvent) {
     e.preventDefault()
+    if (!hasRequiredConsent()) return
+
     setLoading(true)
     try {
       const result = await createUserWithEmailAndPassword(auth, form.email, form.password)
       await firebaseSync(result.user, {
         firstName: form.firstName,
         lastName: form.lastName,
+        acceptTerms: true,
+        acceptPrivacy: true,
       })
       toast({ title: 'Account created!', description: 'Welcome to Cush Passport.' })
       await afterLogin()
@@ -162,6 +182,46 @@ export default function Login() {
                 or
               </span>
             </div>
+
+            {tab === 'signup' && (
+              <fieldset className="space-y-3 rounded-md border border-slate-200 p-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                <legend className="sr-only">Required account agreements</legend>
+                <label htmlFor="accept-terms" className="flex cursor-pointer items-start gap-2 leading-relaxed">
+                  <input
+                    id="accept-terms"
+                    type="checkbox"
+                    required
+                    checked={consent.terms}
+                    disabled={loading}
+                    onChange={(e) => setConsent({ ...consent, terms: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                  />
+                  <span>
+                    I agree to the{' '}
+                    <a href="/terms-of-service" target="_blank" rel="noreferrer" className="underline hover:text-blue-600">
+                      Terms of Service
+                    </a>.
+                  </span>
+                </label>
+                <label htmlFor="accept-privacy" className="flex cursor-pointer items-start gap-2 leading-relaxed">
+                  <input
+                    id="accept-privacy"
+                    type="checkbox"
+                    required
+                    checked={consent.privacy}
+                    disabled={loading}
+                    onChange={(e) => setConsent({ ...consent, privacy: e.target.checked })}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-blue-600"
+                  />
+                  <span>
+                    I have read and agree to the{' '}
+                    <a href="/privacy-policy" target="_blank" rel="noreferrer" className="underline hover:text-blue-600">
+                      Privacy Policy
+                    </a>.
+                  </span>
+                </label>
+              </fieldset>
+            )}
 
             {tab === 'signin' ? (
               <form onSubmit={handleEmailSignIn} className="space-y-3">
