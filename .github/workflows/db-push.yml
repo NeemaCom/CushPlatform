@@ -51,7 +51,7 @@ jobs:
         run: npm ci
 
       - name: Verify diagnostic credential redaction
-        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/push-db-schema.test.mjs scripts/compare-db-tables.test.mjs scripts/audit-db-access.test.mjs
+        run: npx --no-install vitest run scripts/check-db-connection.test.mjs scripts/prepare-db-ca.test.mjs scripts/push-db-schema.test.mjs scripts/compare-db-tables.test.mjs scripts/audit-db-access.test.mjs scripts/users-data-preflight.test.mjs
 
       - name: Prepare trusted Supabase CA certificate
         env:
@@ -75,6 +75,12 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: node scripts/compare-db-tables.mjs
+
+      - name: Check users data constraints (read-only aggregate)
+        if: ${{ inputs.diagnostics_only }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/users-data-preflight.mjs
 
       - name: Audit database role access (read-only)
         if: ${{ inputs.diagnostics_only }}
