@@ -10,7 +10,9 @@ const expected = [
 
 test("loads current schema rather than a hardcoded table inventory", async () => {
   const tables = await loadExpectedTables();
-  assert.ok(tables.some((table) => table.name === "users" && table.columns.includes("firebase_uid")));
+  const users = tables.find((table) => table.name === "users");
+  assert.ok(users && users.columns.includes("firebase_uid"));
+  assert.equal(users.rlsEnabled, true);
   assert.equal(new Set(tables.map((table) => `${table.schema}.${table.name}`)).size, tables.length);
 });
 
@@ -36,6 +38,17 @@ test("matching names do not claim complete schema compatibility", () => {
   assert.deepEqual(result.columnDifferences, []);
   assert.equal(result.possibleCreateRenameConflict, false);
   assert.match(result.scope, /Not a type/);
+});
+
+test("reports row-level-security mismatches without treating them as table renames", () => {
+  const result = compareTables(
+    [{ schema: "public", name: "users", columns: ["id"], rlsEnabled: true }],
+    [{ schema: "public", name: "users", columns: ["id"], rlsEnabled: false }],
+  );
+  assert.deepEqual(result.rlsDifferences, [
+    { table: "public.users", expected: true, actual: false },
+  ]);
+  assert.equal(result.possibleCreateRenameConflict, false);
 });
 
 function fixture(options = {}) {
@@ -74,6 +87,7 @@ test("reads catalogs in a read-only transaction with verified TLS and cleans up"
   assert.equal(f.queries[0].sql, "BEGIN READ ONLY");
   assert.equal(f.queries[2].sql, "ROLLBACK");
   assert.match(f.queries[1].sql, /pg_catalog.pg_attribute/);
+  assert.match(f.queries[1].sql, /relrowsecurity/);
   assert.deepEqual(f.queries[1].params, [["public"]]);
   assert.ok(!f.queries.some(({ sql }) => /\b(INSERT|UPDATE|DELETE|CREATE|ALTER|DROP)\b/.test(sql)));
   const url = new URL(f.config().connectionString);

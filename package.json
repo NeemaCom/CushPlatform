@@ -10,7 +10,7 @@
     "check": "tsc",
     "lint": "tsc --noEmit --incremental false",
     "test": "vitest run",
-    "db:push": "drizzle-kit push --force"
+    "db:push": "node scripts/push-db-schema.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.52.0",

@@ -7,6 +7,7 @@ import { createRedactor, parseDatabaseUrl } from "./check-db-connection.mjs";
 
 const require = createRequire(import.meta.url);
 const stripAnsi = (text) => text.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, "");
+export const PUSH_CONFIRMATION = "APPLY_SCHEMA_CHANGES";
 
 export function resolveDrizzleCli() {
   // bin.cjs is not a package export; resolve the public entry point first.
@@ -100,6 +101,18 @@ export async function pushDatabaseSchema({
   return 0;
 }
 
+export async function runPushCommand({
+  confirmation = process.env.CONFIRM_DB_SCHEMA_PUSH,
+  logger = console,
+  ...options
+} = {}) {
+  if (confirmation !== PUSH_CONFIRMATION) {
+    logger.error(`Schema push blocked. Set CONFIRM_DB_SCHEMA_PUSH=${PUSH_CONFIRMATION} only after reviewing the target and backup.`);
+    return 1;
+  }
+  return pushDatabaseSchema({ ...options, logger });
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  process.exitCode = await pushDatabaseSchema();
+  process.exitCode = await runPushCommand();
 }

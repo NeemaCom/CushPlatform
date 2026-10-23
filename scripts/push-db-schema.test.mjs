@@ -2,7 +2,13 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { test } from "vitest";
-import { assessPush, pushDatabaseSchema, resolveDrizzleCli } from "./push-db-schema.mjs";
+import {
+  assessPush,
+  pushDatabaseSchema,
+  PUSH_CONFIRMATION,
+  resolveDrizzleCli,
+  runPushCommand,
+} from "./push-db-schema.mjs";
 
 const uri = "postgresql://synthetic_user:synthetic_password@invalid.example/db";
 
@@ -82,6 +88,34 @@ test("validates configuration before attempting a child process", async () => {
   const result = await run('console.log("SHOULD_NOT_RUN")', { connectionString: "" });
   assert.equal(result.code, 1);
   assert.ok(!result.output.includes("SHOULD_NOT_RUN"));
+});
+
+test("blocks schema changes unless the exact explicit confirmation is supplied", async () => {
+  const lines = [];
+  const code = await runPushCommand({
+    confirmation: "NO",
+    connectionString: uri,
+    command: process.execPath,
+    args: ["-e", 'console.log("[i] No changes detected")'],
+    logger: { log: (line) => lines.push(line), error: (line) => lines.push(line) },
+  });
+  assert.equal(PUSH_CONFIRMATION, "APPLY_SCHEMA_CHANGES");
+  assert.equal(code, 1);
+  assert.match(lines.join("\n"), /Schema push blocked/);
+  assert.doesNotMatch(lines.join("\n"), /No changes detected/);
+});
+
+test("explicit confirmation still requires Drizzle's success marker", async () => {
+  const lines = [];
+  const code = await runPushCommand({
+    confirmation: PUSH_CONFIRMATION,
+    connectionString: uri,
+    command: process.execPath,
+    args: ["-e", 'console.log("[i] No changes detected")'],
+    logger: { log: (line) => lines.push(line), error: (line) => lines.push(line) },
+  });
+  assert.equal(code, 0);
+  assert.match(lines.join("\n"), /Schema push verified/);
 });
 
 test("signals always override a completion marker", () => {
