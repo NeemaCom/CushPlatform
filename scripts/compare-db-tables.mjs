@@ -123,18 +123,31 @@ function expectedConstraints(table) {
 function normalizeConstraint(constraint) {
   const type = constraint.type;
   const primary = type === "p";
+  const columns = type === "c" ? [] : [...(constraint.columns ?? [])];
+  const referencedSchema = type === "f" ? constraint.referencedSchema ?? null : null;
+  const referencedTable = type === "f" ? constraint.referencedTable ?? null : null;
+  const referencedColumns = type === "f" ? [...(constraint.referencedColumns ?? [])] : [];
+  const onDelete = type === "f" ? (constraint.onDelete ?? "no action").toLowerCase() : null;
+  const onUpdate = type === "f" ? (constraint.onUpdate ?? "no action").toLowerCase() : null;
+  const expression = type === "c" ? normalizeSqlExpression(constraint.expression) : null;
+  const nullsNotDistinct = type === "u" ? Boolean(constraint.nullsNotDistinct) : null;
+  const key = type === "p" || type === "u"
+    ? `${type}:${columns.join(",")}`
+    : type === "f"
+      ? `f:${columns.join(",")}->${referencedSchema}.${referencedTable}(${referencedColumns.join(",")})/${onDelete}/${onUpdate}`
+      : `c:${expression}`;
   return {
-    key: primary ? "p:primary-key" : `${type}:${constraint.name}`,
+    key,
     name: primary ? null : constraint.name,
     type,
-    columns: type === "c" ? [] : [...(constraint.columns ?? [])],
-    referencedSchema: type === "f" ? constraint.referencedSchema ?? null : null,
-    referencedTable: type === "f" ? constraint.referencedTable ?? null : null,
-    referencedColumns: type === "f" ? [...(constraint.referencedColumns ?? [])] : [],
-    onDelete: type === "f" ? (constraint.onDelete ?? "no action").toLowerCase() : null,
-    onUpdate: type === "f" ? (constraint.onUpdate ?? "no action").toLowerCase() : null,
-    expression: type === "c" ? normalizeSqlExpression(constraint.expression) : null,
-    nullsNotDistinct: type === "u" ? Boolean(constraint.nullsNotDistinct) : null,
+    columns,
+    referencedSchema,
+    referencedTable,
+    referencedColumns,
+    onDelete,
+    onUpdate,
+    expression,
+    nullsNotDistinct,
     validated: constraint.validated !== false,
   };
 }
