@@ -1,9 +1,11 @@
 import express from "express";
+import session from "express-session";
 import bcrypt from "bcrypt";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
+  getUser: vi.fn(),
   getByUid: vi.fn(),
   getByEmail: vi.fn(),
   getByEmailForLogin: vi.fn(),
@@ -18,6 +20,7 @@ vi.mock("../server/firebase-auth", () => ({
 }));
 vi.mock("../server/storage", () => ({
   storage: {
+    getUser: mocks.getUser,
     getUserByFirebaseUid: mocks.getByUid,
     getUserByEmailCaseInsensitive: mocks.getByEmail,
     getUserByEmail: mocks.getByEmailForLogin,
@@ -56,6 +59,7 @@ describe("Firebase session sync", () => {
     vi.clearAllMocks();
     process.env.SESSION_SECRET = "test-only-unique-secret-with-32-plus-characters";
     mocks.verify.mockResolvedValue(identity);
+    mocks.getUser.mockResolvedValue(user);
     mocks.getByUid.mockResolvedValue(user);
     mocks.getByEmail.mockResolvedValue(undefined);
     mocks.getByEmailForLogin.mockResolvedValue(undefined);
@@ -64,7 +68,7 @@ describe("Firebase session sync", () => {
     mocks.createUser.mockResolvedValue(user);
     const app = express();
     app.use(express.json());
-    server = await registerRoutes(app);
+    server = await registerRoutes(app, async () => new session.MemoryStore());
     await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     const address = server.address();
     if (!address || typeof address === "string") throw new Error("Expected TCP server");
@@ -101,21 +105,47 @@ describe("Firebase session sync", () => {
   it("refuses to link an existing account by matching email alone", async () => {
     mocks.getByUid.mockResolvedValue(undefined);
     mocks.getByEmail.mockResolvedValue(user);
-    const res = await sync({ idToken: "valid" });
+    const res = await sync({ idToken: "valid", acceptTerms: true, acceptPrivacy: true });
     expect(res.status).toBe(409);
+    expect(mocks.createUser).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it.each([
+    ["both agreements missing", {}],
+    ["Terms missing", { acceptPrivacy: true }],
+    ["Privacy Policy missing", { acceptTerms: true }],
+  ])("requires both agreements for a new Firebase account (%s)", async (_name, consent) => {
+    mocks.getByUid.mockResolvedValue(undefined);
+    const res = await sync({ idToken: "valid", ...consent });
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: "Please accept the Terms of Service and Privacy Policy to create an account.",
+    });
     expect(mocks.createUser).not.toHaveBeenCalled();
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 
   it("creates a UID-bound account and rotates session IDs on sign-in", async () => {
     mocks.getByUid.mockResolvedValueOnce(undefined);
-    const first = await sync({ idToken: "valid" });
+    const first = await sync({ idToken: "valid", acceptTerms: true, acceptPrivacy: true });
     expect(first.status).toBe(200);
     expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       firebaseUid: "trusted-uid", email: "owner@example.com", isEmailVerified: true,
+      acceptTerms: true, acceptPrivacy: true,
     }));
     const firstCookie = first.headers.get("set-cookie")?.split(";")[0];
     expect(firstCookie).toContain("connect.sid=");
+
+    const authenticatedRequest = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Cookie: firstCookie! },
+    });
+    expect(authenticatedRequest.status).toBe(200);
+    expect(await authenticatedRequest.json()).toMatchObject({
+      id: user.id,
+      email: user.email,
+    });
 
     const second = await sync({ idToken: "valid" }, firstCookie);
     expect(second.status).toBe(200);
@@ -154,7 +184,7 @@ describe("Firebase session sync", () => {
 
   it("recovers a Firebase signup when the initial database sync did not complete", async () => {
     mocks.getByUid.mockResolvedValue(undefined);
-    const res = await sync({ idToken: "valid" });
+    const res = await sync({ idToken: "valid", acceptTerms: true, acceptPrivacy: true });
     expect(res.status).toBe(200);
     expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       firebaseUid: "trusted-uid",

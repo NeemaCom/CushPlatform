@@ -10,7 +10,7 @@ if (!process.env.DATABASE_URL && !process.env.PGHOST) {
 
 // Prefer the same DATABASE_URL that drizzle-kit push uses so the app reads the
 // schema created during the build. PG* remains a fallback when no URL is set.
-const pool = process.env.DATABASE_URL
+export const pgPool = process.env.DATABASE_URL
   ? new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
@@ -30,4 +30,4 @@ const pool = process.env.DATABASE_URL
       connectionTimeoutMillis: 10000,
     });
 
-export const db = drizzle(pool, { schema });
+export const db = drizzle(pgPool, { schema });

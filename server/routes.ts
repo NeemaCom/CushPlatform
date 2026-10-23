@@ -2,8 +2,10 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { randomBytes } from "crypto";
 import session from "express-session";
+import type { Store } from "express-session";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
+import { createPostgresSessionStore } from "./session-store";
 import { ensureFirebaseConfigured, verifyFirebaseIdentity } from "./firebase-auth";
 import {
   registerSchema,
@@ -37,13 +39,25 @@ async function createLoginSession(req: Request, user: Pick<User, "id" | "role">)
   await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
 }
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export async function registerRoutes(
+  app: Express,
+  sessionStoreFactory?: () => Promise<Store>,
+): Promise<Server> {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret || sessionSecret.length < 32 || sessionSecret === "your-super-secret-session-key-here") {
     throw new Error("SESSION_SECRET must be set to a unique, random value of at least 32 characters");
   }
   ensureFirebaseConfigured();
   const crossSiteCookies = process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SAME_SITE === "none";
+  const isProduction = process.env.NODE_ENV === "production";
+  const sessionStore = sessionStoreFactory
+    ? await sessionStoreFactory()
+    : isProduction
+      ? await createPostgresSessionStore()
+      : new session.MemoryStore();
+  if (!isProduction && process.env.NODE_ENV === "development") {
+    console.warn("[session] Using volatile in-memory sessions for local development only.");
+  }
 
   // ── Health checks ─────────────────────────────────────────────────────────
   app.get("/api/health", (_req, res) => res.json({ status: "healthy", uptime: process.uptime(), timestamp: new Date().toISOString() }));
@@ -58,6 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use(session({
     secret: sessionSecret,
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -92,6 +107,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { firstName, lastName } = req.body;
       let user = await storage.getUserByFirebaseUid(uid);
       if (!user) {
+        if (req.body.acceptTerms !== true || req.body.acceptPrivacy !== true) {
+          return res.status(400).json({
+            error: "Please accept the Terms of Service and Privacy Policy to create an account.",
+          });
+        }
         // Matching email alone does not prove ownership of a legacy account.
         if (await storage.getUserByEmailCaseInsensitive(email)) {
           return res.status(409).json({ error: "An account with this email already exists. Sign in using its original method." });
@@ -107,8 +127,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: typeof lastName === "string" ? lastName.trim().slice(0, 100) : nameParts.slice(1).join(" ").slice(0, 100),
           profilePicture: photoURL || null,
           isEmailVerified: emailVerified,
-          acceptTerms: req.body.acceptTerms === true,
-          acceptPrivacy: req.body.acceptPrivacy === true,
+          acceptTerms: true,
+          acceptPrivacy: true,
           role: "customer",
         });
         await createLoginSession(req, user);
