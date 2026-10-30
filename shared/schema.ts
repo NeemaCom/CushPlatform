@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, bigint, check, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, check, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -79,6 +79,36 @@ export const passports = pgTable("passports", {
   lastUpdated: timestamp("last_updated").defaultNow(),
   createdAt: timestamp("created_at").defaultNow(),
 }).enableRLS();
+
+// ─── Cush Score V2 Inputs and Policy ──────────────────────────────────────────
+
+export const cushAssessmentInputs = pgTable("cush_assessment_inputs", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  inputData: jsonb("input_data").$type<unknown>().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}).enableRLS();
+
+export const cushScorePolicyVersions = pgTable("cush_score_policy_versions", {
+  id: serial("id").primaryKey(),
+  version: integer("version").notNull(),
+  status: text("status").notNull().default("draft"),
+  configuration: jsonb("configuration").$type<unknown>().notNull(),
+  createdBy: integer("created_by").notNull().references(() => users.id),
+  approvedBy: integer("approved_by").references(() => users.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check("cush_score_policy_versions_status_check", sql`${table.status} in ('draft', 'active', 'archived')`),
+  versionUnique: unique("cush_score_policy_versions_version_unique").on(table.version),
+  statusIndex: index("cush_score_policy_versions_status_idx").on(table.status),
+  oneActivePolicy: uniqueIndex("cush_score_policy_versions_one_active_idx")
+    .on(table.status)
+    .where(sql`${table.status} = 'active'`),
+  oneDraftPolicy: uniqueIndex("cush_score_policy_versions_one_draft_idx")
+    .on(table.status)
+    .where(sql`${table.status} = 'draft'`),
+})).enableRLS();
 
 // ─── Financial Signals ────────────────────────────────────────────────────────
 
@@ -170,6 +200,158 @@ export const addEvidenceSchema = z.object({
 export const updatePassportModeSchema = z.object({
   mode: z.enum(["pre_arrival", "post_arrival"]),
 });
+
+const v2MonthSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Month must use YYYY-MM format.");
+const v2PositivePenceSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const v2NonNegativePenceSchema = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+const v2UuidSchema = z.string().uuid();
+
+export const v2AssessmentInputSchema = z.object({
+  selectedBaselineId: v2UuidSchema.nullable(),
+  availableFunds: z.array(z.object({
+    id: v2UuidSchema,
+    label: z.string().trim().min(1).max(100),
+    deduplicationKey: z.string().trim().min(1).max(120),
+    amountPence: v2PositivePenceSchema,
+    currencyCode: z.literal("GBP"),
+    accessible: z.boolean(),
+  }).strict()).max(100),
+  incomeHistory: z.array(z.object({
+    id: v2UuidSchema,
+    month: v2MonthSchema,
+    sourceId: z.string().trim().min(1).max(100),
+    category: z.enum(["salary", "self_employment", "freelance", "business", "scholarship", "family_support", "other"]),
+    amountPence: v2NonNegativePenceSchema,
+    recurring: z.boolean(),
+    variable: z.boolean(),
+  }).strict()).max(72),
+  cashFlowHistory: z.array(z.object({
+    id: v2UuidSchema,
+    month: v2MonthSchema,
+    eligibleRecurringIncomePence: v2NonNegativePenceSchema,
+    eligibleExpensesPence: v2NonNegativePenceSchema,
+    complete: z.boolean(),
+  }).strict()).max(12),
+  creditClassification: z.enum(["strong", "average", "poor", "thin_file", "no_history", "incomplete", "unavailable"]),
+}).strict().superRefine((value, context) => {
+  const fundKeys = new Set<string>();
+  for (const fund of value.availableFunds) {
+    const key = fund.deduplicationKey.toLowerCase();
+    if (fundKeys.has(key)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["availableFunds"], message: "Use a unique label for each funds source to avoid double counting." });
+      break;
+    }
+    fundKeys.add(key);
+  }
+  const cashFlowMonths = new Set<string>();
+  for (const row of value.cashFlowHistory) {
+    if (cashFlowMonths.has(row.month)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cashFlowHistory"], message: "Only one cash-flow record per month is allowed." });
+      break;
+    }
+    cashFlowMonths.add(row.month);
+  }
+  const incomeObservations = new Set<string>();
+  const incomeVariability = new Map<string, boolean>();
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  for (const row of value.incomeHistory) {
+    const key = `${row.sourceId.toLowerCase()}:${row.month}`;
+    if (row.month > currentMonth) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["incomeHistory"], message: "Income records cannot be in a future month." });
+      break;
+    }
+    if (incomeObservations.has(key)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["incomeHistory"], message: "Only one income record per source and month is allowed." });
+      break;
+    }
+    incomeObservations.add(key);
+    const previousVariability = incomeVariability.get(row.sourceId);
+    if (previousVariability !== undefined && previousVariability !== row.variable) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["incomeHistory"], message: "Keep the income source's variable setting consistent across months." });
+      break;
+    }
+    incomeVariability.set(row.sourceId, row.variable);
+  }
+  for (const row of value.cashFlowHistory) {
+    if (row.month > currentMonth) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["cashFlowHistory"], message: "Cash-flow records cannot be in a future month." });
+      break;
+    }
+  }
+});
+
+const scoreRangeSchema = z.number().finite().min(0).max(100);
+const confidenceWeightSchema = z.number().finite().min(0).max(1);
+
+export const destinationBaselineConfigSchema = z.object({
+  id: v2UuidSchema,
+  destination: z.string().trim().min(1).max(100),
+  monthlyBaselinePence: v2PositivePenceSchema,
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  countryCode: z.literal("GB"),
+  currencyCode: z.literal("GBP"),
+  provenance: z.string().trim().min(1).max(500),
+}).strict();
+
+export const cushScorePolicyConfigSchema = z.object({
+  destinationBaselines: z.array(destinationBaselineConfigSchema).min(1).max(50),
+  creditMappings: z.object({
+    strong: scoreRangeSchema.optional(),
+    average: scoreRangeSchema.optional(),
+    poor: scoreRangeSchema.optional(),
+    no_history: scoreRangeSchema.optional(),
+  }).strict(),
+  confidence: z.object({
+    historyMonthsForMaximum: z.number().int().min(1).max(120),
+    evidenceQualityWeights: z.object({
+      verified: confidenceWeightSchema,
+      documented: confidenceWeightSchema,
+      self_reported: confidenceWeightSchema,
+    }).strict(),
+    creditAvailabilityWeights: z.object({
+      verified: confidenceWeightSchema,
+      documented: confidenceWeightSchema,
+      self_reported: confidenceWeightSchema,
+    }).strict(),
+    incomeReliabilityByCategory: z.object({
+      salary: confidenceWeightSchema,
+      self_employment: confidenceWeightSchema,
+      freelance: confidenceWeightSchema,
+      business: confidenceWeightSchema,
+      scholarship: confidenceWeightSchema,
+      family_support: confidenceWeightSchema,
+      other: confidenceWeightSchema,
+    }).strict(),
+    freshnessBands: z.array(z.object({
+      maxAgeDays: z.number().int().nonnegative(),
+      points: z.number().finite().min(0).max(10),
+    }).strict()).min(1).max(20),
+  }).strict().optional(),
+}).strict().superRefine((configuration, context) => {
+  const baselineIds = new Set<string>();
+  for (const baseline of configuration.destinationBaselines) {
+    if (baselineIds.has(baseline.id)) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["destinationBaselines"], message: "Destination baseline IDs must be unique." });
+      break;
+    }
+    baselineIds.add(baseline.id);
+    const date = new Date(`${baseline.effectiveDate}T00:00:00Z`);
+    if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== baseline.effectiveDate) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["destinationBaselines"], message: "Each baseline needs a valid effective date." });
+      break;
+    }
+  }
+  const bands = configuration.confidence?.freshnessBands ?? [];
+  for (let index = 1; index < bands.length; index += 1) {
+    if (bands[index].maxAgeDays <= bands[index - 1].maxAgeDays) {
+      context.addIssue({ code: z.ZodIssueCode.custom, path: ["confidence", "freshnessBands"], message: "Freshness day limits must increase." });
+      break;
+    }
+  }
+});
+
+export type V2AssessmentInput = z.infer<typeof v2AssessmentInputSchema>;
+export type CushScorePolicyConfig = z.infer<typeof cushScorePolicyConfigSchema>;
 
 // ─── Auth Schemas ─────────────────────────────────────────────────────────────
 

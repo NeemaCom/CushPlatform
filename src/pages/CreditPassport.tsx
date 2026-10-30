@@ -5,6 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
+import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
+import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin";
 import {
   Globe2, TrendingUp, ShieldCheck, ChevronRight,
   Plus, Trash2, Link2, LogOut,
@@ -633,7 +635,7 @@ export default function CreditPassport() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
   const [showSignalForm, setShowSignalForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<"roadmap" | "signals">("roadmap");
+  const [activeTab, setActiveTab] = useState<"roadmap" | "signals" | "assessment" | "policy">("roadmap");
 
   const { data, isLoading } = useQuery<PassportData>({
     queryKey: ["/api/passport/me"],
@@ -894,6 +896,8 @@ export default function CreditPassport() {
               {([
                 { key: "roadmap",  label: "Evidence Roadmap",   icon: TrendingUp },
                 { key: "signals",  label: "Financial Signals",  icon: Globe2 },
+                { key: "assessment", label: "V2 Assessment", icon: FileText },
+                ...(user?.role === "admin" ? [{ key: "policy" as const, label: "Scoring Policy", icon: ShieldCheck }] : []),
               ] as const).map(({ key, label, icon: Icon }) => (
                 <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setActiveTab(key)}
                   className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-lg transition-all ${
@@ -925,7 +929,7 @@ export default function CreditPassport() {
                       isPending={addEvidenceMutation.isPending} />
                   ))}
                 </motion.div>
-              ) : (
+              ) : activeTab === "signals" ? (
                 <motion.div key="signals"
                   initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
                   transition={{ duration: 0.2 }}
@@ -1008,6 +1012,26 @@ export default function CreditPassport() {
                     </div>
                   )}
                 </motion.div>
+              ) : activeTab === "assessment" ? (
+                <motion.div key="assessment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+                  <div>
+                    <h2 className="font-bold text-slate-900 text-base">Cush Score V2 inputs</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">Enter individual GBP-denominated records. Values remain self-reported until reviewed.</p>
+                  </div>
+                  <V2AssessmentPanel />
+                </motion.div>
+              ) : user?.role === "admin" ? (
+                <motion.div key="policy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
+                  <div>
+                    <h2 className="font-bold text-slate-900 text-base">Scoring policy administration</h2>
+                    <p className="mt-0.5 text-xs text-slate-500">Draft and activate destination baselines, credit mappings, and confidence rules.</p>
+                  </div>
+                  <CushScoringPolicyAdmin />
+                </motion.div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status">
+                  Admin access is required to edit scoring policy.
+                </div>
               )}
             </AnimatePresence>
           </div>
