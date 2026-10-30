@@ -21,6 +21,23 @@ interface V2AssessmentResponse {
     assessmentStatus: string;
     cushScore: number | null;
     provisionalScore: number | null;
+    componentScores: {
+      availableFunds: number | null;
+      incomeStrength: number | null;
+      cashFlow: number | null;
+      creditHistory: number | null;
+    };
+    confidenceScore: number | null;
+    confidenceBand: "low" | "medium" | "high" | null;
+    confidenceBreakdown: {
+      financialHistoryDepth: number;
+      sourceQualityAndVerification: number;
+      creditInformationAvailability: number;
+      dataFreshness: number;
+      accountCoverage: number;
+      incomeSourceReliability: number;
+      integrityDeduction: number;
+    } | null;
     missingRequirements: string[];
   };
   destinationBaselines: BaselineOption[];
@@ -109,6 +126,10 @@ function AmountInput({
 export default function V2AssessmentPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [creditNudgeDismissed, setCreditNudgeDismissed] = useState(() =>
+    typeof window !== "undefined" &&
+    window.sessionStorage.getItem("cush-v2-credit-nudge-dismissed") === "true",
+  );
   const [inputs, setInputs] = useState<V2AssessmentInput>(EMPTY_INPUTS);
   const [fundLabel, setFundLabel] = useState("");
   const [fundAmount, setFundAmount] = useState("");
@@ -246,6 +267,17 @@ export default function V2AssessmentPanel() {
 
   const view = assessmentQuery.data!;
   const baselineReady = view.destinationBaselines.length > 0;
+  const creditRequirement = "Completed, supported credit assessment";
+  const needsCreditCheck = view.calculation.missingRequirements.includes(creditRequirement);
+  const otherRequirements = view.calculation.missingRequirements.filter((requirement) =>
+    requirement !== creditRequirement && requirement !== "All four score components",
+  );
+  const canShowCreditNudge =
+    needsCreditCheck &&
+    otherRequirements.length === 0 &&
+    view.calculation.componentScores.availableFunds !== null &&
+    view.calculation.componentScores.incomeStrength !== null &&
+    view.calculation.componentScores.cashFlow !== null;
 
   return (
     <div className="space-y-4">
@@ -255,6 +287,77 @@ export default function V2AssessmentPanel() {
           Enter GBP-denominated records. No exchange rate is guessed or applied. Entries are self-reported and do not become verified merely by being submitted.
         </p>
       </div>
+
+      <Card title="Score components">
+        <div className="rounded-lg bg-slate-50 p-3 text-sm">
+          <span className="text-slate-600">Total score: </span>
+          {view.calculation.cushScore === null
+            ? <span className="font-semibold text-slate-500">Not available yet</span>
+            : <span className="font-bold text-slate-900">{view.calculation.cushScore}/1000</span>}
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {[
+            ["Funds", view.calculation.componentScores.availableFunds],
+            ["Income", view.calculation.componentScores.incomeStrength],
+            ["Cash flow", view.calculation.componentScores.cashFlow],
+            ["Credit history", view.calculation.componentScores.creditHistory],
+          ].map(([label, score]) => (
+            <div key={String(label)} className="flex items-center justify-between rounded-lg border border-slate-100 px-3 py-2 text-xs">
+              <span className="text-slate-600">{label}</span>
+              <span className="font-semibold text-slate-900">{score === null ? "Not available" : `${score}/100`}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {canShowCreditNudge && !creditNudgeDismissed && (
+        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-800" role="status">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-semibold">Your total score needs a completed credit check</p>
+              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                No check is run from this form. Before any check is offered, we’ll explain what data it reads and ask for your consent. You may decline; your available components remain visible, but the total will stay unavailable.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                window.sessionStorage.setItem("cush-v2-credit-nudge-dismissed", "true");
+                setCreditNudgeDismissed(true);
+              }}
+              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {view.calculation.confidenceBreakdown && view.calculation.confidenceScore !== null && (
+        <Card title={`Confidence: ${view.calculation.confidenceScore}/100 · ${view.calculation.confidenceBand ? `${view.calculation.confidenceBand[0].toUpperCase()}${view.calculation.confidenceBand.slice(1)}` : "Pending"}`}>
+          <p className="text-xs text-slate-500">Confidence describes evidence quality and does not change the Cush Score.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ["History depth", view.calculation.confidenceBreakdown.financialHistoryDepth, 30],
+              ["Source quality", view.calculation.confidenceBreakdown.sourceQualityAndVerification, 25],
+              ["Credit check", view.calculation.confidenceBreakdown.creditInformationAvailability, 15],
+              ["Freshness", view.calculation.confidenceBreakdown.dataFreshness, 10],
+              ["Account coverage", view.calculation.confidenceBreakdown.accountCoverage, 10],
+              ["Income source", view.calculation.confidenceBreakdown.incomeSourceReliability, 10],
+            ].map(([label, points, maximum]) => (
+              <div key={String(label)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-xs">
+                <span className="text-slate-600">{label}</span>
+                <span className="font-semibold text-slate-900">{points}/{maximum}</span>
+              </div>
+            ))}
+          </div>
+          {view.calculation.confidenceBreakdown.integrityDeduction > 0 && (
+            <p className="text-xs font-medium text-rose-700">
+              Confirmed integrity flags: −{view.calculation.confidenceBreakdown.integrityDeduction} points
+            </p>
+          )}
+        </Card>
+      )}
 
       {!baselineReady && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">

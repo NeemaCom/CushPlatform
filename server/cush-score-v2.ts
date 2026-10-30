@@ -40,18 +40,6 @@ function asPolicyConfig(value: unknown): CushScorePolicyConfig {
   return cushScorePolicyConfigSchema.parse(value);
 }
 
-function daysSinceLatestMonth(input: V2AssessmentInput, now: Date): number | null {
-  const months = [
-    ...input.incomeHistory.map((row) => row.month),
-    ...input.cashFlowHistory.map((row) => row.month),
-  ];
-  if (months.length === 0) return null;
-  const latestMonth = months.sort().at(-1)!;
-  const [year, month] = latestMonth.split("-").map(Number);
-  const monthEnd = Date.UTC(year, month, 0);
-  return Math.max(0, Math.floor((now.getTime() - monthEnd) / 86_400_000));
-}
-
 function baselineFor(
   input: V2AssessmentInput,
   configuration: CushScorePolicyConfig | null,
@@ -83,11 +71,6 @@ function engineInput(
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
     input.creditClassification !== "unavailable";
-  const sourceCount = new Set([
-    ...input.availableFunds.map((item) => `fund:${item.id}`),
-    ...input.incomeHistory.map((item) => `income:${item.sourceId}`),
-    ...input.cashFlowHistory.map((item) => `cashflow:${item.month}`),
-  ]).size;
   return {
     individualUserId: userId,
     assessmentMonth: now.toISOString().slice(0, 7),
@@ -109,7 +92,9 @@ function engineInput(
       variable: item.variable,
       evidenceQuality: "self_reported",
     })),
-    sourceEvidenceQualities: Array.from({ length: sourceCount }, () => "self_reported"),
+    sourceEvidenceShares: hasSubmittedFinancialData
+      ? [{ sourceType: "self_reported", share: 1 }]
+      : [],
     cashFlowHistory: input.cashFlowHistory.map((item) => ({
       month: item.month,
       eligibleRecurringIncomePence: item.eligibleRecurringIncomePence,
@@ -120,10 +105,13 @@ function engineInput(
     credit: {
       classification: input.creditClassification,
       evidenceQuality: input.creditClassification === "unavailable" ? null : "self_reported",
+      checkStatus: "not_done",
     },
-    dataAgeDays: daysSinceLatestMonth(input, now),
+    // Saving a self-reported form is not evidence that its financial source was refreshed.
+    dataAgeDays: null,
     coveredAccountCount: 0,
     declaredAccountCount: 0,
+    unresolvedUnconnectedTransferShare: 1,
     integrityFlags: [],
   };
 }

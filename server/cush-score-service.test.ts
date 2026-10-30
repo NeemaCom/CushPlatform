@@ -17,29 +17,29 @@ const policy: CushScorePolicy = {
   },
   confidence: {
     historyMonthsForMaximum: 6,
-    evidenceQualityWeights: {
-      verified: 1,
-      documented: 0.7,
-      self_reported: 0.3,
+    sourceQualityPoints: {
+      bank_connection: 25,
+      verified_statement: 15,
+      self_reported: 0,
     },
-    creditAvailabilityWeights: {
-      verified: 1,
-      documented: 0.7,
-      self_reported: 0.3,
+    creditCheckPoints: {
+      matched: 15,
+      matched_thin: 10,
+      no_match: 5,
+      not_done: 0,
     },
-    incomeReliabilityByCategory: {
-      salary: 1,
-      self_employment: 0.8,
-      freelance: 0.75,
-      business: 0.8,
-      scholarship: 0.7,
-      family_support: 0.65,
-      other: 0.5,
+    incomeSourcePoints: {
+      uk_payslip_or_uk_credits: 10,
+      steady_employer: 8,
+      variable: 5,
+      uk_offer_only: 4,
+      family_support_only: 3,
+      other: 0,
     },
     freshnessBands: [
-      { maxAgeDays: 30, points: 10 },
-      { maxAgeDays: 90, points: 7 },
-      { maxAgeDays: 180, points: 3 },
+      { maxAgeDays: 7, points: 10 },
+      { maxAgeDays: 30, points: 6 },
+      { maxAgeDays: 90, points: 3 },
     ],
   },
 };
@@ -95,12 +95,14 @@ function completeInput(overrides: Partial<CushScoreInput> = {}): CushScoreInput 
       evidenceQuality: "verified",
     }],
     incomeHistory: completeIncomeHistory(),
-    sourceEvidenceQualities: ["verified"],
+    sourceEvidenceShares: [{ sourceType: "bank_connection", share: 1 }],
     cashFlowHistory: completeCashFlow(),
-    credit: { classification: "thin_file", evidenceQuality: "verified" },
+    credit: { classification: "thin_file", evidenceQuality: "verified", checkStatus: "matched_thin" },
     dataAgeDays: 10,
     coveredAccountCount: 2,
     declaredAccountCount: 2,
+    unresolvedUnconnectedTransferShare: 0,
+    incomeSourceType: "steady_employer",
     integrityFlags: [],
     ...overrides,
   };
@@ -125,7 +127,8 @@ describe("Cush Score V2 engine", () => {
     });
     expect(result.cushScore).toBe(925);
     expect(result.provisionalScore).toBeNull();
-    expect(result.confidenceScore).toBe(100);
+    expect(result.confidenceScore).toBe(89);
+    expect(result.confidenceBand).toBe("high");
   });
 
   it("only counts verified, accessible funds and rejects duplicate funds", () => {
@@ -249,7 +252,7 @@ describe("Cush Score V2 engine", () => {
 
   it("keeps a confirmed no-history result distinct from thin-file neutral scoring", () => {
     const result = calculateCushScore(completeInput({
-      credit: { classification: "no_history", evidenceQuality: "verified" },
+      credit: { classification: "no_history", evidenceQuality: "verified", checkStatus: "no_match" },
     }), policy);
 
     expect(result.componentScores.creditHistory).toBe(30);
@@ -319,7 +322,7 @@ describe("Cush Score V2 engine", () => {
       }],
       incomeHistory: completeIncomeHistory(BASELINE_PENCE * 2),
       cashFlowHistory: completeCashFlow(BASELINE_PENCE * 2, BASELINE_PENCE * 2),
-      credit: { classification: "strong", evidenceQuality: "verified" },
+      credit: { classification: "strong", evidenceQuality: "verified", checkStatus: "matched" },
     }), policy);
 
     expect(result.componentScores.availableFunds).toBe(20);
@@ -329,7 +332,7 @@ describe("Cush Score V2 engine", () => {
 
   it("does not invent a credit score when no approved mapping exists", () => {
     const result = calculateCushScore(completeInput({
-      credit: { classification: "strong", evidenceQuality: "verified" },
+      credit: { classification: "strong", evidenceQuality: "verified", checkStatus: "matched" },
     }), {
       ...policy,
       creditMappings: {},
@@ -348,7 +351,7 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.assessmentStatus).toBe("provisional");
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBe(925);
+    expect(result.provisionalScore).toBeNull();
     expect(result.missingRequirements).toContain("At least four months of usable financial history");
   });
 
@@ -371,7 +374,7 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.assessmentStatus).toBe("provisional");
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBe(925);
+    expect(result.provisionalScore).toBeNull();
     expect(result.confidenceScore).toBeNull();
     expect(result.missingRequirements).toContain("Approved confidence-scoring policy");
   });
@@ -396,8 +399,89 @@ describe("Cush Score V2 engine", () => {
       ],
     }), policy);
 
-    expect(result.confidenceScore).toBe(95);
+    expect(result.confidenceScore).toBe(84);
     expect(result.confidenceBreakdown?.integrityDeduction).toBe(5);
+  });
+
+  it("matches the specified confidence examples without making confidence part of the score", () => {
+    const steadySalary = calculateCushScore(completeInput({
+      dataAgeDays: 3,
+      credit: { classification: "average", evidenceQuality: "verified", checkStatus: "matched" },
+      incomeSourceType: "steady_employer",
+    }), policy);
+    const freelancer = calculateCushScore(completeInput({
+      dataAgeDays: 3,
+      credit: { classification: "thin_file", evidenceQuality: "verified", checkStatus: "matched_thin" },
+      incomeSourceType: "variable",
+    }), policy);
+    const familySupport = calculateCushScore(completeInput({
+      dataAgeDays: 3,
+      credit: { classification: "thin_file", evidenceQuality: "verified", checkStatus: "matched_thin" },
+      incomeSourceType: "family_support_only",
+    }), policy);
+
+    expect(steadySalary.confidenceScore).toBe(98);
+    expect(freelancer.confidenceScore).toBe(90);
+    expect(familySupport.confidenceScore).toBe(88);
+    expect(steadySalary.cushScore).toBe(940);
+    expect(freelancer.cushScore).toBe(925);
+    expect(familySupport.cushScore).toBe(925);
+  });
+
+  it("uses the low and medium confidence bands at the specified thresholds", () => {
+    const low = calculateCushScore(completeInput({
+      sourceEvidenceShares: [{ sourceType: "self_reported", share: 1 }],
+      credit: { classification: "thin_file", evidenceQuality: "self_reported", checkStatus: "not_done" },
+      dataAgeDays: 91,
+      unresolvedUnconnectedTransferShare: 1,
+      incomeSourceType: "other",
+    }), policy);
+    const medium = calculateCushScore(completeInput({
+      sourceEvidenceShares: [{ sourceType: "verified_statement", share: 1 }],
+      credit: { classification: "no_history", evidenceQuality: "verified", checkStatus: "no_match" },
+      dataAgeDays: 70,
+      unresolvedUnconnectedTransferShare: 1,
+      incomeSourceType: "other",
+    }), policy);
+
+    expect(low.confidenceScore).toBe(30);
+    expect(low.confidenceBand).toBe("low");
+    expect(medium.confidenceScore).toBe(53);
+    expect(medium.confidenceBand).toBe("medium");
+  });
+
+  it("does not return a total until a bank or verified statement source is connected", () => {
+    const result = calculateCushScore(completeInput({
+      sourceEvidenceShares: [{ sourceType: "self_reported", share: 1 }],
+    }), policy);
+
+    expect(result.cushScore).toBeNull();
+    expect(result.provisionalScore).toBeNull();
+    expect(result.missingRequirements).toContain("Connected bank account or verified bank statement");
+    expect(result.componentScores.availableFunds).not.toBeNull();
+  });
+
+  it("keeps a thin-file result incomplete until a supported credit check is recorded", () => {
+    const result = calculateCushScore(completeInput({
+      credit: { classification: "thin_file", evidenceQuality: "self_reported", checkStatus: "not_done" },
+    }), policy);
+
+    expect(result.cushScore).toBeNull();
+    expect(result.provisionalScore).toBeNull();
+    expect(result.confidenceBreakdown?.creditInformationAvailability).toBe(0);
+    expect(result.missingRequirements).toContain("Completed, supported credit assessment");
+  });
+
+  it("weights source quality by the share of assessment data from each source", () => {
+    const result = calculateCushScore(completeInput({
+      sourceEvidenceShares: [
+        { sourceType: "bank_connection", share: 0.4 },
+        { sourceType: "verified_statement", share: 0.4 },
+        { sourceType: "self_reported", share: 0.2 },
+      ],
+    }), policy);
+
+    expect(result.confidenceBreakdown?.sourceQualityAndVerification).toBe(16);
   });
 
   it("ignores history older than the six-month assessment window", () => {

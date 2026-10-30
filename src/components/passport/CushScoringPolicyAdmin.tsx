@@ -41,32 +41,28 @@ type BaselineForm = {
   provenance: string;
 };
 
-type ConfidenceForm = {
-  historyMonthsForMaximum: string;
-  evidenceQualityWeights: Record<"verified" | "documented" | "self_reported", string>;
-  creditAvailabilityWeights: Record<"verified" | "documented" | "self_reported", string>;
-  incomeReliabilityByCategory: Record<
-    "salary" | "self_employment" | "freelance" | "business" | "scholarship" | "family_support" | "other",
-    string
-  >;
-  freshnessBands: string;
-};
-
 type PolicyFormState = {
   baselines: BaselineForm[];
   creditMappings: Record<"strong" | "average" | "poor" | "no_history", string>;
-  confidence: ConfidenceForm;
 };
 
-const EMPTY_CONFIDENCE: ConfidenceForm = {
-  historyMonthsForMaximum: "",
-  evidenceQualityWeights: { verified: "", documented: "", self_reported: "" },
-  creditAvailabilityWeights: { verified: "", documented: "", self_reported: "" },
-  incomeReliabilityByCategory: {
-    salary: "", self_employment: "", freelance: "", business: "",
-    scholarship: "", family_support: "", other: "",
+const POLICY_CONFIDENCE_RULES: CushScorePolicyConfig["confidence"] = {
+  historyMonthsForMaximum: 6,
+  sourceQualityPoints: { bank_connection: 25, verified_statement: 15, self_reported: 0 },
+  creditCheckPoints: { matched: 15, matched_thin: 10, no_match: 5, not_done: 0 },
+  incomeSourcePoints: {
+    uk_payslip_or_uk_credits: 10,
+    steady_employer: 8,
+    variable: 5,
+    uk_offer_only: 4,
+    family_support_only: 3,
+    other: 0,
   },
-  freshnessBands: "",
+  freshnessBands: [
+    { maxAgeDays: 7, points: 10 },
+    { maxAgeDays: 30, points: 6 },
+    { maxAgeDays: 90, points: 3 },
+  ],
 };
 
 function emptyForm(): PolicyFormState {
@@ -77,7 +73,6 @@ function emptyForm(): PolicyFormState {
       provenance: "Cush Score master prompt",
     })),
     creditMappings: { strong: "", average: "", poor: "", no_history: "" },
-    confidence: structuredClone(EMPTY_CONFIDENCE),
   };
 }
 
@@ -93,7 +88,6 @@ function toForm(configuration?: CushScorePolicyConfig): PolicyFormState {
       provenance: configured?.provenance ?? "Cush Score master prompt",
     };
   });
-  const confidence = configuration.confidence;
   return {
     baselines,
     creditMappings: {
@@ -102,29 +96,6 @@ function toForm(configuration?: CushScorePolicyConfig): PolicyFormState {
       poor: configuration.creditMappings.poor?.toString() ?? "",
       no_history: configuration.creditMappings.no_history?.toString() ?? "",
     },
-    confidence: confidence ? {
-      historyMonthsForMaximum: String(confidence.historyMonthsForMaximum),
-      evidenceQualityWeights: {
-        verified: String(confidence.evidenceQualityWeights.verified),
-        documented: String(confidence.evidenceQualityWeights.documented),
-        self_reported: String(confidence.evidenceQualityWeights.self_reported),
-      },
-      creditAvailabilityWeights: {
-        verified: String(confidence.creditAvailabilityWeights.verified),
-        documented: String(confidence.creditAvailabilityWeights.documented),
-        self_reported: String(confidence.creditAvailabilityWeights.self_reported),
-      },
-      incomeReliabilityByCategory: {
-        salary: String(confidence.incomeReliabilityByCategory.salary),
-        self_employment: String(confidence.incomeReliabilityByCategory.self_employment),
-        freelance: String(confidence.incomeReliabilityByCategory.freelance),
-        business: String(confidence.incomeReliabilityByCategory.business),
-        scholarship: String(confidence.incomeReliabilityByCategory.scholarship),
-        family_support: String(confidence.incomeReliabilityByCategory.family_support),
-        other: String(confidence.incomeReliabilityByCategory.other),
-      },
-      freshnessBands: confidence.freshnessBands.map((band) => `${band.maxAgeDays},${band.points}`).join("\n"),
-    } : structuredClone(EMPTY_CONFIDENCE),
   };
 }
 
@@ -170,48 +141,10 @@ function makeConfiguration(form: PolicyFormState): CushScorePolicyConfig {
     creditMappings[key] = score;
   }
 
-  const allConfidenceValues = [
-    form.confidence.historyMonthsForMaximum,
-    ...Object.values(form.confidence.evidenceQualityWeights),
-    ...Object.values(form.confidence.creditAvailabilityWeights),
-    ...Object.values(form.confidence.incomeReliabilityByCategory),
-    form.confidence.freshnessBands,
-  ];
-  const hasAnyConfidenceValue = allConfidenceValues.some((value) => value.trim() !== "");
-  let confidence: CushScorePolicyConfig["confidence"];
-  if (hasAnyConfidenceValue) {
-    if (allConfidenceValues.some((value) => value.trim() === "")) {
-      throw new Error("Complete every confidence field, or leave all confidence fields blank.");
-    }
-    const freshnessBands = form.confidence.freshnessBands.split("\n").map((line) => {
-      const [ageText, pointsText, extra] = line.split(",").map((part) => part.trim());
-      const maxAgeDays = Number(ageText);
-      const points = Number(pointsText);
-      if (extra !== undefined || !Number.isInteger(maxAgeDays) || maxAgeDays < 0 ||
-          !Number.isFinite(points) || points < 0 || points > 10) {
-        throw new Error("Use one freshness pair per line: max age in days, points from 0 to 10.");
-      }
-      return { maxAgeDays, points };
-    });
-    confidence = {
-      historyMonthsForMaximum: Number(form.confidence.historyMonthsForMaximum),
-      evidenceQualityWeights: Object.fromEntries(
-        Object.entries(form.confidence.evidenceQualityWeights).map(([key, value]) => [key, Number(value)]),
-      ) as NonNullable<CushScorePolicyConfig["confidence"]>["evidenceQualityWeights"],
-      creditAvailabilityWeights: Object.fromEntries(
-        Object.entries(form.confidence.creditAvailabilityWeights).map(([key, value]) => [key, Number(value)]),
-      ) as NonNullable<CushScorePolicyConfig["confidence"]>["creditAvailabilityWeights"],
-      incomeReliabilityByCategory: Object.fromEntries(
-        Object.entries(form.confidence.incomeReliabilityByCategory).map(([key, value]) => [key, Number(value)]),
-      ) as NonNullable<CushScorePolicyConfig["confidence"]>["incomeReliabilityByCategory"],
-      freshnessBands,
-    };
-  }
-
   return {
     destinationBaselines,
     creditMappings,
-    ...(confidence ? { confidence } : {}),
+    confidence: POLICY_CONFIDENCE_RULES,
   };
 }
 
@@ -373,27 +306,33 @@ export default function CushScoringPolicyAdmin() {
       <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
         <div>
           <h3 className="font-bold text-slate-900">Confidence policy</h3>
-          <p className="mt-1 text-xs text-slate-500">All values below must come from an approved confidence policy. Leave every field blank to keep confidence scoring disabled.</p>
-        </div>
-        <NumberField label="History months for maximum" min={1} step="1" value={form.confidence.historyMonthsForMaximum} onChange={(value) => setForm((current) => ({ ...current, confidence: { ...current.confidence, historyMonthsForMaximum: value } }))} />
-        <div className="grid gap-4 lg:grid-cols-3">
-          {(["verified", "documented", "self_reported"] as const).map((quality) => (
-            <div key={quality} className="space-y-2 rounded-xl border border-slate-100 p-3">
-              <h4 className="text-sm font-semibold capitalize text-slate-800">{quality}</h4>
-              <NumberField label="Evidence quality weight (0–1)" min={0} max={1} value={form.confidence.evidenceQualityWeights[quality]} onChange={(value) => setForm((current) => ({ ...current, confidence: { ...current.confidence, evidenceQualityWeights: { ...current.confidence.evidenceQualityWeights, [quality]: value } } }))} />
-              <NumberField label="Credit availability weight (0–1)" min={0} max={1} value={form.confidence.creditAvailabilityWeights[quality]} onChange={(value) => setForm((current) => ({ ...current, confidence: { ...current.confidence, creditAvailabilityWeights: { ...current.confidence.creditAvailabilityWeights, [quality]: value } } }))} />
-            </div>
-          ))}
+          <p className="mt-1 text-xs text-slate-500">
+            Confidence is separate from the Cush Score. Verified source points require supported evidence; self-reported data earns no source-quality points.
+          </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {(["salary", "self_employment", "freelance", "business", "scholarship", "family_support", "other"] as const).map((category) => (
-            <NumberField key={category} label={`${category.replace("_", " ")} reliability (0–1)`} min={0} max={1} value={form.confidence.incomeReliabilityByCategory[category]} onChange={(value) => setForm((current) => ({ ...current, confidence: { ...current.confidence, incomeReliabilityByCategory: { ...current.confidence.incomeReliabilityByCategory, [category]: value } } }))} />
-          ))}
+          <div className="rounded-xl border border-slate-100 p-3">
+            <h4 className="text-sm font-semibold text-slate-800">Evidence and history</h4>
+            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+              <li>History: 5 points per usable month, up to 6 months (30)</li>
+              <li>Bank connection: 25; verified statement: 15</li>
+              <li>Freshness: 10 / 6 / 3 points at 7 / 30 / 90 days</li>
+              <li>Account coverage: up to 10, reduced by unresolved-transfer share</li>
+            </ul>
+          </div>
+          <div className="rounded-xl border border-slate-100 p-3">
+            <h4 className="text-sm font-semibold text-slate-800">Credit and income</h4>
+            <ul className="mt-2 space-y-1 text-xs text-slate-600">
+              <li>Credit check: matched 15; thin 10; no match 5; not done 0</li>
+              <li>Income: UK payslip/credits 10; steady employer 8; variable 5</li>
+              <li>UK offer only 4; family support only 3; other 0</li>
+              <li>Confirmed integrity flags: −5 each; minimum confidence 1</li>
+            </ul>
+          </div>
         </div>
-        <label className="block text-xs font-medium text-slate-600">
-          Freshness bands: one “max age days, points 0–10” pair per line
-          <textarea value={form.confidence.freshnessBands} onChange={(event) => setForm((current) => ({ ...current, confidence: { ...current.confidence, freshnessBands: event.target.value } }))} rows={4} placeholder="Enter approved bands, one per line" className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-sm" />
-        </label>
+        <p className="text-xs text-slate-500">
+          Bands: 1–39 Low, 40–69 Medium, 70–100 High. No family-support-only cap is applied. Confidence never changes the score.
+        </p>
       </section>
 
       <button

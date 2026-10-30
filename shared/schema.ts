@@ -281,7 +281,6 @@ export const v2AssessmentInputSchema = z.object({
 });
 
 const scoreRangeSchema = z.number().finite().min(0).max(100);
-const confidenceWeightSchema = z.number().finite().min(0).max(1);
 
 export const destinationBaselineConfigSchema = z.object({
   id: v2UuidSchema,
@@ -302,31 +301,32 @@ export const cushScorePolicyConfigSchema = z.object({
     no_history: scoreRangeSchema.optional(),
   }).strict(),
   confidence: z.object({
-    historyMonthsForMaximum: z.number().int().min(1).max(120),
-    evidenceQualityWeights: z.object({
-      verified: confidenceWeightSchema,
-      documented: confidenceWeightSchema,
-      self_reported: confidenceWeightSchema,
+    historyMonthsForMaximum: z.literal(6),
+    sourceQualityPoints: z.object({
+      bank_connection: z.literal(25),
+      verified_statement: z.literal(15),
+      self_reported: z.literal(0),
     }).strict(),
-    creditAvailabilityWeights: z.object({
-      verified: confidenceWeightSchema,
-      documented: confidenceWeightSchema,
-      self_reported: confidenceWeightSchema,
+    creditCheckPoints: z.object({
+      matched: z.literal(15),
+      matched_thin: z.literal(10),
+      no_match: z.literal(5),
+      not_done: z.literal(0),
     }).strict(),
-    incomeReliabilityByCategory: z.object({
-      salary: confidenceWeightSchema,
-      self_employment: confidenceWeightSchema,
-      freelance: confidenceWeightSchema,
-      business: confidenceWeightSchema,
-      scholarship: confidenceWeightSchema,
-      family_support: confidenceWeightSchema,
-      other: confidenceWeightSchema,
+    incomeSourcePoints: z.object({
+      uk_payslip_or_uk_credits: z.literal(10),
+      steady_employer: z.literal(8),
+      variable: z.literal(5),
+      uk_offer_only: z.literal(4),
+      family_support_only: z.literal(3),
+      other: z.literal(0),
     }).strict(),
-    freshnessBands: z.array(z.object({
-      maxAgeDays: z.number().int().nonnegative(),
-      points: z.number().finite().min(0).max(10),
-    }).strict()).min(1).max(20),
-  }).strict().optional(),
+    freshnessBands: z.tuple([
+      z.object({ maxAgeDays: z.literal(7), points: z.literal(10) }).strict(),
+      z.object({ maxAgeDays: z.literal(30), points: z.literal(6) }).strict(),
+      z.object({ maxAgeDays: z.literal(90), points: z.literal(3) }).strict(),
+    ]),
+  }).strict(),
 }).strict().superRefine((configuration, context) => {
   const baselineIds = new Set<string>();
   for (const baseline of configuration.destinationBaselines) {
@@ -338,13 +338,6 @@ export const cushScorePolicyConfigSchema = z.object({
     const date = new Date(`${baseline.effectiveDate}T00:00:00Z`);
     if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== baseline.effectiveDate) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["destinationBaselines"], message: "Each baseline needs a valid effective date." });
-      break;
-    }
-  }
-  const bands = configuration.confidence?.freshnessBands ?? [];
-  for (let index = 1; index < bands.length; index += 1) {
-    if (bands[index].maxAgeDays <= bands[index - 1].maxAgeDays) {
-      context.addIssue({ code: z.ZodIssueCode.custom, path: ["confidence", "freshnessBands"], message: "Freshness day limits must increase." });
       break;
     }
   }

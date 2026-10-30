@@ -9,6 +9,15 @@
 export const CUSH_SCORE_VERSION = "2.0.0";
 
 export type EvidenceQuality = "verified" | "documented" | "self_reported";
+export type SourceEvidenceType = "bank_connection" | "verified_statement" | "self_reported";
+export type CreditCheckStatus = "matched" | "matched_thin" | "no_match" | "not_done";
+export type IncomeConfidenceSource =
+  | "uk_payslip_or_uk_credits"
+  | "steady_employer"
+  | "variable"
+  | "uk_offer_only"
+  | "family_support_only"
+  | "other";
 
 export type IncomeCategory =
   | "salary"
@@ -60,6 +69,8 @@ export interface MonthlyCashFlow {
 export interface CreditAssessment {
   classification: CreditClassification;
   evidenceQuality: EvidenceQuality | null;
+  /** Set only by a trusted credit-check/review path, never from the V2 form. */
+  checkStatus?: CreditCheckStatus;
 }
 
 export interface ConfirmedIntegrityFlag {
@@ -85,9 +96,9 @@ export interface CushScorePolicy {
   creditMappings: Partial<Record<Exclude<CreditClassification, "thin_file" | "incomplete" | "unavailable">, number>>;
   confidence?: {
     historyMonthsForMaximum: number;
-    evidenceQualityWeights: Record<EvidenceQuality, number>;
-    creditAvailabilityWeights: Record<EvidenceQuality, number>;
-    incomeReliabilityByCategory: Record<IncomeCategory, number>;
+    sourceQualityPoints: Record<SourceEvidenceType, number>;
+    creditCheckPoints: Record<CreditCheckStatus, number>;
+    incomeSourcePoints: Record<IncomeConfidenceSource, number>;
     freshnessBands: Array<{ maxAgeDays: number; points: number }>;
   };
 }
@@ -99,8 +110,8 @@ export interface CushScoreInput {
   hasSubmittedFinancialData: boolean;
   availableFunds: AvailableFund[];
   incomeHistory: MonthlyIncomeObservation[];
-  /** One quality entry per distinct evidence source, not per monthly observation. */
-  sourceEvidenceQualities: EvidenceQuality[];
+  /** Share of assessment data attributed to each trusted evidence source. */
+  sourceEvidenceShares: Array<{ sourceType: SourceEvidenceType; share: number }>;
   verifiedUkEmploymentOffer?: {
     sourceId: string;
     monthlyAmountPence: number;
@@ -111,6 +122,10 @@ export interface CushScoreInput {
   dataAgeDays: number | null;
   coveredAccountCount: number;
   declaredAccountCount: number;
+  /** Share of transfers still unresolved to unconnected accounts; 1 means all unresolved. */
+  unresolvedUnconnectedTransferShare?: number;
+  /** Derived from submitted income records or trusted evidence, not client-supplied. */
+  incomeSourceType?: IncomeConfidenceSource;
   integrityFlags: ConfirmedIntegrityFlag[];
 }
 
@@ -129,9 +144,10 @@ export interface CushScoreResult {
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
   /** Only present when all minimum requirements are met. */
   cushScore: number | null;
-  /** Present when all four component values exist but gating is not complete. */
+  /** Kept for response compatibility; never populated before all score gates pass. */
   provisionalScore: number | null;
   confidenceScore: number | null;
+  confidenceBand: "low" | "medium" | "high" | null;
   componentScores: {
     availableFunds: number | null;
     incomeStrength: number | null;
@@ -187,16 +203,16 @@ const SURPLUS_CURVE = [
 ];
 
 const QUALITY_VALUES: EvidenceQuality[] = ["verified", "documented", "self_reported"];
-const INCOME_CATEGORIES: IncomeCategory[] = [
-  "salary",
-  "self_employment",
-  "freelance",
-  "business",
-  "scholarship",
-  "family_support",
+const SOURCE_EVIDENCE_TYPES: SourceEvidenceType[] = ["bank_connection", "verified_statement", "self_reported"];
+const CREDIT_CHECK_STATUSES: CreditCheckStatus[] = ["matched", "matched_thin", "no_match", "not_done"];
+const INCOME_CONFIDENCE_SOURCES: IncomeConfidenceSource[] = [
+  "uk_payslip_or_uk_credits",
+  "steady_employer",
+  "variable",
+  "uk_offer_only",
+  "family_support_only",
   "other",
 ];
-
 function assertNonNegativeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer.`);
@@ -220,15 +236,15 @@ function isWithinAssessmentWindow(assessmentMonth: string, month: string): boole
   return distance >= 0 && distance < 6;
 }
 
-function assertUnitInterval(value: number, label: string): void {
-  if (!Number.isFinite(value) || value < 0 || value > 1) {
-    throw new Error(`${label} must be between 0 and 1.`);
-  }
-}
-
 function assertEvidenceQuality(value: string, label: string): asserts value is EvidenceQuality {
   if (!QUALITY_VALUES.includes(value as EvidenceQuality)) {
     throw new Error(`${label} is not a supported evidence quality.`);
+  }
+}
+
+function assertSourceEvidenceType(value: string, label: string): asserts value is SourceEvidenceType {
+  if (!SOURCE_EVIDENCE_TYPES.includes(value as SourceEvidenceType)) {
+    throw new Error(`${label} is not a supported source evidence type.`);
   }
 }
 
@@ -266,12 +282,23 @@ function requireValidPolicy(policy: CushScorePolicy): void {
         policy.confidence.historyMonthsForMaximum < 1) {
       throw new Error("Confidence historyMonthsForMaximum must be a positive integer.");
     }
-    for (const quality of QUALITY_VALUES) {
-      assertUnitInterval(policy.confidence.evidenceQualityWeights[quality], `evidenceQualityWeights.${quality}`);
-      assertUnitInterval(policy.confidence.creditAvailabilityWeights[quality], `creditAvailabilityWeights.${quality}`);
+    for (const sourceType of SOURCE_EVIDENCE_TYPES) {
+      const points = policy.confidence.sourceQualityPoints[sourceType];
+      if (!Number.isFinite(points) || points < 0 || points > 25) {
+        throw new Error(`sourceQualityPoints.${sourceType} must be between 0 and 25.`);
+      }
     }
-    for (const category of INCOME_CATEGORIES) {
-      assertUnitInterval(policy.confidence.incomeReliabilityByCategory[category], `incomeReliabilityByCategory.${category}`);
+    for (const status of CREDIT_CHECK_STATUSES) {
+      const points = policy.confidence.creditCheckPoints[status];
+      if (!Number.isFinite(points) || points < 0 || points > 15) {
+        throw new Error(`creditCheckPoints.${status} must be between 0 and 15.`);
+      }
+    }
+    for (const source of INCOME_CONFIDENCE_SOURCES) {
+      const points = policy.confidence.incomeSourcePoints[source];
+      if (!Number.isFinite(points) || points < 0 || points > 10) {
+        throw new Error(`incomeSourcePoints.${source} must be between 0 and 10.`);
+      }
     }
     let previousAge = -1;
     for (const band of policy.confidence.freshnessBands) {
@@ -291,12 +318,28 @@ function requireValidPolicy(policy: CushScorePolicy): void {
 }
 
 function sourceQualityPoints(
-  qualities: EvidenceQuality[],
-  weights: Record<EvidenceQuality, number>,
-  maximum: number,
+  shares: Array<{ sourceType: SourceEvidenceType; share: number }>,
+  points: Record<SourceEvidenceType, number>,
 ): number {
-  if (!qualities.length) return 0;
-  return maximum * qualities.reduce((sum, quality) => sum + weights[quality], 0) / qualities.length;
+  if (!shares.length) return 0;
+  return shares.reduce((sum, item) => sum + points[item.sourceType] * item.share, 0);
+}
+
+function inferIncomeConfidenceSource(input: CushScoreInput): IncomeConfidenceSource {
+  const recurringIncome = input.incomeHistory.filter((item) =>
+    item.recurring && isWithinAssessmentWindow(input.assessmentMonth, item.month),
+  );
+  if (!recurringIncome.length) {
+    return input.verifiedUkEmploymentOffer?.evidenceQuality === "verified"
+      ? "uk_offer_only"
+      : "other";
+  }
+  if (recurringIncome.every((item) => item.category === "family_support")) {
+    return "family_support_only";
+  }
+  if (recurringIncome.some((item) => item.variable)) return "variable";
+  if (recurringIncome.some((item) => item.category === "salary")) return "steady_employer";
+  return "other";
 }
 
 function calculateConfidence(
@@ -309,6 +352,7 @@ function calculateConfidence(
     input.availableFunds.length > 0 ||
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
+    input.sourceEvidenceShares.length > 0 ||
     input.credit.classification !== "unavailable";
   if (!hasAssessmentData || !confidencePolicy) return { score: null, breakdown: null };
 
@@ -318,13 +362,14 @@ function calculateConfidence(
   ) * 30;
 
   const sourceQuality = sourceQualityPoints(
-    input.sourceEvidenceQualities,
-    confidencePolicy.evidenceQualityWeights,
-    25,
+    input.sourceEvidenceShares,
+    confidencePolicy.sourceQualityPoints,
   );
 
-  const creditAvailability = input.credit.evidenceQuality
-    ? 15 * confidencePolicy.creditAvailabilityWeights[input.credit.evidenceQuality]
+  const checkStatus = input.credit.checkStatus ?? "not_done";
+  const creditAvailability = input.credit.evidenceQuality &&
+      input.credit.evidenceQuality !== "self_reported"
+    ? confidencePolicy.creditCheckPoints[checkStatus]
     : 0;
 
   let freshness = 0;
@@ -337,19 +382,14 @@ function calculateConfidence(
     }
   }
 
-  const accountCoverage = input.declaredAccountCount > 0
-    ? 10 * Math.min(input.coveredAccountCount / input.declaredAccountCount, 1)
-    : 0;
+  const accountCoverage = input.unresolvedUnconnectedTransferShare !== undefined
+    ? 10 * (1 - input.unresolvedUnconnectedTransferShare)
+    : input.declaredAccountCount > 0
+      ? 10 * Math.min(input.coveredAccountCount / input.declaredAccountCount, 1)
+      : 0;
 
-  const incomeCategories = [...new Set(
-    input.incomeHistory.filter((item) => item.recurring).map((item) => item.category),
-  )];
-  const incomeReliability = incomeCategories.length
-    ? 10 * incomeCategories.reduce(
-      (sum, category) => sum + confidencePolicy.incomeReliabilityByCategory[category],
-      0,
-    ) / incomeCategories.length
-    : 0;
+  const incomeSourceType = input.incomeSourceType ?? inferIncomeConfidenceSource(input);
+  const incomeReliability = confidencePolicy.incomeSourcePoints[incomeSourceType];
 
   const confirmedFlags = input.integrityFlags.filter((flag) => flag.reviewStatus === "confirmed").length;
   const integrityDeduction = confirmedFlags * 5;
@@ -419,8 +459,28 @@ function validateInput(input: CushScoreInput, policy: CushScorePolicy): void {
     assertEvidenceQuality(fund.evidenceQuality, "fund evidenceQuality");
   }
 
-  for (const quality of input.sourceEvidenceQualities) {
-    assertEvidenceQuality(quality, "sourceEvidenceQualities entry");
+  let sourceShareTotal = 0;
+  for (const source of input.sourceEvidenceShares) {
+    assertSourceEvidenceType(source.sourceType, "sourceEvidenceShares sourceType");
+    if (!Number.isFinite(source.share) || source.share < 0 || source.share > 1) {
+      throw new Error("Each source evidence share must be between 0 and 1.");
+    }
+    sourceShareTotal += source.share;
+  }
+  if (input.sourceEvidenceShares.length && Math.abs(sourceShareTotal - 1) > 0.000001) {
+    throw new Error("Source evidence shares must add up to 1.");
+  }
+  if (input.credit.checkStatus && !CREDIT_CHECK_STATUSES.includes(input.credit.checkStatus)) {
+    throw new Error("Credit check status is not supported.");
+  }
+  if (input.incomeSourceType && !INCOME_CONFIDENCE_SOURCES.includes(input.incomeSourceType)) {
+    throw new Error("Income confidence source is not supported.");
+  }
+  if (input.unresolvedUnconnectedTransferShare !== undefined &&
+      (!Number.isFinite(input.unresolvedUnconnectedTransferShare) ||
+       input.unresolvedUnconnectedTransferShare < 0 ||
+       input.unresolvedUnconnectedTransferShare > 1)) {
+    throw new Error("Unresolved unconnected transfer share must be between 0 and 1.");
   }
 
   const incomeObservations = new Set<string>();
@@ -603,7 +663,10 @@ export function calculateCushScore(
     creditHistory: creditScore,
   };
   const weightedTotal = calculateWeightedScore(componentScores);
-  const verifiedFundsExist = input.availableFunds.some((fund) => fund.evidenceQuality === "verified");
+  const supportedFundsExist = input.availableFunds.some((fund) => fund.evidenceQuality !== "self_reported");
+  const connectedOrStatementSourceExists = input.sourceEvidenceShares.some(
+    (source) => source.sourceType !== "self_reported" && source.share > 0,
+  );
   const incomeEvidenceSufficient = input.incomeHistory.some(
     (item) => item.recurring &&
       item.evidenceQuality !== "self_reported" &&
@@ -615,8 +678,10 @@ export function calculateCushScore(
       item.evidenceQuality !== "self_reported" &&
       isWithinAssessmentWindow(input.assessmentMonth, item.month),
   ).length >= 4;
+  const creditCheckStatus = input.credit.checkStatus ?? "not_done";
   const creditAssessmentComplete =
     creditScore !== null &&
+    creditCheckStatus !== "not_done" &&
     input.credit.evidenceQuality !== null &&
     input.credit.evidenceQuality !== "self_reported";
 
@@ -632,7 +697,10 @@ export function calculateCushScore(
     missingRequirements.push("Selected destination and approved monthly baseline");
   }
   if (usableHistoryMonths < 4) missingRequirements.push("At least four months of usable financial history");
-  if (!verifiedFundsExist) missingRequirements.push("Verified evidence for available funds");
+  if (!connectedOrStatementSourceExists) {
+    missingRequirements.push("Connected bank account or verified bank statement");
+  }
+  if (!supportedFundsExist) missingRequirements.push("Verified evidence for available funds");
   if (!incomeEvidenceSufficient) missingRequirements.push("Documented or verified recurring income");
   if (!cashFlowEvidenceSufficient) missingRequirements.push("Four months of supported cash-flow history");
   if (!creditAssessmentComplete) missingRequirements.push("Completed, supported credit assessment");
@@ -642,6 +710,13 @@ export function calculateCushScore(
   if (weightedTotal === null) missingRequirements.push("All four score components");
 
   const confidence = calculateConfidence(input, policy, usableHistoryMonths);
+  const confidenceBand = confidence.score === null
+    ? null
+    : confidence.score < 40
+      ? "low"
+      : confidence.score < 70
+        ? "medium"
+        : "high";
   const isComplete =
     missingRequirements.length === 0 &&
     weightedTotal !== null &&
@@ -673,8 +748,9 @@ export function calculateCushScore(
     algorithmVersion: CUSH_SCORE_VERSION,
     assessmentStatus: status,
     cushScore: isComplete ? weightedTotal : null,
-    provisionalScore: !isComplete ? weightedTotal : null,
+    provisionalScore: null,
     confidenceScore: confidence.score,
+    confidenceBand,
     componentScores: Object.fromEntries(
       Object.entries(componentScores).map(([key, value]) => [
         key,

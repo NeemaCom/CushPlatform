@@ -106,16 +106,14 @@ function useCountUp(target: number) {
 
 function ScoreRing({
   score,
-  provisionalScore,
   confidence,
   assessmentStatus,
 }: {
   score: number | null;
-  provisionalScore: number | null;
   confidence: number | null;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
 }) {
-  const availableScore = score ?? provisionalScore;
+  const availableScore = score;
   const displayScore = useCountUp(availableScore ?? 0);
   const r = 70, circ = 2 * Math.PI * r;
   const scoreColor = availableScore === null ? "#94a3b8" : score === null ? "#d97706" : "#2563eb";
@@ -130,7 +128,7 @@ function ScoreRing({
     : confidence >= 70
       ? "High confidence"
       : confidence >= 40
-        ? "Moderate confidence"
+        ? "Medium confidence"
         : "Low confidence";
   const confidenceColor = confidence === null
     ? "text-slate-400"
@@ -777,7 +775,6 @@ export default function CreditPassport() {
                 <div className="flex flex-col sm:flex-row items-center gap-8">
                   <ScoreRing
                     score={passport.score}
-                    provisionalScore={passport.provisionalScore}
                     confidence={passport.confidenceScore}
                     assessmentStatus={passport.assessmentStatus}
                   />

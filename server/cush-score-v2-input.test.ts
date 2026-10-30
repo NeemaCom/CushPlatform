@@ -122,6 +122,33 @@ describe("Cush Score V2 input and policy validation", () => {
         provenance: "Cush Score master prompt",
       }],
       creditMappings: {},
+      confidence: {
+        historyMonthsForMaximum: 6,
+        sourceQualityPoints: {
+          bank_connection: 25,
+          verified_statement: 15,
+          self_reported: 0,
+        },
+        creditCheckPoints: {
+          matched: 15,
+          matched_thin: 10,
+          no_match: 5,
+          not_done: 0,
+        },
+        incomeSourcePoints: {
+          uk_payslip_or_uk_credits: 10,
+          steady_employer: 8,
+          variable: 5,
+          uk_offer_only: 4,
+          family_support_only: 3,
+          other: 0,
+        },
+        freshnessBands: [
+          { maxAgeDays: 7, points: 10 },
+          { maxAgeDays: 30, points: 6 },
+          { maxAgeDays: 90, points: 3 },
+        ],
+      },
     };
     expect(cushScorePolicyConfigSchema.safeParse(base).success).toBe(true);
     expect(cushScorePolicyConfigSchema.safeParse({
