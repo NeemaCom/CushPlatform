@@ -2,3 +2,4 @@
 - [GitHub connector and Git pushes](github-connector-git-push.md) — a working GitHub REST connection may leave Git CLI authentication broken; preserve hashes if using Git-data API.
 - [Managed workspace launcher](managed-workspace-launcher.md) — launcher changes require validation, and preview setup can regenerate platform settings.
 - [Portable npm lockfiles](portable-npm-lockfiles.md) — existing local install metadata can contaminate a fresh lock; validate both registry hosts and clean-install dependency resolution.
+- [Cush Score policy](cush-score-policy.md) — scoring is individual-only and follows the four-component prompt; missing credit mappings and integrations must not be invented.

@@ -1,0 +1,21 @@
+---
+name: Cush Score policy
+description: Product rules and scoring design supplied for Cush Score implementation.
+---
+
+# Cush Score policy
+
+## Rules
+
+- Each assessment covers one account holder only. Never use dependants, household size, household income, or household affordability adjustments.
+- The prompt's component weights are available funds 35%, income strength 30%, cash-flow behaviour 20%, and credit history 15%.
+- The score is 0–1000. Confidence is separate, 1–100 when an assessment exists; it describes evidence quality and completeness, not financial strength.
+- Thin credit file maps to neutral 50. Other credit classifications require an approved mapping; no bureau connection or result may be fabricated.
+- Initial destination baselines are configurable: £1,203/month outside London and £1,518/month in London. Keep destination, effective date, and configuration provenance with a calculation.
+- Count only verified, accessible funds, avoid double counting, and exclude one-off income from recurring income. Family support may count as the applicant's own inflow when regular and supported.
+- Do not present a full score before the four-month and evidence requirements are satisfied. Missing or unavailable data is not proof of poor financial behaviour.
+- Plaid was available but not connected when this policy was recorded; no credit-bureau integration was available. Label integrations pending until actually connected and verified.
+
+**Why:** The user supplied a master prompt that governs future scoring work and differs from the legacy 40/30/30 formula.
+
+**How to apply:** Use this policy for scoring-engine, data-model, dashboard, and test work. Keep the current production scoring flow unchanged until the relevant implementation stage is approved; require explicit configuration for underspecified credit and confidence mappings.
