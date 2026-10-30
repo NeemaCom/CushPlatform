@@ -16,6 +16,6 @@ description: Product rules and scoring design supplied for Cush Score implementa
 - Do not present a full score before the four-month and evidence requirements are satisfied. Missing or unavailable data is not proof of poor financial behaviour.
 - Plaid was available but not connected when this policy was recorded; no credit-bureau integration was available. Label integrations pending until actually connected and verified.
 
-**Why:** The user supplied a master prompt that governs future scoring work and differs from the legacy 40/30/30 formula.
+**Why:** The user supplied the scoring prompt and explicitly approved replacing the legacy 40/30/30 calculation with V2, showing incomplete status when required inputs are absent.
 
-**How to apply:** Use this policy for scoring-engine, data-model, dashboard, and test work. Keep the current production scoring flow unchanged until the relevant implementation stage is approved; require explicit configuration for underspecified credit and confidence mappings.
+**How to apply:** V2 is the active passport score. Preserve its incomplete/provisional gates; never fall back to 40/30/30 or fabricate missing funds, history, destination, bureau, or confidence-policy inputs.

@@ -70,13 +70,20 @@ export interface ConfirmedIntegrityFlag {
   reviewStatus: "pending" | "confirmed" | "dismissed";
 }
 
+export interface DestinationBaseline {
+  destination: string;
+  monthlyBaselinePence: number;
+  effectiveDate: string;
+  countryCode: string;
+}
+
 export interface CushScorePolicy {
   /**
    * The prompt fixes thin-file at 50. Other credit mappings are intentionally
    * required from an approved policy; this engine invents no bureau mapping.
    */
   creditMappings: Partial<Record<Exclude<CreditClassification, "thin_file" | "incomplete" | "unavailable">, number>>;
-  confidence: {
+  confidence?: {
     historyMonthsForMaximum: number;
     evidenceQualityWeights: Record<EvidenceQuality, number>;
     creditAvailabilityWeights: Record<EvidenceQuality, number>;
@@ -87,11 +94,9 @@ export interface CushScorePolicy {
 
 export interface CushScoreInput {
   individualUserId: number;
-  destination: string;
-  baselineMonthlyPence: number;
-  baselineEffectiveDate: string;
   assessmentMonth: string;
-  countryCode: string;
+  destinationBaseline: DestinationBaseline | null;
+  hasSubmittedFinancialData: boolean;
   availableFunds: AvailableFund[];
   incomeHistory: MonthlyIncomeObservation[];
   /** One quality entry per distinct evidence source, not per monthly observation. */
@@ -148,10 +153,7 @@ export interface CushScoreResult {
   missingRequirements: string[];
   assessmentContext: {
     individualUserId: number;
-    destination: string;
-    baselineMonthlyPence: number;
-    baselineEffectiveDate: string;
-    countryCode: string;
+    destinationBaseline: DestinationBaseline | null;
   };
 }
 
@@ -259,30 +261,32 @@ function interpolate(value: number, points: Array<{ x: number; y: number }>): nu
 }
 
 function requireValidPolicy(policy: CushScorePolicy): void {
-  if (!Number.isInteger(policy.confidence.historyMonthsForMaximum) ||
-      policy.confidence.historyMonthsForMaximum < 1) {
-    throw new Error("Confidence historyMonthsForMaximum must be a positive integer.");
-  }
-  for (const quality of QUALITY_VALUES) {
-    assertUnitInterval(policy.confidence.evidenceQualityWeights[quality], `evidenceQualityWeights.${quality}`);
-    assertUnitInterval(policy.confidence.creditAvailabilityWeights[quality], `creditAvailabilityWeights.${quality}`);
-  }
-  for (const category of INCOME_CATEGORIES) {
-    assertUnitInterval(policy.confidence.incomeReliabilityByCategory[category], `incomeReliabilityByCategory.${category}`);
+  if (policy.confidence) {
+    if (!Number.isInteger(policy.confidence.historyMonthsForMaximum) ||
+        policy.confidence.historyMonthsForMaximum < 1) {
+      throw new Error("Confidence historyMonthsForMaximum must be a positive integer.");
+    }
+    for (const quality of QUALITY_VALUES) {
+      assertUnitInterval(policy.confidence.evidenceQualityWeights[quality], `evidenceQualityWeights.${quality}`);
+      assertUnitInterval(policy.confidence.creditAvailabilityWeights[quality], `creditAvailabilityWeights.${quality}`);
+    }
+    for (const category of INCOME_CATEGORIES) {
+      assertUnitInterval(policy.confidence.incomeReliabilityByCategory[category], `incomeReliabilityByCategory.${category}`);
+    }
+    let previousAge = -1;
+    for (const band of policy.confidence.freshnessBands) {
+      if (!Number.isInteger(band.maxAgeDays) || band.maxAgeDays < 0 ||
+          band.maxAgeDays <= previousAge || !Number.isFinite(band.points) ||
+          band.points < 0 || band.points > 10) {
+        throw new Error("Freshness bands must have increasing non-negative day limits and 0-10 points.");
+      }
+      previousAge = band.maxAgeDays;
+    }
   }
   for (const [classification, score] of Object.entries(policy.creditMappings)) {
     if (!Number.isFinite(score) || score < 0 || score > 100) {
       throw new Error(`Credit mapping for ${classification} must be between 0 and 100.`);
     }
-  }
-  let previousAge = -1;
-  for (const band of policy.confidence.freshnessBands) {
-    if (!Number.isInteger(band.maxAgeDays) || band.maxAgeDays < 0 ||
-        band.maxAgeDays <= previousAge || !Number.isFinite(band.points) ||
-        band.points < 0 || band.points > 10) {
-      throw new Error("Freshness bands must have increasing non-negative day limits and 0-10 points.");
-    }
-    previousAge = band.maxAgeDays;
   }
 }
 
@@ -300,31 +304,32 @@ function calculateConfidence(
   policy: CushScorePolicy,
   usableHistoryMonths: number,
 ): { score: number | null; breakdown: ConfidenceBreakdown | null } {
+  const confidencePolicy = policy.confidence;
   const hasAssessmentData =
     input.availableFunds.length > 0 ||
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
     input.credit.classification !== "unavailable";
-  if (!hasAssessmentData) return { score: null, breakdown: null };
+  if (!hasAssessmentData || !confidencePolicy) return { score: null, breakdown: null };
 
   const historyDepth = Math.min(
-    usableHistoryMonths / policy.confidence.historyMonthsForMaximum,
+    usableHistoryMonths / confidencePolicy.historyMonthsForMaximum,
     1,
   ) * 30;
 
   const sourceQuality = sourceQualityPoints(
     input.sourceEvidenceQualities,
-    policy.confidence.evidenceQualityWeights,
+    confidencePolicy.evidenceQualityWeights,
     25,
   );
 
   const creditAvailability = input.credit.evidenceQuality
-    ? 15 * policy.confidence.creditAvailabilityWeights[input.credit.evidenceQuality]
+    ? 15 * confidencePolicy.creditAvailabilityWeights[input.credit.evidenceQuality]
     : 0;
 
   let freshness = 0;
   if (input.dataAgeDays !== null) {
-    for (const band of policy.confidence.freshnessBands) {
+    for (const band of confidencePolicy.freshnessBands) {
       if (input.dataAgeDays <= band.maxAgeDays) {
         freshness = band.points;
         break;
@@ -341,7 +346,7 @@ function calculateConfidence(
   )];
   const incomeReliability = incomeCategories.length
     ? 10 * incomeCategories.reduce(
-      (sum, category) => sum + policy.confidence.incomeReliabilityByCategory[category],
+      (sum, category) => sum + confidencePolicy.incomeReliabilityByCategory[category],
       0,
     ) / incomeCategories.length
     : 0;
@@ -370,18 +375,28 @@ function validateInput(input: CushScoreInput, policy: CushScorePolicy): void {
   if (!Number.isSafeInteger(input.individualUserId) || input.individualUserId <= 0) {
     throw new Error("individualUserId must be a positive safe integer.");
   }
-  if (!input.destination.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(input.baselineEffectiveDate)) {
-    throw new Error("Destination and baseline effective date are required.");
+  if (typeof input.hasSubmittedFinancialData !== "boolean") {
+    throw new Error("hasSubmittedFinancialData must be a boolean.");
   }
-  const baselineDate = new Date(`${input.baselineEffectiveDate}T00:00:00Z`);
-  if (!Number.isFinite(baselineDate.getTime()) ||
-      baselineDate.toISOString().slice(0, 10) !== input.baselineEffectiveDate) {
-    throw new Error("baselineEffectiveDate must be a valid calendar date.");
+  if (input.destinationBaseline !== null) {
+    const baseline = input.destinationBaseline;
+    if (!baseline.destination.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(baseline.effectiveDate)) {
+      throw new Error("Destination and baseline effective date are required.");
+    }
+    const baselineDate = new Date(`${baseline.effectiveDate}T00:00:00Z`);
+    if (!Number.isFinite(baselineDate.getTime()) ||
+        baselineDate.toISOString().slice(0, 10) !== baseline.effectiveDate) {
+      throw new Error("baseline effectiveDate must be a valid calendar date.");
+    }
+    assertNonNegativeInteger(baseline.monthlyBaselinePence, "monthlyBaselinePence");
+    if (baseline.monthlyBaselinePence === 0) {
+      throw new Error("monthlyBaselinePence must be greater than zero.");
+    }
+    if (!/^[A-Z]{2}$/.test(baseline.countryCode)) {
+      throw new Error("countryCode must be a two-letter uppercase code.");
+    }
   }
   assertMonth(input.assessmentMonth, "assessmentMonth");
-  assertNonNegativeInteger(input.baselineMonthlyPence, "baselineMonthlyPence");
-  if (input.baselineMonthlyPence === 0) throw new Error("baselineMonthlyPence must be greater than zero.");
-  if (!/^[A-Z]{2}$/.test(input.countryCode)) throw new Error("countryCode must be a two-letter uppercase code.");
   if (!Number.isInteger(input.coveredAccountCount) || input.coveredAccountCount < 0 ||
       !Number.isInteger(input.declaredAccountCount) || input.declaredAccountCount < 0 ||
       input.coveredAccountCount > input.declaredAccountCount) {
@@ -484,7 +499,7 @@ function calculateRecognizedMonthlyIncome(input: CushScoreInput): number | null 
   }
 
   const offer = input.verifiedUkEmploymentOffer;
-  if (offer && input.countryCode === "GB" && offer.evidenceQuality === "verified") {
+  if (offer && input.destinationBaseline?.countryCode === "GB" && offer.evidenceQuality === "verified") {
     const contractIncome = Math.round(offer.monthlyAmountPence * 0.8);
     recognizedBySource.set(
       offer.sourceId,
@@ -500,17 +515,22 @@ function calculateFundsScore(input: CushScoreInput): { score: number | null; mon
   const verifiedFunds = input.availableFunds.filter(
     (fund) => fund.evidenceQuality === "verified",
   );
-  if (verifiedFunds.length === 0) return { score: null, months: null };
+  if (verifiedFunds.length === 0 || input.destinationBaseline === null) {
+    return { score: null, months: null };
+  }
   const accessiblePence = sumSafeIntegers(
     verifiedFunds.filter((fund) => fund.accessible).map((fund) => fund.amountPence),
     "Available funds",
   );
-  const months = accessiblePence / input.baselineMonthlyPence;
+  const months = accessiblePence / input.destinationBaseline.monthlyBaselinePence;
   return { score: interpolate(months, FUNDS_CURVE), months };
 }
 
-function calculateIncomeScore(recognizedIncomePence: number | null, baselinePence: number): number | null {
-  if (recognizedIncomePence === null) return null;
+function calculateIncomeScore(
+  recognizedIncomePence: number | null,
+  baselinePence: number | null,
+): number | null {
+  if (recognizedIncomePence === null || baselinePence === null) return null;
   return interpolate(recognizedIncomePence / baselinePence, INCOME_CURVE);
 }
 
@@ -521,7 +541,9 @@ function calculateCashFlowScore(
   const completeMonths = input.cashFlowHistory.filter(
     (item) => item.complete && isWithinAssessmentWindow(input.assessmentMonth, item.month),
   );
-  if (completeMonths.length === 0 || recognizedIncomePence === null) {
+  if (completeMonths.length === 0 ||
+      recognizedIncomePence === null ||
+      input.destinationBaseline === null) {
     return { score: null, cap: null };
   }
   if (recognizedIncomePence <= 0) return { score: 0, cap: 40 };
@@ -531,7 +553,7 @@ function calculateCashFlowScore(
   );
   const medianSurplusRatio = median(monthlyRatios.map((ratio) => Math.max(ratio, 0))) ?? 0;
   const rawScore = interpolate(medianSurplusRatio, SURPLUS_CURVE);
-  const incomeRatio = recognizedIncomePence / input.baselineMonthlyPence;
+  const incomeRatio = recognizedIncomePence / input.destinationBaseline.monthlyBaselinePence;
   const cap = 40 + 60 * Math.min(incomeRatio, 1);
   return { score: Math.min(rawScore, cap), cap };
 }
@@ -567,7 +589,10 @@ export function calculateCushScore(
   ).size;
   const funds = calculateFundsScore(input);
   const recognizedMonthlyIncomePence = calculateRecognizedMonthlyIncome(input);
-  const incomeScore = calculateIncomeScore(recognizedMonthlyIncomePence, input.baselineMonthlyPence);
+  const incomeScore = calculateIncomeScore(
+    recognizedMonthlyIncomePence,
+    input.destinationBaseline?.monthlyBaselinePence ?? null,
+  );
   const cashFlow = calculateCashFlowScore(input, recognizedMonthlyIncomePence);
   const creditScore = calculateCreditScore(input.credit, policy);
 
@@ -583,7 +608,7 @@ export function calculateCushScore(
     (item) => item.recurring &&
       item.evidenceQuality !== "self_reported" &&
       isWithinAssessmentWindow(input.assessmentMonth, item.month),
-  ) || (input.countryCode === "GB" &&
+  ) || (input.destinationBaseline?.countryCode === "GB" &&
     input.verifiedUkEmploymentOffer?.evidenceQuality === "verified");
   const cashFlowEvidenceSufficient = input.cashFlowHistory.filter(
     (item) => item.complete &&
@@ -595,21 +620,32 @@ export function calculateCushScore(
     input.credit.evidenceQuality !== null &&
     input.credit.evidenceQuality !== "self_reported";
 
+  const hasAnyInput =
+    input.hasSubmittedFinancialData ||
+    input.availableFunds.length > 0 ||
+    input.incomeHistory.length > 0 ||
+    input.cashFlowHistory.length > 0 ||
+    input.credit.classification !== "unavailable";
+
   const missingRequirements: string[] = [];
+  if (input.destinationBaseline === null) {
+    missingRequirements.push("Selected destination and approved monthly baseline");
+  }
   if (usableHistoryMonths < 4) missingRequirements.push("At least four months of usable financial history");
   if (!verifiedFundsExist) missingRequirements.push("Verified evidence for available funds");
   if (!incomeEvidenceSufficient) missingRequirements.push("Documented or verified recurring income");
   if (!cashFlowEvidenceSufficient) missingRequirements.push("Four months of supported cash-flow history");
   if (!creditAssessmentComplete) missingRequirements.push("Completed, supported credit assessment");
+  if (hasAnyInput && !policy.confidence) {
+    missingRequirements.push("Approved confidence-scoring policy");
+  }
   if (weightedTotal === null) missingRequirements.push("All four score components");
 
-  const isComplete = missingRequirements.length === 0 && weightedTotal !== null;
-  const hasAnyInput =
-    input.availableFunds.length > 0 ||
-    input.incomeHistory.length > 0 ||
-    input.cashFlowHistory.length > 0 ||
-    input.credit.classification !== "unavailable";
   const confidence = calculateConfidence(input, policy, usableHistoryMonths);
+  const isComplete =
+    missingRequirements.length === 0 &&
+    weightedTotal !== null &&
+    confidence.score !== null;
   const status: CushScoreResult["assessmentStatus"] = !hasAnyInput
     ? "not_started"
     : isComplete
@@ -621,16 +657,16 @@ export function calculateCushScore(
   const weightedContributions = {
     availableFunds: componentScores.availableFunds === null
       ? null
-      : Math.round(componentScores.availableFunds * COMPONENT_WEIGHTS.availableFunds * 100) / 100,
+      : Math.round(componentScores.availableFunds * COMPONENT_WEIGHTS.availableFunds * 10 * 100) / 100,
     incomeStrength: componentScores.incomeStrength === null
       ? null
-      : Math.round(componentScores.incomeStrength * COMPONENT_WEIGHTS.incomeStrength * 100) / 100,
+      : Math.round(componentScores.incomeStrength * COMPONENT_WEIGHTS.incomeStrength * 10 * 100) / 100,
     cashFlow: componentScores.cashFlow === null
       ? null
-      : Math.round(componentScores.cashFlow * COMPONENT_WEIGHTS.cashFlow * 100) / 100,
+      : Math.round(componentScores.cashFlow * COMPONENT_WEIGHTS.cashFlow * 10 * 100) / 100,
     creditHistory: componentScores.creditHistory === null
       ? null
-      : Math.round(componentScores.creditHistory * COMPONENT_WEIGHTS.creditHistory * 100) / 100,
+      : Math.round(componentScores.creditHistory * COMPONENT_WEIGHTS.creditHistory * 10 * 100) / 100,
   };
 
   return {
@@ -649,18 +685,15 @@ export function calculateCushScore(
     confidenceBreakdown: confidence.breakdown,
     recognizedMonthlyIncomePence,
     fundsMonths: funds.months === null ? null : Math.round(funds.months * 10000) / 10000,
-    incomeRatio: recognizedMonthlyIncomePence === null
+    incomeRatio: recognizedMonthlyIncomePence === null || input.destinationBaseline === null
       ? null
-      : Math.round((recognizedMonthlyIncomePence / input.baselineMonthlyPence) * 10000) / 10000,
+      : Math.round((recognizedMonthlyIncomePence / input.destinationBaseline.monthlyBaselinePence) * 10000) / 10000,
     cashFlowCap: cashFlow.cap === null ? null : Math.round(cashFlow.cap * 100) / 100,
     usableHistoryMonths,
     missingRequirements,
     assessmentContext: {
       individualUserId: input.individualUserId,
-      destination: input.destination,
-      baselineMonthlyPence: input.baselineMonthlyPence,
-      baselineEffectiveDate: input.baselineEffectiveDate,
-      countryCode: input.countryCode,
+      destinationBaseline: input.destinationBaseline,
     },
   };
 }

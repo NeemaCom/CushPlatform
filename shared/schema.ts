@@ -69,7 +69,10 @@ export const passports = pgTable("passports", {
   mode: text("mode").notNull().default("pre_arrival"),
   shareToken: text("share_token").unique(),
   scoreBreakdown: json("score_breakdown").$type<{
-    incomeScore: number; surplusScore: number; stabilityScore: number;
+    availableFunds: number | null;
+    incomeStrength: number | null;
+    cashFlow: number | null;
+    creditHistory: number | null;
   }>(),
   reasonCodes: text("reason_codes").array(),
   generatedAt: timestamp("generated_at"),
@@ -105,6 +108,7 @@ export const evidenceVault = pgTable("evidence_vault", {
   label: text("label").notNull(),
   status: text("status").notNull().default("SELF_REPORTED"),
   tier: integer("tier").notNull().default(1),
+  // Legacy metadata retained for compatibility; V2 never adds document points.
   scoreBoost: integer("score_boost").notNull().default(0),
   fileData: text("file_data"),
   fileName: text("file_name"),

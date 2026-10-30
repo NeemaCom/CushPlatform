@@ -16,9 +16,20 @@ import {
 
 interface PassportData {
   passport: {
-    id: number; score: number; confidenceScore: number; mode: string;
+    id: number; score: number | null; provisionalScore: number | null;
+    confidenceScore: number | null; mode: string;
+    assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
+    algorithmVersion: string; missingRequirements: string[];
+    legacyDataNotice: string | null;
     shareToken: string | null;
-    scoreBreakdown: { incomeScore: number; surplusScore: number; stabilityScore: number } | null;
+    scoreBreakdown: {
+      availableFunds: number | null; incomeStrength: number | null;
+      cashFlow: number | null; creditHistory: number | null;
+    } | null;
+    weightedContributions: {
+      availableFunds: number | null; incomeStrength: number | null;
+      cashFlow: number | null; creditHistory: number | null;
+    } | null;
     reasonCodes: string[] | null; lastUpdated: string | null; generatedAt: string | null;
   };
   signals: Signal[];
@@ -31,7 +42,7 @@ interface Signal {
 }
 interface EvidenceItem {
   id: number; documentType: string; label: string; status: string;
-  tier: number; scoreBoost: number; fileName: string | null;
+  tier: number; fileName: string | null;
 }
 interface Benchmark {
   countryCode: string; countryName: string; currencyCode: string; pppMultiplier: number;
@@ -40,14 +51,14 @@ interface Benchmark {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CHECKLIST_ITEMS = [
-  { documentType: "payslip",            label: "Monthly Payslip Declaration",      tier: 1, scoreBoost: 40, description: "Declare your most recent payslip amount" },
-  { documentType: "bank_statement",     label: "Bank Balance Confirmation",        tier: 1, scoreBoost: 30, description: "Confirm your average monthly bank balance" },
-  { documentType: "employment_contract",label: "Employment Status",                tier: 1, scoreBoost: 35, description: "Confirm employment type and duration" },
-  { documentType: "payslip",            label: "Upload Payslip (PDF/Image)",       tier: 2, scoreBoost: 40, description: "Upload an actual payslip for verification" },
-  { documentType: "bank_statement",     label: "Upload Bank Statement",            tier: 2, scoreBoost: 30, description: "Upload 3-month bank statement PDF" },
-  { documentType: "tax_return",         label: "Upload Tax Return",                tier: 2, scoreBoost: 50, description: "Upload most recent tax assessment" },
-  { documentType: "proof_of_residency", label: "Proof of Residency",              tier: 2, scoreBoost: 20, description: "Required for Post-Arrival mode" },
-  { documentType: "transfer_receipt",   label: "International Transfer Receipt",   tier: 2, scoreBoost: 25, description: "Proves global asset movement capacity" },
+  { documentType: "payslip",            label: "Monthly Payslip Declaration",      tier: 1, description: "Declare your most recent payslip amount" },
+  { documentType: "bank_statement",     label: "Bank Balance Confirmation",        tier: 1, description: "Confirm your average monthly bank balance" },
+  { documentType: "employment_contract",label: "Employment Status",                tier: 1, description: "Confirm employment type and duration" },
+  { documentType: "payslip",            label: "Upload Payslip (PDF/Image)",       tier: 2, description: "Upload an actual payslip for verification" },
+  { documentType: "bank_statement",     label: "Upload Bank Statement",            tier: 2, description: "Upload 3-month bank statement PDF" },
+  { documentType: "tax_return",         label: "Upload Tax Return",                tier: 2, description: "Upload most recent tax assessment" },
+  { documentType: "proof_of_residency", label: "Proof of Residency",              tier: 2, description: "Required for Post-Arrival mode" },
+  { documentType: "transfer_receipt",   label: "International Transfer Receipt",   tier: 2, description: "Supports evidence of financial activity" },
 ];
 const SIGNAL_TYPES = [
   { value: "income",    label: "Monthly Income",       color: "text-blue-600 bg-blue-50" },
@@ -70,16 +81,6 @@ function apiRequest(method: string, url: string, body?: unknown) {
     return data;
   });
 }
-function getTier(score: number) {
-  if (score >= 750) return "excellent";
-  if (score >= 650) return "good";
-  if (score >= 450) return "fair";
-  return "building";
-}
-function scoreColor(s: number) {
-  return s >= 750 ? "#10b981" : s >= 500 ? "#2563eb" : "#94a3b8";
-}
-
 // ─── Custom Hooks ─────────────────────────────────────────────────────────────
 
 function useCountUp(target: number) {
@@ -99,114 +100,80 @@ function useCountUp(target: number) {
   return display;
 }
 
-function useTierChange(score: number) {
-  const prevRef = useRef<string | null>(null);
-  const [burst, setBurst] = useState(false);
-  useEffect(() => {
-    const tier = getTier(score);
-    if (prevRef.current !== null && tier !== prevRef.current) {
-      setBurst(true);
-      const t = setTimeout(() => setBurst(false), 2200);
-      return () => clearTimeout(t);
-    }
-    prevRef.current = tier;
-  }, [score]);
-  return burst;
-}
-
-// ─── Confetti Burst ───────────────────────────────────────────────────────────
-
-function ConfettiBurst({ active }: { active: boolean }) {
-  const particles = Array.from({ length: 18 }, (_, i) => ({
-    id: i,
-    angle: (i / 18) * 360 + Math.sin(i) * 15,
-    color: CONFETTI_COLORS[i % CONFETTI_COLORS.length],
-    r: 55 + Math.abs(Math.sin(i * 1.7)) * 30,
-    size: 4 + (i % 4),
-    round: i % 3 !== 0,
-  }));
-  return (
-    <AnimatePresence>
-      {active && particles.map((p) => (
-        <motion.div key={p.id}
-          className="absolute pointer-events-none"
-          style={{
-            top: "50%", left: "50%", zIndex: 30,
-            width: p.size, height: p.size,
-            borderRadius: p.round ? "50%" : 2,
-            backgroundColor: p.color,
-            transformOrigin: "center",
-          }}
-          initial={{ x: 0, y: 0, opacity: 1, scale: 1, rotate: 0 }}
-          animate={{
-            x: Math.cos((p.angle * Math.PI) / 180) * p.r,
-            y: Math.sin((p.angle * Math.PI) / 180) * p.r - 25,
-            opacity: 0, scale: 0.2, rotate: p.round ? 0 : 270,
-          }}
-          transition={{ duration: 0.85, ease: "easeOut" }}
-        />
-      ))}
-    </AnimatePresence>
-  );
-}
-
 // ─── Score Ring ───────────────────────────────────────────────────────────────
 
-function ScoreRing({ score, confidence }: { score: number; confidence: number }) {
-  const displayScore = useCountUp(score);
-  const showConfetti = useTierChange(score);
+function ScoreRing({
+  score,
+  provisionalScore,
+  confidence,
+  assessmentStatus,
+}: {
+  score: number | null;
+  provisionalScore: number | null;
+  confidence: number | null;
+  assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
+}) {
+  const availableScore = score ?? provisionalScore;
+  const displayScore = useCountUp(availableScore ?? 0);
   const r = 70, circ = 2 * Math.PI * r;
-  const label = score >= 800 ? "Excellent" : score >= 650 ? "Good" : score >= 450 ? "Fair" : "Building";
-  const confLabel = confidence >= 80 ? "High Confidence" : confidence >= 55 ? "Moderate" : confidence >= 30 ? "Building" : "Low";
-  const confColor = confidence >= 80 ? "text-emerald-600" : confidence >= 55 ? "text-blue-600" : confidence >= 30 ? "text-amber-600" : "text-slate-500";
-  const dColor = scoreColor(displayScore);
-  const finalColor = scoreColor(score);
+  const scoreColor = availableScore === null ? "#94a3b8" : score === null ? "#d97706" : "#2563eb";
+  const statusLabel = {
+    not_started: "Not started",
+    incomplete: "Assessment incomplete",
+    provisional: "Provisional",
+    complete: "Complete",
+  }[assessmentStatus];
+  const confidenceLabel = confidence === null
+    ? "Confidence pending"
+    : confidence >= 70
+      ? "High confidence"
+      : confidence >= 40
+        ? "Moderate confidence"
+        : "Low confidence";
+  const confidenceColor = confidence === null
+    ? "text-slate-400"
+    : confidence >= 70
+      ? "text-emerald-600"
+      : confidence >= 40
+        ? "text-amber-600"
+        : "text-slate-500";
 
   return (
     <div className="flex flex-col items-center gap-3">
       <div className="relative">
-        {/* confetti burst */}
-        <div className="absolute inset-0 overflow-visible pointer-events-none flex items-center justify-center">
-          <ConfettiBurst active={showConfetti} />
-        </div>
-
-        {/* pulse ring on score change */}
-        <motion.div
-          animate={showConfetti ? { scale: [1, 1.07, 0.96, 1.03, 1] } : { scale: 1 }}
-          transition={{ duration: 0.55 }}
-        >
-          <svg width="168" height="168" viewBox="0 0 168 168" className="rotate-[-90deg]">
-            <circle cx="84" cy="84" r={r} fill="none" stroke="#f1f5f9" strokeWidth="12" />
-            <motion.circle
-              cx="84" cy="84" r={r} fill="none" strokeWidth="12" strokeLinecap="round"
-              strokeDasharray={circ}
-              initial={{ strokeDashoffset: circ, stroke: "#94a3b8" }}
-              animate={{ strokeDashoffset: circ * (1 - score / 1000), stroke: finalColor }}
-              transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1] }}
-            />
-          </svg>
-        </motion.div>
+        <svg width="168" height="168" viewBox="0 0 168 168" className="rotate-[-90deg]">
+          <circle cx="84" cy="84" r={r} fill="none" stroke="#f1f5f9" strokeWidth="12" />
+          <motion.circle
+            cx="84" cy="84" r={r} fill="none" strokeWidth="12" strokeLinecap="round"
+            strokeDasharray={circ}
+            animate={{
+              strokeDashoffset: availableScore === null ? circ : circ * (1 - availableScore / 1000),
+              stroke: scoreColor,
+            }}
+            transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
+          />
+        </svg>
 
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
-          <span className="text-[2.5rem] font-black leading-none transition-colors duration-150" style={{ color: dColor }}>
-            {displayScore}
+          <span className="text-[2.5rem] font-black leading-none text-slate-700">
+            {availableScore === null ? "—" : displayScore}
           </span>
           <span className="text-xs text-slate-400 font-medium">/ 1000</span>
-          <span className="text-xs font-bold mt-1 transition-colors duration-150" style={{ color: dColor }}>{label}</span>
+          <span className="text-xs font-bold mt-1 text-slate-600">{statusLabel}</span>
         </div>
       </div>
 
-      <div className={`text-xs font-semibold ${confColor} flex items-center gap-1.5`}>
-        <BadgeCheck className="w-3.5 h-3.5" />
-        {confLabel} — {confidence}% Verified
+      <div className={`text-xs font-semibold ${confidenceColor} flex items-center gap-1.5`}>
+        {confidence !== null && <BadgeCheck className="w-3.5 h-3.5" />}
+        {confidence === null ? confidenceLabel : `${confidenceLabel} · ${confidence}/100`}
       </div>
     </div>
   );
 }
 
-// ─── Floating Boost Indicator ─────────────────────────────────────────────────
+// ─── Evidence Saved Indicator ─────────────────────────────────────────────────
 
-function FloatingBoost({ pts, visible }: { pts: number; visible: boolean }) {
+function EvidenceSaved({ visible }: { visible: boolean }) {
   return (
     <AnimatePresence>
       {visible && (
@@ -217,7 +184,7 @@ function FloatingBoost({ pts, visible }: { pts: number; visible: boolean }) {
           exit={{ opacity: 0 }}
           transition={{ duration: 1.1, ease: "easeOut" }}
         >
-          +{pts} pts
+          Evidence saved
         </motion.div>
       )}
     </AnimatePresence>
@@ -308,7 +275,7 @@ function ChecklistRow({
       transition={{ duration: 0.45 }}
       style={{ borderRadius: 12 }}
     >
-      <FloatingBoost pts={item.scoreBoost} visible={showBoost} />
+      <EvidenceSaved visible={showBoost} />
 
       {/* Main row */}
       <div
@@ -393,8 +360,8 @@ function ChecklistRow({
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0 relative z-10">
-          <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-            +{item.scoreBoost} pts
+          <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
+            Evidence
           </span>
           {!submitted && (
             item.tier === 1 ? (
@@ -549,7 +516,7 @@ function SharePanel({
           </div>
         </div>
         <p className="text-slate-400 text-xs leading-relaxed">
-          Your public link lets landlords verify your financial capacity without seeing raw data. Revoke it any time.
+          Your public link lets viewers review your assessment status and listed evidence without seeing raw document contents. Revoke it any time.
         </p>
         <motion.button
           whileTap={{ scale: 0.97 }} onClick={onGenerate} disabled={isGenerating}
@@ -679,7 +646,7 @@ export default function CreditPassport() {
 
   const addSignalMutation = useMutation({
     mutationFn: (body: unknown) => apiRequest("POST", "/api/passport/signals", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); setShowSignalForm(false); toast({ title: "Signal added", description: "Score recalculated." }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); setShowSignalForm(false); toast({ title: "Signal saved", description: "The V2 assessment remains incomplete until its required dated and supported inputs are available." }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const deleteSignalMutation = useMutation({
@@ -688,7 +655,7 @@ export default function CreditPassport() {
   });
   const addEvidenceMutation = useMutation({
     mutationFn: (body: unknown) => apiRequest("POST", "/api/passport/evidence", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); toast({ title: "Evidence submitted", description: "Document queued for review." }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); toast({ title: "Evidence submitted", description: "Document queued for review. Documents do not directly add score points." }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const toggleModeMutation = useMutation({
@@ -726,15 +693,33 @@ export default function CreditPassport() {
   }
 
   const { passport, signals = [], evidence = [] } = data ?? {
-    passport: { id: 0, score: 0, confidenceScore: 0, mode: "pre_arrival", shareToken: null, scoreBreakdown: null, reasonCodes: null, lastUpdated: null, generatedAt: null },
+    passport: {
+      id: 0,
+      score: null,
+      provisionalScore: null,
+      confidenceScore: null,
+      assessmentStatus: "not_started" as const,
+      algorithmVersion: "2.0.0",
+      missingRequirements: [],
+      legacyDataNotice: null,
+      mode: "pre_arrival",
+      shareToken: null,
+      scoreBreakdown: null,
+      weightedContributions: null,
+      reasonCodes: null,
+      lastUpdated: null,
+      generatedAt: null,
+    },
     signals: [], evidence: [],
   };
-  const breakdown = passport.scoreBreakdown ?? { incomeScore: 0, surplusScore: 0, stabilityScore: 0 };
+  const breakdown = passport.scoreBreakdown ?? {
+    availableFunds: null,
+    incomeStrength: null,
+    cashFlow: null,
+    creditHistory: null,
+  };
   const completedItems = evidence.length;
   const maxItems = CHECKLIST_ITEMS.length;
-  const potentialBoost = CHECKLIST_ITEMS
-    .filter((item) => !evidence.find((e) => e.documentType === item.documentType && e.tier === item.tier))
-    .reduce((acc, item) => acc + item.scoreBoost, 0);
 
   // Determine slide direction for mode toggle
   const modeDir = passport.mode === "post_arrival" ? 1 : -1;
@@ -788,7 +773,12 @@ export default function CreditPassport() {
             >
               <div className="p-6 sm:p-8">
                 <div className="flex flex-col sm:flex-row items-center gap-8">
-                  <ScoreRing score={passport.score} confidence={passport.confidenceScore} />
+                  <ScoreRing
+                    score={passport.score}
+                    provisionalScore={passport.provisionalScore}
+                    confidence={passport.confidenceScore}
+                    assessmentStatus={passport.assessmentStatus}
+                  />
 
                   <div className="flex-1 space-y-5 w-full">
                     {/* Mode toggle */}
@@ -824,51 +814,68 @@ export default function CreditPassport() {
                         className="space-y-3"
                       >
                         {[
-                          { label: "Income",    value: breakdown.incomeScore,    weight: "40%", color: "#2563eb" },
-                          { label: "Surplus",   value: breakdown.surplusScore,   weight: "30%", color: "#10b981" },
-                          { label: "Stability", value: breakdown.stabilityScore, weight: "30%", color: "#7c3aed" },
+                          { label: "Available funds", key: "availableFunds" as const, value: breakdown.availableFunds, weight: "35%", color: "#2563eb" },
+                          { label: "Income strength", key: "incomeStrength" as const, value: breakdown.incomeStrength, weight: "30%", color: "#10b981" },
+                          { label: "Cash-flow behaviour", key: "cashFlow" as const, value: breakdown.cashFlow, weight: "20%", color: "#7c3aed" },
+                          { label: "Credit history", key: "creditHistory" as const, value: breakdown.creditHistory, weight: "15%", color: "#f59e0b" },
                         ].map((bar) => (
                           <div key={bar.label}>
                             <div className="flex justify-between text-xs mb-1.5">
                               <span className="text-slate-500 font-medium">{bar.label} <span className="text-slate-300">({bar.weight})</span></span>
-                              <span className="font-bold text-slate-800">{bar.value}/100</span>
+                              <span className="font-bold text-slate-800">
+                                {bar.value === null ? "Not available" : `${bar.value}/100`}
+                              </span>
                             </div>
                             <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                               <motion.div
                                 className="h-full rounded-full"
                                 initial={{ width: 0 }}
-                                animate={{ width: `${bar.value}%` }}
+                                animate={{ width: `${bar.value ?? 0}%` }}
                                 transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
                                 style={{ backgroundColor: bar.color }}
                               />
                             </div>
+                            {passport.weightedContributions?.[bar.key] !== null &&
+                              passport.weightedContributions?.[bar.key] !== undefined && (
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                  Weighted contribution: {passport.weightedContributions[bar.key]}/1000
+                                </p>
+                              )}
                           </div>
                         ))}
-                        {passport.reasonCodes && passport.reasonCodes.length > 0 && (
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {passport.reasonCodes.map((code, i) => (
-                              <motion.span
-                                key={i}
-                                initial={{ opacity: 0, scale: 0.85 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ delay: i * 0.06 }}
-                                className="text-xs bg-slate-50 border border-slate-200 text-slate-600 px-2.5 py-1 rounded-full"
-                              >
-                                {code}
-                              </motion.span>
-                            ))}
-                          </div>
-                        )}
                       </motion.div>
                     </AnimatePresence>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4" role="status">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-700 mt-0.5 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-amber-900">
+                        {passport.assessmentStatus === "not_started" ? "Assessment not started" :
+                          passport.assessmentStatus === "provisional" ? "Provisional assessment" :
+                            passport.assessmentStatus === "complete" ? "Assessment complete" : "Assessment incomplete"}
+                      </p>
+                      {passport.legacyDataNotice && (
+                        <p className="text-xs text-amber-800 mt-1">{passport.legacyDataNotice}</p>
+                      )}
+                      {passport.missingRequirements.length > 0 && (
+                        <ul className="mt-2 space-y-1 list-disc pl-4 text-xs text-amber-800">
+                          {passport.missingRequirements.map((requirement) => (
+                            <li key={requirement}>{requirement}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {/* Strength bar */}
                 <div className="mt-6 pt-5 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="font-semibold text-slate-600">Passport Strength</span>
-                    <span className="text-slate-400">{completedItems}/{maxItems} tasks complete</span>
+                    <span className="font-semibold text-slate-600">Evidence checklist progress</span>
+                    <span className="text-slate-400">{completedItems}/{maxItems} submitted</span>
                   </div>
                   <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                     <motion.div
@@ -878,9 +885,6 @@ export default function CreditPassport() {
                       transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
                     />
                   </div>
-                  {potentialBoost > 0 && (
-                    <p className="text-xs text-blue-600 mt-1.5 font-medium">+{potentialBoost} pts potential boost remaining</p>
-                  )}
                 </div>
               </div>
             </motion.div>
@@ -888,7 +892,7 @@ export default function CreditPassport() {
             {/* Tab bar */}
             <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
               {([
-                { key: "roadmap",  label: "Score Roadmap",      icon: TrendingUp },
+                { key: "roadmap",  label: "Evidence Roadmap",   icon: TrendingUp },
                 { key: "signals",  label: "Financial Signals",  icon: Globe2 },
               ] as const).map(({ key, label, icon: Icon }) => (
                 <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setActiveTab(key)}
@@ -911,8 +915,8 @@ export default function CreditPassport() {
                 >
                   <div className="flex items-center justify-between mb-1">
                     <div>
-                      <h2 className="font-bold text-slate-900 text-base">Ways to Boost Your Score</h2>
-                      <p className="text-xs text-slate-400 mt-0.5">Complete tasks to unlock score points. Drag & drop files to upload.</p>
+                      <h2 className="font-bold text-slate-900 text-base">Evidence for your assessment</h2>
+                      <p className="text-xs text-slate-400 mt-0.5">Supporting documents help verify your information; they do not directly add score points. Drag and drop files to upload.</p>
                     </div>
                   </div>
                   {CHECKLIST_ITEMS.map((item, i) => (
@@ -954,7 +958,7 @@ export default function CreditPassport() {
                       className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200">
                       <Globe2 className="w-8 h-8 text-slate-300 mx-auto mb-3" />
                       <p className="text-sm font-medium text-slate-500">No signals yet</p>
-                      <p className="text-xs text-slate-400 mt-1">Add income, surplus, or stability signals to build your score</p>
+                      <p className="text-xs text-slate-400 mt-1">Signals are retained, but the V2 score needs dated, supported assessment records.</p>
                       <motion.button whileTap={{ scale: 0.95 }} onClick={() => setShowSignalForm(true)}
                         className="mt-4 flex items-center gap-1.5 text-xs bg-slate-900 text-white px-4 py-2 rounded-xl font-semibold mx-auto hover:bg-slate-700 transition-colors">
                         <Plus className="w-3.5 h-3.5" />Add First Signal
@@ -1024,11 +1028,11 @@ export default function CreditPassport() {
 
             {/* Score Stats */}
             <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-              <h3 className="font-bold text-slate-900 text-sm">Score Overview</h3>
+              <h3 className="font-bold text-slate-900 text-sm">Assessment overview</h3>
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: "Current Score", value: passport.score.toString(), sub: "/ 1000",    color: "text-[#2563eb]" },
-                  { label: "Confidence",    value: `${passport.confidenceScore}%`, sub: "Verified", color: "text-emerald-600" },
+                  { label: "Cush Score", value: passport.score !== null ? String(passport.score) : passport.provisionalScore !== null ? String(passport.provisionalScore) : "—", sub: passport.score !== null ? "/ 1000" : passport.provisionalScore !== null ? "Provisional" : "Incomplete", color: "text-[#2563eb]" },
+                  { label: "Confidence", value: passport.confidenceScore === null ? "—" : `${passport.confidenceScore}/100`, sub: passport.confidenceScore === null ? "Pending" : "Evidence quality", color: "text-emerald-600" },
                   { label: "Mode",          value: passport.mode === "pre_arrival" ? "Pre" : "Post", sub: "Arrival", color: "text-violet-600" },
                   { label: "Tasks Done",    value: `${completedItems}/${maxItems}`, sub: "Complete", color: "text-amber-600" },
                 ].map(({ label, value, sub, color }) => (
@@ -1047,10 +1051,10 @@ export default function CreditPassport() {
                 <ShieldCheck className="w-4 h-4 text-blue-600" />Quick Wins
               </h3>
               {[
-                { tip: "Add your monthly income signal",   pts: "+40 pts", dtype: "payslip" },
-                { tip: "Confirm your employment status",   pts: "+35 pts", dtype: "employment_contract" },
-                { tip: "Upload a bank statement PDF",      pts: "+30 pts", dtype: "bank_statement" },
-              ].map(({ tip, pts, dtype }) => {
+                { tip: "Declare your monthly income", dtype: "payslip" },
+                { tip: "Confirm your employment status", dtype: "employment_contract" },
+                { tip: "Upload a bank statement", dtype: "bank_statement" },
+              ].map(({ tip, dtype }) => {
                 const done = evidence.some((e) => e.documentType === dtype);
                 return (
                   <motion.div key={tip} whileHover={!done ? { x: 3 } : {}} transition={{ duration: 0.15 }}
@@ -1066,7 +1070,7 @@ export default function CreditPassport() {
                       }
                       <span className={done ? "text-emerald-700 line-through" : "text-slate-700"}>{tip}</span>
                     </div>
-                    <span className="font-bold text-blue-600 whitespace-nowrap">{pts}</span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">Evidence</span>
                   </motion.div>
                 );
               })}

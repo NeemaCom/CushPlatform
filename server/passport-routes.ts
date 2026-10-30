@@ -1,5 +1,5 @@
 /**
- * Cush Passport V1 — API Routes (in-memory store)
+ * Cush Passport API routes (in-memory store)
  * All routes under /api/passport/*
  */
 import type { Express } from "express";
@@ -21,7 +21,10 @@ export function registerPassportRoutes(app: Express) {
   app.get("/api/passport/me", isAuthenticated, (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const passport = mem.getOrCreatePassport(userId);
+      const initialPassport = mem.getOrCreatePassport(userId);
+      const passport = initialPassport.lastUpdated
+        ? initialPassport
+        : mem.recalculatePassport(initialPassport.id, userId);
       const signals = mem.getPassportSignals(passport.id);
       const evidence = mem.getPassportEvidence(passport.id);
       return res.json({ passport, signals, evidence });
@@ -172,11 +175,14 @@ export function registerPassportRoutes(app: Express) {
   app.get("/api/passport/public/:token", (req, res) => {
     try {
       const { token } = req.params;
-      const passport = mem.getPassportByShareToken(token);
+      const initialPassport = mem.getPassportByShareToken(token);
 
-      if (!passport) {
+      if (!initialPassport) {
         return res.status(404).json({ error: "Passport not found" });
       }
+      const passport = initialPassport.lastUpdated
+        ? initialPassport
+        : mem.recalculatePassport(initialPassport.id, initialPassport.userId);
 
       const evidence = mem.getPassportEvidence(passport.id).map((e) => ({
         documentType: e.documentType,
@@ -194,12 +200,20 @@ export function registerPassportRoutes(app: Express) {
         verificationStatus: s.verificationStatus,
       }));
 
-      const confidence = normalizationService.getConfidenceLabel(passport.confidenceScore);
+      const confidence = passport.confidenceScore === null
+        ? { label: "Pending", color: "text-slate-400" }
+        : normalizationService.getConfidenceLabel(passport.confidenceScore);
 
       return res.json({
         score: passport.score,
+        provisionalScore: passport.provisionalScore,
         confidenceScore: passport.confidenceScore,
         confidenceLabel: confidence.label,
+        assessmentStatus: passport.assessmentStatus,
+        algorithmVersion: passport.algorithmVersion,
+        missingRequirements: passport.missingRequirements,
+        weightedContributions: passport.weightedContributions,
+        legacyDataNotice: passport.legacyDataNotice,
         mode: passport.mode,
         scoreBreakdown: passport.scoreBreakdown,
         reasonCodes: passport.reasonCodes ?? [],

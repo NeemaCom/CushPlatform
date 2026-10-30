@@ -2,18 +2,22 @@ import { Link } from "wouter";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 
 const SAMPLE_DATA = {
-  score: 785,
+  score: 800,
   confidenceScore: 72,
-  confidenceLabel: "High Confidence",
+  confidenceLabel: "High",
   mode: "pre_arrival",
-  scoreBreakdown: { incomeScore: 82, surplusScore: 74, stabilityScore: 79 },
-  reasonCodes: [
-    "Income is 2.1× the PPP-adjusted local median",
-    "Consistent monthly surplus over 12 months",
-    "Employment contract with 24+ months tenure",
-    "Verified international transfer capacity",
-  ],
-  lastUpdated: new Date().toISOString(),
+  scoreBreakdown: {
+    availableFunds: 82,
+    incomeStrength: 82,
+    cashFlow: 74,
+    creditHistory: 79,
+  },
+  weightedContributions: {
+    availableFunds: 287,
+    incomeStrength: 246,
+    cashFlow: 148,
+    creditHistory: 118.5,
+  },
   evidence: [
     { documentType: "payslip", label: "Monthly Payslip Declaration", status: "VERIFIED", tier: 1 },
     { documentType: "employment_contract", label: "Employment Status", status: "VERIFIED", tier: 1 },
@@ -21,9 +25,10 @@ const SAMPLE_DATA = {
     { documentType: "payslip", label: "Upload Payslip (PDF/Image)", status: "SELF_REPORTED", tier: 2 },
   ],
   signals: [
-    { signalType: "income", label: "Primary employer salary", country: "NG", currencyCode: "NGN", normalizedValue: "3.4", verificationStatus: "VERIFIED" },
-    { signalType: "surplus", label: "Monthly net surplus", country: "NG", currencyCode: "NGN", normalizedValue: "1.9", verificationStatus: "SELF_REPORTED" },
-    { signalType: "stability", label: "12-month track record", country: "NG", currencyCode: "NGN", normalizedValue: "2.6", verificationStatus: "VERIFIED" },
+    { signalType: "funds", label: "Accessible savings", country: "GB", currencyCode: "GBP", normalizedValue: null, verificationStatus: "VERIFIED" },
+    { signalType: "income", label: "Recurring income history", country: "GB", currencyCode: "GBP", normalizedValue: null, verificationStatus: "VERIFIED" },
+    { signalType: "cash_flow", label: "Monthly cash-flow history", country: "GB", currencyCode: "GBP", normalizedValue: null, verificationStatus: "VERIFIED" },
+    { signalType: "credit", label: "Credit assessment", country: "GB", currencyCode: "GBP", normalizedValue: null, verificationStatus: "VERIFIED" },
   ],
 };
 
@@ -37,7 +42,7 @@ function ScoreGauge({ score }: { score: number }) {
   const pct = Math.round((score / 1000) * 100);
   const r = 92;
   const circ = 2 * Math.PI * r;
-  const color = score >= 750 ? "#10b981" : score >= 550 ? "#2563eb" : score >= 350 ? "#f59e0b" : "#94a3b8";
+  const color = "#2563eb";
 
   return (
     <div className="relative inline-block">
@@ -92,27 +97,27 @@ export default function SamplePassport() {
           <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold mt-0.5">i</div>
           <div>
             <p className="text-sm font-semibold text-blue-900">This is a sample passport for demonstration purposes.</p>
-            <p className="text-xs text-blue-700 mt-0.5">Real scores are computed from verified financial signals using our PPP-normalized model.</p>
+            <p className="text-xs text-blue-700 mt-0.5">All values on this page are illustrative and do not represent a real applicant or production assessment.</p>
           </div>
         </div>
 
         {/* Hero Score Card */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
           <div className="bg-gradient-to-br from-slate-900 to-slate-800 px-8 pt-8 pb-10 text-white text-center">
-            <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-6">Cush Global Credit Score</p>
+            <p className="text-slate-400 text-xs uppercase tracking-widest font-semibold mb-6">Illustrative Cush Score</p>
             <div className="relative inline-block">
               <ScoreGauge score={data.score} />
             </div>
             <div className="mt-4 space-y-1">
-              <p className="text-2xl font-bold">Excellent</p>
+              <p className="text-2xl font-bold">Example only</p>
               <div className="inline-block bg-emerald-500/20 border border-emerald-400/30 rounded-full px-4 py-1 mt-1">
-                <span className="text-emerald-300 text-sm font-semibold">{data.confidenceLabel} — {data.confidenceScore}% Verified</span>
+                <span className="text-emerald-300 text-sm font-semibold">Illustrative confidence · {data.confidenceScore}/100</span>
               </div>
             </div>
             <div className="mt-4 flex items-center justify-center gap-4 text-xs text-slate-400">
               <span>Mode: Pre-Arrival</span>
               <span>·</span>
-              <span>Last updated {new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</span>
+              <span>Illustrative values</span>
             </div>
           </div>
 
@@ -121,10 +126,10 @@ export default function SamplePassport() {
               <span className="text-white text-xs font-bold">i</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-blue-900 mb-0.5">How to read this score</p>
+              <p className="text-sm font-semibold text-blue-900 mb-0.5">How the V2 score is weighted</p>
               <p className="text-xs text-blue-700 leading-relaxed">
-                We measure financial discipline relative to local cost-of-living to prove global reliability.
-                A score of 600+ indicates the applicant is a significantly above-average earner in their home economy.
+                Available funds account for 35%, income strength 30%, cash-flow behaviour 20%, and credit history 15%.
+                Real assessments remain incomplete until the required evidence and history checks pass.
               </p>
             </div>
           </div>
@@ -135,36 +140,23 @@ export default function SamplePassport() {
           <h2 className="font-bold text-slate-900 mb-5">Score Breakdown</h2>
           <div className="space-y-4">
             {[
-              { label: "Income Strength", sublabel: "Relative to local purchasing power", value: breakdown.incomeScore, weight: 40, color: "#2563eb" },
-              { label: "Monthly Surplus", sublabel: "Consistency of surplus over expenses", value: breakdown.surplusScore, weight: 30, color: "#10b981" },
-              { label: "Financial Stability", sublabel: "Track record length and consistency", value: breakdown.stabilityScore, weight: 30, color: "#7c3aed" },
+              { label: "Available funds", value: breakdown.availableFunds, contribution: data.weightedContributions.availableFunds, weight: 35, color: "#2563eb" },
+              { label: "Income strength", value: breakdown.incomeStrength, contribution: data.weightedContributions.incomeStrength, weight: 30, color: "#10b981" },
+              { label: "Cash-flow behaviour", value: breakdown.cashFlow, contribution: data.weightedContributions.cashFlow, weight: 20, color: "#7c3aed" },
+              { label: "Credit history", value: breakdown.creditHistory, contribution: data.weightedContributions.creditHistory, weight: 15, color: "#f59e0b" },
             ].map((item) => (
               <div key={item.label}>
                 <div className="flex justify-between mb-1.5">
                   <div>
                     <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                    <p className="text-xs text-slate-400">{item.sublabel} · {item.weight}% of score</p>
+                    <p className="text-xs text-slate-400">{item.weight}% of score</p>
                   </div>
                   <span className="text-lg font-bold text-slate-900">{item.value}<span className="text-sm text-slate-400">/100</span></span>
                 </div>
                 <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Reason Codes */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <h2 className="font-bold text-slate-900 mb-4">Key Financial Indicators</h2>
-          <div className="space-y-2">
-            {data.reasonCodes.map((code, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
-                <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-emerald-600 text-xs font-bold">✓</span>
-                </div>
-                <p className="text-sm text-slate-700">{code}</p>
+                <p className="text-xs text-slate-400 mt-1">Weighted contribution: {item.contribution}/1000</p>
               </div>
             ))}
           </div>
@@ -195,18 +187,17 @@ export default function SamplePassport() {
         {/* CTA */}
         <div className="bg-[#0f172a] rounded-2xl p-8 text-center space-y-4">
           <h3 className="text-xl font-bold text-white">Build your own Cush Passport</h3>
-          <p className="text-slate-400 text-sm max-w-sm mx-auto">Add your financial signals, upload evidence, and get a verified score that travels with you globally.</p>
+          <p className="text-slate-400 text-sm max-w-sm mx-auto">Build an individual assessment from supported financial history and evidence.</p>
           <Link href="/login">
             <button className="inline-flex items-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white font-semibold px-7 py-3 rounded-xl transition-colors text-sm shadow-lg shadow-blue-900/30">
-              Get Your Passport Score
+              Build Your Passport
               <ArrowRight className="w-4 h-4" />
             </button>
           </Link>
         </div>
 
         <div className="text-center pb-4 space-y-1">
-          <p className="text-xs text-slate-400">This report is generated by Cush and reflects verified financial data.</p>
-          <p className="text-xs text-slate-400">For verification queries, contact <span className="text-blue-600">verify@we-cush.com</span></p>
+          <p className="text-xs text-slate-400">This demonstration contains illustrative values only and is not a real assessment.</p>
         </div>
       </div>
     </div>

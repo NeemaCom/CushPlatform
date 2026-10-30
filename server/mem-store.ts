@@ -1,11 +1,15 @@
 /**
- * In-memory store for Cush Passport V1
- * Provides database-independent persistence for the current process.
+ * In-memory store for Cush Passport's current process.
+ * Provides database-independent storage for the current process.
  * All data resets on server restart (acceptable for V1 MVP).
  */
 
 import crypto from "crypto";
-import { normalizationService } from "./normalization-service";
+import {
+  calculateCushScore,
+  CUSH_SCORE_VERSION,
+  type CushScorePolicy,
+} from "./cush-score-service";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -35,15 +39,37 @@ export interface MemUser {
 export interface MemPassport {
   id: number;
   userId: number;
-  score: number;
-  confidenceScore: number;
+  score: number | null;
+  provisionalScore: number | null;
+  confidenceScore: number | null;
+  assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
+  algorithmVersion: string;
+  missingRequirements: string[];
+  weightedContributions: {
+    availableFunds: number | null;
+    incomeStrength: number | null;
+    cashFlow: number | null;
+    creditHistory: number | null;
+  } | null;
+  legacyDataNotice: string | null;
   mode: "pre_arrival" | "post_arrival";
   shareToken: string | null;
-  scoreBreakdown: { incomeScore: number; surplusScore: number; stabilityScore: number } | null;
+  scoreBreakdown: {
+    availableFunds: number | null;
+    incomeStrength: number | null;
+    cashFlow: number | null;
+    creditHistory: number | null;
+  } | null;
   reasonCodes: string[] | null;
   generatedAt: Date | null;
   lastUpdated: Date | null;
 }
+
+const LIVE_CUSH_SCORE_POLICY: CushScorePolicy = {
+  // Thin-file scoring is defined by the product prompt; other mappings are
+  // intentionally unavailable until an approved bureau taxonomy is supplied.
+  creditMappings: {},
+};
 
 export interface MemSignal {
   id: number;
@@ -67,7 +93,6 @@ export interface MemEvidence {
   documentType: string;
   label: string;
   tier: number;
-  scoreBoost: number;
   fileData: string | null;
   fileName: string | null;
   status: string;
@@ -94,17 +119,6 @@ const signals = new Map<number, MemSignal>();
 const evidence = new Map<number, MemEvidence>();
 
 const shareTokenIndex = new Map<string, number>(); // shareToken → passportId
-
-// ── Score Boost Map ────────────────────────────────────────────────────────────
-
-const BOOST_MAP: Record<string, number> = {
-  payslip: 40,
-  bank_statement: 30,
-  proof_of_residency: 20,
-  tax_return: 50,
-  employment_contract: 35,
-  transfer_receipt: 25,
-};
 
 // ── User Operations ───────────────────────────────────────────────────────────
 
@@ -180,8 +194,14 @@ export function getOrCreatePassport(userId: number): MemPassport {
   const passport: MemPassport = {
     id,
     userId,
-    score: 0,
-    confidenceScore: 0,
+    score: null,
+    provisionalScore: null,
+    confidenceScore: null,
+    assessmentStatus: "not_started",
+    algorithmVersion: CUSH_SCORE_VERSION,
+    missingRequirements: [],
+    weightedContributions: null,
+    legacyDataNotice: null,
     mode: "pre_arrival",
     shareToken: null,
     scoreBreakdown: null,
@@ -209,52 +229,41 @@ export function recalculatePassport(passportId: number, userId: number): MemPass
   const sigs = getPassportSignals(passportId);
   const evs = getPassportEvidence(passportId);
 
-  const signalInputs = sigs.map((s) => ({
-    type: s.signalType as "income" | "surplus" | "transfer" | "stability",
-    rawAmountCents: s.rawAmountCents,
-    currencyCode: s.currencyCode,
-    country: s.country,
-    period: s.period as "monthly" | "annual",
-  }));
-
-  const evidenceInputs = evs.map((e) => ({
-    status: e.status,
-    scoreBoost: e.scoreBoost,
-  }));
-
-  const result = normalizationService.calculatePassportScore(signalInputs, evidenceInputs);
+  const result = calculateCushScore({
+    individualUserId: userId,
+    assessmentMonth: new Date().toISOString().slice(0, 7),
+    destinationBaseline: null,
+    hasSubmittedFinancialData: sigs.length > 0 || evs.length > 0,
+    availableFunds: [],
+    incomeHistory: [],
+    sourceEvidenceQualities: [],
+    cashFlowHistory: [],
+    credit: { classification: "unavailable", evidenceQuality: null },
+    dataAgeDays: null,
+    coveredAccountCount: 0,
+    declaredAccountCount: 0,
+    integrityFlags: [],
+  }, LIVE_CUSH_SCORE_POLICY);
 
   const updated: MemPassport = {
     ...passport,
-    score: result.finalScore,
+    score: result.cushScore,
+    provisionalScore: result.provisionalScore,
     confidenceScore: result.confidenceScore,
-    scoreBreakdown: {
-      incomeScore: result.incomeScore,
-      surplusScore: result.surplusScore,
-      stabilityScore: result.stabilityScore,
-    },
-    reasonCodes: result.reasonCodes,
-    generatedAt: result.generatedAt,
+    assessmentStatus: result.assessmentStatus,
+    algorithmVersion: result.algorithmVersion,
+    missingRequirements: result.missingRequirements,
+    weightedContributions: result.weightedContributions,
+    legacyDataNotice: sigs.length > 0 || evs.length > 0
+      ? "Existing financial signals and document submissions are preserved, but they do not contain the dated, supported V2 fields required for scoring."
+      : null,
+    scoreBreakdown: result.componentScores,
+    reasonCodes: null,
+    generatedAt: result.cushScore === null ? null : new Date(),
     lastUpdated: new Date(),
   };
 
   passports.set(passportId, updated);
-
-  // Update normalized values on signals
-  for (const sig of sigs) {
-    const normalized = normalizationService.normalizeSignal({
-      type: sig.signalType as "income" | "surplus" | "transfer" | "stability",
-      rawAmountCents: sig.rawAmountCents,
-      currencyCode: sig.currencyCode,
-      country: sig.country,
-      period: sig.period as "monthly" | "annual",
-    });
-    const updatedSig = signals.get(sig.id);
-    if (updatedSig) {
-      updatedSig.normalizedValue = String(normalized.normalizedValue);
-      signals.set(sig.id, updatedSig);
-    }
-  }
 
   return updated;
 }
@@ -271,14 +280,6 @@ export function addSignal(params: {
   country: string;
   period: string;
 }): MemSignal {
-  const normalized = normalizationService.normalizeSignal({
-    type: params.signalType as "income" | "surplus" | "transfer" | "stability",
-    rawAmountCents: params.rawAmountCents,
-    currencyCode: params.currencyCode,
-    country: params.country,
-    period: params.period as "monthly" | "annual",
-  });
-
   const id = ++signalSeq;
   const signal: MemSignal = {
     id,
@@ -288,7 +289,7 @@ export function addSignal(params: {
     label: params.label,
     rawAmountCents: params.rawAmountCents,
     currencyCode: params.currencyCode,
-    normalizedValue: String(normalized.normalizedValue),
+    normalizedValue: null,
     country: params.country,
     period: params.period,
     verificationStatus: "SELF_REPORTED",
@@ -328,7 +329,6 @@ export function addEvidence(params: {
     documentType: params.documentType,
     label: params.label,
     tier: params.tier,
-    scoreBoost: BOOST_MAP[params.documentType] ?? 20,
     fileData: params.fileData ?? null,
     fileName: params.fileName ?? null,
     status: params.fileData ? "PENDING_REVIEW" : "SELF_REPORTED",

@@ -1,13 +1,13 @@
 import { Link } from "wouter";
 import {
   Globe2, ShieldCheck, Zap, ArrowRight, CheckCircle2,
-  TrendingUp, Lock, BadgeCheck, ChevronRight, Star,
+  TrendingUp, Lock, BadgeCheck, ChevronRight,
   Plane, MapPin
 } from "lucide-react";
 
 // ─── Mock Passport Card ───────────────────────────────────────────────────────
 
-function PassportCard({ score = 785, demo = false }: { score?: number; demo?: boolean }) {
+function PassportCard({ score = 800, demo = false }: { score?: number; demo?: boolean }) {
   const pct = Math.round((score / 1000) * 100);
   const circumference = 2 * Math.PI * 38;
 
@@ -40,7 +40,7 @@ function PassportCard({ score = 785, demo = false }: { score?: number; demo?: bo
             </div>
             <div className="flex items-center gap-1.5 bg-emerald-500/20 border border-emerald-400/40 rounded-full px-2.5 py-1">
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-300 text-xs font-semibold">VERIFIED</span>
+              <span className="text-emerald-300 text-xs font-semibold">SAMPLE</span>
             </div>
           </div>
 
@@ -74,14 +74,15 @@ function PassportCard({ score = 785, demo = false }: { score?: number; demo?: bo
             </div>
             <div className="space-y-2 flex-1">
               <div>
-                <span className="text-slate-400 text-xs uppercase tracking-widest">Capacity</span>
-                <p className="text-white font-bold text-lg leading-tight">High Capacity</p>
+                <span className="text-slate-400 text-xs uppercase tracking-widest">Assessment</span>
+                <p className="text-white font-bold text-lg leading-tight">Illustrative example</p>
               </div>
               <div className="space-y-1.5">
                 {[
-                  { label: "Income", w: 82, color: "#2563eb" },
-                  { label: "Surplus", w: 74, color: "#10b981" },
-                  { label: "Stability", w: 79, color: "#7c3aed" },
+                  { label: "Funds", w: 82, color: "#2563eb" },
+                  { label: "Income", w: 82, color: "#10b981" },
+                  { label: "Cash flow", w: 74, color: "#7c3aed" },
+                  { label: "Credit", w: 79, color: "#f59e0b" },
                 ].map((b) => (
                   <div key={b.label} className="flex items-center gap-2">
                     <span className="text-slate-500 text-xs w-14">{b.label}</span>
@@ -106,7 +107,7 @@ function PassportCard({ score = 785, demo = false }: { score?: number; demo?: bo
             </div>
             <div className="text-right">
               <p className="text-slate-500 text-xs uppercase tracking-widest">Confidence</p>
-              <p className="text-emerald-400 text-sm font-bold mt-0.5">High — 72%</p>
+              <p className="text-emerald-400 text-sm font-bold mt-0.5">Illustrative — 72/100</p>
             </div>
           </div>
         </div>
@@ -246,7 +247,7 @@ export default function Home() {
             <div className="space-y-7">
               <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5">
                 <Globe2 className="w-3.5 h-3.5 text-blue-600" />
-                <span className="text-blue-700 text-xs font-semibold tracking-wide uppercase">Global Credit Identity Layer</span>
+                <span className="text-blue-700 text-xs font-semibold tracking-wide uppercase">Individual Financial Assessment</span>
               </div>
 
               <h1 className="text-5xl sm:text-6xl font-black text-[#0f172a] leading-[1.08] tracking-tight">
@@ -256,13 +257,13 @@ export default function Home() {
               </h1>
 
               <p className="text-lg text-slate-500 leading-relaxed max-w-xl">
-                The Cush Passport turns your global income and assets into a verified credit score that travels with you. Prove your reliability to landlords and lenders — before or after you land.
+                Cush Passport is building an individual financial assessment from supported funds, income history, cash flow, and credit information. Missing inputs are marked rather than presented as a finished score.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <Link href="/login">
                   <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#2563eb] hover:bg-blue-700 text-white font-semibold px-7 py-3.5 rounded-xl transition-colors shadow-md shadow-blue-200 text-sm">
-                    Get Your Passport Score
+                    Start Your Assessment
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </Link>
@@ -274,27 +275,16 @@ export default function Home() {
               </div>
 
               {/* Social proof row */}
-              <div className="flex items-center gap-6 pt-2">
-                <div className="flex -space-x-2">
-                  {["2563eb", "0f172a", "10b981", "7c3aed"].map((c) => (
-                    <div key={c} className="w-8 h-8 rounded-full border-2 border-white flex items-center justify-center text-white text-xs font-bold"
-                      style={{ backgroundColor: `#${c}` }}>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div className="flex gap-0.5">
-                    {[1,2,3,4,5].map(i => <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />)}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">Used by migrants in 40+ countries</p>
-                </div>
+              <div className="flex flex-wrap items-center gap-2 pt-2">
+                <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">Individual-only</span>
+                <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full">Four scoring components</span>
               </div>
             </div>
 
             {/* Right: passport card */}
             <div className="flex items-center justify-center lg:justify-end">
               <div className="w-full max-w-[360px]">
-                <PassportCard score={785} />
+                <PassportCard score={800} demo />
               </div>
             </div>
           </div>
@@ -314,14 +304,14 @@ export default function Home() {
               icon={Plane}
               eyebrow="Pre-Arrival"
               title="Preparing to Move?"
-              description="Build a globally recognized credit score from your home country before you even land. No local credit history needed."
+              description="Prepare a supported financial assessment before your move. The score remains incomplete until its required history and evidence are available."
               bullets={[
-                "Add income & savings signals from home",
+                "Provide dated income and available-funds history",
                 "Self-declare employment contracts and payslips",
-                "Get a shareable score to send landlords in advance",
+                "Review the requirements for a complete assessment",
                 "Supports NGN, GHS, KES, INR, and more",
               ]}
-              cta="Start Building Your Score"
+              cta="Start Your Assessment"
               accent="border-blue-200 bg-blue-50/40"
               href="/login"
             />
@@ -329,11 +319,11 @@ export default function Home() {
               icon={MapPin}
               eyebrow="Post-Arrival"
               title="Recently Arrived?"
-              description="Bridge your global financial history to your new home. Prove you're more reliable than a blank credit file suggests."
+              description="Keep your individual financial assessment clear as you settle in a new destination."
               bullets={[
                 "Upload proof of residency to unlock this mode",
                 "Combine home-country and local financial data",
-                "Bypass rent deposits with verified capacity proof",
+                "Share a supported financial assessment with prospective landlords",
                 "Instant shareable link for landlords and agents",
               ]}
               cta="Unlock Post-Arrival Mode"
@@ -350,25 +340,25 @@ export default function Home() {
           <div className="text-center mb-12">
             <p className="text-blue-600 text-xs font-bold uppercase tracking-widest mb-3">Why Cush Passport</p>
             <h2 className="text-3xl sm:text-4xl font-black text-[#0f172a] tracking-tight">A score built for the world</h2>
-            <p className="text-slate-500 mt-3 text-base max-w-xl mx-auto">Traditional credit scores are local. Your financial discipline isn't.</p>
+            <p className="text-slate-500 mt-3 text-base max-w-xl mx-auto">A clear, individual view of financial readiness across borders.</p>
           </div>
           <div className="grid md:grid-cols-3 gap-5">
             <TrustCard
               icon={TrendingUp}
               title="More Than a Credit Score"
-              body="We measure your Peak Capacity and global asset history — using PPP-adjusted benchmarks across 10+ currencies so your score reflects real financial strength, not just local purchasing power."
+              body="Your individual assessment combines available funds, income strength, cash-flow behaviour, and credit history against a configurable destination baseline."
               accent="bg-blue-50 text-blue-600"
             />
             <TrustCard
               icon={Lock}
-              title="Bank-Grade Privacy"
-              body="Share your verified score without exposing raw bank transactions. Your financial data stays encrypted. You control exactly who sees what — and you can revoke access at any time."
+              title="Controlled sharing"
+              body="Share an assessment summary through a controlled link. The current public view does not claim bank or bureau verification, and you can revoke the link."
               accent="bg-slate-100 text-slate-700"
             />
             <TrustCard
               icon={Zap}
-              title="Day-Zero Ready"
-              body="Send your verified Cush Passport link to landlords before signing. Bypass 6-month rent deposits and security barriers that punish migrants with no local credit file."
+              title="Clear assessment status"
+              body="Share your assessment status and supported financial history with prospective landlords before signing. Missing information is clearly marked."
               accent="bg-emerald-50 text-emerald-600"
             />
           </div>
@@ -382,8 +372,8 @@ export default function Home() {
           <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-12">Three steps to financial trust</h2>
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { step: "01", title: "Add Your Signals", body: "Declare income, surplus, and stability data from your home economy. Upload evidence to boost your score.", icon: TrendingUp },
-              { step: "02", title: "Get Your Score", body: "Our deterministic PPP model calculates your 0–1000 Cush Score in seconds. No black boxes, no algorithms.", icon: BadgeCheck },
+              { step: "01", title: "Provide Your History", body: "Add dated financial records and supporting evidence for an individual assessment.", icon: TrendingUp },
+              { step: "02", title: "Complete the Assessment", body: "The four-part Cush Score is shown only when the required history and evidence checks pass.", icon: BadgeCheck },
               { step: "03", title: "Share Anywhere", body: "Generate a secure public link and send to landlords, agents, or lenders. Revoke access any time.", icon: Globe2 },
             ].map(({ step, title, body, icon: Icon }) => (
               <div key={step} className="text-center space-y-3">

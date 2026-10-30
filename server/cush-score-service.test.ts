@@ -79,11 +79,14 @@ function completeCashFlow(
 function completeInput(overrides: Partial<CushScoreInput> = {}): CushScoreInput {
   return {
     individualUserId: 42,
-    destination: "Outside London, United Kingdom",
-    baselineMonthlyPence: BASELINE_PENCE,
-    baselineEffectiveDate: "2026-01-01",
     assessmentMonth: "2026-10",
-    countryCode: "GB",
+    destinationBaseline: {
+      destination: "Outside London, United Kingdom",
+      monthlyBaselinePence: BASELINE_PENCE,
+      effectiveDate: "2026-01-01",
+      countryCode: "GB",
+    },
+    hasSubmittedFinancialData: true,
     availableFunds: [{
       id: "fund-1",
       deduplicationKey: "bank-account-1",
@@ -115,10 +118,10 @@ describe("Cush Score V2 engine", () => {
       creditHistory: 50,
     });
     expect(result.weightedContributions).toEqual({
-      availableFunds: 35,
-      incomeStrength: 30,
-      cashFlow: 20,
-      creditHistory: 7.5,
+      availableFunds: 350,
+      incomeStrength: 300,
+      cashFlow: 200,
+      creditHistory: 75,
     });
     expect(result.cushScore).toBe(925);
     expect(result.provisionalScore).toBeNull();
@@ -347,6 +350,30 @@ describe("Cush Score V2 engine", () => {
     expect(result.cushScore).toBeNull();
     expect(result.provisionalScore).toBe(925);
     expect(result.missingRequirements).toContain("At least four months of usable financial history");
+  });
+
+  it("does not calculate baseline-dependent components before a destination is selected", () => {
+    const result = calculateCushScore(completeInput({
+      destinationBaseline: null,
+    }), policy);
+
+    expect(result.assessmentStatus).toBe("incomplete");
+    expect(result.cushScore).toBeNull();
+    expect(result.componentScores.availableFunds).toBeNull();
+    expect(result.componentScores.incomeStrength).toBeNull();
+    expect(result.componentScores.cashFlow).toBeNull();
+    expect(result.missingRequirements).toContain("Selected destination and approved monthly baseline");
+  });
+
+  it("keeps a weighted score provisional without approved confidence rules", () => {
+    const { confidence: _confidence, ...unapprovedConfidencePolicy } = policy;
+    const result = calculateCushScore(completeInput(), unapprovedConfidencePolicy);
+
+    expect(result.assessmentStatus).toBe("provisional");
+    expect(result.cushScore).toBeNull();
+    expect(result.provisionalScore).toBe(925);
+    expect(result.confidenceScore).toBeNull();
+    expect(result.missingRequirements).toContain("Approved confidence-scoring policy");
   });
 
   it("deducts five confidence points only for confirmed, evidenced integrity flags", () => {
