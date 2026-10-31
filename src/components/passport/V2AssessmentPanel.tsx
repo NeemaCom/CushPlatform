@@ -198,7 +198,7 @@ export default function V2AssessmentPanel() {
       setCreditReportResult(result);
       setCreditLookupConsent(false);
       toast({
-        title: "Credit report received",
+        title: "Provider supplied a credit report",
         description: "It is shown for your review and has not changed your Cush Score.",
       });
     },
@@ -471,7 +471,7 @@ export default function V2AssessmentPanel() {
         {creditReportResult && (
           <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-slate-800">Interswitch report · {new Date(creditReportResult.completedAt).toLocaleString()}</p>
+              <p className="text-xs font-semibold text-slate-800">Provider supplied · Interswitch report · {new Date(creditReportResult.completedAt).toLocaleString()}</p>
               <button
                 type="button"
                 onClick={() => {
