@@ -4,6 +4,7 @@ import { AlertCircle, Plus, Save, Trash2 } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
 import { useToast } from "@/hooks/use-toast";
 import type { V2AssessmentInput } from "@shared/schema";
+import MonoBankDataPanel from "@/components/passport/MonoBankDataPanel";
 
 interface BaselineOption {
   id: string;
@@ -281,10 +282,12 @@ export default function V2AssessmentPanel() {
 
   return (
     <div className="space-y-4">
+      <MonoBankDataPanel />
+
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
         <p className="font-semibold">GBP only for this release</p>
         <p className="mt-1 text-xs leading-relaxed">
-          Enter GBP-denominated records. No exchange rate is guessed or applied. Entries are self-reported and do not become verified merely by being submitted.
+          Enter GBP-denominated records. Mono lookup and statements are shown separately and do not populate these inputs. No NGN-to-GBP conversion is guessed or applied.
         </p>
       </div>
 

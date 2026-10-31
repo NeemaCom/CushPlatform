@@ -8,6 +8,11 @@ declare module "express-session" {
     userId?: number;
     role?: string;
     lastActivity?: number;
+    monoBvnLookup?: {
+      sessionId: string;
+      methods: string[];
+      expiresAt: number;
+    };
   }
 }
 

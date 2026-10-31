@@ -634,6 +634,28 @@ export default function CreditPassport() {
   const { user } = useAuth();
   const [showSignalForm, setShowSignalForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"roadmap" | "signals" | "assessment" | "policy">("roadmap");
+  const [monoCodePending, setMonoCodePending] = useState(false);
+  const monoCodeProcessed = useRef(false);
+
+  useEffect(() => {
+    const callbackUrl = new URL(window.location.href);
+    const monoCode = callbackUrl.searchParams.get("code");
+    if (!monoCode || monoCodeProcessed.current) return;
+    monoCodeProcessed.current = true;
+    setActiveTab("assessment");
+    setMonoCodePending(true);
+    callbackUrl.searchParams.delete("code");
+    window.history.replaceState({}, "", `${callbackUrl.pathname}${callbackUrl.search}${callbackUrl.hash}`);
+    apiRequest("POST", "/api/mono/connect/exchange", { code: monoCode })
+      .then(() => {
+        qc.invalidateQueries({ queryKey: ["/api/mono/accounts"] });
+        toast({ title: "Bank connected", description: "Mono linked the account to your Cush profile." });
+      })
+      .catch((error: Error) => {
+        toast({ title: "Could not finish bank connection", description: error.message, variant: "destructive" });
+      })
+      .finally(() => setMonoCodePending(false));
+  }, [qc, toast]);
 
   const { data, isLoading } = useQuery<PassportData>({
     queryKey: ["/api/passport/me"],
@@ -1013,8 +1035,9 @@ export default function CreditPassport() {
                 <motion.div key="assessment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                   <div>
                     <h2 className="font-bold text-slate-900 text-base">Cush Score V2 inputs</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">Enter individual GBP-denominated records. Values remain self-reported until reviewed.</p>
+                    <p className="mt-0.5 text-xs text-slate-500">Connect bank data through Mono or enter individual GBP-denominated records.</p>
                   </div>
+                  {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
                   <V2AssessmentPanel />
                 </motion.div>
               ) : user?.role === "admin" ? (

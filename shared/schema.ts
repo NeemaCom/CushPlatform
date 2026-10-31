@@ -88,6 +88,24 @@ export const cushAssessmentInputs = pgTable("cush_assessment_inputs", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }).enableRLS();
 
+export const monoLinkedAccounts = pgTable("mono_linked_accounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  monoAccountId: text("mono_account_id").notNull().unique(),
+  linkedAt: timestamp("linked_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userIdIndex: index("mono_linked_accounts_user_id_idx").on(table.userId),
+})).enableRLS();
+
+export const monoBvnLookupConsents = pgTable("mono_bvn_lookup_consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  consentVersion: text("consent_version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userAcceptedAtIndex: index("mono_bvn_lookup_consents_user_accepted_at_idx").on(table.userId, table.acceptedAt),
+})).enableRLS();
+
 export const cushScorePolicyVersions = pgTable("cush_score_policy_versions", {
   id: serial("id").primaryKey(),
   version: integer("version").notNull(),
