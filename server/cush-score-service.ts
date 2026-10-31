@@ -5,7 +5,7 @@
  * normalised to GBP pence by a trusted, separately audited ingestion layer.
  */
 
-export const CUSH_SCORE_VERSION = "2.1.0";
+export const CUSH_SCORE_VERSION = "2.2.0";
 
 export type EvidenceQuality = "verified" | "documented" | "self_reported";
 export type SourceEvidenceType = "bank_connection" | "verified_statement" | "self_reported";
@@ -144,10 +144,13 @@ export interface ConfidenceBreakdown {
 export interface CushScoreResult {
   algorithmVersion: string;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
-  /** Only present when all minimum requirements are met. */
+  /** Only present when all completion requirements are met. */
   cushScore: number | null;
-  /** Kept for response compatibility; never populated before all score gates pass. */
+  /** Normalized score from supported components while completion requirements remain. */
   provisionalScore: number | null;
+  /** Percentage of the four components' total weight represented by scored components. */
+  scoreCoveragePercent: number;
+  scoredComponentCount: number;
   confidenceScore: number | null;
   confidenceBand: "low" | "medium" | "high" | null;
   componentScores: {
@@ -547,7 +550,9 @@ function validateInput(input: CushScoreInput, policy: CushScorePolicy): void {
 function calculateRecognizedMonthlyIncome(input: CushScoreInput): number | null {
   const bySource = new Map<string, MonthlyIncomeObservation[]>();
   for (const item of input.incomeHistory) {
-    if (!item.recurring || !isWithinAssessmentWindow(input.assessmentMonth, item.month)) continue;
+    if (!item.recurring ||
+        item.evidenceQuality === "self_reported" ||
+        !isWithinAssessmentWindow(input.assessmentMonth, item.month)) continue;
     const source = bySource.get(item.sourceId) ?? [];
     source.push(item);
     bySource.set(item.sourceId, source);
@@ -610,7 +615,9 @@ function calculateCashFlowScore(
   recognizedIncomePence: number | null,
 ): { score: number | null; cap: number | null } {
   const completeMonths = input.cashFlowHistory.filter(
-    (item) => item.complete && isWithinAssessmentWindow(input.assessmentMonth, item.month),
+    (item) => item.complete &&
+      item.evidenceQuality !== "self_reported" &&
+      isWithinAssessmentWindow(input.assessmentMonth, item.month),
   );
   if (completeMonths.length === 0 ||
       recognizedIncomePence === null ||
@@ -633,9 +640,15 @@ function calculateCreditScore(
   credit: CreditAssessment,
   policy: CushScorePolicy,
 ): number | null {
+  if (credit.evidenceQuality === null ||
+      credit.evidenceQuality === "self_reported" ||
+      credit.checkStatus === undefined ||
+      credit.checkStatus === "not_done") return null;
   if (credit.score !== undefined && credit.score !== null) return credit.score;
   if (credit.classification === "incomplete" || credit.classification === "unavailable") return null;
-  if (credit.classification === "thin_file") return 50;
+  if (credit.classification === "thin_file") {
+    return credit.checkStatus === "matched_thin" ? 50 : null;
+  }
   return policy.creditMappings[credit.classification] ?? null;
 }
 
@@ -646,6 +659,30 @@ function calculateWeightedScore(scores: CushScoreResult["componentScores"]): num
   if (entries.some(([key]) => scores[key] === null)) return null;
   const weighted = entries.reduce((total, [key, weight]) => total + (scores[key] ?? 0) * weight, 0);
   return Math.max(0, Math.min(1000, Math.round(weighted * 10)));
+}
+
+function calculateProvisionalScore(scores: CushScoreResult["componentScores"]): {
+  score: number | null;
+  coveragePercent: number;
+  componentCount: number;
+} {
+  const entries = Object.entries(COMPONENT_WEIGHTS) as Array<
+    [keyof typeof COMPONENT_WEIGHTS, number]
+  >;
+  const available = entries.filter(([key]) => scores[key] !== null);
+  const availableWeight = available.reduce((total, [, weight]) => total + weight, 0);
+  if (availableWeight === 0) {
+    return { score: null, coveragePercent: 0, componentCount: 0 };
+  }
+  const weightedAverage = available.reduce(
+    (total, [key, weight]) => total + (scores[key] ?? 0) * weight,
+    0,
+  ) / availableWeight;
+  return {
+    score: Math.max(0, Math.min(1000, Math.round(weightedAverage * 10))),
+    coveragePercent: Math.round(availableWeight * 100),
+    componentCount: available.length,
+  };
 }
 
 export function calculateCushScore(
@@ -675,6 +712,7 @@ export function calculateCushScore(
     creditHistory: creditScore,
   };
   const weightedTotal = calculateWeightedScore(componentScores);
+  const provisional = calculateProvisionalScore(componentScores);
   const supportedFundsExist = input.availableFunds.some((fund) => fund.evidenceQuality !== "self_reported");
   const connectedOrStatementSourceExists = input.sourceEvidenceShares.some(
     (source) => source.sourceType !== "self_reported" && source.share > 0,
@@ -738,9 +776,9 @@ export function calculateCushScore(
     ? "not_started"
     : isComplete
       ? "complete"
-      : weightedTotal === null
-        ? "incomplete"
-        : "provisional";
+      : provisional.score !== null
+        ? "provisional"
+        : "incomplete";
 
   const weightedContributions = {
     availableFunds: componentScores.availableFunds === null
@@ -761,7 +799,9 @@ export function calculateCushScore(
     algorithmVersion: CUSH_SCORE_VERSION,
     assessmentStatus: status,
     cushScore: isComplete ? weightedTotal : null,
-    provisionalScore: null,
+    provisionalScore: isComplete ? null : provisional.score,
+    scoreCoveragePercent: provisional.coveragePercent,
+    scoredComponentCount: provisional.componentCount,
     confidenceScore: confidence.score,
     confidenceBand,
     componentScores: Object.fromEntries(

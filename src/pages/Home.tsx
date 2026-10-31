@@ -304,7 +304,7 @@ export default function Home() {
               icon={Plane}
               eyebrow="Pre-Arrival"
               title="Preparing to Move?"
-              description="Prepare a supported financial assessment before your move. The score remains incomplete until its required history and evidence are available."
+              description="Build a supported financial assessment over time. See a provisional score and progress as score criteria become available."
               bullets={[
                 "Provide dated income and available-funds history",
                 "Self-declare employment contracts and payslips",

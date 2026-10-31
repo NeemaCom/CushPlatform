@@ -19,6 +19,7 @@ import {
 interface PassportData {
   passport: {
     id: number; score: number | null; provisionalScore: number | null;
+    scoreCoveragePercent: number; scoredComponentCount: number;
     confidenceScore: number | null; mode: string;
     assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
     algorithmVersion: string; missingRequirements: string[];
@@ -106,17 +107,24 @@ function useCountUp(target: number) {
 
 function ScoreRing({
   score,
+  provisionalScore,
+  scoreCoveragePercent,
+  scoredComponentCount,
   confidence,
   assessmentStatus,
 }: {
   score: number | null;
+  provisionalScore: number | null;
+  scoreCoveragePercent: number;
+  scoredComponentCount: number;
   confidence: number | null;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
 }) {
-  const availableScore = score;
+  const availableScore = score ?? provisionalScore;
   const displayScore = useCountUp(availableScore ?? 0);
   const r = 70, circ = 2 * Math.PI * r;
-  const scoreColor = availableScore === null ? "#94a3b8" : score === null ? "#d97706" : "#2563eb";
+  const scoreHue = availableScore === null ? null : Math.round(Math.max(0, Math.min(1000, availableScore)) / 1000 * 120);
+  const scoreColor = scoreHue === null ? "#94a3b8" : `hsl(${scoreHue} 72% 42%)`;
   const statusLabel = {
     not_started: "Not started",
     incomplete: "Assessment incomplete",
@@ -166,6 +174,9 @@ function ScoreRing({
       <div className={`text-xs font-semibold ${confidenceColor} flex items-center gap-1.5`}>
         {confidence !== null && <BadgeCheck className="w-3.5 h-3.5" />}
         {confidence === null ? confidenceLabel : `${confidenceLabel} · ${confidence}/100`}
+      </div>
+      <div className="text-center text-xs text-slate-500" aria-live="polite">
+        {scoredComponentCount}/4 components · {scoreCoveragePercent}% covered
       </div>
     </div>
   );
@@ -668,7 +679,7 @@ export default function CreditPassport() {
 
   const addSignalMutation = useMutation({
     mutationFn: (body: unknown) => apiRequest("POST", "/api/passport/signals", body),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); setShowSignalForm(false); toast({ title: "Signal saved", description: "The V2 assessment remains incomplete until its required dated and supported inputs are available." }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); setShowSignalForm(false); toast({ title: "Signal saved", description: "Your provisional score and component coverage update when supported scoring criteria are available." }); },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
   const deleteSignalMutation = useMutation({
@@ -719,9 +730,11 @@ export default function CreditPassport() {
       id: 0,
       score: null,
       provisionalScore: null,
+      scoreCoveragePercent: 0,
+      scoredComponentCount: 0,
       confidenceScore: null,
       assessmentStatus: "not_started" as const,
-      algorithmVersion: "2.1.0",
+      algorithmVersion: "2.2.0",
       missingRequirements: [],
       legacyDataNotice: null,
       mode: "pre_arrival",
@@ -797,6 +810,9 @@ export default function CreditPassport() {
                 <div className="flex flex-col sm:flex-row items-center gap-8">
                   <ScoreRing
                     score={passport.score}
+                    provisionalScore={passport.provisionalScore}
+                    scoreCoveragePercent={passport.scoreCoveragePercent}
+                    scoredComponentCount={passport.scoredComponentCount}
                     confidence={passport.confidenceScore}
                     assessmentStatus={passport.assessmentStatus}
                   />
@@ -895,17 +911,28 @@ export default function CreditPassport() {
                 {/* Strength bar */}
                 <div className="mt-6 pt-5 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="font-semibold text-slate-600">Evidence checklist progress</span>
-                    <span className="text-slate-400">{completedItems}/{maxItems} submitted</span>
+                    <span className="font-semibold text-slate-600">Scoring criteria progress</span>
+                    <span className="text-slate-400">{passport.scoreCoveragePercent}% weighted coverage</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-2 bg-slate-100 rounded-full overflow-hidden"
+                    role="progressbar"
+                    aria-label="Scoring criteria coverage"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={passport.scoreCoveragePercent}
+                  >
                     <motion.div
-                      className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full"
+                      className="h-full rounded-full"
                       initial={{ width: 0 }}
-                      animate={{ width: `${(completedItems / maxItems) * 100}%` }}
+                      animate={{ width: `${passport.scoreCoveragePercent}%` }}
                       transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                      style={{ background: "linear-gradient(90deg, #ef4444 0%, #f59e0b 52%, #10b981 100%)" }}
                     />
                   </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    The provisional score uses only supported components; missing components are excluded, not scored as zero.
+                  </p>
                 </div>
               </div>
             </motion.div>

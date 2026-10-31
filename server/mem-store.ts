@@ -41,6 +41,8 @@ export interface MemPassport {
   userId: number;
   score: number | null;
   provisionalScore: number | null;
+  scoreCoveragePercent: number;
+  scoredComponentCount: number;
   confidenceScore: number | null;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
   algorithmVersion: string;
@@ -196,6 +198,8 @@ export function getOrCreatePassport(userId: number): MemPassport {
     userId,
     score: null,
     provisionalScore: null,
+    scoreCoveragePercent: 0,
+    scoredComponentCount: 0,
     confidenceScore: null,
     assessmentStatus: "not_started",
     algorithmVersion: CUSH_SCORE_VERSION,
@@ -249,6 +253,8 @@ export function recalculatePassport(passportId: number, userId: number): MemPass
     ...passport,
     score: result.cushScore,
     provisionalScore: result.provisionalScore,
+    scoreCoveragePercent: result.scoreCoveragePercent,
+    scoredComponentCount: result.scoredComponentCount,
     confidenceScore: result.confidenceScore,
     assessmentStatus: result.assessmentStatus,
     algorithmVersion: result.algorithmVersion,
@@ -259,7 +265,7 @@ export function recalculatePassport(passportId: number, userId: number): MemPass
       : null,
     scoreBreakdown: result.componentScores,
     reasonCodes: null,
-    generatedAt: result.cushScore === null ? null : new Date(),
+    generatedAt: result.cushScore === null && result.provisionalScore === null ? null : new Date(),
     lastUpdated: new Date(),
   };
 

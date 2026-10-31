@@ -266,7 +266,9 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.componentScores.creditHistory).toBeNull();
     expect(result.cushScore).toBeNull();
-    expect(result.assessmentStatus).toBe("incomplete");
+    expect(result.provisionalScore).not.toBeNull();
+    expect(result.scoreCoveragePercent).toBe(85);
+    expect(result.assessmentStatus).toBe("provisional");
     expect(result.missingRequirements).toContain("Completed, supported credit assessment");
   });
 
@@ -340,8 +342,10 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.componentScores.creditHistory).toBeNull();
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBeNull();
-    expect(result.assessmentStatus).toBe("incomplete");
+    expect(result.provisionalScore).toBe(1000);
+    expect(result.scoreCoveragePercent).toBe(85);
+    expect(result.scoredComponentCount).toBe(3);
+    expect(result.assessmentStatus).toBe("provisional");
   });
 
   it("keeps a provisional total separate until all minimum requirements are met", () => {
@@ -351,7 +355,8 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.assessmentStatus).toBe("provisional");
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBeNull();
+    expect(result.provisionalScore).toBe(925);
+    expect(result.scoreCoveragePercent).toBe(100);
     expect(result.missingRequirements).toContain("At least four months of usable financial history");
   });
 
@@ -360,11 +365,13 @@ describe("Cush Score V2 engine", () => {
       destinationBaseline: null,
     }), policy);
 
-    expect(result.assessmentStatus).toBe("incomplete");
+    expect(result.assessmentStatus).toBe("provisional");
     expect(result.cushScore).toBeNull();
     expect(result.componentScores.availableFunds).toBeNull();
     expect(result.componentScores.incomeStrength).toBeNull();
     expect(result.componentScores.cashFlow).toBeNull();
+    expect(result.provisionalScore).toBe(500);
+    expect(result.scoreCoveragePercent).toBe(15);
     expect(result.missingRequirements).toContain("Selected destination and approved monthly baseline");
   });
 
@@ -374,7 +381,8 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.assessmentStatus).toBe("provisional");
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBeNull();
+    expect(result.provisionalScore).toBe(925);
+    expect(result.scoreCoveragePercent).toBe(100);
     expect(result.confidenceScore).toBeNull();
     expect(result.missingRequirements).toContain("Approved confidence-scoring policy");
   });
@@ -456,7 +464,7 @@ describe("Cush Score V2 engine", () => {
     }), policy);
 
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBeNull();
+    expect(result.provisionalScore).not.toBeNull();
     expect(result.missingRequirements).toContain("Connected bank account or verified bank statement");
     expect(result.componentScores.availableFunds).not.toBeNull();
   });
@@ -467,7 +475,7 @@ describe("Cush Score V2 engine", () => {
     }), policy);
 
     expect(result.cushScore).toBeNull();
-    expect(result.provisionalScore).toBeNull();
+    expect(result.provisionalScore).not.toBeNull();
     expect(result.confidenceBreakdown?.creditInformationAvailability).toBe(0);
     expect(result.missingRequirements).toContain("Completed, supported credit assessment");
   });
@@ -484,6 +492,46 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.componentScores.creditHistory).toBe(63);
     expect(result.weightedContributions.creditHistory).toBe(94.5);
+  });
+
+  it("shows a normalized score and weight coverage from one supported component", () => {
+    const result = calculateCushScore(completeInput({
+      destinationBaseline: null,
+      availableFunds: [],
+      incomeHistory: [],
+      sourceEvidenceShares: [],
+      cashFlowHistory: [],
+      credit: {
+        classification: "unavailable",
+        evidenceQuality: "verified",
+        checkStatus: "matched",
+        score: 63,
+      },
+    }), policy);
+
+    expect(result.cushScore).toBeNull();
+    expect(result.provisionalScore).toBe(630);
+    expect(result.scoreCoveragePercent).toBe(15);
+    expect(result.scoredComponentCount).toBe(1);
+    expect(result.assessmentStatus).toBe("provisional");
+  });
+
+  it("does not score self-reported income or cash flow as supported components", () => {
+    const result = calculateCushScore(completeInput({
+      incomeHistory: completeIncomeHistory(BASELINE_PENCE, { evidenceQuality: "self_reported" }),
+      cashFlowHistory: completeCashFlow().map((item) => ({
+        ...item,
+        evidenceQuality: "self_reported",
+      })),
+      credit: { classification: "unavailable", evidenceQuality: null, checkStatus: "not_done" },
+    }), policy);
+
+    expect(result.componentScores.availableFunds).not.toBeNull();
+    expect(result.componentScores.incomeStrength).toBeNull();
+    expect(result.componentScores.cashFlow).toBeNull();
+    expect(result.scoreCoveragePercent).toBe(35);
+    expect(result.scoredComponentCount).toBe(1);
+    expect(result.provisionalScore).not.toBeNull();
   });
 
   it("rejects out-of-range and unverified provider component scores", () => {

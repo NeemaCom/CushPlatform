@@ -22,6 +22,8 @@ interface V2AssessmentResponse {
     assessmentStatus: string;
     cushScore: number | null;
     provisionalScore: number | null;
+    scoreCoveragePercent: number;
+    scoredComponentCount: number;
     componentScores: {
       availableFunds: number | null;
       incomeStrength: number | null;
@@ -404,10 +406,44 @@ export default function V2AssessmentPanel() {
 
       <Card title="Score components">
         <div className="rounded-lg bg-slate-50 p-3 text-sm">
-          <span className="text-slate-600">Total score: </span>
-          {view.calculation.cushScore === null
-            ? <span className="font-semibold text-slate-500">Not available yet</span>
-            : <span className="font-bold text-slate-900">{view.calculation.cushScore}/1000</span>}
+          <span className="text-slate-600">
+            {view.calculation.cushScore === null && view.calculation.provisionalScore !== null
+              ? "Provisional score: "
+              : "Overall score: "}
+          </span>
+          {view.calculation.cushScore !== null || view.calculation.provisionalScore !== null
+            ? <span className="font-bold text-slate-900">
+                {view.calculation.cushScore ?? view.calculation.provisionalScore}/1000
+              </span>
+            : <span className="font-semibold text-slate-500">Not available yet</span>}
+          <p className="mt-1 text-xs text-slate-500">
+            {view.calculation.cushScore === null && view.calculation.provisionalScore !== null
+              ? `Normalized from ${view.calculation.scoredComponentCount} supported components.`
+              : "Final score"}
+          </p>
+          <div className="mt-3 flex items-center justify-between text-xs text-slate-600">
+            <span>Score component coverage</span>
+            <span>{view.calculation.scoreCoveragePercent}% · {view.calculation.scoredComponentCount}/4</span>
+          </div>
+          <div
+            className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-200"
+            role="progressbar"
+            aria-label="Score component coverage"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={view.calculation.scoreCoveragePercent}
+          >
+            <div
+              className="h-full rounded-full transition-[width] duration-700"
+              style={{
+                width: `${view.calculation.scoreCoveragePercent}%`,
+                background: "linear-gradient(90deg, #ef4444 0%, #f59e0b 52%, #10b981 100%)",
+              }}
+            />
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-500">
+            Missing components are excluded from a provisional score, not treated as zero. Coverage is weighted by the scoring model.
+          </p>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {[
@@ -698,7 +734,7 @@ export default function V2AssessmentPanel() {
         <p className="text-xs leading-relaxed text-slate-600">
           Credit history is 15% of the Cush Score. It must be based on supported provider evidence, not a manually selected
           classification. The Interswitch result will populate this component after its response fields are validated and mapped;
-          until then, the credit component is unavailable and the overall score remains incomplete.
+          until then, the credit component stays unavailable. Any provisional score uses only other supported components and shows their coverage.
         </p>
       </Card>
 

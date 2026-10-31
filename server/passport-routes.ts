@@ -30,6 +30,8 @@ function applyV2Calculation<T extends mem.MemPassport>(
     ...passport,
     score: calculation.cushScore,
     provisionalScore: calculation.provisionalScore,
+    scoreCoveragePercent: calculation.scoreCoveragePercent,
+    scoredComponentCount: calculation.scoredComponentCount,
     confidenceScore: calculation.confidenceScore,
     assessmentStatus: calculation.assessmentStatus,
     algorithmVersion: calculation.algorithmVersion,
@@ -37,7 +39,9 @@ function applyV2Calculation<T extends mem.MemPassport>(
     weightedContributions: calculation.weightedContributions,
     scoreBreakdown: calculation.componentScores,
     reasonCodes: null,
-    generatedAt: calculation.cushScore === null ? null : new Date(),
+    generatedAt: calculation.cushScore === null && calculation.provisionalScore === null
+      ? null
+      : new Date(),
     lastUpdated: new Date(),
   };
 }
