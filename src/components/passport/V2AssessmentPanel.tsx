@@ -65,18 +65,31 @@ interface V2AssessmentResponse {
   monoDataReady: boolean;
 }
 
-interface InterswitchCreditReportStatus {
-  configured: boolean;
-  verifiedNigerianPhoneAvailable: boolean;
-  maskedPhone: string | null;
-  consentSchemaReady: boolean;
+interface NormalizedCreditHistory {
+  accountsReported: number;
+  historyRecords: number;
+  loanStatusCounts: { open: number; closed: number; other: number };
+  performanceStatusCounts: { performing: number; nonPerforming: number; other: number };
+  repaymentStatusCounts: { settled: number; overdue: number; adverse: number; pending: number; other: number };
 }
 
-interface InterswitchCreditReportResult {
-  provider: "Interswitch";
-  completedAt: string;
+interface InterswitchCreditHistoryResult {
+  evidence: NormalizedCreditHistory;
+  mappingStatus: "draft_pending_review";
+  fetchedAt: string;
   scoreApplied: false;
-  report: unknown;
+}
+
+interface InterswitchCreditHistoryStatus {
+  configured: boolean;
+  consentSchemaReady: boolean;
+  evidenceSchemaReady: boolean;
+  latest: InterswitchCreditHistoryResult | null;
+}
+
+interface InterswitchCreditHistoryResponse extends InterswitchCreditHistoryResult {
+  provider: "Interswitch";
+  evidenceId: number;
 }
 
 const EMPTY_INPUTS: V2AssessmentInput = {
@@ -161,7 +174,8 @@ export default function V2AssessmentPanel() {
   const queryClient = useQueryClient();
   const [inputs, setInputs] = useState<V2AssessmentInput>(EMPTY_INPUTS);
   const [creditLookupConsent, setCreditLookupConsent] = useState(false);
-  const [creditReportResult, setCreditReportResult] = useState<InterswitchCreditReportResult | null>(null);
+  const [creditBvn, setCreditBvn] = useState("");
+  const [creditHistoryResult, setCreditHistoryResult] = useState<InterswitchCreditHistoryResponse | null>(null);
   const [fundLabel, setFundLabel] = useState("");
   const [fundAmount, setFundAmount] = useState("");
   const [fundAccessible, setFundAccessible] = useState(true);
@@ -182,24 +196,26 @@ export default function V2AssessmentPanel() {
     retry: false,
   });
 
-  const interswitchStatusQuery = useQuery<InterswitchCreditReportStatus>({
-    queryKey: ["/api/interswitch/credit-report/status"],
-    queryFn: () => request("GET", "/api/interswitch/credit-report/status"),
+  const interswitchStatusQuery = useQuery<InterswitchCreditHistoryStatus>({
+    queryKey: ["/api/interswitch/credit-history/status"],
+    queryFn: () => request("GET", "/api/interswitch/credit-history/status"),
     retry: false,
   });
 
   const creditLookupMutation = useMutation({
-    mutationFn: () => request<InterswitchCreditReportResult>(
+    mutationFn: () => request<InterswitchCreditHistoryResponse>(
       "POST",
-      "/api/interswitch/credit-report",
-      { consent: true },
+      "/api/interswitch/credit-history",
+      { bvn: creditBvn, consent: true },
     ),
     onSuccess: (result) => {
-      setCreditReportResult(result);
+      setCreditHistoryResult(result);
+      setCreditBvn("");
       setCreditLookupConsent(false);
+      void queryClient.invalidateQueries({ queryKey: ["/api/interswitch/credit-history/status"] });
       toast({
-        title: "Provider supplied a credit report",
-        description: "It is shown for your review and has not changed your Cush Score.",
+        title: "Credit history received",
+        description: "Only normalized counts were saved. No points were added to your Cush Score.",
       });
     },
     onError: (error: Error) => {
@@ -400,19 +416,18 @@ export default function V2AssessmentPanel() {
         </div>
       </Card>
 
-      <Card title="Required Interswitch credit bureau report">
+      <Card title="Required Interswitch credit history">
         <p className="text-xs leading-relaxed text-slate-600">
-          A provider credit report is required to complete a Cush Score. Before requesting it, you must explicitly consent to Cush
-          sending your verified Nigerian phone number to Interswitch. If you do not consent, no report is requested and your assessment
-          remains incomplete. We do not send a BVN or save the report to the database; it is displayed temporarily on this page.
+          An Interswitch credit-history lookup is required to complete a Cush Score. This lookup requires your BVN. It is sent to
+          Interswitch only after separate consent, used for the request, and not stored by Cush. Cush stores only aggregate status
+          counts from the latest result; names, addresses, BVNs, institution names, balances, dates, and the raw report are not stored.
         </p>
         <p className="text-xs leading-relaxed text-slate-600">
-          Interswitch response fields are not yet mapped into V2 scoring. Until that mapping is complete, no credit points are awarded
-          and the full score remains incomplete.
+          The repayment-based scoring rule is a draft for review. No credit points are applied until that rule is approved and implemented;
+          the full score remains incomplete in the meantime.
         </p>
         <p className="text-xs leading-relaxed text-amber-800">
-          Interswitch’s public documentation does not say whether this inquiry affects a credit file or what it costs.
-          Confirm those terms with Interswitch before using live lookups.
+          Confirm with Interswitch whether this inquiry affects a credit file and what it costs before using live lookups.
         </p>
         {interswitchStatusQuery.isLoading ? (
           <p className="text-xs text-slate-500" role="status">Checking lookup availability…</p>
@@ -420,19 +435,31 @@ export default function V2AssessmentPanel() {
           <p className="text-xs text-amber-800" role="status">Lookup availability could not be checked. No report request has been made.</p>
         ) : (
           <div className="space-y-2 text-xs">
-            {interswitchStatusQuery.data?.verifiedNigerianPhoneAvailable ? (
-              <p className="text-slate-600">Verified number on file: {interswitchStatusQuery.data.maskedPhone}</p>
-            ) : (
-              <p className="text-amber-800">A verified Nigerian phone number is required. No BVN lookup is offered here.</p>
-            )}
             {!interswitchStatusQuery.data?.configured && (
               <p className="text-amber-800">Interswitch server settings are incomplete, or live lookups have not been explicitly enabled.</p>
             )}
             {!interswitchStatusQuery.data?.consentSchemaReady && (
               <p className="text-amber-800">The consent table is not installed. Apply the Interswitch consent migration before requesting a report.</p>
             )}
+            {!interswitchStatusQuery.data?.evidenceSchemaReady && (
+              <p className="text-amber-800">The normalized-evidence table is not installed. Apply the Interswitch credit-history migration first.</p>
+            )}
           </div>
         )}
+        <label className="block text-xs font-medium text-slate-600">
+          BVN
+          <input
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={11}
+            value={creditBvn}
+            onChange={(event) => setCreditBvn(event.target.value.replace(/\D/g, "").slice(0, 11))}
+            disabled={creditLookupMutation.isPending}
+            className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            placeholder="Enter your 11-digit BVN"
+          />
+        </label>
         <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-700">
           <input
             type="checkbox"
@@ -442,8 +469,8 @@ export default function V2AssessmentPanel() {
             className="mt-0.5"
           />
           <span>
-            I consent to the required credit bureau lookup and to Cush sending my verified Nigerian phone number to Interswitch.
-            This consent is separate from accepting the Terms or Privacy Policy.
+            I authorize Cush to send my BVN to Interswitch for this required credit-history lookup and to store only the normalized
+            aggregate counts described above. This is separate from accepting the Terms or Privacy Policy.
           </span>
         </label>
         <div className="flex flex-wrap gap-2">
@@ -451,43 +478,57 @@ export default function V2AssessmentPanel() {
             type="button"
             onClick={() => creditLookupMutation.mutate()}
             disabled={
+              creditBvn.length !== 11 ||
               !creditLookupConsent ||
               creditLookupMutation.isPending ||
               !interswitchStatusQuery.data?.configured ||
-              !interswitchStatusQuery.data?.verifiedNigerianPhoneAvailable ||
-              !interswitchStatusQuery.data?.consentSchemaReady
+              !interswitchStatusQuery.data?.consentSchemaReady ||
+              !interswitchStatusQuery.data?.evidenceSchemaReady
             }
             className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {creditLookupMutation.isPending ? "Requesting report…" : "Request credit report"}
+            {creditLookupMutation.isPending ? "Requesting credit history…" : "Request credit history"}
           </button>
           <button
             type="button"
-            onClick={() => setCreditLookupConsent(false)}
-            disabled={!creditLookupConsent || creditLookupMutation.isPending}
+            onClick={() => {
+              setCreditLookupConsent(false);
+              setCreditBvn("");
+            }}
+            disabled={(!creditLookupConsent && !creditBvn) || creditLookupMutation.isPending}
             className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
           >
             Decline
           </button>
         </div>
-        {creditReportResult && (
+        {(creditHistoryResult ?? interswitchStatusQuery.data?.latest) && (
           <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-slate-800">Provider supplied · Interswitch report · {new Date(creditReportResult.completedAt).toLocaleString()}</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setCreditReportResult(null);
-                  creditLookupMutation.reset();
-                }}
-                className="text-xs font-semibold text-slate-600 underline"
-              >
-                Clear report from this page
-              </button>
+              <p className="text-xs font-semibold text-slate-800">
+                Provider supplied · Interswitch · {new Date((creditHistoryResult ?? interswitchStatusQuery.data?.latest)!.fetchedAt).toLocaleString()}
+              </p>
             </div>
-            <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-[11px] text-slate-700">
-              {JSON.stringify(creditReportResult.report, null, 2)}
-            </pre>
+            {(() => {
+              const result = creditHistoryResult ?? interswitchStatusQuery.data?.latest;
+              if (!result) return null;
+              return (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-2 text-xs">
+                    <p>Accounts reported: <strong>{result.evidence.accountsReported}</strong></p>
+                    <p>History records: <strong>{result.evidence.historyRecords}</strong></p>
+                    <p>Performing: <strong>{result.evidence.performanceStatusCounts.performing}</strong></p>
+                    <p>Non-performing: <strong>{result.evidence.performanceStatusCounts.nonPerforming}</strong></p>
+                    <p>Settled installments: <strong>{result.evidence.repaymentStatusCounts.settled}</strong></p>
+                    <p>Overdue installments: <strong>{result.evidence.repaymentStatusCounts.overdue}</strong></p>
+                    <p>Adverse installments: <strong>{result.evidence.repaymentStatusCounts.adverse}</strong></p>
+                    <p>Pending / other: <strong>{result.evidence.repaymentStatusCounts.pending + result.evidence.repaymentStatusCounts.other}</strong></p>
+                  </div>
+                  <p className="text-xs text-amber-800">
+                    Draft mapping pending review. This evidence has not changed your score.
+                  </p>
+                </>
+              );
+            })()}
           </div>
         )}
       </Card>

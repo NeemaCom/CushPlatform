@@ -115,6 +115,21 @@ export const interswitchCreditLookupConsents = pgTable("interswitch_credit_looku
   userAcceptedAtIndex: index("interswitch_credit_lookup_consents_user_accepted_at_idx").on(table.userId, table.acceptedAt),
 })).enableRLS();
 
+export const interswitchCreditHistoryEvidence = pgTable("interswitch_credit_history_evidence", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  consentId: integer("consent_id").notNull()
+    .references(() => interswitchCreditLookupConsents.id, { onDelete: "cascade" }),
+  evidenceData: jsonb("evidence_data").$type<unknown>().notNull(),
+  mappingStatus: text("mapping_status").notNull().default("draft_pending_review"),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userIdUnique: uniqueIndex("interswitch_credit_history_evidence_user_id_key").on(table.userId),
+  userFetchedAtIndex: index("interswitch_credit_history_evidence_user_fetched_at_idx")
+    .on(table.userId, table.fetchedAt),
+})).enableRLS();
+
 export const monoV2AssessmentEvidence = pgTable("mono_v2_assessment_evidence", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

@@ -32,7 +32,7 @@ import {
 import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
 import { registerMonoRoutes } from "./mono-routes";
-import { registerInterswitchCreditRoutes } from "./interswitch-credit-routes";
+import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
 
 async function createLoginSession(req: Request, user: Pick<User, "id" | "role">): Promise<void> {
   await new Promise<void>((resolve, reject) => req.session.regenerate((err) => err ? reject(err) : resolve()));
@@ -89,7 +89,7 @@ export async function registerRoutes(
   // ── Passport V1 routes ────────────────────────────────────────────────────
   registerPassportRoutes(app);
   registerMonoRoutes(app);
-  registerInterswitchCreditRoutes(app);
+  registerInterswitchCreditHistoryRoutes(app);
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
   app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {
