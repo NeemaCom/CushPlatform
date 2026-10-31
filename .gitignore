@@ -4,3 +4,8 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Local cookie jars can contain session credentials; never track them.
+admin_cookies.txt
+cookie.txt
+cookies.txt
