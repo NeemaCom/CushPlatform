@@ -11,6 +11,7 @@ import { authRateLimit } from "./security";
 import { InterswitchCreditHistoryError, interswitchCreditHistoryClient } from "./interswitch-credit-history-service";
 import {
   INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
+  INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION,
   scoreInterswitchCreditHistory,
 } from "./interswitch-credit-history-scoring";
 
@@ -65,6 +66,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
     noStore(res);
     try {
       const readiness = await schemaReadiness();
+      const providerReadiness = interswitchCreditHistoryClient.getReadiness();
       const [latest] = readiness.evidenceSchemaReady
         ? await db.select({
             evidenceData: interswitchCreditHistoryEvidence.evidenceData,
@@ -76,24 +78,37 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
             .orderBy(desc(interswitchCreditHistoryEvidence.fetchedAt))
             .limit(1)
         : [];
-      const scoring = latest &&
-        latest.mappingVersion === INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION
+      const canScore = Boolean(
+        latest &&
+        providerReadiness.mode === "production" &&
+        providerReadiness.configured &&
+        latest.mappingVersion === INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
+      );
+      const scoring = canScore && latest
         ? scoreInterswitchCreditHistory(latest.evidenceData)
         : null;
+      const sandboxResult = latest?.mappingVersion === INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION;
       return res.json({
-        configured: interswitchCreditHistoryClient.isConfigured(),
+        configured: providerReadiness.configured,
+        providerReadiness,
         ...readiness,
         latest: latest ? {
           evidence: latest.evidenceData,
-          mappingStatus: scoring?.score !== null && scoring
-            ? "score_applied"
-            : "no_scoreable_history",
+          mappingStatus: sandboxResult || !canScore
+            ? "draft_pending_review"
+            : scoring?.score !== null && scoring
+              ? "score_applied"
+              : "no_scoreable_history",
           mappingVersion: latest.mappingVersion,
-          creditComponentScore: scoring?.score ?? null,
+          creditComponentScore: canScore ? scoring?.score ?? null : null,
           scoreableInstallments: scoring?.scoreableInstallments ?? 0,
-          scoreReason: scoring?.reason ?? "mapping_version_mismatch",
+          scoreReason: sandboxResult
+            ? "sandbox_not_scored"
+            : canScore
+              ? scoring?.reason ?? "mapping_version_mismatch"
+              : "live_not_confirmed",
           fetchedAt: latest.fetchedAt.toISOString(),
-          scoreApplied: scoring?.score !== null && scoring !== null,
+          scoreApplied: canScore && scoring?.score !== null && scoring !== null,
         } : null,
       });
     } catch {
@@ -146,7 +161,16 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
         // provider response is logged, returned to the browser, or persisted.
         const evidence = await interswitchCreditHistoryClient.lookup(bvn);
         const scoring = scoreInterswitchCreditHistory(evidence);
-        const mappingStatus = scoring.score === null ? "no_scoreable_history" : "score_applied";
+        const providerReadiness = interswitchCreditHistoryClient.getReadiness();
+        const canScore = providerReadiness.mode === "production" && providerReadiness.configured;
+        const mappingVersion = providerReadiness.mode === "sandbox"
+          ? INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION
+          : INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION;
+        const mappingStatus = !canScore
+          ? "draft_pending_review"
+          : scoring.score === null
+            ? "no_scoreable_history"
+            : "score_applied";
         const fetchedAt = new Date();
         const [stored] = await db.insert(interswitchCreditHistoryEvidence)
           .values({
@@ -154,7 +178,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
             consentId,
             evidenceData: evidence,
             mappingStatus,
-            mappingVersion: INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
+            mappingVersion,
             fetchedAt,
           })
           .onConflictDoUpdate({
@@ -163,7 +187,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
               consentId,
               evidenceData: evidence,
               mappingStatus,
-              mappingVersion: INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
+              mappingVersion,
               fetchedAt,
             },
           })
@@ -174,11 +198,11 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
           fetchedAt: fetchedAt.toISOString(),
           evidence,
           mappingStatus,
-          mappingVersion: INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
-          creditComponentScore: scoring.score,
+          mappingVersion,
+          creditComponentScore: canScore ? scoring.score : null,
           scoreableInstallments: scoring.scoreableInstallments,
-          scoreReason: scoring.reason,
-          scoreApplied: scoring.score !== null,
+          scoreReason: canScore ? scoring.reason : "sandbox_not_scored",
+          scoreApplied: canScore && scoring.score !== null,
         });
       } catch (error) {
         if (isMissingSchema(error)) {

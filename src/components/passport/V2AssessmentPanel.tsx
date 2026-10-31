@@ -88,6 +88,14 @@ interface InterswitchCreditHistoryResult {
 
 interface InterswitchCreditHistoryStatus {
   configured: boolean;
+  providerReadiness?: {
+    mode: "sandbox" | "production" | "unconfigured";
+    configured: boolean;
+    liveEnabled: boolean;
+    providerMappingConfirmed: boolean;
+    identityMatchConfirmed: boolean;
+    inquiryEffectsConfirmed: boolean;
+  };
   consentSchemaReady: boolean;
   evidenceSchemaReady: boolean;
   latest: InterswitchCreditHistoryResult | null;
@@ -225,10 +233,13 @@ export default function V2AssessmentPanel() {
         title: result.scoreApplied ? "Credit history scored" : "Credit history received",
         description: result.scoreApplied
           ? "The mapped credit component was refreshed. Your overall score may still be incomplete."
+          : result.scoreReason === "sandbox_not_scored"
+            ? "Sandbox evidence is saved for review only and does not affect the Cush Score."
           : "No resolved repayment records were available to score, so no credit points were added.",
       });
     },
     onError: (error: Error) => {
+      setCreditBvn("");
       setCreditLookupConsent(false);
       toast({
         title: "Credit report unavailable",
@@ -472,7 +483,9 @@ export default function V2AssessmentPanel() {
           statuses conflict.
         </p>
         <p className="text-xs leading-relaxed text-amber-800">
-          Confirm with Interswitch whether this inquiry affects a credit file and what it costs before using live lookups.
+          Before live use, get provider confirmation of the repayment labels, how identity matches are indicated, whether each
+          lookup creates a bureau inquiry, and any per-request or repeat-request charges. Production lookups remain blocked until
+          those confirmations are recorded in server settings.
         </p>
         {interswitchStatusQuery.isLoading ? (
           <p className="text-xs text-slate-500" role="status">Checking lookup availability…</p>
@@ -480,9 +493,29 @@ export default function V2AssessmentPanel() {
           <p className="text-xs text-amber-800" role="status">Lookup availability could not be checked. No report request has been made.</p>
         ) : (
           <div className="space-y-2 text-xs">
-            {!interswitchStatusQuery.data?.configured && (
-              <p className="text-amber-800">Interswitch server settings are incomplete, or live lookups have not been explicitly enabled.</p>
+            {!interswitchStatusQuery.data?.configured &&
+              interswitchStatusQuery.data?.providerReadiness?.mode === "production" && (
+                <p className="text-amber-800">
+                  Production lookup is blocked until live mode, provider mapping, identity-match behavior, and inquiry/cost effects
+                  are explicitly confirmed.
+                </p>
+              )}
+            {!interswitchStatusQuery.data?.configured &&
+              interswitchStatusQuery.data?.providerReadiness?.mode !== "production" && (
+                <p className="text-amber-800">Interswitch server settings are incomplete or no supported environment is configured.</p>
+              )}
+            {interswitchStatusQuery.data?.providerReadiness?.mode === "sandbox" && (
+              <p className="text-blue-800">
+                Sandbox is configured. Sandbox responses do not confirm production identity matching, bureau inquiry effects, or fees.
+              </p>
             )}
+            {interswitchStatusQuery.data?.configured &&
+              interswitchStatusQuery.data?.providerReadiness?.mode === "production" && (
+                <p className="text-amber-800">
+                  Production readiness flags are enabled. Keep written Interswitch confirmation for the mapping, identity-match rule,
+                  and inquiry/cost effects.
+                </p>
+              )}
             {!interswitchStatusQuery.data?.consentSchemaReady && (
               <p className="text-amber-800">The consent table is not installed. Apply the Interswitch consent migration before requesting a report.</p>
             )}
@@ -571,6 +604,8 @@ export default function V2AssessmentPanel() {
                   <p className="text-xs text-amber-800">
                     {result.creditComponentScore !== null
                       ? `Mapped credit component: ${result.creditComponentScore}/100 (${result.scoreableInstallments} resolved installments). The overall score may still be incomplete.`
+                      : result.scoreReason === "sandbox_not_scored"
+                        ? "Sandbox evidence is for mapping review only and is not used in the Cush Score."
                       : result.scoreReason === "inconsistent_statuses"
                         ? "Provider statuses conflict, so this report was not scored."
                         : result.scoreReason === "invalid_evidence" || result.scoreReason === "mapping_version_mismatch"

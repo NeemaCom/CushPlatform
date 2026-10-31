@@ -45,7 +45,8 @@ export const normalizedCreditHistorySchema = z.object({
 
 export type NormalizedCreditHistory = z.infer<typeof normalizedCreditHistorySchema>;
 
-export const INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION = "interswitch-repayment-history-v1";
+export const INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION = "interswitch-repayment-history-v2";
+export const INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION = "interswitch-repayment-history-v2-sandbox";
 
 export type CreditHistoryScoreResult =
   | { score: number; scoreableInstallments: number; reason: "scored" }

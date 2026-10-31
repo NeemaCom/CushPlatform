@@ -12,6 +12,9 @@ interface Environment {
   INTERSWITCH_CREDIT_HISTORY_AUTH_URL?: string;
   INTERSWITCH_CREDIT_HISTORY_URL?: string;
   INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED?: string;
+  INTERSWITCH_CREDIT_HISTORY_MAPPING_CONFIRMED?: string;
+  INTERSWITCH_CREDIT_HISTORY_IDENTITY_MATCH_CONFIRMED?: string;
+  INTERSWITCH_CREDIT_HISTORY_INQUIRY_EFFECTS_CONFIRMED?: string;
 }
 
 export class InterswitchCreditHistoryError extends Error {
@@ -43,18 +46,35 @@ function providerUrl(value: string | undefined, expectedPath: string): URL | nul
   }
 }
 
+type ProviderMode = "sandbox" | "production" | "unconfigured";
+
+function providerMode(authUrl: URL | null, historyUrl: URL | null): ProviderMode {
+  if (!authUrl || !historyUrl) return "unconfigured";
+  if (authUrl.hostname === "sandbox.interswitchng.com" &&
+      historyUrl.hostname === "sandbox.interswitchng.com") {
+    return "sandbox";
+  }
+  if (authUrl.hostname === "api-marketplace-routing.interswitchng.com" &&
+      historyUrl.hostname === "api-marketplace-routing.interswitchng.com") {
+    return "production";
+  }
+  return "unconfigured";
+}
+
 function readConfig(env: Environment) {
   const clientId = env.INTERSWITCH_CLIENT_ID?.trim();
   const secretKey = env.INTERSWITCH_SECRET_KEY?.trim();
   const authUrl = providerUrl(env.INTERSWITCH_CREDIT_HISTORY_AUTH_URL, AUTH_PATH);
   const historyUrl = providerUrl(env.INTERSWITCH_CREDIT_HISTORY_URL, HISTORY_PATH);
   if (!clientId || !secretKey || !authUrl || !historyUrl) return null;
-  const sandbox = authUrl.hostname === "sandbox.interswitchng.com" &&
-    historyUrl.hostname === "sandbox.interswitchng.com";
-  const production = authUrl.hostname === "api-marketplace-routing.interswitchng.com" &&
-    historyUrl.hostname === "api-marketplace-routing.interswitchng.com";
-  if (!sandbox && !production) return null;
-  if (production && env.INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED !== "true") return null;
+  const mode = providerMode(authUrl, historyUrl);
+  if (mode === "unconfigured") return null;
+  if (mode === "production" && (
+    env.INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED !== "true" ||
+    env.INTERSWITCH_CREDIT_HISTORY_MAPPING_CONFIRMED !== "true" ||
+    env.INTERSWITCH_CREDIT_HISTORY_IDENTITY_MATCH_CONFIRMED !== "true" ||
+    env.INTERSWITCH_CREDIT_HISTORY_INQUIRY_EFFECTS_CONFIRMED !== "true"
+  )) return null;
   return { clientId, secretKey, authUrl, historyUrl };
 }
 
@@ -192,6 +212,20 @@ export function createInterswitchCreditHistoryClient(options: {
   return {
     isConfigured(): boolean {
       return getConfig() !== null;
+    },
+
+    getReadiness() {
+      const env = getEnvironment();
+      const authUrl = providerUrl(env.INTERSWITCH_CREDIT_HISTORY_AUTH_URL, AUTH_PATH);
+      const historyUrl = providerUrl(env.INTERSWITCH_CREDIT_HISTORY_URL, HISTORY_PATH);
+      return {
+        mode: providerMode(authUrl, historyUrl),
+        configured: readConfig(env) !== null,
+        liveEnabled: env.INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED === "true",
+        providerMappingConfirmed: env.INTERSWITCH_CREDIT_HISTORY_MAPPING_CONFIRMED === "true",
+        identityMatchConfirmed: env.INTERSWITCH_CREDIT_HISTORY_IDENTITY_MATCH_CONFIRMED === "true",
+        inquiryEffectsConfirmed: env.INTERSWITCH_CREDIT_HISTORY_INQUIRY_EFFECTS_CONFIRMED === "true",
+      };
     },
 
     async lookup(bvn: string): Promise<NormalizedCreditHistory> {

@@ -18,7 +18,7 @@ function evidence(overrides: Record<string, unknown> = {}) {
 
 describe("approved Interswitch credit-history mapping", () => {
   it("versions the rule and averages resolved installment weights", () => {
-    expect(INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION).toBe("interswitch-repayment-history-v1");
+    expect(INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION).toBe("interswitch-repayment-history-v2");
     expect(scoreInterswitchCreditHistory(evidence())).toEqual({
       score: 63,
       scoreableInstallments: 4,
@@ -78,6 +78,14 @@ describe("approved Interswitch credit-history mapping", () => {
 
     const unsupported = creditAssessmentFromInterswitchEvidence(evidence(), "unknown-version");
     expect(unsupported).toEqual({
+      classification: "unavailable",
+      evidenceQuality: null,
+      checkStatus: "not_done",
+      score: null,
+    });
+
+    const sandbox = creditAssessmentFromInterswitchEvidence(evidence(), "interswitch-repayment-history-v2-sandbox");
+    expect(sandbox).toEqual({
       classification: "unavailable",
       evidenceQuality: null,
       checkStatus: "not_done",

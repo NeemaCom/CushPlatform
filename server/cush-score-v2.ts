@@ -25,6 +25,7 @@ import {
   INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
   creditAssessmentFromInterswitchEvidence,
 } from "./interswitch-credit-history-scoring";
+import { interswitchCreditHistoryClient } from "./interswitch-credit-history-service";
 
 export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
   selectedBaselineId: null,
@@ -253,6 +254,8 @@ async function loadMonoAssessmentData(userId: number) {
 }
 
 async function loadCreditHistoryEvidence(userId: number) {
+  const providerReadiness = interswitchCreditHistoryClient.getReadiness();
+  if (providerReadiness.mode !== "production" || !providerReadiness.configured) return null;
   try {
     const [row] = await db.select({
       evidenceData: interswitchCreditHistoryEvidence.evidenceData,

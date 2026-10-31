@@ -3,6 +3,7 @@ import {
   createInterswitchCreditHistoryClient,
   normalizeInterswitchCreditHistory,
 } from "./interswitch-credit-history-service";
+import { scoreInterswitchCreditHistory } from "./interswitch-credit-history-scoring";
 
 const sandboxEnvironment: Record<string, string> = {
   INTERSWITCH_CLIENT_ID: "test-client",
@@ -80,6 +81,28 @@ describe("normalizeInterswitchCreditHistory", () => {
     expect(result.performanceStatusCounts.other).toBe(1);
     expect(result.repaymentStatusCounts.other).toBe(1);
   });
+
+  it("does not award credit points for the supplied pending-only repayment schedule", () => {
+    const normalized = normalizeInterswitchCreditHistory({
+      success: true,
+      code: "200",
+      data: {
+        credit_history: [{
+          history: [{
+            loan_status: "open",
+            performance_status: "performing",
+            repayment_schedule: [{ date: "06-2022", status: "pending" }],
+          }],
+        }],
+      },
+    });
+
+    expect(scoreInterswitchCreditHistory(normalized)).toEqual({
+      score: null,
+      scoreableInstallments: 0,
+      reason: "no_resolved_installments",
+    });
+  });
 });
 
 describe("Interswitch credit-history client", () => {
@@ -104,6 +127,13 @@ describe("Interswitch credit-history client", () => {
     });
 
     expect(client.isConfigured()).toBe(true);
+    expect(client.getReadiness()).toMatchObject({
+      mode: "sandbox",
+      configured: true,
+      providerMappingConfirmed: false,
+      identityMatchConfirmed: false,
+      inquiryEffectsConfirmed: false,
+    });
     const result = await client.lookup("12345678901");
     expect(calls).toHaveLength(2);
     expect(calls[0].url.toString()).toBe(sandboxEnvironment.INTERSWITCH_CREDIT_HISTORY_AUTH_URL);
@@ -119,7 +149,7 @@ describe("Interswitch credit-history client", () => {
     expect(JSON.stringify(result)).not.toMatch(/PRIVATE|tracking-id|address|BVN/i);
   });
 
-  it("does not enable production lookups without the explicit live flag", () => {
+  it("blocks production lookups until live mode and every provider confirmation are enabled", async () => {
     const environment: Record<string, string> = {
       ...sandboxEnvironment,
       INTERSWITCH_CREDIT_HISTORY_AUTH_URL:
@@ -127,13 +157,35 @@ describe("Interswitch credit-history client", () => {
       INTERSWITCH_CREDIT_HISTORY_URL:
         "https://api-marketplace-routing.interswitchng.com/marketplace-routing/api/v1/verify/identity/credit-history-lookup",
     };
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
     const client = createInterswitchCreditHistoryClient({
       getEnvironment: () => environment,
-      fetchImpl: vi.fn() as unknown as typeof fetch,
+      fetchImpl,
     });
     expect(client.isConfigured()).toBe(false);
+    await expect(client.lookup("12345678901")).rejects.toThrow("not configured");
+    expect(fetchImpl).not.toHaveBeenCalled();
     environment.INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED = "true";
+    expect(client.isConfigured()).toBe(false);
+    environment.INTERSWITCH_CREDIT_HISTORY_MAPPING_CONFIRMED = "true";
+    expect(client.isConfigured()).toBe(false);
+    environment.INTERSWITCH_CREDIT_HISTORY_IDENTITY_MATCH_CONFIRMED = "true";
+    expect(client.isConfigured()).toBe(false);
+    expect(client.getReadiness()).toMatchObject({
+      mode: "production",
+      configured: false,
+      liveEnabled: true,
+      providerMappingConfirmed: true,
+      identityMatchConfirmed: true,
+      inquiryEffectsConfirmed: false,
+    });
+    environment.INTERSWITCH_CREDIT_HISTORY_INQUIRY_EFFECTS_CONFIRMED = "true";
     expect(client.isConfigured()).toBe(true);
+    expect(client.getReadiness()).toMatchObject({
+      mode: "production",
+      configured: true,
+      inquiryEffectsConfirmed: true,
+    });
   });
 
   it("rejects mixed sandbox and production endpoints", () => {
