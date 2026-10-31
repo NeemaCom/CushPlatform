@@ -33,7 +33,7 @@ describe("live passport scoring adapter", () => {
 
     const result = recalculatePassport(passport.id, userId);
 
-    expect(result.algorithmVersion).toBe("2.0.0");
+    expect(result.algorithmVersion).toBe("2.1.0");
     expect(result.score).toBeNull();
     expect(result.assessmentStatus).toBe("incomplete");
     expect(result.legacyDataNotice).toContain("do not contain the dated");

@@ -721,7 +721,7 @@ export default function CreditPassport() {
       provisionalScore: null,
       confidenceScore: null,
       assessmentStatus: "not_started" as const,
-      algorithmVersion: "2.0.0",
+      algorithmVersion: "2.1.0",
       missingRequirements: [],
       legacyDataNotice: null,
       mode: "pre_arrival",

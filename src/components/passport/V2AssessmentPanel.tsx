@@ -75,9 +75,13 @@ interface NormalizedCreditHistory {
 
 interface InterswitchCreditHistoryResult {
   evidence: NormalizedCreditHistory;
-  mappingStatus: "draft_pending_review";
+  mappingStatus: "draft_pending_review" | "score_applied" | "no_scoreable_history";
+  mappingVersion: string;
   fetchedAt: string;
-  scoreApplied: false;
+  creditComponentScore: number | null;
+  scoreableInstallments: number;
+  scoreApplied: boolean;
+  scoreReason?: string;
 }
 
 interface InterswitchCreditHistoryStatus {
@@ -213,9 +217,13 @@ export default function V2AssessmentPanel() {
       setCreditBvn("");
       setCreditLookupConsent(false);
       void queryClient.invalidateQueries({ queryKey: ["/api/interswitch/credit-history/status"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] });
+      void queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] });
       toast({
-        title: "Credit history received",
-        description: "Only normalized counts were saved. No points were added to your Cush Score.",
+        title: result.scoreApplied ? "Credit history scored" : "Credit history received",
+        description: result.scoreApplied
+          ? "The mapped credit component was refreshed. Your overall score may still be incomplete."
+          : "No resolved repayment records were available to score, so no credit points were added.",
       });
     },
     onError: (error: Error) => {
@@ -423,8 +431,9 @@ export default function V2AssessmentPanel() {
           counts from the latest result; names, addresses, BVNs, institution names, balances, dates, and the raw report are not stored.
         </p>
         <p className="text-xs leading-relaxed text-slate-600">
-          The repayment-based scoring rule is a draft for review. No credit points are applied until that rule is approved and implemented;
-          the full score remains incomplete in the meantime.
+          The approved repayment rule scores settled installments as 1, overdue as 0.5, and confirmed missed/default as 0. Pending and
+          unrecognized statuses are excluded. The component stays unavailable if no resolved installment is present or provider
+          statuses conflict.
         </p>
         <p className="text-xs leading-relaxed text-amber-800">
           Confirm with Interswitch whether this inquiry affects a credit file and what it costs before using live lookups.
@@ -442,7 +451,7 @@ export default function V2AssessmentPanel() {
               <p className="text-amber-800">The consent table is not installed. Apply the Interswitch consent migration before requesting a report.</p>
             )}
             {!interswitchStatusQuery.data?.evidenceSchemaReady && (
-              <p className="text-amber-800">The normalized-evidence table is not installed. Apply the Interswitch credit-history migration first.</p>
+              <p className="text-amber-800">The credit-history scoring schema is incomplete. Apply both Interswitch credit-history migrations in order.</p>
             )}
           </div>
         )}
@@ -524,7 +533,13 @@ export default function V2AssessmentPanel() {
                     <p>Pending / other: <strong>{result.evidence.repaymentStatusCounts.pending + result.evidence.repaymentStatusCounts.other}</strong></p>
                   </div>
                   <p className="text-xs text-amber-800">
-                    Draft mapping pending review. This evidence has not changed your score.
+                    {result.creditComponentScore !== null
+                      ? `Mapped credit component: ${result.creditComponentScore}/100 (${result.scoreableInstallments} resolved installments). The overall score may still be incomplete.`
+                      : result.scoreReason === "inconsistent_statuses"
+                        ? "Provider statuses conflict, so this report was not scored."
+                        : result.scoreReason === "invalid_evidence" || result.scoreReason === "mapping_version_mismatch"
+                          ? "This report could not be safely matched to the active scoring rule, so it was not scored."
+                          : "No resolved repayment history was available to score. No credit points were added."}
                   </p>
                 </>
               );

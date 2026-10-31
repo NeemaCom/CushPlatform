@@ -3,6 +3,7 @@ import {
   cushAssessmentInputs,
   cushScorePolicyVersions,
   cushScorePolicyConfigSchema,
+  interswitchCreditHistoryEvidence,
   monoLinkedAccounts,
   monoV2AssessmentEvidence,
   monoV2AssessmentEvidenceSchema,
@@ -20,6 +21,10 @@ import {
   type CushScorePolicy,
   type DestinationBaseline,
 } from "./cush-score-service";
+import {
+  INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
+  creditAssessmentFromInterswitchEvidence,
+} from "./interswitch-credit-history-scoring";
 
 export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
   selectedBaselineId: null,
@@ -89,6 +94,7 @@ function engineInput(
   now: Date,
   monoImports: Array<{ linkedAccountId: number; fetchedAt: Date; evidence: MonoV2AssessmentEvidence }>,
   linkedAccountCount: number,
+  creditHistoryEvidence: { evidenceData: unknown; mappingVersion: string } | null,
 ): CushScoreInput {
   const monoMonthSet = new Set(monoImports.flatMap(({ evidence }) =>
     evidence.cashFlowHistory.map((item) => item.month),
@@ -147,6 +153,12 @@ function engineInput(
         ...(monoRecordCount > 0 ? [{ sourceType: "bank_connection" as const, share: monoRecordCount / sourceRecordCount }] : []),
         ...(selfReportedRecordCount > 0 ? [{ sourceType: "self_reported" as const, share: selfReportedRecordCount / sourceRecordCount }] : []),
       ];
+  const creditAssessment = creditHistoryEvidence
+    ? creditAssessmentFromInterswitchEvidence(
+        creditHistoryEvidence.evidenceData,
+        creditHistoryEvidence.mappingVersion,
+      )
+    : creditAssessmentFromInterswitchEvidence(null, INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION);
   const oldestImportDate = monoImports.length
     ? Math.min(...monoImports.map(({ fetchedAt }) => fetchedAt.getTime()))
     : null;
@@ -199,12 +211,8 @@ function engineInput(
       })),
       ...monoCashFlowRows,
     ],
-    credit: {
-      // User-entered classifications are not supported evidence for V2 scoring.
-      classification: "unavailable",
-      evidenceQuality: null,
-      checkStatus: "not_done",
-    },
+    // User-entered classifications are not supported evidence for V2 scoring.
+    credit: creditAssessment,
     dataAgeDays,
     coveredAccountCount: monoImports.length,
     declaredAccountCount: Math.max(linkedAccountCount, monoImports.length),
@@ -244,6 +252,23 @@ async function loadMonoAssessmentData(userId: number) {
   }
 }
 
+async function loadCreditHistoryEvidence(userId: number) {
+  try {
+    const [row] = await db.select({
+      evidenceData: interswitchCreditHistoryEvidence.evidenceData,
+      mappingVersion: interswitchCreditHistoryEvidence.mappingVersion,
+      fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
+    }).from(interswitchCreditHistoryEvidence)
+      .where(eq(interswitchCreditHistoryEvidence.userId, userId))
+      .orderBy(desc(interswitchCreditHistoryEvidence.fetchedAt))
+      .limit(1);
+    return row ?? null;
+  } catch (error) {
+    if (isCreditHistorySchemaMissing(error)) return null;
+    throw error;
+  }
+}
+
 async function loadStoredInputs(userId: number): Promise<V2AssessmentInput> {
   const [row] = await db.select().from(cushAssessmentInputs).where(eq(cushAssessmentInputs.userId, userId)).limit(1);
   return row ? v2AssessmentInputSchema.parse(row.inputData) : EMPTY_V2_ASSESSMENT;
@@ -258,10 +283,11 @@ async function loadActivePolicy() {
 }
 
 export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
-  const [inputs, activePolicy, monoData] = await Promise.all([
+  const [inputs, activePolicy, monoData, creditHistoryEvidence] = await Promise.all([
     loadStoredInputs(userId),
     loadActivePolicy(),
     loadMonoAssessmentData(userId),
+    loadCreditHistoryEvidence(userId),
   ]);
   const today = now.toISOString().slice(0, 10);
   const selectedBaseline = baselineFor(inputs, activePolicy?.configuration ?? null, today);
@@ -274,7 +300,7 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
       }
     : { creditMappings: {} };
   const calculation = calculateCushScore(
-    engineInput(userId, inputs, selectedBaseline, now, monoData.imports, monoData.linkedAccountCount),
+    engineInput(userId, inputs, selectedBaseline, now, monoData.imports, monoData.linkedAccountCount, creditHistoryEvidence),
     scoringPolicy,
   );
   const destinationBaselines = activePolicy?.configuration.destinationBaselines.filter((baseline) =>
@@ -417,6 +443,18 @@ export function isV2SchemaMissing(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; depth < 5 && typeof current === "object" && current !== null; depth += 1) {
     if ("code" in current && (current as { code?: string }).code === "42P01") return true;
+    current = "cause" in current ? (current as { cause?: unknown }).cause : null;
+  }
+  return false;
+}
+
+function isCreditHistorySchemaMissing(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && typeof current === "object" && current !== null; depth += 1) {
+    if (
+      "code" in current &&
+      ["42P01", "42703"].includes(String((current as { code?: unknown }).code))
+    ) return true;
     current = "cause" in current ? (current as { cause?: unknown }).cause : null;
   }
   return false;

@@ -1,12 +1,11 @@
 /**
  * Cush Score V2 calculation engine.
  *
- * This module is deliberately pure and is not wired to the current passport
- * routes yet. All monetary inputs must already be normalised to GBP pence by
- * a trusted, separately audited ingestion layer.
+ * This module is deliberately pure. All monetary inputs must already be
+ * normalised to GBP pence by a trusted, separately audited ingestion layer.
  */
 
-export const CUSH_SCORE_VERSION = "2.0.0";
+export const CUSH_SCORE_VERSION = "2.1.0";
 
 export type EvidenceQuality = "verified" | "documented" | "self_reported";
 export type SourceEvidenceType = "bank_connection" | "verified_statement" | "self_reported";
@@ -69,6 +68,8 @@ export interface MonthlyCashFlow {
 export interface CreditAssessment {
   classification: CreditClassification;
   evidenceQuality: EvidenceQuality | null;
+  /** Server-derived provider score on the 0–100 component scale, if scoreable. */
+  score?: number | null;
   /** Set only by a trusted credit-check/review path, never from the V2 form. */
   checkStatus?: CreditCheckStatus;
 }
@@ -90,8 +91,9 @@ export interface DestinationBaseline {
 
 export interface CushScorePolicy {
   /**
-   * The prompt fixes thin-file at 50. Other credit mappings are intentionally
-   * required from an approved policy; this engine invents no bureau mapping.
+   * The prompt fixes thin-file at 50. Provider-specific classification mappings
+   * remain policy-driven; verified credit-history components may supply a
+   * server-derived score through CreditAssessment.score.
    */
   creditMappings: Partial<Record<Exclude<CreditClassification, "thin_file" | "incomplete" | "unavailable">, number>>;
   confidence?: {
@@ -353,7 +355,8 @@ function calculateConfidence(
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
     input.sourceEvidenceShares.length > 0 ||
-    input.credit.classification !== "unavailable";
+    input.credit.classification !== "unavailable" ||
+    input.credit.checkStatus !== undefined && input.credit.checkStatus !== "not_done";
   if (!hasAssessmentData || !confidencePolicy) return { score: null, breakdown: null };
 
   const historyDepth = Math.min(
@@ -472,6 +475,14 @@ function validateInput(input: CushScoreInput, policy: CushScorePolicy): void {
   }
   if (input.credit.checkStatus && !CREDIT_CHECK_STATUSES.includes(input.credit.checkStatus)) {
     throw new Error("Credit check status is not supported.");
+  }
+  if (input.credit.score !== undefined && input.credit.score !== null &&
+      (!Number.isFinite(input.credit.score) || input.credit.score < 0 || input.credit.score > 100)) {
+    throw new Error("Credit score must be null or between 0 and 100.");
+  }
+  if (input.credit.score !== undefined && input.credit.score !== null &&
+      (input.credit.evidenceQuality !== "verified" || input.credit.checkStatus !== "matched")) {
+    throw new Error("A mapped provider credit score requires verified matched evidence.");
   }
   if (input.incomeSourceType && !INCOME_CONFIDENCE_SOURCES.includes(input.incomeSourceType)) {
     throw new Error("Income confidence source is not supported.");
@@ -622,6 +633,7 @@ function calculateCreditScore(
   credit: CreditAssessment,
   policy: CushScorePolicy,
 ): number | null {
+  if (credit.score !== undefined && credit.score !== null) return credit.score;
   if (credit.classification === "incomplete" || credit.classification === "unavailable") return null;
   if (credit.classification === "thin_file") return 50;
   return policy.creditMappings[credit.classification] ?? null;
@@ -690,7 +702,8 @@ export function calculateCushScore(
     input.availableFunds.length > 0 ||
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
-    input.credit.classification !== "unavailable";
+    input.credit.classification !== "unavailable" ||
+    (input.credit.checkStatus !== undefined && input.credit.checkStatus !== "not_done");
 
   const missingRequirements: string[] = [];
   if (input.destinationBaseline === null) {

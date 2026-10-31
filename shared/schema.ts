@@ -122,6 +122,7 @@ export const interswitchCreditHistoryEvidence = pgTable("interswitch_credit_hist
     .references(() => interswitchCreditLookupConsents.id, { onDelete: "cascade" }),
   evidenceData: jsonb("evidence_data").$type<unknown>().notNull(),
   mappingStatus: text("mapping_status").notNull().default("draft_pending_review"),
+  mappingVersion: text("mapping_version").notNull().default("interswitch-repayment-history-v1"),
   fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({

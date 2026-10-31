@@ -1,3 +1,5 @@
+import type { NormalizedCreditHistory } from "./interswitch-credit-history-scoring";
+
 const AUTH_PATH = "/marketplace-routing/api/v1/authentication/client";
 const HISTORY_PATH = "/marketplace-routing/api/v1/verify/identity/credit-history-lookup";
 const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -10,14 +12,6 @@ interface Environment {
   INTERSWITCH_CREDIT_HISTORY_AUTH_URL?: string;
   INTERSWITCH_CREDIT_HISTORY_URL?: string;
   INTERSWITCH_CREDIT_HISTORY_LIVE_ENABLED?: string;
-}
-
-export interface NormalizedCreditHistory {
-  accountsReported: number;
-  historyRecords: number;
-  loanStatusCounts: { open: number; closed: number; other: number };
-  performanceStatusCounts: { performing: number; nonPerforming: number; other: number };
-  repaymentStatusCounts: { settled: number; overdue: number; adverse: number; pending: number; other: number };
 }
 
 export class InterswitchCreditHistoryError extends Error {

@@ -472,6 +472,40 @@ describe("Cush Score V2 engine", () => {
     expect(result.missingRequirements).toContain("Completed, supported credit assessment");
   });
 
+  it("uses the mapped provider component score only with verified matched evidence", () => {
+    const result = calculateCushScore(completeInput({
+      credit: {
+        classification: "unavailable",
+        evidenceQuality: "verified",
+        checkStatus: "matched",
+        score: 63,
+      },
+    }), policy);
+
+    expect(result.componentScores.creditHistory).toBe(63);
+    expect(result.weightedContributions.creditHistory).toBe(94.5);
+  });
+
+  it("rejects out-of-range and unverified provider component scores", () => {
+    expect(() => calculateCushScore(completeInput({
+      credit: {
+        classification: "unavailable",
+        evidenceQuality: "verified",
+        checkStatus: "matched",
+        score: 101,
+      },
+    }), policy)).toThrow(/between 0 and 100/);
+
+    expect(() => calculateCushScore(completeInput({
+      credit: {
+        classification: "unavailable",
+        evidenceQuality: "self_reported",
+        checkStatus: "matched",
+        score: 63,
+      },
+    }), policy)).toThrow(/verified matched evidence/);
+  });
+
   it("weights source quality by the share of assessment data from each source", () => {
     const result = calculateCushScore(completeInput({
       sourceEvidenceShares: [
