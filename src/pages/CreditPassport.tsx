@@ -4,12 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
+import AccountDropdown from "@/components/AccountDropdown";
+import { logoutFromCush } from "@/lib/logout";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
 import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin";
 import {
   Globe2, TrendingUp, ShieldCheck, ChevronRight,
-  Plus, Trash2, Link2, LogOut,
+  Plus, Trash2, Link2,
   FileCheck, Upload, BadgeCheck, Clock, AlertCircle,
   Plane, MapPin, Copy, Eye, EyeOff, FileText, Users,
 } from "lucide-react";
@@ -636,18 +638,6 @@ function SharePanel({
   );
 }
 
-function getAccountDisplayName(user: {
-  firstName?: string | null;
-  lastName?: string | null;
-  email?: string | null;
-} | null | undefined): string {
-  const fullName = [user?.firstName?.trim(), user?.lastName?.trim()]
-    .filter((part): part is string => Boolean(part))
-    .join(" ");
-  if (fullName && fullName.toLowerCase() !== "user") return fullName;
-  return user?.email?.split("@")[0] || "User";
-}
-
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function CreditPassport() {
@@ -655,7 +645,6 @@ export default function CreditPassport() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const accountDisplayName = getAccountDisplayName(user);
   const [showSignalForm, setShowSignalForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"roadmap" | "signals" | "assessment" | "policy">("roadmap");
   const [monoCodePending, setMonoCodePending] = useState(false);
@@ -720,7 +709,7 @@ export default function CreditPassport() {
   });
 
   async function handleLogout() {
-    await fetch(`${API_BASE_URL}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => {});
+    await logoutFromCush();
     await qc.cancelQueries();
     await qc.clear();
     setLocation("/login");
@@ -786,23 +775,7 @@ export default function CreditPassport() {
               <span className="font-bold text-slate-900 text-sm hidden sm:block">Cush Passport</span>
             </div>
           </Link>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2">
-              <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center">
-                <span className="text-slate-600 font-bold text-xs">
-                  {accountDisplayName[0]?.toUpperCase() ?? "U"}
-                </span>
-              </div>
-              <span className="text-sm text-slate-600 font-medium truncate max-w-32">
-                {accountDisplayName}
-              </span>
-            </div>
-            <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Sign Out</span>
-            </motion.button>
-          </div>
+          {user && <AccountDropdown user={user} onSignOut={handleLogout} />}
         </div>
       </header>
 

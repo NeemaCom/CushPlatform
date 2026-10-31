@@ -1,5 +1,5 @@
 import { Router, Route, Switch, useLocation } from 'wouter'
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { QueryProvider } from '@/lib/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
@@ -10,6 +10,7 @@ import PublicPassport from '@/pages/PublicPassport'
 import SamplePassport from '@/pages/SamplePassport'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
+const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 import { useAuth } from '@/hooks/useAuth'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
@@ -78,6 +79,17 @@ function App() {
               <Route path="/passport">
                 <AuthRoute><CreditPassport /></AuthRoute>
               </Route>
+
+              {/* Account management and support are authenticated and owner-scoped. */}
+              <Route path="/account/:section">
+                {(params) => <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section={params.section} /></AuthRoute></Suspense>}
+              </Route>
+              <Route path="/support">
+                <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="support" /></AuthRoute></Suspense>
+              </Route>
+              <Route path="/contact">
+                <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="contact" /></AuthRoute></Suspense>
+              </Route>
             </Switch>
           </div>
         </Router>
@@ -85,6 +97,10 @@ function App() {
       </QueryProvider>
     </ThemeProvider>
   )
+}
+
+function AccountLoading() {
+  return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading account…</div>
 }
 
 export default App

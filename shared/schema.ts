@@ -482,6 +482,7 @@ export const updateProfileSchema = z.object({
   phoneNumber: z.string().optional(),
   nationality: z.string().optional(),
   profilePicture: z.string().optional(),
+  marketingConsent: z.boolean().optional(),
 });
 
 export const passwordRecoverySchema = z.object({

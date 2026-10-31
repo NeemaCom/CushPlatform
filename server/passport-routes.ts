@@ -12,6 +12,7 @@ import {
   updatePassportModeSchema,
 } from "@shared/schema";
 import * as mem from "./mem-store";
+import { toEvidenceMetadata } from "./evidence-metadata";
 import {
   activateScoringPolicy,
   getAdminPolicyVersions,
@@ -59,7 +60,7 @@ export function registerPassportRoutes(app: Express) {
         ? initialPassport
         : mem.recalculatePassport(initialPassport.id, userId);
       const signals = mem.getPassportSignals(storedPassport.id);
-      const evidence = mem.getPassportEvidence(storedPassport.id);
+      const evidence = mem.getPassportEvidence(storedPassport.id).map(toEvidenceMetadata);
       try {
         const assessment = await getV2Assessment(userId);
         return res.json({
@@ -91,6 +92,18 @@ export function registerPassportRoutes(app: Express) {
       }
       console.error("GET /api/passport/v2 error:", error);
       return res.status(500).json({ error: "Failed to load V2 assessment" });
+    }
+  });
+
+  // Return only document metadata; never send the stored file payload back in this list.
+  app.get("/api/passport/evidence", isAuthenticated, (req: AuthenticatedRequest, res) => {
+    try {
+      const passport = mem.getOrCreatePassport(req.userId!);
+      const documents = mem.getPassportEvidence(passport.id).map(toEvidenceMetadata);
+      return res.json({ documents });
+    } catch (error) {
+      console.error("GET /api/passport/evidence error:", error);
+      return res.status(500).json({ error: "Failed to load document records" });
     }
   });
 

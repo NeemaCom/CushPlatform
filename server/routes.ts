@@ -35,6 +35,15 @@ import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
 import { firebaseProfileNamePatch } from "./firebase-profile-name";
 
+const profilePictureSchema = z.object({
+  image: z.string()
+    .max(80_000, "Profile image must be smaller than 60 KB after optimization.")
+    .regex(
+      /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i,
+      "Upload a valid JPEG, PNG, or WebP image.",
+    ),
+});
+
 async function createLoginSession(req: Request, user: Pick<User, "id" | "role">): Promise<void> {
   await new Promise<void>((resolve, reject) => req.session.regenerate((err) => err ? reject(err) : resolve()));
   req.session.userId = user.id;
@@ -294,11 +303,13 @@ export async function registerRoutes(
   // ── Profile picture ───────────────────────────────────────────────────────
   app.post("/api/profile/picture", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const { image } = req.body;
-      if (!image) return res.status(400).json({ error: "Image data required" });
-      await storage.updateUser(req.userId!, { profilePicture: image });
-      res.json({ message: "Profile picture updated" });
-    } catch {
+      const { image } = profilePictureSchema.parse(req.body);
+      const updated = await storage.updateUser(req.userId!, { profilePicture: image });
+      res.json(createSafeUser(updated));
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid profile image." });
+      }
       res.status(500).json({ error: "Failed to update profile picture" });
     }
   });

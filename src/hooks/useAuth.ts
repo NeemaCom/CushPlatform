@@ -2,13 +2,22 @@ import { useQuery } from "@tanstack/react-query";
 
 import { API_BASE_URL } from "@/lib/api-base";
 
-interface User {
+export interface User {
   id: number;
   username: string;
   email: string;
   role: string;
   firstName: string;
   lastName: string;
+  phoneNumber?: string | null;
+  nationality?: string | null;
+  profilePicture?: string | null;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  acceptTerms?: boolean;
+  acceptPrivacy?: boolean;
+  marketingConsent?: boolean;
+  mfaEnabled?: boolean;
 }
 
 export function useAuth() {
