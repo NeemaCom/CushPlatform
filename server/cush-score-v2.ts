@@ -137,8 +137,7 @@ function engineInput(
     input.cashFlowHistory.length > 0 ||
     monoFunds.length > 0 ||
     monoIncome.length > 0 ||
-    monoCashFlowRows.length > 0 ||
-    input.creditClassification !== "unavailable";
+    monoCashFlowRows.length > 0;
   const monoRecordCount = monoFunds.length + monoIncome.length + monoCashFlowRows.length;
   const selfReportedRecordCount = manualFunds.length + manualIncome.length + manualCashFlow.length;
   const sourceRecordCount = monoRecordCount + selfReportedRecordCount;
@@ -201,8 +200,9 @@ function engineInput(
       ...monoCashFlowRows,
     ],
     credit: {
-      classification: input.creditClassification,
-      evidenceQuality: input.creditClassification === "unavailable" ? null : "self_reported",
+      // User-entered classifications are not supported evidence for V2 scoring.
+      classification: "unavailable",
+      evidenceQuality: null,
       checkStatus: "not_done",
     },
     dataAgeDays,

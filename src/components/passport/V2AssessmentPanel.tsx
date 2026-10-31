@@ -400,17 +400,19 @@ export default function V2AssessmentPanel() {
         </div>
       </Card>
 
-      <Card title="Optional Interswitch credit bureau report">
+      <Card title="Required Interswitch credit bureau report">
         <p className="text-xs leading-relaxed text-slate-600">
-          With your separate consent, Cush sends your verified Nigerian phone number to Interswitch to request a bureau report.
-          We do not send a BVN or save the report to the database; it is displayed temporarily in this page.
+          A provider credit report is required to complete a Cush Score. Before requesting it, you must explicitly consent to Cush
+          sending your verified Nigerian phone number to Interswitch. If you do not consent, no report is requested and your assessment
+          remains incomplete. We do not send a BVN or save the report to the database; it is displayed temporarily on this page.
         </p>
         <p className="text-xs leading-relaxed text-slate-600">
-          The report will not affect your Cush Score until its fields and scoring treatment are reviewed and approved.
+          Interswitch response fields are not yet mapped into V2 scoring. Until that mapping is complete, no credit points are awarded
+          and the full score remains incomplete.
         </p>
         <p className="text-xs leading-relaxed text-amber-800">
           Interswitch’s public documentation does not say whether this inquiry affects a credit file or what it costs.
-          Confirm those terms with Interswitch before enabling live lookups.
+          Confirm those terms with Interswitch before using live lookups.
         </p>
         {interswitchStatusQuery.isLoading ? (
           <p className="text-xs text-slate-500" role="status">Checking lookup availability…</p>
@@ -440,8 +442,8 @@ export default function V2AssessmentPanel() {
             className="mt-0.5"
           />
           <span>
-            I consent to Cush sending my verified Nigerian phone number to Interswitch to request my credit bureau report.
-            This is optional and separate from accepting the Terms or Privacy Policy.
+            I consent to the required credit bureau lookup and to Cush sending my verified Nigerian phone number to Interswitch.
+            This consent is separate from accepting the Terms or Privacy Policy.
           </span>
         </label>
         <div className="flex flex-wrap gap-2">
@@ -637,19 +639,11 @@ export default function V2AssessmentPanel() {
       </Card>
 
       <Card title="Credit assessment">
-        <label className="block text-xs font-medium text-slate-600">
-          Your current classification
-          <select value={inputs.creditClassification} onChange={(event) => setInputs((current) => ({ ...current, creditClassification: event.target.value as V2AssessmentInput["creditClassification"] }))} className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-            <option value="unavailable">Not entered / unavailable</option>
-            <option value="thin_file">Thin file</option>
-            <option value="no_history">No history</option>
-            <option value="strong">Strong</option>
-            <option value="average">Average</option>
-            <option value="poor">Poor</option>
-            <option value="incomplete">Assessment incomplete</option>
-          </select>
-        </label>
-        <p className="text-xs text-slate-500">This entry is self-reported. Thin-file is the only fixed mapping; other classifications need an active approved mapping and supported evidence. The Interswitch report above is not mapped into scoring yet.</p>
+        <p className="text-xs leading-relaxed text-slate-600">
+          Credit history is 15% of the Cush Score. It must be based on supported provider evidence, not a manually selected
+          classification. The Interswitch result will populate this component after its response fields are validated and mapped;
+          until then, the credit component is unavailable and the overall score remains incomplete.
+        </p>
       </Card>
 
       <button
