@@ -106,6 +106,15 @@ export const monoBvnLookupConsents = pgTable("mono_bvn_lookup_consents", {
   userAcceptedAtIndex: index("mono_bvn_lookup_consents_user_accepted_at_idx").on(table.userId, table.acceptedAt),
 })).enableRLS();
 
+export const interswitchCreditLookupConsents = pgTable("interswitch_credit_lookup_consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  consentVersion: text("consent_version").notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userAcceptedAtIndex: index("interswitch_credit_lookup_consents_user_accepted_at_idx").on(table.userId, table.acceptedAt),
+})).enableRLS();
+
 export const monoV2AssessmentEvidence = pgTable("mono_v2_assessment_evidence", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

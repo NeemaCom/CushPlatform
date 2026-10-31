@@ -65,6 +65,20 @@ interface V2AssessmentResponse {
   monoDataReady: boolean;
 }
 
+interface InterswitchCreditReportStatus {
+  configured: boolean;
+  verifiedNigerianPhoneAvailable: boolean;
+  maskedPhone: string | null;
+  consentSchemaReady: boolean;
+}
+
+interface InterswitchCreditReportResult {
+  provider: "Interswitch";
+  completedAt: string;
+  scoreApplied: false;
+  report: unknown;
+}
+
 const EMPTY_INPUTS: V2AssessmentInput = {
   selectedBaselineId: null,
   availableFunds: [],
@@ -145,11 +159,9 @@ function AmountInput({
 export default function V2AssessmentPanel() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [creditNudgeDismissed, setCreditNudgeDismissed] = useState(() =>
-    typeof window !== "undefined" &&
-    window.sessionStorage.getItem("cush-v2-credit-nudge-dismissed") === "true",
-  );
   const [inputs, setInputs] = useState<V2AssessmentInput>(EMPTY_INPUTS);
+  const [creditLookupConsent, setCreditLookupConsent] = useState(false);
+  const [creditReportResult, setCreditReportResult] = useState<InterswitchCreditReportResult | null>(null);
   const [fundLabel, setFundLabel] = useState("");
   const [fundAmount, setFundAmount] = useState("");
   const [fundAccessible, setFundAccessible] = useState(true);
@@ -168,6 +180,36 @@ export default function V2AssessmentPanel() {
     queryKey: ["/api/passport/v2"],
     queryFn: () => request("GET", "/api/passport/v2"),
     retry: false,
+  });
+
+  const interswitchStatusQuery = useQuery<InterswitchCreditReportStatus>({
+    queryKey: ["/api/interswitch/credit-report/status"],
+    queryFn: () => request("GET", "/api/interswitch/credit-report/status"),
+    retry: false,
+  });
+
+  const creditLookupMutation = useMutation({
+    mutationFn: () => request<InterswitchCreditReportResult>(
+      "POST",
+      "/api/interswitch/credit-report",
+      { consent: true },
+    ),
+    onSuccess: (result) => {
+      setCreditReportResult(result);
+      setCreditLookupConsent(false);
+      toast({
+        title: "Credit report received",
+        description: "It is shown for your review and has not changed your Cush Score.",
+      });
+    },
+    onError: (error: Error) => {
+      setCreditLookupConsent(false);
+      toast({
+        title: "Credit report unavailable",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -286,17 +328,6 @@ export default function V2AssessmentPanel() {
 
   const view = assessmentQuery.data!;
   const baselineReady = view.destinationBaselines.length > 0;
-  const creditRequirement = "Completed, supported credit assessment";
-  const needsCreditCheck = view.calculation.missingRequirements.includes(creditRequirement);
-  const otherRequirements = view.calculation.missingRequirements.filter((requirement) =>
-    requirement !== creditRequirement && requirement !== "All four score components",
-  );
-  const canShowCreditNudge =
-    needsCreditCheck &&
-    otherRequirements.length === 0 &&
-    view.calculation.componentScores.availableFunds !== null &&
-    view.calculation.componentScores.incomeStrength !== null &&
-    view.calculation.componentScores.cashFlow !== null;
 
   return (
     <div className="space-y-4">
@@ -369,28 +400,95 @@ export default function V2AssessmentPanel() {
         </div>
       </Card>
 
-      {canShowCreditNudge && !creditNudgeDismissed && (
-        <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-800" role="status">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold">Your total score needs a completed credit check</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                No check is run from this form. Before any check is offered, we’ll explain what data it reads and ask for your consent. You may decline; your available components remain visible, but the total will stay unavailable.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => {
-                window.sessionStorage.setItem("cush-v2-credit-nudge-dismissed", "true");
-                setCreditNudgeDismissed(true);
-              }}
-              className="shrink-0 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-            >
-              Not now
-            </button>
+      <Card title="Optional Interswitch credit bureau report">
+        <p className="text-xs leading-relaxed text-slate-600">
+          With your separate consent, Cush sends your verified Nigerian phone number to Interswitch to request a bureau report.
+          We do not send a BVN or save the report to the database; it is displayed temporarily in this page.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-600">
+          The report will not affect your Cush Score until its fields and scoring treatment are reviewed and approved.
+        </p>
+        <p className="text-xs leading-relaxed text-amber-800">
+          Interswitch’s public documentation does not say whether this inquiry affects a credit file or what it costs.
+          Confirm those terms with Interswitch before enabling live lookups.
+        </p>
+        {interswitchStatusQuery.isLoading ? (
+          <p className="text-xs text-slate-500" role="status">Checking lookup availability…</p>
+        ) : interswitchStatusQuery.isError ? (
+          <p className="text-xs text-amber-800" role="status">Lookup availability could not be checked. No report request has been made.</p>
+        ) : (
+          <div className="space-y-2 text-xs">
+            {interswitchStatusQuery.data?.verifiedNigerianPhoneAvailable ? (
+              <p className="text-slate-600">Verified number on file: {interswitchStatusQuery.data.maskedPhone}</p>
+            ) : (
+              <p className="text-amber-800">A verified Nigerian phone number is required. No BVN lookup is offered here.</p>
+            )}
+            {!interswitchStatusQuery.data?.configured && (
+              <p className="text-amber-800">Interswitch server settings are incomplete, or live lookups have not been explicitly enabled.</p>
+            )}
+            {!interswitchStatusQuery.data?.consentSchemaReady && (
+              <p className="text-amber-800">The consent table is not installed. Apply the Interswitch consent migration before requesting a report.</p>
+            )}
           </div>
+        )}
+        <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-700">
+          <input
+            type="checkbox"
+            checked={creditLookupConsent}
+            onChange={(event) => setCreditLookupConsent(event.target.checked)}
+            disabled={creditLookupMutation.isPending}
+            className="mt-0.5"
+          />
+          <span>
+            I consent to Cush sending my verified Nigerian phone number to Interswitch to request my credit bureau report.
+            This is optional and separate from accepting the Terms or Privacy Policy.
+          </span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => creditLookupMutation.mutate()}
+            disabled={
+              !creditLookupConsent ||
+              creditLookupMutation.isPending ||
+              !interswitchStatusQuery.data?.configured ||
+              !interswitchStatusQuery.data?.verifiedNigerianPhoneAvailable ||
+              !interswitchStatusQuery.data?.consentSchemaReady
+            }
+            className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {creditLookupMutation.isPending ? "Requesting report…" : "Request credit report"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreditLookupConsent(false)}
+            disabled={!creditLookupConsent || creditLookupMutation.isPending}
+            className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Decline
+          </button>
         </div>
-      )}
+        {creditReportResult && (
+          <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-800">Interswitch report · {new Date(creditReportResult.completedAt).toLocaleString()}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setCreditReportResult(null);
+                  creditLookupMutation.reset();
+                }}
+                className="text-xs font-semibold text-slate-600 underline"
+              >
+                Clear report from this page
+              </button>
+            </div>
+            <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-white p-3 text-[11px] text-slate-700">
+              {JSON.stringify(creditReportResult.report, null, 2)}
+            </pre>
+          </div>
+        )}
+      </Card>
 
       {view.calculation.confidenceBreakdown && view.calculation.confidenceScore !== null && (
         <Card title={`Confidence: ${view.calculation.confidenceScore}/100 · ${view.calculation.confidenceBand ? `${view.calculation.confidenceBand[0].toUpperCase()}${view.calculation.confidenceBand.slice(1)}` : "Pending"}`}>
@@ -551,7 +649,7 @@ export default function V2AssessmentPanel() {
             <option value="incomplete">Assessment incomplete</option>
           </select>
         </label>
-        <p className="text-xs text-slate-500">This entry is self-reported. Thin-file is the only fixed mapping; other classifications need an active approved mapping and supported evidence.</p>
+        <p className="text-xs text-slate-500">This entry is self-reported. Thin-file is the only fixed mapping; other classifications need an active approved mapping and supported evidence. The Interswitch report above is not mapped into scoring yet.</p>
       </Card>
 
       <button
