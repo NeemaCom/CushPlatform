@@ -506,7 +506,8 @@ export default function V2AssessmentPanel() {
               )}
             {interswitchStatusQuery.data?.providerReadiness?.mode === "sandbox" && (
               <p className="text-blue-800">
-                Sandbox is configured. Sandbox responses do not confirm production identity matching, bureau inquiry effects, or fees.
+                Sandbox is configured. Use only provider-issued test BVNs here; do not enter a real BVN. Sandbox responses do not
+                confirm production identity matching, bureau inquiry effects, or fees.
               </p>
             )}
             {interswitchStatusQuery.data?.configured &&
@@ -608,7 +609,9 @@ export default function V2AssessmentPanel() {
                         ? "Sandbox evidence is for mapping review only and is not used in the Cush Score."
                       : result.scoreReason === "inconsistent_statuses"
                         ? "Provider statuses conflict, so this report was not scored."
-                        : result.scoreReason === "invalid_evidence" || result.scoreReason === "mapping_version_mismatch"
+                      : result.scoreReason === "invalid_evidence" ||
+                        result.scoreReason === "mapping_version_mismatch" ||
+                        result.scoreReason === "live_not_confirmed"
                           ? "This report could not be safely matched to the active scoring rule, so it was not scored."
                           : "No resolved repayment history was available to score. No credit points were added."}
                   </p>

@@ -67,6 +67,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
     try {
       const readiness = await schemaReadiness();
       const providerReadiness = interswitchCreditHistoryClient.getReadiness();
+      const liveReady = providerReadiness.mode === "production" && providerReadiness.configured;
       const [latest] = readiness.evidenceSchemaReady
         ? await db.select({
             evidenceData: interswitchCreditHistoryEvidence.evidenceData,
@@ -80,8 +81,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
         : [];
       const canScore = Boolean(
         latest &&
-        providerReadiness.mode === "production" &&
-        providerReadiness.configured &&
+        liveReady &&
         latest.mappingVersion === INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
       );
       const scoring = canScore && latest
@@ -104,9 +104,9 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
           scoreableInstallments: scoring?.scoreableInstallments ?? 0,
           scoreReason: sandboxResult
             ? "sandbox_not_scored"
-            : canScore
-              ? scoring?.reason ?? "mapping_version_mismatch"
-              : "live_not_confirmed",
+            : !liveReady
+              ? "live_not_confirmed"
+              : scoring?.reason ?? "mapping_version_mismatch",
           fetchedAt: latest.fetchedAt.toISOString(),
           scoreApplied: canScore && scoring?.score !== null && scoring !== null,
         } : null,

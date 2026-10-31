@@ -4,3 +4,4 @@
 - [Portable npm lockfiles](portable-npm-lockfiles.md) — existing local install metadata can contaminate a fresh lock; validate both registry hosts and clean-install dependency resolution.
 - [Cush Score policy](cush-score-policy.md) — scoring is individual-only and follows the four-component prompt; missing credit mappings and integrations must not be invented.
 - [Mono bank data](mono-bank-data.md) — BVN account discovery and Mono Connect statements are separate consented flows; never store BVN/OTP or auto-score NGN data.
+- [Interswitch production checks](interswitch-production-checks.md) — provider sample did not establish BVN identity matching, inquiry effects, or fees; require written confirmation before live lookups.
