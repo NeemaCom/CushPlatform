@@ -33,6 +33,7 @@ import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
 import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
+import { firebaseProfileNamePatch } from "./firebase-profile-name";
 
 async function createLoginSession(req: Request, user: Pick<User, "id" | "role">): Promise<void> {
   await new Promise<void>((resolve, reject) => req.session.regenerate((err) => err ? reject(err) : resolve()));
@@ -144,10 +145,11 @@ export async function registerRoutes(
 
       await createLoginSession(req, user);
       try {
-        await storage.updateUser(user.id, { lastLoginAt: new Date() });
+        const profileName = firebaseProfileNamePatch(user, displayName);
+        await storage.updateUser(user.id, { ...profileName, lastLoginAt: new Date() });
       } catch (error) {
-        // Last-login tracking is best effort; keep sign-in working but make failures visible.
-        console.error("[Firebase Sync Last Login Update Error]:", error);
+        // Profile hydration and last-login tracking are best effort; do not block sign-in.
+        console.error("[Firebase Sync Profile Update Error]:", error);
       }
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });

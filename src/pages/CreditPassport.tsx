@@ -636,6 +636,18 @@ function SharePanel({
   );
 }
 
+function getAccountDisplayName(user: {
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+} | null | undefined): string {
+  const fullName = [user?.firstName?.trim(), user?.lastName?.trim()]
+    .filter((part): part is string => Boolean(part))
+    .join(" ");
+  if (fullName && fullName.toLowerCase() !== "user") return fullName;
+  return user?.email?.split("@")[0] || "User";
+}
+
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function CreditPassport() {
@@ -643,6 +655,7 @@ export default function CreditPassport() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const accountDisplayName = getAccountDisplayName(user);
   const [showSignalForm, setShowSignalForm] = useState(false);
   const [activeTab, setActiveTab] = useState<"roadmap" | "signals" | "assessment" | "policy">("roadmap");
   const [monoCodePending, setMonoCodePending] = useState(false);
@@ -777,11 +790,11 @@ export default function CreditPassport() {
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center">
                 <span className="text-slate-600 font-bold text-xs">
-                  {(user?.firstName?.[0] ?? user?.email?.[0] ?? "U").toUpperCase()}
+                  {accountDisplayName[0]?.toUpperCase() ?? "U"}
                 </span>
               </div>
               <span className="text-sm text-slate-600 font-medium truncate max-w-32">
-                {user?.firstName || user?.email?.split("@")[0] || "User"}
+                {accountDisplayName}
               </span>
             </div>
             <motion.button whileTap={{ scale: 0.95 }} onClick={handleLogout}
