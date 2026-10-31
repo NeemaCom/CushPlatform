@@ -41,10 +41,28 @@ interface V2AssessmentResponse {
     } | null;
     missingRequirements: string[];
   };
+  monoImports: Array<{
+    linkedAccountId: number;
+    fetchedAt: string;
+    statementPeriodMonths: number;
+    balancePence: number | null;
+    incomeMonths: number;
+    cashFlowMonths: number;
+    sourceCurrencies: Array<"GBP" | "USD" | "NGN">;
+    fxRateSource: string;
+    fxRateDateBasis: "transaction_date";
+    fxRates: Array<{
+      rateDate: string;
+      currencyCode: "USD" | "NGN";
+      usdNgnCentralRate: string;
+      gbpNgnCentralRate: string;
+    }>;
+  }>;
   destinationBaselines: BaselineOption[];
   policyStatus: "active" | "not_configured";
   policyVersion: number | null;
   schemaReady: true;
+  monoDataReady: boolean;
 }
 
 const EMPTY_INPUTS: V2AssessmentInput = {
@@ -285,11 +303,49 @@ export default function V2AssessmentPanel() {
       <MonoBankDataPanel />
 
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-950">
-        <p className="font-semibold">GBP only for this release</p>
+        <p className="font-semibold">V2 scores in GBP</p>
         <p className="mt-1 text-xs leading-relaxed">
-          Enter GBP-denominated records. Mono lookup and statements are shown separately and do not populate these inputs. No NGN-to-GBP conversion is guessed or applied.
+          Mono statements in GBP, USD, or NGN can be reviewed and imported. USD and NGN amounts use CBN central rates for each transaction date; exchange-rate details are retained with the derived assessment data.
         </p>
       </div>
+
+      {view.monoImports.length > 0 && (
+        <Card title="Mono data used in V2">
+          <div className="space-y-2">
+            {view.monoImports.map((item) => (
+              <div key={item.linkedAccountId} className="rounded-lg border border-slate-100 p-3 text-xs">
+                <p className="font-semibold text-slate-800">Linked account {item.linkedAccountId}</p>
+                <p className="mt-1 text-slate-600">
+                  Imported {new Date(item.fetchedAt).toLocaleString("en-GB")} · {item.statementPeriodMonths}-month statement · currencies: {item.sourceCurrencies.join(", ")}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  FX source: <a className="underline" href={item.fxRateSource} target="_blank" rel="noreferrer">CBN central exchange rates</a> · dates: {item.fxRateDateBasis}
+                </p>
+                <p className="mt-1 text-slate-500">
+                  {item.balancePence === null ? "No balance included" : `Accessible balance £${(item.balancePence / 100).toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                  {" · "}{item.incomeMonths} income month{item.incomeMonths === 1 ? "" : "s"}
+                  {" · "}{item.cashFlowMonths} cash-flow month{item.cashFlowMonths === 1 ? "" : "s"}
+                </p>
+                {item.fxRates.length > 0 && (
+                  <p className="mt-1 text-slate-500">
+                    CBN central rates (NGN per unit): {item.fxRates.slice(0, 3).map((rate) =>
+                      `${rate.rateDate} USD ₦${rate.usdNgnCentralRate} / GBP ₦${rate.gbpNgnCentralRate}`,
+                    ).join(" · ")}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Imported Mono records are used instead of self-reported records for overlapping months to avoid double counting. Income and expense classifications were selected during review.
+          </p>
+        </Card>
+      )}
+      {!view.monoDataReady && (
+        <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+          Mono data is not available to V2 until its Supabase tables are installed. The rest of the V2 assessment can still load.
+        </div>
+      )}
 
       <Card title="Score components">
         <div className="rounded-lg bg-slate-50 p-3 text-sm">

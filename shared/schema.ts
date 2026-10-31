@@ -106,6 +106,21 @@ export const monoBvnLookupConsents = pgTable("mono_bvn_lookup_consents", {
   userAcceptedAtIndex: index("mono_bvn_lookup_consents_user_accepted_at_idx").on(table.userId, table.acceptedAt),
 })).enableRLS();
 
+export const monoV2AssessmentEvidence = pgTable("mono_v2_assessment_evidence", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  monoLinkedAccountId: integer("mono_linked_account_id").notNull()
+    .references(() => monoLinkedAccounts.id, { onDelete: "cascade" }).unique(),
+  evidenceData: jsonb("evidence_data").$type<unknown>().notNull(),
+  statementPeriodMonths: integer("statement_period_months").notNull(),
+  consentVersion: text("consent_version").notNull(),
+  consentAcceptedAt: timestamp("consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userIdIndex: index("mono_v2_assessment_evidence_user_id_idx").on(table.userId),
+})).enableRLS();
+
 export const cushScorePolicyVersions = pgTable("cush_score_policy_versions", {
   id: serial("id").primaryKey(),
   version: integer("version").notNull(),
@@ -242,7 +257,7 @@ export const v2AssessmentInputSchema = z.object({
     amountPence: v2NonNegativePenceSchema,
     recurring: z.boolean(),
     variable: z.boolean(),
-  }).strict()).max(72),
+  }).strict()).max(168),
   cashFlowHistory: z.array(z.object({
     id: v2UuidSchema,
     month: v2MonthSchema,
@@ -297,6 +312,55 @@ export const v2AssessmentInputSchema = z.object({
     }
   }
 });
+
+export const monoV2AssessmentEvidenceSchema = z.object({
+  fxRateSource: z.literal("https://www.cbn.gov.ng/api/GetAllExchangeRates?format=json"),
+  fxRateDateBasis: z.literal("transaction_date"),
+  sourceCurrencies: z.array(z.enum(["GBP", "USD", "NGN"])).min(1).max(3),
+  availableFunds: z.array(z.object({
+    id: v2UuidSchema,
+    label: z.string().trim().min(1).max(100),
+    deduplicationKey: z.string().trim().min(1).max(120),
+    amountPence: v2PositivePenceSchema,
+    currencyCode: z.literal("GBP"),
+    accessible: z.boolean(),
+  }).strict()).max(1),
+  incomeHistory: z.array(z.object({
+    id: v2UuidSchema,
+    month: v2MonthSchema,
+    sourceId: z.string().trim().min(1).max(120),
+    category: z.enum(["salary", "self_employment", "freelance", "business", "scholarship", "family_support", "other"]),
+    amountPence: v2NonNegativePenceSchema,
+    recurring: z.literal(true),
+    variable: z.boolean(),
+  }).strict()).max(168),
+  cashFlowHistory: z.array(z.object({
+    id: v2UuidSchema,
+    month: v2MonthSchema,
+    eligibleRecurringIncomePence: v2NonNegativePenceSchema,
+    eligibleExpensesPence: v2NonNegativePenceSchema,
+    complete: z.boolean(),
+  }).strict()).max(12),
+  conversionAudit: z.array(z.object({
+    source: z.literal("https://www.cbn.gov.ng/api/GetAllExchangeRates?format=json"),
+    valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) =>
+      Number.isFinite(new Date(`${value}T00:00:00Z`).getTime()) &&
+      new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value,
+    ),
+    dateBasis: z.enum(["transaction_date", "balance_snapshot_date"]),
+    rateDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) =>
+      Number.isFinite(new Date(`${value}T00:00:00Z`).getTime()) &&
+      new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value,
+    ),
+    currencyCode: z.enum(["USD", "NGN"]),
+    usdNgnCentralRate: z.string().regex(/^\d+(?:\.\d{1,4})?$/),
+    gbpNgnCentralRate: z.string().regex(/^\d+(?:\.\d{1,4})?$/),
+  }).strict()).max(5000),
+  statementPeriodMonths: z.number().int().min(1).max(12),
+  fetchedAt: z.string().datetime(),
+  consentVersion: z.literal("mono-v2-statement-assessment-v1"),
+  consentAcceptedAt: z.string().datetime(),
+}).strict();
 
 const scoreRangeSchema = z.number().finite().min(0).max(100);
 
@@ -362,6 +426,7 @@ export const cushScorePolicyConfigSchema = z.object({
 });
 
 export type V2AssessmentInput = z.infer<typeof v2AssessmentInputSchema>;
+export type MonoV2AssessmentEvidence = z.infer<typeof monoV2AssessmentEvidenceSchema>;
 export type CushScorePolicyConfig = z.infer<typeof cushScorePolicyConfigSchema>;
 
 // ─── Auth Schemas ─────────────────────────────────────────────────────────────

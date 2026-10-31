@@ -2,9 +2,14 @@ import type { Express } from "express";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db";
-import { monoBvnLookupConsents, monoLinkedAccounts } from "@shared/schema";
+import {
+  monoBvnLookupConsents,
+  monoLinkedAccounts,
+  monoV2AssessmentEvidence,
+} from "@shared/schema";
 import { authRateLimit } from "./security";
 import { isAuthenticated, type AuthenticatedRequest } from "./auth";
+import { getV2Assessment } from "./cush-score-v2";
 import {
   getMonoCallbackUrl,
   getMonoClient,
@@ -12,6 +17,12 @@ import {
   MonoRequestError,
   normalizeBvnAccounts,
 } from "./mono-service";
+import {
+  buildMonoV2Evidence,
+  MonoV2PreviewError,
+  createMonoV2Preview,
+  type MonoV2ImportSelection,
+} from "./mono-v2-import";
 
 const initiateBvnSchema = z.object({
   bvn: z.string().regex(/^\d{11}$/, "Enter an 11-digit BVN."),
@@ -34,6 +45,24 @@ const exchangeSchema = z.object({
 const statementSchema = z.object({
   periodMonths: z.number().int().min(1).max(12),
 });
+
+const monoV2PreviewSchema = z.object({
+  periodMonths: z.number().int().min(1).max(12),
+  consent: z.literal(true),
+}).strict();
+
+const monoV2ImportSchema = z.object({
+  previewToken: z.string().uuid(),
+  recurringIncome: z.array(z.object({
+    transactionId: z.string().uuid(),
+    category: z.enum(["salary", "self_employment", "freelance", "business", "scholarship", "family_support", "other"]),
+    variable: z.boolean(),
+  }).strict()).max(5000),
+  eligibleExpenseIds: z.array(z.string().uuid()).max(5000),
+  completeMonths: z.array(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)).max(12),
+  includeBalance: z.boolean(),
+  consent: z.literal(true),
+}).strict();
 
 function noStore(res: import("express").Response) {
   res.setHeader("Cache-Control", "no-store, private");
@@ -68,6 +97,7 @@ export function registerMonoRoutes(app: Express) {
     try {
       await db.select({ id: monoLinkedAccounts.id }).from(monoLinkedAccounts).limit(0);
       await db.select({ id: monoBvnLookupConsents.id }).from(monoBvnLookupConsents).limit(0);
+      await db.select({ id: monoV2AssessmentEvidence.id }).from(monoV2AssessmentEvidence).limit(0);
     } catch {
       schemaReady = false;
     }
@@ -267,6 +297,112 @@ export function registerMonoRoutes(app: Express) {
       return res.json({ statement, periodMonths: parsed.data.periodMonths });
     } catch (error) {
       return providerFailure(res, error);
+    }
+  });
+
+  app.post("/api/mono/accounts/:id/v2-preview", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
+    const localId = Number(req.params.id);
+    const parsed = monoV2PreviewSchema.safeParse(req.body);
+    if (!Number.isSafeInteger(localId) || localId < 1 || !parsed.success) {
+      return res.status(400).json({ error: "Confirm assessment consent and choose a statement period from 1 to 12 months." });
+    }
+
+    try {
+      const [account] = await db.select().from(monoLinkedAccounts).where(and(
+        eq(monoLinkedAccounts.id, localId),
+        eq(monoLinkedAccounts.userId, req.userId!),
+      )).limit(1);
+      if (!account) return res.status(404).json({ error: "Linked account not found." });
+
+      const client = getMonoClient();
+      const [statement, accountDetails] = await Promise.all([
+        client.request<unknown>(`/v2/accounts/${encodeURIComponent(account.monoAccountId)}/statement`, {
+          query: { period: String(parsed.data.periodMonths), output: "json" },
+        }),
+        client.request<unknown>(`/v2/accounts/${encodeURIComponent(account.monoAccountId)}`),
+      ]);
+      const preview = await createMonoV2Preview({
+        userId: req.userId!,
+        linkedAccountId: localId,
+        periodMonths: parsed.data.periodMonths,
+        statement,
+        accountDetails,
+      });
+      return res.json(preview);
+    } catch (error) {
+      if (error instanceof MonoV2PreviewError) {
+        return res.status(422).json({ error: error.message });
+      }
+      if (error instanceof Error && error.message.includes("CBN")) {
+        return res.status(503).json({ error: "CBN official rates are unavailable for this statement date. No converted amounts were imported." });
+      }
+      return providerFailure(res, error);
+    }
+  });
+
+  app.post("/api/mono/accounts/:id/v2-import", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
+    const localId = Number(req.params.id);
+    const parsed = monoV2ImportSchema.safeParse(req.body);
+    if (!Number.isSafeInteger(localId) || localId < 1 || !parsed.success) {
+      return res.status(400).json({ error: parsed.success ? "Invalid linked account." : parsed.error.errors[0]?.message ?? "Invalid Mono assessment review." });
+    }
+
+    try {
+      const [account] = await db.select().from(monoLinkedAccounts).where(and(
+        eq(monoLinkedAccounts.id, localId),
+        eq(monoLinkedAccounts.userId, req.userId!),
+      )).limit(1);
+      if (!account) return res.status(404).json({ error: "Linked account not found." });
+
+      const selection: MonoV2ImportSelection = { ...parsed.data, consent: true };
+      const evidence = buildMonoV2Evidence({
+        userId: req.userId!,
+        linkedAccountId: localId,
+        selection,
+      });
+      if (!evidence.availableFunds.length && !evidence.incomeHistory.length &&
+          !evidence.cashFlowHistory.length) {
+        return res.status(400).json({ error: "Select a balance, recurring income, or eligible expenses before importing." });
+      }
+
+      const fetchedAt = new Date(evidence.fetchedAt);
+      const consentAcceptedAt = new Date(evidence.consentAcceptedAt);
+      await db.insert(monoV2AssessmentEvidence).values({
+        userId: req.userId!,
+        monoLinkedAccountId: localId,
+        evidenceData: evidence,
+        statementPeriodMonths: evidence.statementPeriodMonths,
+        consentVersion: evidence.consentVersion,
+        consentAcceptedAt,
+        fetchedAt,
+        updatedAt: new Date(),
+      }).onConflictDoUpdate({
+        target: monoV2AssessmentEvidence.monoLinkedAccountId,
+        set: {
+          evidenceData: evidence,
+          statementPeriodMonths: evidence.statementPeriodMonths,
+          consentVersion: evidence.consentVersion,
+          consentAcceptedAt,
+          fetchedAt,
+          updatedAt: new Date(),
+        },
+      });
+
+      return res.json(await getV2Assessment(req.userId!));
+    } catch (error) {
+      if (error instanceof MonoV2PreviewError) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (error instanceof Error && error.message.includes("CBN")) {
+        return res.status(503).json({ error: "CBN official rates are unavailable. No converted amounts were imported." });
+      }
+      if (error instanceof Error && "code" in error && (error as { code?: string }).code === "42P01") {
+        return res.status(503).json({ error: "Mono V2 storage is not ready. Apply migrations/manual/create-mono-v2-assessment-evidence.sql in the intended Supabase project." });
+      }
+      console.error("Mono V2 statement import failed.");
+      return res.status(503).json({ error: "Could not import the reviewed Mono data. No raw statement was stored." });
     }
   });
 }

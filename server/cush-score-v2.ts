@@ -3,9 +3,13 @@ import {
   cushAssessmentInputs,
   cushScorePolicyVersions,
   cushScorePolicyConfigSchema,
+  monoLinkedAccounts,
+  monoV2AssessmentEvidence,
+  monoV2AssessmentEvidenceSchema,
   v2AssessmentInputSchema,
   type CushScorePolicyConfig,
   type V2AssessmentInput,
+  type MonoV2AssessmentEvidence,
 } from "@shared/schema";
 import { db } from "./db";
 import {
@@ -28,10 +32,28 @@ export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
 export interface V2AssessmentView {
   inputs: V2AssessmentInput;
   calculation: CushScoreResult;
+  monoImports: Array<{
+    linkedAccountId: number;
+    fetchedAt: string;
+    statementPeriodMonths: number;
+    balancePence: number | null;
+    incomeMonths: number;
+    cashFlowMonths: number;
+    sourceCurrencies: Array<"GBP" | "USD" | "NGN">;
+    fxRateSource: string;
+    fxRateDateBasis: "transaction_date";
+    fxRates: Array<{
+      rateDate: string;
+      currencyCode: "USD" | "NGN";
+      usdNgnCentralRate: string;
+      gbpNgnCentralRate: string;
+    }>;
+  }>;
   destinationBaselines: CushScorePolicyConfig["destinationBaselines"];
   policyStatus: "active" | "not_configured";
   policyVersion: number | null;
   schemaReady: true;
+  monoDataReady: boolean;
 }
 
 export class ScoringPolicyValidationError extends Error {}
@@ -65,55 +87,161 @@ function engineInput(
   input: V2AssessmentInput,
   destinationBaseline: DestinationBaseline | null,
   now: Date,
+  monoImports: Array<{ linkedAccountId: number; fetchedAt: Date; evidence: MonoV2AssessmentEvidence }>,
+  linkedAccountCount: number,
 ): CushScoreInput {
+  const monoMonthSet = new Set(monoImports.flatMap(({ evidence }) =>
+    evidence.cashFlowHistory.map((item) => item.month),
+  ));
+  const monoFunds = monoImports.flatMap(({ evidence }) => evidence.availableFunds);
+  const monoIncome = monoImports.flatMap(({ evidence }) => evidence.incomeHistory);
+  const monoCashFlows = new Map<string, {
+    eligibleRecurringIncomePence: number;
+    eligibleExpensesPence: number;
+    completeAccountIds: Set<number>;
+  }>();
+  for (const imported of monoImports) {
+    for (const item of imported.evidence.cashFlowHistory) {
+      const month = monoCashFlows.get(item.month) ?? {
+        eligibleRecurringIncomePence: 0,
+        eligibleExpensesPence: 0,
+        completeAccountIds: new Set<number>(),
+      };
+      month.eligibleRecurringIncomePence += item.eligibleRecurringIncomePence;
+      month.eligibleExpensesPence += item.eligibleExpensesPence;
+      if (item.complete) month.completeAccountIds.add(imported.linkedAccountId);
+      monoCashFlows.set(item.month, month);
+    }
+  }
+  const monoCashFlowRows = [...monoCashFlows.entries()].map(([month, value]) => ({
+    month,
+    eligibleRecurringIncomePence: value.eligibleRecurringIncomePence,
+    eligibleExpensesPence: value.eligibleExpensesPence,
+    complete: monoImports.length > 0 &&
+      monoImports.length === linkedAccountCount &&
+      value.completeAccountIds.size === monoImports.length,
+    evidenceQuality: "documented" as const,
+  }));
+  const manualIncome = input.incomeHistory.filter((item) => !monoMonthSet.has(item.month));
+  const manualCashFlow = input.cashFlowHistory.filter((item) => !monoMonthSet.has(item.month));
+  const manualFunds = input.availableFunds.map((item) => ({
+    id: `self-reported-${item.id}`,
+    deduplicationKey: `self-reported-${item.deduplicationKey}`,
+    amountPence: item.amountPence,
+    accessible: item.accessible,
+    evidenceQuality: "self_reported" as const,
+  }));
   const hasSubmittedFinancialData =
     input.availableFunds.length > 0 ||
     input.incomeHistory.length > 0 ||
     input.cashFlowHistory.length > 0 ||
+    monoFunds.length > 0 ||
+    monoIncome.length > 0 ||
+    monoCashFlowRows.length > 0 ||
     input.creditClassification !== "unavailable";
+  const monoRecordCount = monoFunds.length + monoIncome.length + monoCashFlowRows.length;
+  const selfReportedRecordCount = manualFunds.length + manualIncome.length + manualCashFlow.length;
+  const sourceRecordCount = monoRecordCount + selfReportedRecordCount;
+  const sourceEvidenceShares = sourceRecordCount === 0
+    ? []
+    : [
+        ...(monoRecordCount > 0 ? [{ sourceType: "bank_connection" as const, share: monoRecordCount / sourceRecordCount }] : []),
+        ...(selfReportedRecordCount > 0 ? [{ sourceType: "self_reported" as const, share: selfReportedRecordCount / sourceRecordCount }] : []),
+      ];
+  const oldestImportDate = monoImports.length
+    ? Math.min(...monoImports.map(({ fetchedAt }) => fetchedAt.getTime()))
+    : null;
+  const dataAgeDays = oldestImportDate === null
+    ? null
+    : Math.max(0, Math.floor((now.getTime() - oldestImportDate) / 86_400_000));
   return {
     individualUserId: userId,
     assessmentMonth: now.toISOString().slice(0, 7),
     destinationBaseline,
     hasSubmittedFinancialData,
-    availableFunds: input.availableFunds.map((item) => ({
-      id: item.id,
-      deduplicationKey: item.deduplicationKey,
-      amountPence: item.amountPence,
-      accessible: item.accessible,
-      evidenceQuality: "self_reported",
-    })),
-    incomeHistory: input.incomeHistory.map((item) => ({
+    availableFunds: [
+      ...manualFunds,
+      ...monoFunds.map((item) => ({
+        id: item.id,
+        deduplicationKey: item.deduplicationKey,
+        amountPence: item.amountPence,
+        accessible: item.accessible,
+        evidenceQuality: "verified" as const,
+      })),
+    ],
+    incomeHistory: [
+      ...manualIncome.map((item) => ({
+        month: item.month,
+        sourceId: item.sourceId,
+        category: item.category,
+        amountPence: item.amountPence,
+        recurring: item.recurring,
+        variable: item.variable,
+        evidenceQuality: "self_reported" as const,
+      })),
+      ...monoIncome.map((item) => ({
       month: item.month,
       sourceId: item.sourceId,
       category: item.category,
       amountPence: item.amountPence,
       recurring: item.recurring,
       variable: item.variable,
-      evidenceQuality: "self_reported",
-    })),
-    sourceEvidenceShares: hasSubmittedFinancialData
-      ? [{ sourceType: "self_reported", share: 1 }]
-      : [],
-    cashFlowHistory: input.cashFlowHistory.map((item) => ({
+        evidenceQuality: "documented" as const,
+      })),
+    ],
+    sourceEvidenceShares,
+    cashFlowHistory: [
+      ...manualCashFlow.map((item) => ({
       month: item.month,
       eligibleRecurringIncomePence: item.eligibleRecurringIncomePence,
       eligibleExpensesPence: item.eligibleExpensesPence,
       complete: item.complete,
-      evidenceQuality: "self_reported",
-    })),
+        evidenceQuality: "self_reported" as const,
+      })),
+      ...monoCashFlowRows,
+    ],
     credit: {
       classification: input.creditClassification,
       evidenceQuality: input.creditClassification === "unavailable" ? null : "self_reported",
       checkStatus: "not_done",
     },
-    // Saving a self-reported form is not evidence that its financial source was refreshed.
-    dataAgeDays: null,
-    coveredAccountCount: 0,
-    declaredAccountCount: 0,
-    unresolvedUnconnectedTransferShare: 1,
+    dataAgeDays,
+    coveredAccountCount: monoImports.length,
+    declaredAccountCount: Math.max(linkedAccountCount, monoImports.length),
     integrityFlags: [],
   };
+}
+
+async function loadMonoImports(userId: number) {
+  const rows = await db.select({
+    linkedAccountId: monoV2AssessmentEvidence.monoLinkedAccountId,
+    evidenceData: monoV2AssessmentEvidence.evidenceData,
+    fetchedAt: monoV2AssessmentEvidence.fetchedAt,
+    statementPeriodMonths: monoV2AssessmentEvidence.statementPeriodMonths,
+  }).from(monoV2AssessmentEvidence)
+    .where(eq(monoV2AssessmentEvidence.userId, userId));
+  return rows.map((row) => ({
+    linkedAccountId: row.linkedAccountId,
+    fetchedAt: row.fetchedAt,
+    statementPeriodMonths: row.statementPeriodMonths,
+    evidence: monoV2AssessmentEvidenceSchema.parse(row.evidenceData),
+  }));
+}
+
+async function loadMonoAssessmentData(userId: number) {
+  try {
+    const [imports, linkedAccounts] = await Promise.all([
+      loadMonoImports(userId),
+      db.select({ id: monoLinkedAccounts.id }).from(monoLinkedAccounts)
+        .where(eq(monoLinkedAccounts.userId, userId)),
+    ]);
+    return { imports, linkedAccountCount: linkedAccounts.length, monoDataReady: true };
+  } catch (error) {
+    if (isV2SchemaMissing(error)) {
+      return { imports: [], linkedAccountCount: 0, monoDataReady: false };
+    }
+    throw error;
+  }
 }
 
 async function loadStoredInputs(userId: number): Promise<V2AssessmentInput> {
@@ -130,9 +258,10 @@ async function loadActivePolicy() {
 }
 
 export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
-  const [inputs, activePolicy] = await Promise.all([
+  const [inputs, activePolicy, monoData] = await Promise.all([
     loadStoredInputs(userId),
     loadActivePolicy(),
+    loadMonoAssessmentData(userId),
   ]);
   const today = now.toISOString().slice(0, 10);
   const selectedBaseline = baselineFor(inputs, activePolicy?.configuration ?? null, today);
@@ -145,7 +274,7 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
       }
     : { creditMappings: {} };
   const calculation = calculateCushScore(
-    engineInput(userId, inputs, selectedBaseline, now),
+    engineInput(userId, inputs, selectedBaseline, now, monoData.imports, monoData.linkedAccountCount),
     scoringPolicy,
   );
   const destinationBaselines = activePolicy?.configuration.destinationBaselines.filter((baseline) =>
@@ -156,10 +285,31 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
   return {
     inputs,
     calculation,
+    monoImports: monoData.imports.map(({ linkedAccountId, fetchedAt, statementPeriodMonths, evidence }) => ({
+      linkedAccountId,
+      fetchedAt: fetchedAt.toISOString(),
+      statementPeriodMonths,
+      balancePence: evidence.availableFunds[0]?.amountPence ?? null,
+      incomeMonths: new Set(evidence.incomeHistory.map((item) => item.month)).size,
+      cashFlowMonths: evidence.cashFlowHistory.length,
+      sourceCurrencies: evidence.sourceCurrencies,
+      fxRateSource: evidence.fxRateSource,
+      fxRateDateBasis: evidence.fxRateDateBasis,
+      fxRates: [...new Map(evidence.conversionAudit.map((rate) => [
+        `${rate.currencyCode}:${rate.rateDate}`,
+        {
+          rateDate: rate.rateDate,
+          currencyCode: rate.currencyCode,
+          usdNgnCentralRate: rate.usdNgnCentralRate,
+          gbpNgnCentralRate: rate.gbpNgnCentralRate,
+        },
+      ])).values()].sort((a, b) => b.rateDate.localeCompare(a.rateDate)).slice(0, 10),
+    })),
     destinationBaselines,
     policyStatus: activePolicy ? "active" : "not_configured",
     policyVersion: activePolicy?.row.version ?? null,
     schemaReady: true,
+    monoDataReady: monoData.monoDataReady,
   };
 }
 

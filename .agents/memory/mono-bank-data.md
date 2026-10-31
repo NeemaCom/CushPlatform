@@ -10,8 +10,8 @@ Use Mono for Cush bank-account discovery and statements. These are distinct flow
 - BVN lookup uses the `bank_accounts` scope and requires the user's explicit consent and OTP verification. The provider charges for lookup steps; do not trigger live lookups during development or tests.
 - Finding accounts by BVN does not authorize account transaction access. Statements require a separate Mono Connect account-linking authorization.
 - Do not log or persist BVNs, OTPs, provider session IDs, full account numbers, or statement payloads. Keep provider account IDs owner-scoped and store lookup-consent evidence without the BVN itself.
-- The V2 assessment accepts GBP only. Mono statements may be NGN and must not be converted or automatically scored until the currency policy and evidence mapping are explicitly approved.
+- Mono statement data may populate V2 only after explicit consent and user review of recurring income, eligible expenses, and statement completeness. Normalize GBP/USD/NGN to GBP; use the CBN central rate on each transaction date for USD/NGN (current balance uses its snapshot date).
 
-**Why:** The user selected Mono for BVN account discovery and connected-bank statements instead of the Interswitch path. The two Mono capabilities require separate user actions, and the user's scoring policy disallows guessed currency conversion.
+**Why:** The user selected Mono for BVN account discovery and connected-bank statements instead of the Interswitch path. The two Mono capabilities require separate user actions. The user approved transaction-date CBN central rates for USD/NGN conversion and reviewed-data-only scoring.
 
-**How to apply:** Keep Mono secret keys in the production server environment, require consent before billable BVN lookup, and fetch statements only for the authenticated user's stored Mono account ID. Do not treat a BVN lookup as a connected account or as a credit check.
+**How to apply:** Keep Mono secret keys in the production server environment, require consent before billable BVN lookup and before assessment import, and fetch statements only for the authenticated user's stored Mono account ID. Store derived aggregates and rate provenance only; discard raw statement rows and descriptions. Do not treat a BVN lookup as a connected account or as a credit check.
