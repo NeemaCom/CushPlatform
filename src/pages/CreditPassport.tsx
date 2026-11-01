@@ -8,9 +8,9 @@ import AccountDropdown from "@/components/AccountDropdown";
 import { logoutFromCush } from "@/lib/logout";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
-import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin";
+import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import {
-  Globe2, TrendingUp, ShieldCheck, ChevronRight,
+  Globe2, TrendingUp, ChevronRight,
   Trash2, Link2,
   BadgeCheck, AlertCircle,
   Plane, MapPin, Copy, Eye, EyeOff, FileText, Users,
@@ -319,7 +319,7 @@ export default function CreditPassport() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"signals" | "assessment" | "policy">("assessment");
+  const [activeTab, setActiveTab] = useState<"signals" | "assessment">("assessment");
   const [monoCodePending, setMonoCodePending] = useState(false);
   const monoCodeProcessed = useRef(false);
 
@@ -431,6 +431,14 @@ export default function CreditPassport() {
               height={32}
             />
           </Link>
+          {user && hasAdminPermission(user.role, ADMIN_PERMISSION.dashboardRead) && (
+            <Link
+              href="/admin"
+              className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-800 transition hover:bg-indigo-100"
+            >
+              Admin
+            </Link>
+          )}
           {user && <AccountDropdown user={user} onSignOut={handleLogout} />}
         </div>
       </header>
@@ -584,7 +592,6 @@ export default function CreditPassport() {
               {([
                 { key: "assessment", label: "Assessment", icon: FileText },
                 { key: "signals", label: "Legacy signals", icon: Globe2 },
-                ...(user?.role === "admin" ? [{ key: "policy" as const, label: "Scoring Policy", icon: ShieldCheck }] : []),
               ] as const).map(({ key, label, icon: Icon }) => (
                 <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setActiveTab(key)}
                   type="button"
@@ -666,7 +673,7 @@ export default function CreditPassport() {
                     </div>
                   )}
                 </motion.div>
-              ) : activeTab === "assessment" ? (
+              ) : (
                 <motion.div key="assessment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                   <div>
                       <h2 className="font-bold text-slate-900 text-base">Your assessment</h2>
@@ -677,18 +684,6 @@ export default function CreditPassport() {
                   {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
                   <V2AssessmentPanel />
                 </motion.div>
-              ) : user?.role === "admin" ? (
-                <motion.div key="policy" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                  <div>
-                    <h2 className="font-bold text-slate-900 text-base">Scoring policy administration</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">Draft and activate destination baselines, credit mappings, and confidence rules.</p>
-                  </div>
-                  <CushScoringPolicyAdmin />
-                </motion.div>
-              ) : (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900" role="status">
-                  Admin access is required to edit scoring policy.
-                </div>
               )}
             </AnimatePresence>
           </div>

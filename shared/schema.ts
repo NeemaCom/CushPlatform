@@ -31,6 +31,24 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }).enableRLS();
 
+export const adminAuditLogs = pgTable("admin_audit_logs", {
+  id: serial("id").primaryKey(),
+  adminUserId: integer("admin_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  action: text("action").notNull(),
+  resourceType: text("resource_type"),
+  resourceId: text("resource_id"),
+  outcome: text("outcome").notNull().default("success"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  outcomeCheck: check(
+    "admin_audit_logs_outcome_check",
+    sql`${table.outcome} in ('success', 'denied', 'failed')`,
+  ),
+  adminCreatedAtIndex: index("admin_audit_logs_admin_created_at_idx").on(table.adminUserId, table.createdAt),
+  createdAtIndex: index("admin_audit_logs_created_at_idx").on(table.createdAt),
+})).enableRLS();
+
 export type ConsentPolicyType = "terms" | "privacy";
 
 export const userConsentRecords = pgTable("user_consent_records", {

@@ -67,7 +67,7 @@ class DatabaseStorage implements IStorage {
         nationality: data.nationality ?? null,
         profilePicture: data.profilePicture ?? null,
         firebaseUid: data.firebaseUid ?? null,
-        role: data.role ?? "customer",
+        role: data.role ?? "user",
         isEmailVerified: data.isEmailVerified ?? false,
         acceptTerms: data.acceptTerms,
         acceptPrivacy: data.acceptPrivacy,

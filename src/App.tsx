@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 import Home from '@/pages/Home'
 import Login from '@/pages/Login'
 import CreditPassport from '@/pages/CreditPassport'
+import AdminDashboard from '@/pages/AdminDashboard'
 import PublicPassport from '@/pages/PublicPassport'
 import SamplePassport from '@/pages/SamplePassport'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
@@ -78,6 +79,11 @@ function App() {
               </Route>
               <Route path="/passport">
                 <AuthRoute><CreditPassport /></AuthRoute>
+              </Route>
+
+              {/* Admin surface is authenticated; APIs enforce permissions server-side. */}
+              <Route path="/admin">
+                <AuthRoute><AdminDashboard /></AuthRoute>
               </Route>
 
               {/* Account management and support are authenticated and owner-scoped. */}

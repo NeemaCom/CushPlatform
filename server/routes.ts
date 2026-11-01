@@ -31,6 +31,7 @@ import {
 } from "./auth";
 import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
+import { registerAdminRoutes } from "./admin-routes";
 import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
 import { firebaseProfileNamePatch } from "./firebase-profile-name";
@@ -47,7 +48,7 @@ const profilePictureSchema = z.object({
 async function createLoginSession(req: Request, user: Pick<User, "id" | "role">): Promise<void> {
   await new Promise<void>((resolve, reject) => req.session.regenerate((err) => err ? reject(err) : resolve()));
   req.session.userId = user.id;
-  req.session.role = user.role || "customer";
+  req.session.role = user.role || "user";
   req.session.lastActivity = Date.now();
   await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
 }
@@ -97,6 +98,7 @@ export async function registerRoutes(
   }));
 
   // ── Passport V1 routes ────────────────────────────────────────────────────
+  registerAdminRoutes(app);
   registerPassportRoutes(app);
   registerMonoRoutes(app);
   registerInterswitchCreditHistoryRoutes(app);
@@ -145,7 +147,7 @@ export async function registerRoutes(
           acceptTerms: true,
           acceptPrivacy: true,
           marketingConsent: req.body.marketingConsent === true,
-          role: "customer",
+          role: "user",
         });
         await createLoginSession(req, user);
         SecurityLogger.logAuthEvent("firebase_signup_success", user.id, true, req.ip, req.get("User-Agent"));

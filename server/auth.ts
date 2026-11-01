@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { storage } from "./storage";
 import { SecurityLogger } from "./security";
 import type { User, SafeUser } from "@shared/schema";
+import { hasAdminPermission, type AdminPermission } from "@shared/admin-permissions";
 
 declare module "express-session" {
   interface SessionData {
@@ -156,6 +157,62 @@ export async function isAuthenticated(
   }
 }
 
+export function requireAdminPermission(permission: AdminPermission) {
+  return (
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction,
+  ): void => {
+    if (!req.user || !hasAdminPermission(req.user.role, permission)) {
+      SecurityLogger.logAuthEvent(
+        "unauthorized_admin_permission",
+        req.userId || null,
+        false,
+        req.ip,
+        req.get("User-Agent"),
+        { endpoint: req.originalUrl, permission },
+      );
+      res.status(403).json({ error: "Admin permission required" });
+      return;
+    }
+    next();
+  };
+}
+
+export function requireTrustedAdminOrigin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): void {
+  const origin = req.get("Origin");
+  const configuredOrigins = (process.env.FRONTEND_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const localOrigins = process.env.NODE_ENV === "production"
+    ? []
+    : [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+      ];
+
+  if (!origin || !new Set([...configuredOrigins, ...localOrigins]).has(origin)) {
+    SecurityLogger.logAuthEvent(
+      "admin_origin_rejected",
+      req.userId || null,
+      false,
+      req.ip,
+      req.get("User-Agent"),
+      { endpoint: req.originalUrl },
+    );
+    res.status(403).json({ error: "Admin request origin not allowed" });
+    return;
+  }
+  next();
+}
+
 // Admin role middleware
 export function requireAdmin(
   req: AuthenticatedRequest,
@@ -184,7 +241,7 @@ export function requireCustomer(
   res: Response,
   next: NextFunction
 ): void {
-  if (!req.user || req.user.role !== 'customer') {
+  if (!req.user || !["user", "customer"].includes(req.user.role ?? "")) {
     SecurityLogger.logAuthEvent(
       'unauthorized_customer_access',
       req.userId || null,

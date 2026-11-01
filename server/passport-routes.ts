@@ -4,7 +4,12 @@
  */
 import type { Express } from "express";
 import { z } from "zod";
-import { isAuthenticated, requireAdmin, type AuthenticatedRequest } from "./auth";
+import {
+  isAuthenticated,
+  requireAdminPermission,
+  requireTrustedAdminOrigin,
+  type AuthenticatedRequest,
+} from "./auth";
 import { normalizationService } from "./normalization-service";
 import {
   addSignalSchema,
@@ -130,7 +135,7 @@ export function registerPassportRoutes(app: Express) {
   app.get(
     "/api/passport/v2/admin/policy",
     isAuthenticated,
-    requireAdmin,
+    requireAdminPermission("admin.scoring_policy.read"),
     async (_req: AuthenticatedRequest, res) => {
       try {
         return res.json(await getAdminPolicyVersions());
@@ -150,7 +155,8 @@ export function registerPassportRoutes(app: Express) {
   app.put(
     "/api/passport/v2/admin/policy/draft",
     isAuthenticated,
-    requireAdmin,
+    requireAdminPermission("admin.scoring_policy.manage"),
+    requireTrustedAdminOrigin,
     async (req: AuthenticatedRequest, res) => {
       try {
         return res.json(await saveScoringPolicyDraft(req.userId!, req.body));
@@ -173,7 +179,8 @@ export function registerPassportRoutes(app: Express) {
   app.post(
     "/api/passport/v2/admin/policy/:id/activate",
     isAuthenticated,
-    requireAdmin,
+    requireAdminPermission("admin.scoring_policy.manage"),
+    requireTrustedAdminOrigin,
     async (req: AuthenticatedRequest, res) => {
       const policyId = Number(req.params.id);
       if (!Number.isSafeInteger(policyId) || policyId < 1) {
