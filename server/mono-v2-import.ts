@@ -465,6 +465,17 @@ export function buildMonoV2Evidence(options: {
     complete: completeMonths.has(month),
   }));
 
+  const selectedStatementDates = preview.transactions
+    .filter((transaction) => selectedTransactions.has(transaction.id))
+    .map((transaction) => transaction.date);
+  const completeMonthEndDates = [...completeMonths].map((month) => {
+    const [year, monthNumber] = month.split("-").map(Number);
+    return new Date(Date.UTC(year, monthNumber, 0)).toISOString().slice(0, 10);
+  });
+  const statementDataThroughDate = [...selectedStatementDates, ...completeMonthEndDates]
+    .sort()
+    .at(-1) ?? null;
+
   const evidence = monoV2AssessmentEvidenceSchema.parse({
     fxRateSource: CBN_SOURCE,
     fxRateDateBasis: "transaction_date",
@@ -480,6 +491,11 @@ export function buildMonoV2Evidence(options: {
       variable: item.variable,
     })),
     cashFlowHistory,
+    // Mono's account-detail payload in this flow does not provide a confirmed
+    // balance snapshot date. The fetch timestamp is used as a confidence
+    // fallback and surfaced for admin review instead of being called a source date.
+    balanceAsOfDate: null,
+    statementDataThroughDate,
     conversionAudit: [...audit.values()],
     statementPeriodMonths: preview.statementPeriodMonths,
     fetchedAt: preview.fetchedAt,

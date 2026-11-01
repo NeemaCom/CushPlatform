@@ -1,20 +1,247 @@
 import type { Express } from "express";
 import { count, desc, eq, gte } from "drizzle-orm";
+import { z } from "zod";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
 import {
   adminAuditLogs,
   cushAssessmentInputs,
+  cushEvidenceFreshnessReviews,
   interswitchCreditHistoryEvidence,
   monoLinkedAccounts,
+  monoV2AssessmentEvidence,
+  monoV2AssessmentEvidenceSchema,
   users,
 } from "@shared/schema";
 import { db } from "./db";
 import { isAuthenticated, requireAdminPermission, type AuthenticatedRequest } from "./auth";
 import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
+import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
+import { normalizedCreditHistorySchema } from "./interswitch-credit-history-scoring";
 
 const allowedRanges = [7, 30, 90] as const;
+const evidenceReviewSchema = z.object({
+  sourceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+}).strict();
+
+function isMissingEvidenceReviewSchema(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && current && typeof current === "object"; depth += 1) {
+    if ("code" in current && ["42P01", "42703"].includes(String((current as { code?: unknown }).code))) {
+      return true;
+    }
+    current = "cause" in current ? (current as { cause?: unknown }).cause : null;
+  }
+  return false;
+}
 
 export function registerAdminRoutes(app: Express): void {
+  app.get(
+    "/api/admin/evidence-freshness/review-queue",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.evidenceFreshnessRead),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        const [monoRows, creditRows, decisions] = await Promise.all([
+          db.select({
+            id: monoV2AssessmentEvidence.id,
+            userId: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            evidenceData: monoV2AssessmentEvidence.evidenceData,
+            fetchedAt: monoV2AssessmentEvidence.fetchedAt,
+          }).from(monoV2AssessmentEvidence)
+            .innerJoin(users, eq(users.id, monoV2AssessmentEvidence.userId))
+            .orderBy(desc(monoV2AssessmentEvidence.fetchedAt))
+            .limit(500),
+          db.select({
+            id: interswitchCreditHistoryEvidence.id,
+            userId: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            evidenceData: interswitchCreditHistoryEvidence.evidenceData,
+            fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
+          }).from(interswitchCreditHistoryEvidence)
+            .innerJoin(users, eq(users.id, interswitchCreditHistoryEvidence.userId))
+            .orderBy(desc(interswitchCreditHistoryEvidence.fetchedAt))
+            .limit(500),
+          db.select().from(cushEvidenceFreshnessReviews),
+        ]);
+        const reviewedMono = new Map(decisions.flatMap((item) =>
+          item.monoEvidenceId === null ? [] : [[item.monoEvidenceId, item.evidenceFetchedAt.getTime()] as const]));
+        const reviewedCredit = new Map(decisions.flatMap((item) =>
+          item.creditEvidenceId === null ? [] : [[item.creditEvidenceId, item.evidenceFetchedAt.getTime()] as const]));
+        const now = new Date();
+
+        const monoCases = monoRows.flatMap((row) => {
+          if (reviewedMono.get(row.id) === row.fetchedAt.getTime()) return [];
+          const parsed = monoV2AssessmentEvidenceSchema.safeParse(row.evidenceData);
+          const hasStatementData = parsed.success &&
+            (parsed.data.incomeHistory.length > 0 || parsed.data.cashFlowHistory.length > 0);
+          const hasBalanceData = parsed.success && parsed.data.availableFunds.length > 0;
+          const hasAllSourceDates = parsed.success &&
+            (!hasStatementData || ageInDays(parsed.data.statementDataThroughDate ?? null, now) !== null) &&
+            (!hasBalanceData || ageInDays(parsed.data.balanceAsOfDate ?? null, now) !== null);
+          if (hasAllSourceDates) return [];
+          const resolved = resolveEvidenceFreshnessDate({
+            retrievedAt: row.fetchedAt,
+            now,
+          });
+          return [{
+            source: "mono" as const,
+            evidenceId: row.id,
+            userId: row.userId,
+            email: row.email,
+            displayName: [row.firstName, row.lastName].filter(Boolean).join(" "),
+            retrievedAt: row.fetchedAt.toISOString(),
+            detectedSourceDate: parsed.success
+              ? parsed.data.statementDataThroughDate ?? parsed.data.balanceAsOfDate ?? null
+              : null,
+            effectiveDate: resolved.effectiveDate,
+            ageDays: ageInDays(resolved.effectiveDate, now),
+            reason: parsed.success
+              ? "A contributing statement or balance is missing its source date."
+              : "The imported bank evidence needs a metadata check.",
+          }];
+        });
+        const creditCases = creditRows.flatMap((row) => {
+          if (reviewedCredit.get(row.id) === row.fetchedAt.getTime()) return [];
+          const parsed = normalizedCreditHistorySchema.safeParse(row.evidenceData);
+          const sourceDate = parsed.success ? parsed.data.sourceReportDate ?? null : null;
+          if (sourceDate && ageInDays(sourceDate, now) !== null) return [];
+          const resolved = resolveEvidenceFreshnessDate({
+            retrievedAt: row.fetchedAt,
+            now,
+          });
+          return [{
+            source: "credit" as const,
+            evidenceId: row.id,
+            userId: row.userId,
+            email: row.email,
+            displayName: [row.firstName, row.lastName].filter(Boolean).join(" "),
+            retrievedAt: row.fetchedAt.toISOString(),
+            detectedSourceDate: null,
+            effectiveDate: resolved.effectiveDate,
+            ageDays: ageInDays(resolved.effectiveDate, now),
+            reason: parsed.success
+              ? "The provider response has no explicit report date; the lookup date is used for confidence."
+              : "The normalized credit evidence needs a metadata check.",
+          }];
+        });
+        await recordAdminAuditEvent(req, {
+          action: "admin.evidence_freshness.queue_read",
+          resourceType: "evidence_freshness",
+        });
+        return res.json({ generatedAt: now.toISOString(), cases: [...monoCases, ...creditCases] });
+      } catch (error) {
+        if (isMissingEvidenceReviewSchema(error)) {
+          return res.status(503).json({
+            code: "EVIDENCE_FRESHNESS_SCHEMA_MISSING",
+            error: "Evidence review is unavailable. Apply migrations/manual/create-cush-evidence-freshness-reviews.sql.",
+          });
+        }
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin evidence freshness queue failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to load the evidence review queue." });
+      }
+    },
+  );
+
+  app.post(
+    "/api/admin/evidence-freshness/:source/:evidenceId",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.evidenceFreshnessManage),
+    async (req: AuthenticatedRequest, res) => {
+      const source = req.params.source;
+      const evidenceId = Number(req.params.evidenceId);
+      const parsedBody = evidenceReviewSchema.safeParse(req.body);
+      if (!["mono", "credit"].includes(source) || !Number.isSafeInteger(evidenceId) ||
+          evidenceId < 1 || !parsedBody.success) {
+        return res.status(400).json({ error: "Provide a valid evidence record and source date decision." });
+      }
+      const sourceDate = parsedBody.data.sourceDate ?? null;
+      if (sourceDate && ageInDays(sourceDate, new Date()) === null) {
+        return res.status(400).json({ error: "Enter a valid source date that is not in the future." });
+      }
+      try {
+        const target = source === "mono" ? "mono" : "credit";
+        const [evidence] = target === "mono"
+          ? await db.select({
+              id: monoV2AssessmentEvidence.id,
+              userId: monoV2AssessmentEvidence.userId,
+            fetchedAt: monoV2AssessmentEvidence.fetchedAt,
+            }).from(monoV2AssessmentEvidence).where(eq(monoV2AssessmentEvidence.id, evidenceId)).limit(1)
+          : await db.select({
+              id: interswitchCreditHistoryEvidence.id,
+              userId: interswitchCreditHistoryEvidence.userId,
+            fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
+            }).from(interswitchCreditHistoryEvidence).where(eq(interswitchCreditHistoryEvidence.id, evidenceId)).limit(1);
+        if (!evidence) return res.status(404).json({ error: "Evidence record not found." });
+
+        const isMono = target === "mono";
+        const existingRows = isMono
+          ? await db.select({ id: cushEvidenceFreshnessReviews.id })
+              .from(cushEvidenceFreshnessReviews)
+              .where(eq(cushEvidenceFreshnessReviews.monoEvidenceId, evidenceId)).limit(1)
+          : await db.select({ id: cushEvidenceFreshnessReviews.id })
+              .from(cushEvidenceFreshnessReviews)
+              .where(eq(cushEvidenceFreshnessReviews.creditEvidenceId, evidenceId)).limit(1);
+        const decision = sourceDate ? "confirm_source_date" : "confirm_retrieval_date";
+        const reviewValues = {
+          userId: evidence.userId,
+          monoEvidenceId: isMono ? evidenceId : null,
+          creditEvidenceId: isMono ? null : evidenceId,
+          decision,
+          confirmedSourceDate: sourceDate,
+          evidenceFetchedAt: evidence.fetchedAt,
+          reviewedBy: req.userId!,
+          reviewedAt: new Date(),
+        };
+        if (existingRows[0]) {
+          await db.update(cushEvidenceFreshnessReviews).set(reviewValues)
+            .where(eq(cushEvidenceFreshnessReviews.id, existingRows[0].id));
+        } else {
+          await db.insert(cushEvidenceFreshnessReviews).values(reviewValues);
+        }
+        await recordAdminAuditEvent(req, {
+          action: sourceDate
+            ? "admin.evidence_freshness.source_date_confirmed"
+            : "admin.evidence_freshness.retrieval_date_confirmed",
+          resourceType: `${source}_evidence`,
+          resourceId: evidenceId,
+        });
+        return res.json({ success: true, decision, sourceDate });
+      } catch (error) {
+        if (isMissingEvidenceReviewSchema(error)) {
+          return res.status(503).json({
+            code: "EVIDENCE_FRESHNESS_SCHEMA_MISSING",
+            error: "Evidence review is unavailable. Apply migrations/manual/create-cush-evidence-freshness-reviews.sql.",
+          });
+        }
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin evidence freshness review failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to save the evidence review." });
+      }
+    },
+  );
+
   app.get(
     "/api/admin/overview",
     isAuthenticated,

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, check, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, date, check, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -162,6 +162,41 @@ export const monoV2AssessmentEvidence = pgTable("mono_v2_assessment_evidence", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   userIdIndex: index("mono_v2_assessment_evidence_user_id_idx").on(table.userId),
+})).enableRLS();
+
+export const cushEvidenceFreshnessReviews = pgTable("cush_evidence_freshness_reviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  monoEvidenceId: integer("mono_evidence_id")
+    .references(() => monoV2AssessmentEvidence.id, { onDelete: "cascade" }),
+  creditEvidenceId: integer("credit_evidence_id")
+    .references(() => interswitchCreditHistoryEvidence.id, { onDelete: "cascade" }),
+  decision: text("decision").notNull(),
+  confirmedSourceDate: date("confirmed_source_date"),
+  evidenceFetchedAt: timestamp("evidence_fetched_at", { withTimezone: true, mode: "date" }).notNull(),
+  reviewedBy: integer("reviewed_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  decisionCheck: check(
+    "cush_evidence_freshness_reviews_decision_check",
+    sql`${table.decision} in ('confirm_source_date', 'confirm_retrieval_date')`,
+  ),
+  targetCheck: check(
+    "cush_evidence_freshness_reviews_target_check",
+    sql`(${table.monoEvidenceId} is null) <> (${table.creditEvidenceId} is null)`,
+  ),
+  sourceDateCheck: check(
+    "cush_evidence_freshness_reviews_source_date_check",
+    sql`(${table.decision} = 'confirm_source_date' and ${table.confirmedSourceDate} is not null) or
+      (${table.decision} = 'confirm_retrieval_date' and ${table.confirmedSourceDate} is null)`,
+  ),
+  monoEvidenceUnique: uniqueIndex("cush_evidence_freshness_reviews_mono_evidence_key")
+    .on(table.monoEvidenceId).where(sql`${table.monoEvidenceId} is not null`),
+  creditEvidenceUnique: uniqueIndex("cush_evidence_freshness_reviews_credit_evidence_key")
+    .on(table.creditEvidenceId).where(sql`${table.creditEvidenceId} is not null`),
+  userReviewedAtIndex: index("cush_evidence_freshness_reviews_user_reviewed_at_idx")
+    .on(table.userId, table.reviewedAt),
 })).enableRLS();
 
 export const cushScorePolicyVersions = pgTable("cush_score_policy_versions", {
@@ -384,6 +419,8 @@ export const monoV2AssessmentEvidenceSchema = z.object({
     eligibleExpensesPence: v2NonNegativePenceSchema,
     complete: z.boolean(),
   }).strict()).max(12),
+  balanceAsOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  statementDataThroughDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   conversionAudit: z.array(z.object({
     source: z.literal("https://www.cbn.gov.ng/api/GetAllExchangeRates?format=json"),
     valueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) =>

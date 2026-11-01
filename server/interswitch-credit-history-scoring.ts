@@ -1,8 +1,13 @@
 import { z } from "zod";
 
 const count = z.number().int().min(0).max(1_000_000);
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+});
 
 export const normalizedCreditHistorySchema = z.object({
+  sourceReportDate: isoDate.nullable().optional(),
   accountsReported: count,
   historyRecords: count,
   loanStatusCounts: z.object({

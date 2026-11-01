@@ -165,6 +165,15 @@ describe("Cush Score V2 engine", () => {
     expect(result.assessmentStatus).toBe("provisional");
   });
 
+  it("keeps valid older evidence in the score while freshness lowers confidence", () => {
+    const recent = calculateCushScore(completeInput({ dataAgeDays: 3 }), policy);
+    const older = calculateCushScore(completeInput({ dataAgeDays: 180 }), policy);
+
+    expect(older.cushScore).toBe(recent.cushScore);
+    expect(older.componentScores).toEqual(recent.componentScores);
+    expect(older.confidenceScore).toBeLessThan(recent.confidenceScore!);
+  });
+
   it("only counts verified, accessible funds and rejects duplicate funds", () => {
     const result = calculateCushScore(completeInput({
       availableFunds: [

@@ -118,7 +118,25 @@ export function normalizeInterswitchCreditHistory(payload: unknown): NormalizedC
   }
 
   const rows = payload.data.credit_history;
+  const possibleReportDates = [
+    payload.data.report_date,
+    payload.data.as_of_date,
+    payload.data.generated_at,
+  ];
+  const sourceReportDate = possibleReportDates
+    .map((value) => {
+      if (typeof value !== "string") return null;
+      const dateOnly = value.match(/^(\d{4}-\d{2}-\d{2})(?:T.*)?$/);
+      if (!dateOnly) return null;
+      const date = new Date(`${dateOnly[1]}T00:00:00.000Z`);
+      const timestampValid = value === dateOnly[1] || Number.isFinite(new Date(value).getTime());
+      return timestampValid && Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === dateOnly[1]
+        ? dateOnly[1]
+        : null;
+    })
+    .find((value) => value !== null) ?? null;
   const result: NormalizedCreditHistory = {
+    ...(sourceReportDate ? { sourceReportDate } : {}),
     accountsReported: rows.length,
     historyRecords: 0,
     loanStatusCounts: { open: 0, closed: 0, other: 0 },

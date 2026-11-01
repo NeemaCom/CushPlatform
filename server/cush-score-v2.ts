@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import {
   cushAssessmentInputs,
+  cushEvidenceFreshnessReviews,
   cushScorePolicyVersions,
   cushScorePolicyConfigSchema,
   interswitchCreditHistoryEvidence,
@@ -31,6 +32,7 @@ import {
   creditAssessmentFromInterswitchEvidence,
 } from "./interswitch-credit-history-scoring";
 import { interswitchCreditHistoryClient } from "./interswitch-credit-history-service";
+import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
 
 export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
   selectedBaselineId: null,
@@ -69,9 +71,10 @@ function engineInput(
   input: V2AssessmentInput,
   destinationBaseline: DestinationBaseline | null,
   now: Date,
-  monoImports: Array<{ linkedAccountId: number; fetchedAt: Date; evidence: MonoV2AssessmentEvidence }>,
+  monoImports: Array<{ id: number; linkedAccountId: number; fetchedAt: Date; evidence: MonoV2AssessmentEvidence }>,
   linkedAccountCount: number,
-  creditHistoryEvidence: { evidenceData: unknown; mappingVersion: string } | null,
+  creditHistoryEvidence: { id: number; evidenceData: unknown; mappingVersion: string; fetchedAt: Date } | null,
+  freshnessReviews: Array<typeof cushEvidenceFreshnessReviews.$inferSelect> = [],
 ): CushScoreInput {
   const monoMonthSet = new Set(monoImports.flatMap(({ evidence }) =>
     evidence.cashFlowHistory.map((item) => item.month),
@@ -136,12 +139,67 @@ function engineInput(
         creditHistoryEvidence.mappingVersion,
       )
     : creditAssessmentFromInterswitchEvidence(null, INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION);
-  const oldestImportDate = monoImports.length
-    ? Math.min(...monoImports.map(({ fetchedAt }) => fetchedAt.getTime()))
-    : null;
-  const dataAgeDays = oldestImportDate === null
-    ? null
-    : Math.max(0, Math.floor((now.getTime() - oldestImportDate) / 86_400_000));
+  const freshnessAges: number[] = [];
+  for (const imported of monoImports) {
+    const candidateReview = freshnessReviews.find((item) => item.monoEvidenceId === imported.id);
+    const review = candidateReview?.evidenceFetchedAt.getTime() === imported.fetchedAt.getTime()
+      ? candidateReview
+      : undefined;
+    const dateCandidates = [
+      ...(imported.evidence.statementDataThroughDate ? [imported.evidence.statementDataThroughDate] : []),
+      ...(imported.evidence.balanceAsOfDate ? [imported.evidence.balanceAsOfDate] : []),
+    ];
+    const hasStatementEvidence = imported.evidence.incomeHistory.length > 0 ||
+      imported.evidence.cashFlowHistory.length > 0;
+    const hasBalanceEvidence = imported.evidence.availableFunds.length > 0;
+    const candidateDates = [
+      ...(hasStatementEvidence
+        ? [imported.evidence.statementDataThroughDate ?? null]
+        : []),
+      ...(hasBalanceEvidence
+        ? [imported.evidence.balanceAsOfDate ?? null]
+        : []),
+    ];
+    const reviewedSourceDate = review?.decision === "confirm_source_date"
+      ? review.confirmedSourceDate
+      : null;
+    const reviewedDateDecision = review?.decision as "confirm_source_date" | "confirm_retrieval_date" | undefined;
+    const sourceDate = reviewedSourceDate ?? dateCandidates.sort()[0] ?? null;
+    const resolved = resolveEvidenceFreshnessDate({
+      sourceDate,
+      retrievedAt: imported.fetchedAt,
+      reviewDecision: reviewedDateDecision,
+      reviewedSourceDate,
+      now,
+    });
+    const age = ageInDays(resolved.effectiveDate, now);
+    if (age !== null) freshnessAges.push(age);
+  }
+  if (creditHistoryEvidence) {
+    const candidateReview = freshnessReviews.find((item) => item.creditEvidenceId === creditHistoryEvidence.id);
+    const review = candidateReview?.evidenceFetchedAt.getTime() === creditHistoryEvidence.fetchedAt.getTime()
+      ? candidateReview
+      : undefined;
+    const creditData = creditHistoryEvidence.evidenceData as { sourceReportDate?: unknown } | null;
+    const sourceReportDate = typeof creditData?.sourceReportDate === "string"
+      ? creditData.sourceReportDate
+      : null;
+    const reviewDecision = review?.decision as "confirm_source_date" | "confirm_retrieval_date" | undefined;
+    const resolved = resolveEvidenceFreshnessDate({
+      sourceDate: sourceReportDate,
+      retrievedAt: creditHistoryEvidence.fetchedAt,
+      reviewDecision,
+      reviewedSourceDate: review?.decision === "confirm_source_date"
+        ? review.confirmedSourceDate
+        : null,
+      now,
+    });
+    const age = ageInDays(resolved.effectiveDate, now);
+    if (age !== null) freshnessAges.push(age);
+  }
+  // Confidence reflects the least-fresh contributing source. Age never removes
+  // otherwise valid or relevant evidence from score processing.
+  const dataAgeDays = freshnessAges.length ? Math.max(...freshnessAges) : null;
   return {
     individualUserId: userId,
     assessmentMonth: now.toISOString().slice(0, 7),
@@ -199,6 +257,7 @@ function engineInput(
 
 async function loadMonoImports(userId: number) {
   const rows = await db.select({
+    id: monoV2AssessmentEvidence.id,
     linkedAccountId: monoV2AssessmentEvidence.monoLinkedAccountId,
     evidenceData: monoV2AssessmentEvidence.evidenceData,
     fetchedAt: monoV2AssessmentEvidence.fetchedAt,
@@ -206,6 +265,7 @@ async function loadMonoImports(userId: number) {
   }).from(monoV2AssessmentEvidence)
     .where(eq(monoV2AssessmentEvidence.userId, userId));
   return rows.map((row) => ({
+    id: row.id,
     linkedAccountId: row.linkedAccountId,
     fetchedAt: row.fetchedAt,
     statementPeriodMonths: row.statementPeriodMonths,
@@ -234,6 +294,7 @@ async function loadCreditHistoryEvidence(userId: number) {
   if (providerReadiness.mode !== "production" || !providerReadiness.configured) return null;
   try {
     const [row] = await db.select({
+      id: interswitchCreditHistoryEvidence.id,
       evidenceData: interswitchCreditHistoryEvidence.evidenceData,
       mappingVersion: interswitchCreditHistoryEvidence.mappingVersion,
       fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
@@ -244,6 +305,16 @@ async function loadCreditHistoryEvidence(userId: number) {
     return row ?? null;
   } catch (error) {
     if (isCreditHistorySchemaMissing(error)) return null;
+    throw error;
+  }
+}
+
+async function loadEvidenceFreshnessReviews(userId: number) {
+  try {
+    return await db.select().from(cushEvidenceFreshnessReviews)
+      .where(eq(cushEvidenceFreshnessReviews.userId, userId));
+  } catch (error) {
+    if (isV2SchemaMissing(error)) return [];
     throw error;
   }
 }
@@ -262,11 +333,12 @@ async function loadActivePolicy() {
 }
 
 export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
-  const [inputs, activePolicy, monoData, creditHistoryEvidence] = await Promise.all([
+  const [inputs, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
     loadStoredInputs(userId),
     loadActivePolicy(),
     loadMonoAssessmentData(userId),
     loadCreditHistoryEvidence(userId),
+    loadEvidenceFreshnessReviews(userId),
   ]);
   const selectedBaseline = baselineFor();
   const scoringPolicy: CushScorePolicy = activePolicy
@@ -278,7 +350,16 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
       }
     : { creditMappings: {} };
   const calculation = calculateCushScore(
-    engineInput(userId, inputs, selectedBaseline, now, monoData.imports, monoData.linkedAccountCount, creditHistoryEvidence),
+    engineInput(
+      userId,
+      inputs,
+      selectedBaseline,
+      now,
+      monoData.imports,
+      monoData.linkedAccountCount,
+      creditHistoryEvidence,
+      freshnessReviews,
+    ),
     scoringPolicy,
   );
   return {
