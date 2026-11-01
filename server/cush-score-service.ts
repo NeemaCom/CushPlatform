@@ -241,6 +241,15 @@ function isWithinAssessmentWindow(assessmentMonth: string, month: string): boole
   return distance >= 0 && distance < 6;
 }
 
+function isSupportedCompleteCashFlowMonth(
+  item: MonthlyCashFlow,
+  assessmentMonth: string,
+): boolean {
+  return item.complete &&
+    item.evidenceQuality !== "self_reported" &&
+    isWithinAssessmentWindow(assessmentMonth, item.month);
+}
+
 function assertEvidenceQuality(value: string, label: string): asserts value is EvidenceQuality {
   if (!QUALITY_VALUES.includes(value as EvidenceQuality)) {
     throw new Error(`${label} is not a supported evidence quality.`);
@@ -614,10 +623,8 @@ function calculateCashFlowScore(
   input: CushScoreInput,
   recognizedIncomePence: number | null,
 ): { score: number | null; cap: number | null } {
-  const completeMonths = input.cashFlowHistory.filter(
-    (item) => item.complete &&
-      item.evidenceQuality !== "self_reported" &&
-      isWithinAssessmentWindow(input.assessmentMonth, item.month),
+  const completeMonths = input.cashFlowHistory.filter((item) =>
+    isSupportedCompleteCashFlowMonth(item, input.assessmentMonth),
   );
   if (completeMonths.length === 0 ||
       recognizedIncomePence === null ||
@@ -693,7 +700,7 @@ export function calculateCushScore(
 
   const usableHistoryMonths = new Set(
     input.cashFlowHistory
-      .filter((item) => item.complete && isWithinAssessmentWindow(input.assessmentMonth, item.month))
+      .filter((item) => isSupportedCompleteCashFlowMonth(item, input.assessmentMonth))
       .map((item) => item.month),
   ).size;
   const funds = calculateFundsScore(input);
@@ -723,10 +730,8 @@ export function calculateCushScore(
       isWithinAssessmentWindow(input.assessmentMonth, item.month),
   ) || (input.destinationBaseline?.countryCode === "GB" &&
     input.verifiedUkEmploymentOffer?.evidenceQuality === "verified");
-  const cashFlowEvidenceSufficient = input.cashFlowHistory.filter(
-    (item) => item.complete &&
-      item.evidenceQuality !== "self_reported" &&
-      isWithinAssessmentWindow(input.assessmentMonth, item.month),
+  const cashFlowEvidenceSufficient = input.cashFlowHistory.filter((item) =>
+    isSupportedCompleteCashFlowMonth(item, input.assessmentMonth),
   ).length >= 4;
   const creditCheckStatus = input.credit.checkStatus ?? "not_done";
   const creditAssessmentComplete =

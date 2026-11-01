@@ -131,6 +131,40 @@ describe("Cush Score V2 engine", () => {
     expect(result.confidenceBand).toBe("high");
   });
 
+  it("counts relevant supported history months regardless of import age and excludes self-reported months", () => {
+    const result = calculateCushScore(completeInput({
+      dataAgeDays: 180,
+      cashFlowHistory: [
+        {
+          month: "2026-05",
+          eligibleRecurringIncomePence: BASELINE_PENCE * 2,
+          eligibleExpensesPence: BASELINE_PENCE,
+          complete: true,
+          evidenceQuality: "documented",
+        },
+        {
+          month: "2026-06",
+          eligibleRecurringIncomePence: BASELINE_PENCE * 2,
+          eligibleExpensesPence: BASELINE_PENCE,
+          complete: true,
+          evidenceQuality: "self_reported",
+        },
+        {
+          month: "2026-04",
+          eligibleRecurringIncomePence: BASELINE_PENCE * 2,
+          eligibleExpensesPence: BASELINE_PENCE,
+          complete: true,
+          evidenceQuality: "verified",
+        },
+      ],
+    }), policy);
+
+    expect(result.usableHistoryMonths).toBe(1);
+    expect(result.confidenceBreakdown?.financialHistoryDepth).toBe(5);
+    expect(result.missingRequirements).toContain("At least four months of usable financial history");
+    expect(result.assessmentStatus).toBe("provisional");
+  });
+
   it("only counts verified, accessible funds and rejects duplicate funds", () => {
     const result = calculateCushScore(completeInput({
       availableFunds: [
