@@ -15,19 +15,6 @@ interface MonoLinkedAccount {
   linkedAt: string;
 }
 
-interface LookupMethod {
-  method: string;
-  hint: string;
-}
-
-interface LookupAccount {
-  accountName: string | null;
-  accountType: string | null;
-  institutionName: string | null;
-  bankCode: string | null;
-  accountLast4: string | null;
-}
-
 interface MonoResponse {
   accounts: MonoLinkedAccount[];
 }
@@ -110,13 +97,6 @@ function transactionDate(row: Record<string, unknown>) {
 
 export default function MonoBankDataPanel() {
   const queryClient = useQueryClient();
-  const [bvn, setBvn] = useState("");
-  const [lookupConsent, setLookupConsent] = useState(false);
-  const [methods, setMethods] = useState<LookupMethod[]>([]);
-  const [selectedMethod, setSelectedMethod] = useState("");
-  const [alternatePhone, setAlternatePhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [lookupAccounts, setLookupAccounts] = useState<LookupAccount[] | null>(null);
   const [statementResult, setStatementResult] = useState<{
     accountId: number;
     periodMonths: number;
@@ -148,39 +128,6 @@ export default function MonoBankDataPanel() {
   const connectMutation = useMutation({
     mutationFn: () => request<{ monoUrl: string }>("POST", "/api/mono/connect/initiate"),
     onSuccess: ({ monoUrl }) => window.location.assign(monoUrl),
-  });
-
-  const lookupMutation = useMutation({
-    mutationFn: () => request<{ methods: LookupMethod[] }>("POST", "/api/mono/bvn/initiate", {
-      bvn,
-      consent: lookupConsent,
-    }),
-    onSuccess: (result) => {
-      setMethods(result.methods);
-      setSelectedMethod(result.methods[0]?.method ?? "");
-      setBvn("");
-      setOtp("");
-      setLookupAccounts(null);
-    },
-  });
-
-  const otpMutation = useMutation({
-    mutationFn: () => request<{ success: boolean }>("POST", "/api/mono/bvn/request-otp", {
-      method: selectedMethod,
-      ...(selectedMethod === "alternate_phone" ? { phoneNumber: alternatePhone } : {}),
-    }),
-  });
-
-  const fetchAccountsMutation = useMutation({
-    mutationFn: () => request<{ accounts: LookupAccount[] }>("POST", "/api/mono/bvn/fetch-accounts", { otp }),
-    onSuccess: (result) => {
-      setLookupAccounts(result.accounts);
-      setOtp("");
-      setMethods([]);
-      setSelectedMethod("");
-      setAlternatePhone("");
-      setLookupConsent(false);
-    },
   });
 
   const statementMutation = useMutation({
@@ -250,142 +197,13 @@ export default function MonoBankDataPanel() {
   return (
     <div className="space-y-4">
       <AssessmentStep
-        id="assessment-bank-accounts"
-        step={1}
-        title="Find bank accounts with BVN"
-        description="Identify accounts linked to your BVN. This is separate from connecting an account for statements."
-        defaultOpen
-      >
-        <p className="text-xs leading-relaxed text-slate-600">
-          Mono sends an OTP to a contact method already registered with the BVN. Account numbers are masked here and lookup results are not saved by Cush.
-        </p>
-
-        <label className="block text-xs font-medium text-slate-600">
-          BVN
-          <input
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={11}
-            value={bvn}
-            onChange={(event) => setBvn(event.target.value.replace(/\D/g, ""))}
-            className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-            placeholder="Enter 11 digits"
-          />
-        </label>
-
-        <label className="flex items-start gap-2 text-xs leading-relaxed text-slate-600">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={lookupConsent}
-            onChange={(event) => setLookupConsent(event.target.checked)}
-          />
-          <span>
-            I authorize Cush to send my BVN to Mono to retrieve the bank accounts linked to it. I understand Mono charges for each lookup step, including OTP requests.
-          </span>
-        </label>
-
-        <button
-          type="button"
-          disabled={!setupReady || bvn.length !== 11 || !lookupConsent || lookupMutation.isPending}
-          onClick={() => lookupMutation.mutate()}
-          className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {lookupMutation.isPending ? "Starting lookup…" : "Start BVN account lookup"}
-        </button>
-
-        {lookupMutation.isError && <p className="text-xs text-red-700" role="alert">{lookupMutation.error.message}</p>}
-
-        {methods.length > 0 && (
-          <div className="space-y-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
-            <label className="block text-xs font-medium text-slate-700">
-              OTP delivery method
-              <select
-                value={selectedMethod}
-                onChange={(event) => setSelectedMethod(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-              >
-                {methods.map((method) => (
-                  <option value={method.method} key={method.method}>
-                    {method.hint || method.method.replace(/_/g, " ")}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {selectedMethod === "alternate_phone" && (
-              <label className="block text-xs font-medium text-slate-700">
-                Alternate phone number
-                <input
-                  value={alternatePhone}
-                  onChange={(event) => setAlternatePhone(event.target.value)}
-                  autoComplete="tel"
-                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                />
-              </label>
-            )}
-            <button
-              type="button"
-              disabled={otpMutation.isPending || !selectedMethod}
-              onClick={() => otpMutation.mutate()}
-              className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-800 disabled:opacity-50"
-            >
-              {otpMutation.isPending ? "Requesting OTP…" : "Send OTP"}
-            </button>
-            {otpMutation.isError && <p className="text-xs text-red-700" role="alert">{otpMutation.error.message}</p>}
-            {otpMutation.isSuccess && (
-              <div className="space-y-2">
-                <label className="block text-xs font-medium text-slate-700">
-                  OTP
-                  <input
-                    value={otp}
-                    onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 8))}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
-                    placeholder="Enter the code"
-                  />
-                </label>
-                <button
-                  type="button"
-                  disabled={fetchAccountsMutation.isPending || otp.length < 4}
-                  onClick={() => fetchAccountsMutation.mutate()}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                >
-                  {fetchAccountsMutation.isPending ? "Verifying…" : "Verify and show accounts"}
-                </button>
-                {fetchAccountsMutation.isError && <p className="text-xs text-red-700" role="alert">{fetchAccountsMutation.error.message}</p>}
-              </div>
-            )}
-          </div>
-        )}
-
-        {lookupAccounts && (
-          <div className="space-y-2" role="status">
-            <p className="text-xs font-semibold text-slate-700">Accounts found: {lookupAccounts.length}</p>
-            {lookupAccounts.length === 0 ? (
-              <p className="text-xs text-slate-500">Mono returned no bank accounts for this lookup.</p>
-            ) : lookupAccounts.map((account, index) => (
-              <div key={`${account.bankCode ?? "bank"}-${account.accountLast4 ?? index}`} className="rounded-lg border border-slate-100 p-3 text-xs">
-                <p className="font-semibold text-slate-800">{account.institutionName ?? "Bank"} ···· {account.accountLast4 ?? "—"}</p>
-                <p className="mt-1 text-slate-500">{account.accountName ?? "Account holder"}{account.accountType ? ` · ${account.accountType}` : ""}</p>
-              </div>
-            ))}
-            <p className="text-xs text-slate-500">This temporary result clears when you leave or refresh this page. It does not connect the bank for statements.</p>
-          </div>
-        )}
-      </AssessmentStep>
-
-      <AssessmentStep
         id="assessment-bank-statements"
-        step={2}
+        step={1}
         title="Connect a bank for statements"
         description="Authorize account access, then review statement activity for your assessment."
       >
         <p className="text-xs leading-relaxed text-slate-600">
-          BVN lookup only identifies accounts. Use Mono Connect to authorize access to account data and request statements. Raw statements are not retained; importing saves only reviewed monthly aggregates and exchange-rate provenance.
-        </p>
-        <p className="text-xs leading-relaxed text-slate-600">
-          Review a connected statement to add selected balance, recurring income, and expenses to V2. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.
+          Connect your bank to review account statements and add selected balance, recurring income, and expenses to V2. Raw statements are not retained; imports save reviewed monthly aggregates and exchange-rate provenance. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.
         </p>
 
         {statusQuery.isError && <p className="text-xs text-red-700" role="alert">Could not check Mono setup. Refresh this section and try again.</p>}

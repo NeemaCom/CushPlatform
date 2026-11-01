@@ -30,7 +30,6 @@ export class MonoClient {
     options: {
       method?: "GET" | "POST";
       body?: unknown;
-      sessionId?: string;
       query?: Record<string, string>;
     } = {},
   ): Promise<T> {
@@ -47,7 +46,6 @@ export class MonoClient {
           Accept: "application/json",
           "Content-Type": "application/json",
           "mono-sec-key": this.secretKey,
-          ...(options.sessionId ? { "x-session-id": options.sessionId } : {}),
         },
         ...(options.body === undefined ? {} : { body: JSON.stringify(options.body) }),
         signal: AbortSignal.timeout(20_000),
@@ -74,29 +72,6 @@ export function getMonoClient(): MonoClient {
   const secretKey = process.env.MONO_SECRET_KEY;
   if (!secretKey) throw new MonoNotConfiguredError();
   return new MonoClient(secretKey);
-}
-
-export interface SafeBvnAccount {
-  accountName: string | null;
-  accountType: string | null;
-  institutionName: string | null;
-  bankCode: string | null;
-  accountLast4: string | null;
-}
-
-export function normalizeBvnAccounts(value: unknown): SafeBvnAccount[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item: any) => {
-    const accountNumber = typeof item?.account_number === "string" ? item.account_number : "";
-    const institution = item?.institution;
-    return {
-      accountName: typeof item?.account_name === "string" ? item.account_name : null,
-      accountType: typeof item?.account_type === "string" ? item.account_type : null,
-      institutionName: typeof institution?.name === "string" ? institution.name : null,
-      bankCode: typeof institution?.bank_code === "string" ? institution.bank_code : null,
-      accountLast4: accountNumber.length >= 4 ? accountNumber.slice(-4) : null,
-    };
-  });
 }
 
 export function getMonoCallbackUrl(): string | null {

@@ -3,7 +3,6 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "./db";
 import {
-  monoBvnLookupConsents,
   monoLinkedAccounts,
   monoV2AssessmentEvidence,
 } from "@shared/schema";
@@ -15,7 +14,6 @@ import {
   getMonoClient,
   MonoNotConfiguredError,
   MonoRequestError,
-  normalizeBvnAccounts,
 } from "./mono-service";
 import {
   buildMonoV2Evidence,
@@ -23,20 +21,6 @@ import {
   createMonoV2Preview,
   type MonoV2ImportSelection,
 } from "./mono-v2-import";
-
-const initiateBvnSchema = z.object({
-  bvn: z.string().regex(/^\d{11}$/, "Enter an 11-digit BVN."),
-  consent: z.literal(true, { errorMap: () => ({ message: "Consent is required to request this lookup." }) }),
-});
-
-const otpRequestSchema = z.object({
-  method: z.enum(["phone", "phone_1", "email", "alternate_phone"]),
-  phoneNumber: z.string().trim().min(7).max(20).optional(),
-});
-
-const otpSchema = z.object({
-  otp: z.string().regex(/^\d{4,8}$/, "Enter the OTP sent by Mono."),
-});
 
 const exchangeSchema = z.object({
   code: z.string().trim().min(1).max(500),
@@ -81,22 +65,12 @@ function providerFailure(res: import("express").Response, error: unknown) {
   return res.status(503).json({ error: "Mono is temporarily unavailable." });
 }
 
-function getPendingBvnSession(req: AuthenticatedRequest) {
-  const pending = req.session.monoBvnLookup;
-  if (!pending || pending.expiresAt <= Date.now()) {
-    delete req.session.monoBvnLookup;
-    return null;
-  }
-  return pending;
-}
-
 export function registerMonoRoutes(app: Express) {
   app.get("/api/mono/status", isAuthenticated, async (_req, res) => {
     noStore(res);
     let schemaReady = true;
     try {
       await db.select({ id: monoLinkedAccounts.id }).from(monoLinkedAccounts).limit(0);
-      await db.select({ id: monoBvnLookupConsents.id }).from(monoBvnLookupConsents).limit(0);
       await db.select({ id: monoV2AssessmentEvidence.id }).from(monoV2AssessmentEvidence).limit(0);
     } catch {
       schemaReady = false;
@@ -106,99 +80,6 @@ export function registerMonoRoutes(app: Express) {
       callbackConfigured: Boolean(getMonoCallbackUrl()),
       schemaReady,
     });
-  });
-
-  // BVN values and OTPs are processed transiently and are never stored or logged.
-  app.post("/api/mono/bvn/initiate", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
-    noStore(res);
-    const parsed = initiateBvnSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid BVN lookup request." });
-
-    try {
-      // Record consent before initiating the billable provider flow. The record
-      // contains no BVN, OTP, session ID, or lookup result.
-      await db.insert(monoBvnLookupConsents).values({
-        userId: req.userId!,
-        consentVersion: "mono-bvn-bank-accounts-v1",
-      });
-
-      const result = await getMonoClient().request<any>("/v3/lookup/bvn/initiate", {
-        method: "POST",
-        body: { bvn: parsed.data.bvn, scope: "bank_accounts" },
-      });
-      const data = result?.data;
-      if (typeof data?.session_id !== "string" || !Array.isArray(data?.methods)) {
-        return res.status(502).json({ error: "Mono returned an unexpected lookup response." });
-      }
-
-      const methods = data.methods
-        .filter((method: any) => typeof method?.method === "string")
-        .map((method: any) => ({
-          method: method.method,
-          hint: typeof method.hint === "string" ? method.hint : "",
-        }));
-      if (methods.length === 0) return res.status(502).json({ error: "Mono did not return a verification method." });
-
-      req.session.monoBvnLookup = {
-        sessionId: data.session_id,
-        methods: methods.map((method: { method: string }) => method.method),
-        expiresAt: Date.now() + 10 * 60 * 1000,
-      };
-      return res.json({ methods, expiresAt: req.session.monoBvnLookup.expiresAt });
-    } catch (error) {
-      return providerFailure(res, error);
-    }
-  });
-
-  app.post("/api/mono/bvn/request-otp", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
-    noStore(res);
-    const parsed = otpRequestSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid OTP request." });
-
-    const pending = getPendingBvnSession(req);
-    if (!pending) return res.status(400).json({ error: "This BVN lookup has expired. Start a new lookup." });
-    if (!pending.methods.includes(parsed.data.method)) {
-      return res.status(400).json({ error: "Choose a verification method returned for this lookup." });
-    }
-    if (parsed.data.method === "alternate_phone" && !/^\+?[\d\s()-]{7,20}$/.test(parsed.data.phoneNumber ?? "")) {
-      return res.status(400).json({ error: "Enter the alternate phone number for this verification method." });
-    }
-
-    try {
-      await getMonoClient().request("/v3/lookup/bvn/verify", {
-        method: "POST",
-        sessionId: pending.sessionId,
-        body: {
-          method: parsed.data.method,
-          ...(parsed.data.method === "alternate_phone" ? { phone_number: parsed.data.phoneNumber } : {}),
-        },
-      });
-      return res.json({ success: true });
-    } catch (error) {
-      return providerFailure(res, error);
-    }
-  });
-
-  app.post("/api/mono/bvn/fetch-accounts", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
-    noStore(res);
-    const parsed = otpSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid OTP." });
-
-    const pending = getPendingBvnSession(req);
-    if (!pending) return res.status(400).json({ error: "This BVN lookup has expired. Start a new lookup." });
-
-    try {
-      const result = await getMonoClient().request<any>("/v3/lookup/bvn/details", {
-        method: "POST",
-        sessionId: pending.sessionId,
-        body: { otp: parsed.data.otp },
-      });
-      const accounts = normalizeBvnAccounts(result?.data);
-      delete req.session.monoBvnLookup;
-      return res.json({ accounts });
-    } catch (error) {
-      return providerFailure(res, error);
-    }
   });
 
   app.get("/api/mono/accounts", isAuthenticated, async (req: AuthenticatedRequest, res) => {
