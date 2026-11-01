@@ -10,7 +10,6 @@ interface PublicPassportData {
   confidenceLabel: string;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
   missingRequirements: string[];
-  legacyDataNotice: string | null;
   mode: string;
   scoreBreakdown: {
     availableFunds: number | null;
@@ -31,14 +30,6 @@ interface PublicPassportData {
     label: string;
     status: string;
     tier: number;
-  }[];
-  signals: {
-    signalType: string;
-    label: string;
-    country: string;
-    currencyCode: string;
-    normalizedValue: string | null;
-    verificationStatus: string;
   }[];
 }
 
@@ -213,12 +204,6 @@ export default function PublicPassport() {
             </div>
           </div>
         </div>
-
-        {data.legacyDataNotice && (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-900">
-            {data.legacyDataNotice}
-          </div>
-        )}
 
         {data.missingRequirements.length > 0 && (
           <div className="bg-white rounded-2xl border border-amber-200 p-6">

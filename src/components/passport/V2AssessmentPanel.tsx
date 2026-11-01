@@ -5,6 +5,7 @@ import { API_BASE_URL } from "@/lib/api-base";
 import { useToast } from "@/hooks/use-toast";
 import type { V2AssessmentInput } from "@shared/schema";
 import MonoBankDataPanel from "@/components/passport/MonoBankDataPanel";
+import AssessmentStep from "@/components/passport/AssessmentStep";
 
 interface BaselineOption {
   id: string;
@@ -342,9 +343,14 @@ export default function V2AssessmentPanel() {
         </div>
       </Card>
 
-      <Card title="Required Interswitch credit history">
+      <AssessmentStep
+        id="assessment-credit-check"
+        step={3}
+        title="Credit check"
+        description="Required for a complete Cush Score and requires separate BVN consent."
+      >
         <p className="text-xs leading-relaxed text-slate-600">
-          An Interswitch credit-history lookup is required to complete a Cush Score. This lookup requires your BVN. It is sent to
+          A credit-history lookup is required to complete a Cush Score. This lookup requires your BVN. It is sent to
           Interswitch only after separate consent, used for the request, and not stored by Cush. Cush stores only aggregate status
           counts from the latest result; names, addresses, BVNs, institution names, balances, dates, and the raw report are not stored.
         </p>
@@ -371,9 +377,9 @@ export default function V2AssessmentPanel() {
                   are explicitly confirmed.
                 </p>
               )}
-            {!interswitchStatusQuery.data?.configured &&
+              {!interswitchStatusQuery.data?.configured &&
               interswitchStatusQuery.data?.providerReadiness?.mode !== "production" && (
-                <p className="text-amber-800">Interswitch server settings are incomplete or no supported environment is configured.</p>
+                <p className="text-amber-800">Credit-check provider settings are incomplete or no supported environment is configured.</p>
               )}
             {interswitchStatusQuery.data?.providerReadiness?.mode === "sandbox" && (
               <p className="text-blue-800">
@@ -384,15 +390,15 @@ export default function V2AssessmentPanel() {
             {interswitchStatusQuery.data?.configured &&
               interswitchStatusQuery.data?.providerReadiness?.mode === "production" && (
                 <p className="text-amber-800">
-                  Production readiness flags are enabled. Keep written Interswitch confirmation for the mapping, identity-match rule,
+                  Production readiness flags are enabled. Keep written provider confirmation for the mapping, identity-match rule,
                   and inquiry/cost effects.
                 </p>
               )}
             {!interswitchStatusQuery.data?.consentSchemaReady && (
-              <p className="text-amber-800">The consent table is not installed. Apply the Interswitch consent migration before requesting a report.</p>
+              <p className="text-amber-800">The consent table is not installed. Apply the consent migration before requesting a report.</p>
             )}
             {!interswitchStatusQuery.data?.evidenceSchemaReady && (
-              <p className="text-amber-800">The credit-history scoring schema is incomplete. Apply both Interswitch credit-history migrations in order.</p>
+              <p className="text-amber-800">The credit-history scoring schema is incomplete. Apply both credit-history migrations in order.</p>
             )}
           </div>
         )}
@@ -455,7 +461,7 @@ export default function V2AssessmentPanel() {
           <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold text-slate-800">
-                Provider supplied · Interswitch · {new Date((creditHistoryResult ?? interswitchStatusQuery.data?.latest)!.fetchedAt).toLocaleString()}
+                Provider supplied · {new Date((creditHistoryResult ?? interswitchStatusQuery.data?.latest)!.fetchedAt).toLocaleString()}
               </p>
             </div>
             {(() => {
@@ -491,7 +497,7 @@ export default function V2AssessmentPanel() {
             })()}
           </div>
         )}
-      </Card>
+      </AssessmentStep>
 
       {view.calculation.confidenceBreakdown && view.calculation.confidenceScore !== null && (
         <Card title={`Confidence: ${view.calculation.confidenceScore}/100 · ${view.calculation.confidenceBand ? `${view.calculation.confidenceBand[0].toUpperCase()}${view.calculation.confidenceBand.slice(1)}` : "Pending"}`}>

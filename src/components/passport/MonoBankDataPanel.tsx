@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Building2, Link2, ShieldCheck } from "lucide-react";
+import { AlertCircle, ShieldCheck } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
+import AssessmentStep from "@/components/passport/AssessmentStep";
 
 interface MonoStatus {
   configured: boolean;
@@ -248,16 +249,16 @@ export default function MonoBankDataPanel() {
 
   return (
     <div className="space-y-4">
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-blue-50 p-2 text-blue-700"><Building2 className="h-5 w-5" /></div>
-          <div>
-            <h3 className="font-bold text-slate-900">Find bank accounts with BVN</h3>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              Mono sends an OTP to a contact method already registered with the BVN. Account numbers are masked here and lookup results are not saved by Cush.
-            </p>
-          </div>
-        </div>
+      <AssessmentStep
+        id="assessment-bank-accounts"
+        step={1}
+        title="Find bank accounts with BVN"
+        description="Identify accounts linked to your BVN. This is separate from connecting an account for statements."
+        defaultOpen
+      >
+        <p className="text-xs leading-relaxed text-slate-600">
+          Mono sends an OTP to a contact method already registered with the BVN. Account numbers are masked here and lookup results are not saved by Cush.
+        </p>
 
         <label className="block text-xs font-medium text-slate-600">
           BVN
@@ -372,21 +373,20 @@ export default function MonoBankDataPanel() {
             <p className="text-xs text-slate-500">This temporary result clears when you leave or refresh this page. It does not connect the bank for statements.</p>
           </div>
         )}
-      </section>
+      </AssessmentStep>
 
-      <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700"><Link2 className="h-5 w-5" /></div>
-          <div>
-            <h3 className="font-bold text-slate-900">Connect a bank for statements</h3>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              BVN lookup only identifies accounts. Use Mono Connect to authorize access to account data and request statements. Raw statements are not retained; importing saves only reviewed monthly aggregates and exchange-rate provenance.
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-600">
-              Review a connected statement to add selected balance, recurring income, and expenses to V2. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.
-            </p>
-          </div>
-        </div>
+      <AssessmentStep
+        id="assessment-bank-statements"
+        step={2}
+        title="Connect a bank for statements"
+        description="Authorize account access, then review statement activity for your assessment."
+      >
+        <p className="text-xs leading-relaxed text-slate-600">
+          BVN lookup only identifies accounts. Use Mono Connect to authorize access to account data and request statements. Raw statements are not retained; importing saves only reviewed monthly aggregates and exchange-rate provenance.
+        </p>
+        <p className="text-xs leading-relaxed text-slate-600">
+          Review a connected statement to add selected balance, recurring income, and expenses to V2. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.
+        </p>
 
         {statusQuery.isError && <p className="text-xs text-red-700" role="alert">Could not check Mono setup. Refresh this section and try again.</p>}
         {!setupReady && (
@@ -680,7 +680,7 @@ export default function MonoBankDataPanel() {
             </button>
           </div>
         )}
-      </section>
+      </AssessmentStep>
     </div>
   );
 }

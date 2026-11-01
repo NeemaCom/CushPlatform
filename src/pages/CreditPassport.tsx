@@ -10,10 +10,9 @@ import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import {
-  Globe2, TrendingUp, ChevronRight,
-  Trash2, Link2,
+  ChevronRight, Link2,
   BadgeCheck, AlertCircle,
-  Plane, MapPin, Copy, Eye, EyeOff, FileText, Users,
+  Plane, MapPin, Copy, Eye, EyeOff, Users,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -25,7 +24,6 @@ interface PassportData {
     confidenceScore: number | null; mode: string;
     assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
     algorithmVersion: string; missingRequirements: string[];
-    legacyDataNotice: string | null;
     shareToken: string | null;
     scoreBreakdown: {
       availableFunds: number | null; incomeStrength: number | null;
@@ -37,22 +35,8 @@ interface PassportData {
     } | null;
     reasonCodes: string[] | null; lastUpdated: string | null; generatedAt: string | null;
   };
-  signals: Signal[];
-}
-interface Signal {
-  id: number; signalType: string; label: string; rawAmountCents: number;
-  currencyCode: string; country: string; normalizedValue: string | null;
-  verificationStatus: string; period: string;
 }
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SIGNAL_TYPES = [
-  { value: "income",    label: "Monthly Income",       color: "text-blue-600 bg-blue-50" },
-  { value: "surplus",   label: "Monthly Surplus",      color: "text-emerald-600 bg-emerald-50" },
-  { value: "transfer",  label: "Max Single Transfer",  color: "text-violet-600 bg-violet-50" },
-  { value: "stability", label: "Stability Indicator",  color: "text-amber-600 bg-amber-50" },
-];
-const CONFETTI_COLORS = ["#2563eb","#10b981","#7c3aed","#f59e0b","#ef4444","#06b6d4","#ec4899"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -319,7 +303,6 @@ export default function CreditPassport() {
   const qc = useQueryClient();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<"signals" | "assessment">("assessment");
   const [monoCodePending, setMonoCodePending] = useState(false);
   const monoCodeProcessed = useRef(false);
 
@@ -328,7 +311,6 @@ export default function CreditPassport() {
     const monoCode = callbackUrl.searchParams.get("code");
     if (!monoCode || monoCodeProcessed.current) return;
     monoCodeProcessed.current = true;
-    setActiveTab("assessment");
     setMonoCodePending(true);
     callbackUrl.searchParams.delete("code");
     window.history.replaceState({}, "", `${callbackUrl.pathname}${callbackUrl.search}${callbackUrl.hash}`);
@@ -346,10 +328,6 @@ export default function CreditPassport() {
   const { data, isLoading } = useQuery<PassportData>({
     queryKey: ["/api/passport/me"],
     queryFn: () => apiRequest("GET", "/api/passport/me"),
-  });
-  const deleteSignalMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/passport/signals/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/passport/me"] }),
   });
   const toggleModeMutation = useMutation({
     mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
@@ -385,7 +363,7 @@ export default function CreditPassport() {
     );
   }
 
-  const { passport, signals = [] } = data ?? {
+  const { passport } = data ?? {
     passport: {
       id: 0,
       score: null,
@@ -396,7 +374,6 @@ export default function CreditPassport() {
       assessmentStatus: "not_started" as const,
       algorithmVersion: "2.2.0",
       missingRequirements: [],
-      legacyDataNotice: null,
       mode: "pre_arrival",
       shareToken: null,
       scoreBreakdown: null,
@@ -405,7 +382,6 @@ export default function CreditPassport() {
       lastUpdated: null,
       generatedAt: null,
     },
-    signals: [],
   };
   const breakdown = passport.scoreBreakdown ?? {
     availableFunds: null,
@@ -544,9 +520,6 @@ export default function CreditPassport() {
                           passport.assessmentStatus === "provisional" ? "Provisional assessment" :
                             passport.assessmentStatus === "complete" ? "Assessment complete" : "Assessment incomplete"}
                       </p>
-                      {passport.legacyDataNotice && (
-                        <p className="text-xs text-amber-800 mt-1">{passport.legacyDataNotice}</p>
-                      )}
                       {passport.missingRequirements.length > 0 && (
                         <ul className="mt-2 space-y-1 list-disc pl-4 text-xs text-amber-800">
                           {passport.missingRequirements.map((requirement) => (
@@ -587,105 +560,16 @@ export default function CreditPassport() {
               </div>
             </motion.div>
 
-            {/* Tab bar */}
-            <nav className="grid w-full grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 sm:flex sm:w-fit" aria-label="Dashboard sections">
-              {([
-                { key: "assessment", label: "Assessment", icon: FileText },
-                { key: "signals", label: "Legacy signals", icon: Globe2 },
-              ] as const).map(({ key, label, icon: Icon }) => (
-                <motion.button key={key} whileTap={{ scale: 0.95 }} onClick={() => setActiveTab(key)}
-                  type="button"
-                  aria-pressed={activeTab === key}
-                  className={`flex w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-all sm:w-auto sm:px-4 ${
-                    activeTab === key ? "bg-white text-[#2926a5] shadow-sm" : "text-slate-500 hover:text-slate-700"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />{label}
-                </motion.button>
-              ))}
-            </nav>
-
-            {/* Assessment / Signals panels */}
-            <AnimatePresence mode="wait" initial={false}>
-              {activeTab === "signals" ? (
-                <motion.div key="signals"
-                  initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }}
-                  transition={{ duration: 0.2 }}
-                  className="space-y-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="font-bold text-slate-900 text-base">Legacy financial signals</h2>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Kept for reference only; these older declarations do not affect the current V2 score.
-                      </p>
-                    </div>
-                  </div>
-
-                  {signals.length === 0 ? (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                      className="text-center py-10 bg-white rounded-2xl border border-dashed border-slate-200">
-                      <Globe2 className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-700">No legacy signals</p>
-                      <p className="text-xs text-slate-500 mt-1">Current assessments use reviewed Mono account data and the required provider credit-history flow.</p>
-                    </motion.div>
-                  ) : (
-                    <div className="space-y-2">
-                      <AnimatePresence>
-                        {signals.map((signal) => {
-                          const st = SIGNAL_TYPES.find((t) => t.value === signal.signalType);
-                          const amt = (signal.rawAmountCents / 100).toLocaleString("en-GB", { maximumFractionDigits: 0 });
-                          return (
-                            <motion.div key={signal.id}
-                              initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 20, height: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="flex items-center justify-between gap-3 px-4 py-3 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition-all"
-                            >
-                              <div className="flex items-center gap-3 min-w-0">
-                                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${st?.color ?? "bg-slate-100 text-slate-600"}`}>
-                                  <TrendingUp className="w-3.5 h-3.5" />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-slate-800 truncate">{signal.label}</p>
-                                  <p className="text-xs text-slate-400">{signal.currencyCode} {amt} / {signal.period} · {signal.country}</p>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                                  signal.verificationStatus === "VERIFIED" ? "bg-emerald-50 text-emerald-700" :
-                                  signal.verificationStatus === "PENDING_REVIEW" ? "bg-amber-50 text-amber-700" :
-                                  "bg-slate-100 text-slate-500"
-                                }`}>
-                                  {signal.verificationStatus === "VERIFIED" ? "Verified" :
-                                   signal.verificationStatus === "PENDING_REVIEW" ? "Pending" : "Self-Reported"}
-                                </span>
-                                <motion.button whileTap={{ scale: 0.9 }}
-                                  onClick={() => deleteSignalMutation.mutate(signal.id)}
-                                  disabled={deleteSignalMutation.isPending}
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                </motion.button>
-                              </div>
-                            </motion.div>
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div key="assessment" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                  <div>
-                      <h2 className="font-bold text-slate-900 text-base">Your assessment</h2>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        Connect and review bank activity through Mono. The required credit-history check uses a separate provider flow.
-                      </p>
-                  </div>
-                  {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
-                  <V2AssessmentPanel />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <section id="assessment-tasks" className="space-y-4">
+              <div>
+                <h2 className="font-bold text-slate-900 text-base">Your assessment</h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Complete the three supported steps below. Your score updates as eligible evidence is reviewed.
+                </p>
+              </div>
+              {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
+              <V2AssessmentPanel />
+            </section>
           </div>
 
           {/* ── Right Sidebar ────────────────────────────────────────────── */}
@@ -730,7 +614,7 @@ export default function CreditPassport() {
               </p>
               <button
                 type="button"
-                onClick={() => setActiveTab("assessment")}
+                onClick={() => document.getElementById("assessment-tasks")?.scrollIntoView({ behavior: "smooth" })}
                 className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#2926a5] transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2926a5]"
               >
                 Open assessment <ChevronRight className="h-4 w-4" aria-hidden="true" />

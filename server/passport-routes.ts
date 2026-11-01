@@ -52,6 +52,12 @@ function applyV2Calculation<T extends mem.MemPassport>(
   };
 }
 
+function omitLegacyDataNotice<T extends { legacyDataNotice: unknown }>(passport: T) {
+  const userFacingPassport = { ...passport };
+  delete (userFacingPassport as Partial<T>).legacyDataNotice;
+  return userFacingPassport;
+}
+
 // ─── Route Registration ──────────────────────────────────────────────────────
 
 export function registerPassportRoutes(app: Express) {
@@ -64,19 +70,17 @@ export function registerPassportRoutes(app: Express) {
       const storedPassport = initialPassport.lastUpdated
         ? initialPassport
         : mem.recalculatePassport(initialPassport.id, userId);
-      const signals = mem.getPassportSignals(storedPassport.id);
       const evidence = mem.getPassportEvidence(storedPassport.id).map(toEvidenceMetadata);
       try {
         const assessment = await getV2Assessment(userId);
         return res.json({
-          passport: applyV2Calculation(storedPassport, assessment.calculation),
-          signals,
+          passport: omitLegacyDataNotice(applyV2Calculation(storedPassport, assessment.calculation)),
           evidence,
           v2SchemaReady: true,
         });
       } catch (error) {
         if (!isV2SchemaMissing(error)) throw error;
-        return res.json({ passport: storedPassport, signals, evidence, v2SchemaReady: false });
+        return res.json({ passport: omitLegacyDataNotice(storedPassport), evidence, v2SchemaReady: false });
       }
     } catch (err) {
       console.error("GET /api/passport/me error:", err);
@@ -368,15 +372,6 @@ export function registerPassportRoutes(app: Express) {
         tier: e.tier,
       }));
 
-      const signals = mem.getPassportSignals(passport.id).map((s) => ({
-        signalType: s.signalType,
-        label: s.label,
-        country: s.country,
-        currencyCode: s.currencyCode,
-        normalizedValue: s.normalizedValue,
-        verificationStatus: s.verificationStatus,
-      }));
-
       const confidence = passport.confidenceScore === null
         ? { label: "Pending", color: "text-slate-400" }
         : normalizationService.getConfidenceLabel(passport.confidenceScore);
@@ -390,13 +385,11 @@ export function registerPassportRoutes(app: Express) {
         algorithmVersion: passport.algorithmVersion,
         missingRequirements: passport.missingRequirements,
         weightedContributions: passport.weightedContributions,
-        legacyDataNotice: passport.legacyDataNotice,
         mode: passport.mode,
         scoreBreakdown: passport.scoreBreakdown,
         reasonCodes: passport.reasonCodes ?? [],
         lastUpdated: passport.lastUpdated,
         evidence,
-        signals,
       });
     } catch (err) {
       console.error("GET /api/passport/public/:token error:", err);
