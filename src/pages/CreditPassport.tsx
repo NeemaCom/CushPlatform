@@ -79,8 +79,9 @@ function ScoreRing({
 }) {
   const availableScore = score ?? provisionalScore;
   const displayScore = useCountUp(availableScore ?? 0);
-  const r = 70, circ = 2 * Math.PI * r;
-  const scoreHue = availableScore === null ? null : Math.round(Math.max(0, Math.min(1000, availableScore)) / 1000 * 120);
+  const scoreProgress = availableScore === null ? 0 : Math.max(0, Math.min(1000, availableScore)) / 1000;
+  const r = 76, circ = 2 * Math.PI * r;
+  const scoreHue = availableScore === null ? null : Math.round(scoreProgress * 120);
   const scoreColor = scoreHue === null ? "#94a3b8" : `hsl(${scoreHue} 72% 42%)`;
   const statusLabel = {
     not_started: "Not started",
@@ -88,51 +89,110 @@ function ScoreRing({
     provisional: "Provisional",
     complete: "Complete",
   }[assessmentStatus];
+  const statusStyle = {
+    not_started: "border-slate-200 bg-slate-50 text-slate-600",
+    incomplete: "border-amber-200 bg-amber-50 text-amber-800",
+    provisional: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    complete: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  }[assessmentStatus];
   const confidenceLabel = confidence === null
-    ? "Confidence pending"
+    ? "Pending"
     : confidence >= 70
-      ? "High confidence"
+      ? "High"
       : confidence >= 40
-        ? "Medium confidence"
-        : "Low confidence";
-  const confidenceColor = confidence === null
-    ? "text-slate-400"
+        ? "Medium"
+        : "Low";
+  const confidenceStyle = confidence === null
+    ? "border-slate-200 bg-white text-slate-500"
     : confidence >= 70
-      ? "text-emerald-600"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
       : confidence >= 40
-        ? "text-amber-600"
-        : "text-slate-500";
+        ? "border-amber-200 bg-amber-50 text-amber-700"
+        : "border-rose-200 bg-rose-50 text-rose-700";
 
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative">
-        <svg width="168" height="168" viewBox="0 0 168 168" className="rotate-[-90deg]">
-          <circle cx="84" cy="84" r={r} fill="none" stroke="#f1f5f9" strokeWidth="12" />
+    <div className="flex w-full shrink-0 flex-col items-center gap-3.5 sm:w-[240px]">
+      <div className="text-center">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-indigo-600">Cush score</p>
+        <p className="mt-0.5 text-[11px] text-slate-500">Your current assessment</p>
+      </div>
+
+      <div className="relative h-[188px] w-[188px]">
+        <div
+          aria-hidden="true"
+          className="absolute inset-5 rounded-full opacity-20 blur-2xl"
+          style={{ backgroundColor: scoreColor }}
+        />
+        <svg
+          width="188"
+          height="188"
+          viewBox="0 0 188 188"
+          className="relative -rotate-90 drop-shadow-sm"
+          role="img"
+          aria-label={availableScore === null
+            ? `Cush score ${statusLabel.toLowerCase()}`
+            : `Cush score ${displayScore} out of 1000, ${statusLabel.toLowerCase()}`}
+        >
+          <circle cx="94" cy="94" r={r} fill="none" stroke="#e9edf5" strokeWidth="14" />
           <motion.circle
-            cx="84" cy="84" r={r} fill="none" strokeWidth="12" strokeLinecap="round"
+            cx="94" cy="94" r={r} fill="none" strokeWidth="14" strokeLinecap="round"
             strokeDasharray={circ}
             animate={{
-              strokeDashoffset: availableScore === null ? circ : circ * (1 - availableScore / 1000),
+              strokeDashoffset: circ * (1 - scoreProgress),
               stroke: scoreColor,
             }}
             transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1] }}
           />
+          <circle cx="94" cy="94" r="64" fill="none" stroke="#f8fafc" strokeWidth="1.5" />
         </svg>
 
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 pointer-events-none">
-          <span className="text-[2.5rem] font-black leading-none text-slate-700">
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-[2.8rem] font-extrabold leading-none tracking-tight text-slate-900">
             {availableScore === null ? "—" : displayScore}
           </span>
-          <span className="text-xs text-slate-400 font-medium">/ 1000</span>
-          <span className="text-xs font-bold mt-1 text-slate-600">{statusLabel}</span>
+          <span className="mt-1 text-[11px] font-semibold tracking-wide text-slate-500">OUT OF 1,000</span>
+          <span className={`mt-2 rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusStyle}`}>
+            {statusLabel}
+          </span>
         </div>
       </div>
 
-      <div className={`text-xs font-semibold ${confidenceColor} flex items-center gap-1.5`}>
-        {confidence !== null && <BadgeCheck className="w-3.5 h-3.5" />}
-        {confidence === null ? confidenceLabel : `${confidenceLabel} · ${confidence}/100`}
+      <div className="w-full max-w-[232px] rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/90 via-white to-violet-50/80 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+              <BadgeCheck className="h-4 w-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-800">Confidence</p>
+              <p className="text-[10px] text-slate-500">Evidence quality</p>
+            </div>
+          </div>
+          <span className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-bold ${confidenceStyle}`}>
+            {confidenceLabel}
+          </span>
+        </div>
+        <div
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-indigo-100"
+          role="progressbar"
+          aria-label="Confidence in the evidence"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          {...(confidence === null ? {} : { "aria-valuenow": confidence })}
+        >
+          <motion.div
+            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+            initial={false}
+            animate={{ width: `${confidence ?? 0}%` }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          />
+        </div>
+        <p className="mt-2 text-[10px] leading-snug text-slate-500">
+          {confidence === null ? "Calculated as evidence is reviewed" : `${confidence}/100 · How complete and reliable your evidence is`}
+        </p>
       </div>
-      <div className="text-center text-xs text-slate-500" aria-live="polite">
+      <div className="flex items-center gap-1.5 text-center text-[11px] font-medium text-slate-500" aria-live="polite">
+        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" aria-hidden="true" />
         {scoreCoveragePercent}% assessment progress
       </div>
     </div>
