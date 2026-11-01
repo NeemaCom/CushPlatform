@@ -131,9 +131,9 @@ export function AccountDropdown({ user, onSignOut }: AccountDropdownProps) {
         side="bottom"
         sideOffset={10}
         collisionPadding={12}
-        className="z-50 w-[min(21rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-[#dce6f0] bg-[#fbfdff] p-0 text-[#263b54] shadow-[0_18px_48px_-20px_rgba(24,55,91,0.32)]"
+        className="z-50 flex w-[min(21rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-2xl border border-[#dce6f0] bg-[#fbfdff] p-0 text-[#263b54] shadow-[0_18px_48px_-20px_rgba(24,55,91,0.32)]"
       >
-        <div className="bg-[linear-gradient(135deg,#f2f7fc_0%,#fbfdff_75%)] px-4 pb-3.5 pt-4">
+        <div className="shrink-0 bg-[linear-gradient(135deg,#f2f7fc_0%,#fbfdff_75%)] px-4 pb-3.5 pt-4">
           <div className="flex min-w-0 items-center gap-3">
             <Avatar className="h-11 w-11 shrink-0 border-2 border-white bg-[#e5eef8] shadow-sm">
               <AvatarImage src={user.profilePicture || undefined} alt={`${displayName} profile photo`} />
@@ -170,7 +170,7 @@ export function AccountDropdown({ user, onSignOut }: AccountDropdownProps) {
         </div>
 
         <DropdownMenuSeparator className="my-0 bg-[#e6edf4]" />
-        <div className="max-h-[min(65vh,30rem)] overflow-y-auto px-2 py-2">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
           <DropdownMenuGroup>
             <DropdownMenuLabel className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#8292a6]">
               Your Cush profile
@@ -196,10 +196,10 @@ export function AccountDropdown({ user, onSignOut }: AccountDropdownProps) {
         </div>
 
         <DropdownMenuSeparator className="my-0 bg-[#e6edf4]" />
-        <div className="p-2">
+        <div className="shrink-0 border-t border-[#e6edf4] bg-[#fbfdff] p-2">
           <DropdownMenuItem
             onSelect={() => onSignOut()}
-            className="flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-2.5 text-[13px] font-medium text-[#8c4a4a] outline-none transition-colors hover:bg-[#fbf0ef] hover:text-[#793c3c] focus:bg-[#fbf0ef] focus:text-[#793c3c] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#d99b96]"
+            className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm font-semibold text-[#8c4a4a] outline-none transition-colors hover:bg-[#fbf0ef] hover:text-[#793c3c] focus:bg-[#fbf0ef] focus:text-[#793c3c] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#d99b96]"
           >
             <LogOut className="h-4 w-4 text-[#a66a67]" aria-hidden="true" />
             <span>Sign Out</span>
