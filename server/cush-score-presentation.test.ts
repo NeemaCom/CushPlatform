@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CushScoreResult } from "./cush-score-service";
-import { FLAT_UK_BASELINE, toCustomerCalculation } from "./cush-score-presentation";
+import { toCustomerCalculation } from "./cush-score-presentation";
+
+const testBaseline = {
+  destination: "United Kingdom",
+  monthlyBaselinePence: 100_000,
+  effectiveDate: "2026-11-01",
+  countryCode: "GB",
+};
 
 const calculation: CushScoreResult = {
   algorithmVersion: "test",
@@ -32,19 +39,11 @@ const calculation: CushScoreResult = {
   missingRequirements: ["Connect a bank for statements"],
   assessmentContext: {
     individualUserId: 7,
-    destinationBaseline: FLAT_UK_BASELINE,
+    destinationBaseline: testBaseline,
   },
 };
 
 describe("customer score presentation", () => {
-  it("uses a flat £1,000 UK baseline", () => {
-    expect(FLAT_UK_BASELINE).toMatchObject({
-      destination: "United Kingdom",
-      monthlyBaselinePence: 100_000,
-      countryCode: "GB",
-    });
-  });
-
   it("keeps the overall score and progress while withholding component details", () => {
     const customerView = toCustomerCalculation(calculation);
 

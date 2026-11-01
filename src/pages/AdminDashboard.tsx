@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin";
+import CushUserScoreReview from "@/components/passport/CushUserScoreReview";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
 
@@ -102,10 +103,11 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "scoring-policy" | "evidence-freshness">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "scoring-policy" | "evidence-freshness" | "score-review">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
+  const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
   const hasEvidenceFreshnessManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessManage);
   const overviewQuery = useQuery<AdminOverview>({
@@ -203,6 +205,20 @@ export default function AdminDashboard() {
               Evidence freshness
             </button>
           )}
+          {hasScoreBreakdownAccess && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("score-review")}
+              aria-current={activeSection === "score-review" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "score-review"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              User score review
+            </button>
+          )}
         </nav>
         {activeSection === "scoring-policy" ? (
           <section aria-labelledby="scoring-policy-heading">
@@ -215,6 +231,15 @@ export default function AdminDashboard() {
           </section>
         ) : activeSection === "evidence-freshness" ? (
           <EvidenceFreshnessAdmin canManage={hasEvidenceFreshnessManage} />
+        ) : activeSection === "score-review" ? (
+          <section aria-labelledby="score-review-heading">
+            <div className="mb-5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#82847d]">Cush Passport · Admin</p>
+              <h1 id="score-review-heading" className="mt-1 text-2xl font-semibold tracking-tight text-[#24252a]">User score review</h1>
+              <p className="mt-2 text-sm text-[#6f706f]">Inspect score components and confidence for one account at a time.</p>
+            </div>
+            <CushUserScoreReview />
+          </section>
         ) : (
           <>
         <section className="relative overflow-hidden rounded-2xl border border-[#343279] bg-[#29266f] px-6 py-7 text-[#f7f6f1] sm:px-8 sm:py-8">

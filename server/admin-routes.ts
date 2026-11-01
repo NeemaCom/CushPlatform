@@ -13,14 +13,23 @@ import {
   users,
 } from "@shared/schema";
 import { db } from "./db";
-import { isAuthenticated, requireAdminPermission, type AuthenticatedRequest } from "./auth";
+import {
+  isAuthenticated,
+  requireAdminPermission,
+  requireTrustedAdminOrigin,
+  type AuthenticatedRequest,
+} from "./auth";
 import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
 import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
 import { normalizedCreditHistorySchema } from "./interswitch-credit-history-scoring";
+import { getAdminV2Assessment, isV2SchemaMissing } from "./cush-score-v2";
 
 const allowedRanges = [7, 30, 90] as const;
 const evidenceReviewSchema = z.object({
   sourceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+}).strict();
+const scoreBreakdownLookupSchema = z.object({
+  email: z.string().trim().email().max(254),
 }).strict();
 
 function isMissingEvidenceReviewSchema(error: unknown): boolean {
@@ -35,6 +44,62 @@ function isMissingEvidenceReviewSchema(error: unknown): boolean {
 }
 
 export function registerAdminRoutes(app: Express): void {
+  app.post(
+    "/api/admin/score-breakdown",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.scoreBreakdownRead),
+    requireTrustedAdminOrigin,
+    async (req: AuthenticatedRequest, res) => {
+      const parsed = scoreBreakdownLookupSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Enter a valid account email address." });
+      }
+      const email = parsed.data.email.toLowerCase();
+      try {
+        const [user] = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        }).from(users).where(eq(users.email, email)).limit(1);
+        if (!user) return res.status(404).json({ error: "No account was found for that email." });
+
+        const assessment = await getAdminV2Assessment(user.id);
+        await recordAdminAuditEvent(req, {
+          action: "admin.score_breakdown.read",
+          resourceType: "user_score_breakdown",
+          resourceId: user.id,
+        });
+        return res.json({
+          user: {
+            id: user.id,
+            email: user.email,
+            displayName: [user.firstName, user.lastName].filter(Boolean).join(" ") || "Cush user",
+          },
+          assessment,
+        });
+      } catch (error) {
+        if (isV2SchemaMissing(error)) {
+          return res.status(503).json({
+            code: "V2_SCHEMA_MISSING",
+            error: "V2 scoring data is not set up yet. Apply the required Supabase migrations first.",
+          });
+        }
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin score breakdown lookup failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to load the user's score breakdown." });
+      }
+    },
+  );
+
   app.get(
     "/api/admin/evidence-freshness/review-queue",
     isAuthenticated,

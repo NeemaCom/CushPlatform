@@ -1,11 +1,4 @@
-import type { CushScoreResult, DestinationBaseline } from "./cush-score-service";
-
-export const FLAT_UK_BASELINE: DestinationBaseline = {
-  destination: "United Kingdom",
-  monthlyBaselinePence: 100_000,
-  effectiveDate: "2026-11-01",
-  countryCode: "GB",
-};
+import type { CushScoreResult } from "./cush-score-service";
 
 export type CustomerCalculation = Omit<
   CushScoreResult,

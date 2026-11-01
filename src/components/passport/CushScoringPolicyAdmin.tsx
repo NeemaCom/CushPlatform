@@ -7,7 +7,8 @@ import type { CushScorePolicyConfig } from "@shared/schema";
 
 const FLAT_BASELINE_ID = "00000000-0000-4000-8000-000000000003";
 const FLAT_BASELINE_EFFECTIVE_DATE = "2026-11-01";
-const FLAT_BASELINE_PROVENANCE = "Cush initial flat UK baseline";
+const FLAT_BASELINE_PENCE = 100_000;
+const FLAT_BASELINE_PROVENANCE = "Initial UK baseline; update rationale when reviewing.";
 
 type PolicyVersions = {
   active: null | {
@@ -25,6 +26,10 @@ type PolicyVersions = {
 };
 
 type PolicyFormState = {
+  baselineId: string;
+  baselineAmountPounds: string;
+  baselineEffectiveDate: string;
+  baselineProvenance: string;
   creditMappings: Record<"strong" | "average" | "poor" | "no_history", string>;
 };
 
@@ -49,13 +54,22 @@ const POLICY_CONFIDENCE_RULES: CushScorePolicyConfig["confidence"] = {
 
 function emptyForm(): PolicyFormState {
   return {
+    baselineId: FLAT_BASELINE_ID,
+    baselineAmountPounds: (FLAT_BASELINE_PENCE / 100).toFixed(2),
+    baselineEffectiveDate: FLAT_BASELINE_EFFECTIVE_DATE,
+    baselineProvenance: FLAT_BASELINE_PROVENANCE,
     creditMappings: { strong: "", average: "", poor: "", no_history: "" },
   };
 }
 
 function toForm(configuration?: CushScorePolicyConfig): PolicyFormState {
   if (!configuration) return emptyForm();
+  const baseline = configuration.destinationBaselines[0];
   return {
+    baselineId: baseline.id,
+    baselineAmountPounds: (baseline.monthlyBaselinePence / 100).toFixed(2),
+    baselineEffectiveDate: baseline.effectiveDate,
+    baselineProvenance: baseline.provenance,
     creditMappings: {
       strong: configuration.creditMappings.strong?.toString() ?? "",
       average: configuration.creditMappings.average?.toString() ?? "",
@@ -78,6 +92,25 @@ async function apiRequest<T>(method: string, path: string, body?: unknown): Prom
 }
 
 function makeConfiguration(form: PolicyFormState): CushScorePolicyConfig {
+  const amountText = form.baselineAmountPounds.trim();
+  if (!/^\d+(?:\.\d{1,2})?$/.test(amountText)) {
+    throw new Error("Enter the monthly baseline in pounds, using up to two decimal places.");
+  }
+  const monthlyBaselinePence = Math.round(Number(amountText) * 100);
+  if (!Number.isSafeInteger(monthlyBaselinePence) || monthlyBaselinePence <= 0) {
+    throw new Error("The monthly baseline must be a positive amount.");
+  }
+  const baselineEffectiveDate = form.baselineEffectiveDate.trim();
+  const parsedEffectiveDate = new Date(`${baselineEffectiveDate}T00:00:00.000Z`);
+  if (!Number.isFinite(parsedEffectiveDate.getTime()) ||
+      parsedEffectiveDate.toISOString().slice(0, 10) !== baselineEffectiveDate) {
+    throw new Error("Choose a valid effective date for the baseline.");
+  }
+  const baselineProvenance = form.baselineProvenance.trim();
+  if (!baselineProvenance || baselineProvenance.length > 500) {
+    throw new Error("Add a baseline rationale of up to 500 characters.");
+  }
+
   const creditMappings: CushScorePolicyConfig["creditMappings"] = {};
   for (const key of ["strong", "average", "poor", "no_history"] as const) {
     const value = form.creditMappings[key].trim();
@@ -91,13 +124,13 @@ function makeConfiguration(form: PolicyFormState): CushScorePolicyConfig {
 
   return {
     destinationBaselines: [{
-      id: FLAT_BASELINE_ID,
+      id: form.baselineId || FLAT_BASELINE_ID,
       destination: "United Kingdom",
-      monthlyBaselinePence: 100_000,
-      effectiveDate: FLAT_BASELINE_EFFECTIVE_DATE,
+      monthlyBaselinePence,
+      effectiveDate: baselineEffectiveDate,
       countryCode: "GB",
       currencyCode: "GBP",
-      provenance: FLAT_BASELINE_PROVENANCE,
+      provenance: baselineProvenance,
     }],
     creditMappings,
     confidence: POLICY_CONFIDENCE_RULES,
@@ -195,7 +228,7 @@ export default function CushScoringPolicyAdmin() {
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
         <p className="font-semibold">Admin-only scoring configuration</p>
         <p className="mt-1 text-xs leading-relaxed">
-          User calculations currently use a flat £1,000 monthly baseline across the UK. Credit mappings and confidence rules are versioned here. Saving creates a draft; activation changes scoring for all users.
+          Baseline, credit mappings, and confidence rules are saved together as a policy version. Saving creates a draft; only activating that reviewed version changes calculations for users.
         </p>
       </div>
 
@@ -227,9 +260,56 @@ export default function CushScoringPolicyAdmin() {
       </section>
 
       <section className="rounded-2xl border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 p-5">
-        <h3 className="font-bold text-violet-950">Flat UK computation baseline</h3>
-        <p className="mt-2 text-2xl font-extrabold text-violet-800">£1,000 <span className="text-sm font-semibold">per month</span></p>
-        <p className="mt-1 text-xs text-violet-800">The same individual baseline is used for every UK destination.</p>
+        <h3 className="font-bold text-violet-950">UK monthly computation baseline</h3>
+        <p className="mt-1 text-xs leading-relaxed text-violet-800">
+          This versioned value is used to normalize UK funds and income. It remains a draft until separately activated.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <NumberField
+            label="Monthly baseline (£)"
+            min={0.01}
+            step="0.01"
+            value={form.baselineAmountPounds}
+            onChange={(value) => setForm((current) => ({ ...current, baselineAmountPounds: value }))}
+          />
+          <label className="block text-xs font-medium text-slate-600">
+            Effective date
+            <input
+              type="date"
+              value={form.baselineEffectiveDate}
+              onChange={(event) => setForm((current) => ({ ...current, baselineEffectiveDate: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="block text-xs font-medium text-slate-600 sm:col-span-2">
+            Source or rationale
+            <input
+              type="text"
+              maxLength={500}
+              value={form.baselineProvenance}
+              onChange={(event) => setForm((current) => ({ ...current, baselineProvenance: event.target.value }))}
+              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+        <div className="mt-4 grid gap-2 text-xs text-violet-950 sm:grid-cols-2">
+          <p className="rounded-lg bg-white/70 px-3 py-2">
+            Active: {active
+              ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
+                  (active.configuration.destinationBaselines[0]?.monthlyBaselinePence ?? 0) / 100,
+                )
+              : "No active baseline"}
+            {active ? ` · v${active.version}` : ""}
+          </p>
+          <p className="rounded-lg bg-white/70 px-3 py-2">
+            Draft: {draft
+              ? new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP" }).format(
+                  (draft.configuration.destinationBaselines[0]?.monthlyBaselinePence ?? 0) / 100,
+                )
+              : "Not saved yet"}
+            {draft ? ` · v${draft.version}` : ""}
+          </p>
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">

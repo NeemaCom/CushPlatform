@@ -16,6 +16,7 @@ import {
 import { db } from "./db";
 import {
   calculateCushScore,
+  COMPONENT_WEIGHTS,
   CUSH_SCORE_VERSION,
   type CushScoreInput,
   type CushScoreResult,
@@ -23,7 +24,6 @@ import {
   type DestinationBaseline,
 } from "./cush-score-service";
 import {
-  FLAT_UK_BASELINE,
   toCustomerCalculation,
   type CustomerCalculation,
 } from "./cush-score-presentation";
@@ -33,6 +33,10 @@ import {
 } from "./interswitch-credit-history-scoring";
 import { interswitchCreditHistoryClient } from "./interswitch-credit-history-service";
 import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
+import {
+  selectVersionedDestinationBaseline,
+  type DestinationBaselinePolicy,
+} from "./cush-score-policy-selection";
 
 export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
   selectedBaselineId: null,
@@ -60,10 +64,6 @@ export class ScoringPolicyValidationError extends Error {}
 
 function asPolicyConfig(value: unknown): CushScorePolicyConfig {
   return cushScorePolicyConfigSchema.parse(value);
-}
-
-function baselineFor(): DestinationBaseline {
-  return FLAT_UK_BASELINE;
 }
 
 function engineInput(
@@ -332,7 +332,18 @@ async function loadActivePolicy() {
   return row ? { row, configuration: asPolicyConfig(row.configuration) } : null;
 }
 
-export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
+interface CalculatedV2Assessment {
+  calculation: CushScoreResult;
+  monoImports: Awaited<ReturnType<typeof loadMonoAssessmentData>>["imports"];
+  monoDataReady: boolean;
+  activePolicyVersion: number | null;
+  baselinePolicy: DestinationBaselinePolicy | null;
+}
+
+async function calculateV2AssessmentForUser(
+  userId: number,
+  now: Date,
+): Promise<CalculatedV2Assessment> {
   const [inputs, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
     loadStoredInputs(userId),
     loadActivePolicy(),
@@ -340,7 +351,19 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     loadCreditHistoryEvidence(userId),
     loadEvidenceFreshnessReviews(userId),
   ]);
-  const selectedBaseline = baselineFor();
+  const baselinePolicy = selectVersionedDestinationBaseline(
+    activePolicy?.configuration ?? null,
+    inputs.selectedBaselineId,
+    now.toISOString().slice(0, 10),
+  );
+  const selectedBaseline: DestinationBaseline | null = baselinePolicy
+    ? {
+        destination: baselinePolicy.destination,
+        monthlyBaselinePence: baselinePolicy.monthlyBaselinePence,
+        effectiveDate: baselinePolicy.effectiveDate,
+        countryCode: baselinePolicy.countryCode,
+      }
+    : null;
   const scoringPolicy: CushScorePolicy = activePolicy
     ? {
         creditMappings: activePolicy.configuration.creditMappings,
@@ -363,8 +386,19 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     scoringPolicy,
   );
   return {
-    calculation: toCustomerCalculation(calculation),
-    monoImports: monoData.imports.map(({ linkedAccountId, fetchedAt, statementPeriodMonths, evidence }) => ({
+    calculation,
+    monoImports: monoData.imports,
+    monoDataReady: monoData.monoDataReady,
+    activePolicyVersion: activePolicy?.row.version ?? null,
+    baselinePolicy,
+  };
+}
+
+export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
+  const result = await calculateV2AssessmentForUser(userId, now);
+  return {
+    calculation: toCustomerCalculation(result.calculation),
+    monoImports: result.monoImports.map(({ linkedAccountId, fetchedAt, statementPeriodMonths, evidence }) => ({
       linkedAccountId,
       fetchedAt: fetchedAt.toISOString(),
       statementPeriodMonths,
@@ -373,7 +407,42 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
       cashFlowMonths: evidence.cashFlowHistory.length,
     })),
     schemaReady: true,
-    monoDataReady: monoData.monoDataReady,
+    monoDataReady: result.monoDataReady,
+  };
+}
+
+const COMPONENT_PRESENTATION = [
+  { key: "availableFunds", label: "Available funds", weightPercent: COMPONENT_WEIGHTS.availableFunds * 100 },
+  { key: "incomeStrength", label: "Income strength", weightPercent: COMPONENT_WEIGHTS.incomeStrength * 100 },
+  { key: "cashFlow", label: "Cash-flow behaviour", weightPercent: COMPONENT_WEIGHTS.cashFlow * 100 },
+  { key: "creditHistory", label: "Credit history", weightPercent: COMPONENT_WEIGHTS.creditHistory * 100 },
+] as const;
+
+export async function getAdminV2Assessment(userId: number, now = new Date()) {
+  const result = await calculateV2AssessmentForUser(userId, now);
+  const { calculation } = result;
+  return {
+    algorithmVersion: calculation.algorithmVersion,
+    assessmentStatus: calculation.assessmentStatus,
+    score: calculation.cushScore,
+    provisionalScore: calculation.provisionalScore,
+    scoreCoveragePercent: calculation.scoreCoveragePercent,
+    scoredComponentCount: calculation.scoredComponentCount,
+    confidenceScore: calculation.confidenceScore,
+    confidenceBand: calculation.confidenceBand,
+    components: COMPONENT_PRESENTATION.map(({ key, label, weightPercent }) => ({
+      key,
+      label,
+      weightPercent,
+      score: calculation.componentScores[key],
+      weightedContribution: calculation.weightedContributions[key],
+    })),
+    confidenceBreakdown: calculation.confidenceBreakdown,
+    usableHistoryMonths: calculation.usableHistoryMonths,
+    missingRequirements: calculation.missingRequirements,
+    activePolicyVersion: result.activePolicyVersion,
+    baseline: result.baselinePolicy,
+    generatedAt: now.toISOString(),
   };
 }
 

@@ -178,7 +178,7 @@ export interface CushScoreResult {
   };
 }
 
-const COMPONENT_WEIGHTS = {
+export const COMPONENT_WEIGHTS = {
   availableFunds: 0.35,
   incomeStrength: 0.3,
   cashFlow: 0.2,
