@@ -20,19 +20,11 @@ import {
 interface PassportData {
   passport: {
     id: number; score: number | null; provisionalScore: number | null;
-    scoreCoveragePercent: number; scoredComponentCount: number;
+    scoreCoveragePercent: number;
     confidenceScore: number | null; mode: string;
     assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
     algorithmVersion: string; missingRequirements: string[];
     shareToken: string | null;
-    scoreBreakdown: {
-      availableFunds: number | null; incomeStrength: number | null;
-      cashFlow: number | null; creditHistory: number | null;
-    } | null;
-    weightedContributions: {
-      availableFunds: number | null; incomeStrength: number | null;
-      cashFlow: number | null; creditHistory: number | null;
-    } | null;
     reasonCodes: string[] | null; lastUpdated: string | null; generatedAt: string | null;
   };
 }
@@ -76,14 +68,12 @@ function ScoreRing({
   score,
   provisionalScore,
   scoreCoveragePercent,
-  scoredComponentCount,
   confidence,
   assessmentStatus,
 }: {
   score: number | null;
   provisionalScore: number | null;
   scoreCoveragePercent: number;
-  scoredComponentCount: number;
   confidence: number | null;
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
 }) {
@@ -143,7 +133,7 @@ function ScoreRing({
         {confidence === null ? confidenceLabel : `${confidenceLabel} · ${confidence}/100`}
       </div>
       <div className="text-center text-xs text-slate-500" aria-live="polite">
-        {scoredComponentCount}/4 components · {scoreCoveragePercent}% covered
+        {scoreCoveragePercent}% assessment progress
       </div>
     </div>
   );
@@ -369,29 +359,17 @@ export default function CreditPassport() {
       score: null,
       provisionalScore: null,
       scoreCoveragePercent: 0,
-      scoredComponentCount: 0,
       confidenceScore: null,
       assessmentStatus: "not_started" as const,
       algorithmVersion: "2.2.0",
       missingRequirements: [],
       mode: "pre_arrival",
       shareToken: null,
-      scoreBreakdown: null,
-      weightedContributions: null,
       reasonCodes: null,
       lastUpdated: null,
       generatedAt: null,
     },
   };
-  const breakdown = passport.scoreBreakdown ?? {
-    availableFunds: null,
-    incomeStrength: null,
-    cashFlow: null,
-    creditHistory: null,
-  };
-  // Determine slide direction for mode toggle
-  const modeDir = passport.mode === "post_arrival" ? 1 : -1;
-
   return (
     <div className="min-h-screen bg-slate-50">
 
@@ -438,7 +416,6 @@ export default function CreditPassport() {
                     score={passport.score}
                     provisionalScore={passport.provisionalScore}
                     scoreCoveragePercent={passport.scoreCoveragePercent}
-                    scoredComponentCount={passport.scoredComponentCount}
                     confidence={passport.confidenceScore}
                     assessmentStatus={passport.assessmentStatus}
                   />
@@ -466,48 +443,6 @@ export default function CreditPassport() {
                       </div>
                     </div>
 
-                    {/* Score breakdown with slide animation on mode change */}
-                    <AnimatePresence mode="wait" initial={false}>
-                      <motion.div
-                        key={passport.mode}
-                        initial={{ x: modeDir * 24, opacity: 0 }}
-                        animate={{ x: 0, opacity: 1 }}
-                        exit={{ x: -modeDir * 24, opacity: 0 }}
-                        transition={{ duration: 0.22, ease: "easeOut" }}
-                        className="space-y-3"
-                      >
-                        {[
-                          { label: "Available funds", key: "availableFunds" as const, value: breakdown.availableFunds, weight: "35%", color: "#2563eb" },
-                          { label: "Income strength", key: "incomeStrength" as const, value: breakdown.incomeStrength, weight: "30%", color: "#10b981" },
-                          { label: "Cash-flow behaviour", key: "cashFlow" as const, value: breakdown.cashFlow, weight: "20%", color: "#7c3aed" },
-                          { label: "Credit history", key: "creditHistory" as const, value: breakdown.creditHistory, weight: "15%", color: "#f59e0b" },
-                        ].map((bar) => (
-                          <div key={bar.label}>
-                            <div className="flex justify-between text-xs mb-1.5">
-                              <span className="text-slate-500 font-medium">{bar.label} <span className="text-slate-300">({bar.weight})</span></span>
-                              <span className="font-bold text-slate-800">
-                                {bar.value === null ? "Not available" : `${bar.value}/100`}
-                              </span>
-                            </div>
-                            <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                              <motion.div
-                                className="h-full rounded-full"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${bar.value ?? 0}%` }}
-                                transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-                                style={{ backgroundColor: bar.color }}
-                              />
-                            </div>
-                            {passport.weightedContributions?.[bar.key] !== null &&
-                              passport.weightedContributions?.[bar.key] !== undefined && (
-                                <p className="text-[11px] text-slate-400 mt-1">
-                                  Weighted contribution: {passport.weightedContributions[bar.key]}/1000
-                                </p>
-                              )}
-                          </div>
-                        ))}
-                      </motion.div>
-                    </AnimatePresence>
                   </div>
                 </div>
 
@@ -534,8 +469,8 @@ export default function CreditPassport() {
                 {/* Strength bar */}
                 <div className="mt-6 pt-5 border-t border-slate-100">
                   <div className="flex items-center justify-between text-xs mb-2">
-                    <span className="font-semibold text-slate-600">Scoring criteria progress</span>
-                    <span className="text-slate-400">{passport.scoreCoveragePercent}% weighted coverage</span>
+                    <span className="font-semibold text-slate-600">Assessment progress</span>
+                    <span className="text-slate-400">{passport.scoreCoveragePercent}%</span>
                   </div>
                   <div
                     className="h-2 bg-slate-100 rounded-full overflow-hidden"
@@ -554,7 +489,7 @@ export default function CreditPassport() {
                     />
                   </div>
                   <p className="mt-1.5 text-[11px] text-slate-500">
-                    The provisional score uses only supported components; missing components are excluded, not scored as zero.
+                    Your score updates as supported information is reviewed. Missing information is not treated as a zero.
                   </p>
                 </div>
               </div>
@@ -564,7 +499,7 @@ export default function CreditPassport() {
               <div>
                 <h2 className="font-bold text-slate-900 text-base">Your assessment</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Complete the three supported steps below. Your score updates as eligible evidence is reviewed.
+                  Complete the two steps below. Your score updates as eligible information is reviewed.
                 </p>
               </div>
               {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
@@ -594,7 +529,7 @@ export default function CreditPassport() {
                   { label: "Cush Score", value: passport.score !== null ? String(passport.score) : passport.provisionalScore !== null ? String(passport.provisionalScore) : "—", sub: passport.score !== null ? "/ 1000" : passport.provisionalScore !== null ? "Provisional" : "Incomplete", color: "text-[#2563eb]" },
                   { label: "Confidence", value: passport.confidenceScore === null ? "—" : `${passport.confidenceScore}/100`, sub: passport.confidenceScore === null ? "Pending" : "Evidence quality", color: "text-emerald-600" },
                   { label: "Mode",          value: passport.mode === "pre_arrival" ? "Pre" : "Post", sub: "Arrival", color: "text-violet-600" },
-                    { label: "Coverage", value: `${passport.scoreCoveragePercent}%`, sub: "Weighted", color: "text-[#342ca8]" },
+                    { label: "Progress", value: `${passport.scoreCoveragePercent}%`, sub: "Assessment", color: "text-[#342ca8]" },
                 ].map(({ label, value, sub, color }) => (
                   <div key={label} className="bg-slate-50 rounded-xl p-3 text-center">
                     <p className={`text-xl font-black ${color}`}>{value}</p>
@@ -609,8 +544,7 @@ export default function CreditPassport() {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">Your next steps</p>
               <h3 className="mt-2 text-lg font-bold">Build your Cush Score</h3>
               <p className="mt-2 text-sm leading-relaxed text-indigo-50">
-                Connect or manage bank data through Mono and review the statement. Complete the required credit-history check when
-                production lookup is enabled. Your provisional score updates as supported information is added.
+                Connect a bank for statements and complete the required Credit Check. Your score updates as supported information is reviewed.
               </p>
               <button
                 type="button"

@@ -71,7 +71,6 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
       const [latest] = readiness.evidenceSchemaReady
         ? await db.select({
             evidenceData: interswitchCreditHistoryEvidence.evidenceData,
-            mappingStatus: interswitchCreditHistoryEvidence.mappingStatus,
             mappingVersion: interswitchCreditHistoryEvidence.mappingVersion,
             fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
           }).from(interswitchCreditHistoryEvidence)
@@ -90,18 +89,12 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
       const sandboxResult = latest?.mappingVersion === INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION;
       return res.json({
         configured: providerReadiness.configured,
-        providerReadiness,
+        providerReadiness: {
+          mode: providerReadiness.mode,
+          configured: providerReadiness.configured,
+        },
         ...readiness,
         latest: latest ? {
-          evidence: latest.evidenceData,
-          mappingStatus: sandboxResult || !canScore
-            ? "draft_pending_review"
-            : scoring?.score !== null && scoring
-              ? "score_applied"
-              : "no_scoreable_history",
-          mappingVersion: latest.mappingVersion,
-          creditComponentScore: canScore ? scoring?.score ?? null : null,
-          scoreableInstallments: scoring?.scoreableInstallments ?? 0,
           scoreReason: sandboxResult
             ? "sandbox_not_scored"
             : !liveReady
@@ -125,7 +118,7 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
       const parsed = lookupSchema.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({
-          error: "Enter an 11-digit BVN and explicitly consent before requesting the Interswitch lookup.",
+          error: "Enter an 11-digit BVN and consent before requesting a credit check.",
         });
       }
       const bvn = parsed.data.bvn;
@@ -133,13 +126,13 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
       if (!interswitchCreditHistoryClient.isConfigured()) {
         return res.status(503).json({
           code: "INTERSWITCH_NOT_CONFIGURED",
-          error: "The Interswitch credit-history service is not configured.",
+          error: "Credit checks are not available in this environment.",
         });
       }
       if (!(await schemasReady())) {
         return res.status(503).json({
           code: "INTERSWITCH_EVIDENCE_SCHEMA_MISSING",
-          error: "Apply both Interswitch credit-history migrations in order before requesting a report.",
+          error: "Credit checks are temporarily unavailable. Please try again later.",
         });
       }
 
@@ -171,8 +164,13 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
           : scoring.score === null
             ? "no_scoreable_history"
             : "score_applied";
+        const scoreReason = mappingVersion === INTERSWITCH_CREDIT_HISTORY_SANDBOX_MAPPING_VERSION
+          ? "sandbox_not_scored"
+          : canScore
+            ? scoring.reason
+            : "not_scoreable";
         const fetchedAt = new Date();
-        const [stored] = await db.insert(interswitchCreditHistoryEvidence)
+        await db.insert(interswitchCreditHistoryEvidence)
           .values({
             userId: req.userId!,
             consentId,
@@ -190,32 +188,24 @@ export function registerInterswitchCreditHistoryRoutes(app: Express) {
               mappingVersion,
               fetchedAt,
             },
-          })
-          .returning({ id: interswitchCreditHistoryEvidence.id });
+          });
         return res.json({
-          provider: "Interswitch",
-          evidenceId: stored.id,
           fetchedAt: fetchedAt.toISOString(),
-          evidence,
-          mappingStatus,
-          mappingVersion,
-          creditComponentScore: canScore ? scoring.score : null,
-          scoreableInstallments: scoring.scoreableInstallments,
-          scoreReason: canScore ? scoring.reason : "sandbox_not_scored",
+          scoreReason,
           scoreApplied: canScore && scoring.score !== null,
         });
       } catch (error) {
         if (isMissingSchema(error)) {
           return res.status(503).json({
             code: "INTERSWITCH_EVIDENCE_SCHEMA_MISSING",
-            error: "Apply both Interswitch credit-history migrations in order before requesting a report.",
+            error: "Credit checks are temporarily unavailable. Please try again later.",
           });
         }
         const providerStatus = error instanceof InterswitchCreditHistoryError ? error.statusCode : undefined;
         if (providerStatus) res.setHeader("X-Provider-Status", String(providerStatus));
         return res.status(error instanceof InterswitchCreditHistoryError ? 502 : 503).json({
           code: "INTERSWITCH_CREDIT_HISTORY_FAILED",
-          error: "No usable credit-history result was saved. Try again later.",
+          error: "Your credit check could not be completed. Please try again later.",
         });
       }
     },

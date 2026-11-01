@@ -22,6 +22,11 @@ import {
   type DestinationBaseline,
 } from "./cush-score-service";
 import {
+  FLAT_UK_BASELINE,
+  toCustomerCalculation,
+  type CustomerCalculation,
+} from "./cush-score-presentation";
+import {
   INTERSWITCH_CREDIT_HISTORY_MAPPING_VERSION,
   creditAssessmentFromInterswitchEvidence,
 } from "./interswitch-credit-history-scoring";
@@ -36,8 +41,7 @@ export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
 };
 
 export interface V2AssessmentView {
-  inputs: V2AssessmentInput;
-  calculation: CushScoreResult;
+  calculation: CustomerCalculation;
   monoImports: Array<{
     linkedAccountId: number;
     fetchedAt: string;
@@ -45,19 +49,7 @@ export interface V2AssessmentView {
     balancePence: number | null;
     incomeMonths: number;
     cashFlowMonths: number;
-    sourceCurrencies: Array<"GBP" | "USD" | "NGN">;
-    fxRateSource: string;
-    fxRateDateBasis: "transaction_date";
-    fxRates: Array<{
-      rateDate: string;
-      currencyCode: "USD" | "NGN";
-      usdNgnCentralRate: string;
-      gbpNgnCentralRate: string;
-    }>;
   }>;
-  destinationBaselines: CushScorePolicyConfig["destinationBaselines"];
-  policyStatus: "active" | "not_configured";
-  policyVersion: number | null;
   schemaReady: true;
   monoDataReady: boolean;
 }
@@ -68,24 +60,8 @@ function asPolicyConfig(value: unknown): CushScorePolicyConfig {
   return cushScorePolicyConfigSchema.parse(value);
 }
 
-function baselineFor(
-  input: V2AssessmentInput,
-  configuration: CushScorePolicyConfig | null,
-  today: string,
-): DestinationBaseline | null {
-  const configured = configuration?.destinationBaselines.find((item) =>
-    item.id === input.selectedBaselineId &&
-    item.currencyCode === "GBP" &&
-    item.countryCode === "GB" &&
-    item.effectiveDate <= today,
-  );
-  if (!configured) return null;
-  return {
-    destination: configured.destination,
-    monthlyBaselinePence: configured.monthlyBaselinePence,
-    effectiveDate: configured.effectiveDate,
-    countryCode: configured.countryCode,
-  };
+function baselineFor(): DestinationBaseline {
+  return FLAT_UK_BASELINE;
 }
 
 function engineInput(
@@ -292,8 +268,7 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     loadMonoAssessmentData(userId),
     loadCreditHistoryEvidence(userId),
   ]);
-  const today = now.toISOString().slice(0, 10);
-  const selectedBaseline = baselineFor(inputs, activePolicy?.configuration ?? null, today);
+  const selectedBaseline = baselineFor();
   const scoringPolicy: CushScorePolicy = activePolicy
     ? {
         creditMappings: activePolicy.configuration.creditMappings,
@@ -306,14 +281,8 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     engineInput(userId, inputs, selectedBaseline, now, monoData.imports, monoData.linkedAccountCount, creditHistoryEvidence),
     scoringPolicy,
   );
-  const destinationBaselines = activePolicy?.configuration.destinationBaselines.filter((baseline) =>
-    baseline.currencyCode === "GBP" &&
-    baseline.countryCode === "GB" &&
-    baseline.effectiveDate <= today,
-  ) ?? [];
   return {
-    inputs,
-    calculation,
+    calculation: toCustomerCalculation(calculation),
     monoImports: monoData.imports.map(({ linkedAccountId, fetchedAt, statementPeriodMonths, evidence }) => ({
       linkedAccountId,
       fetchedAt: fetchedAt.toISOString(),
@@ -321,22 +290,7 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
       balancePence: evidence.availableFunds[0]?.amountPence ?? null,
       incomeMonths: new Set(evidence.incomeHistory.map((item) => item.month)).size,
       cashFlowMonths: evidence.cashFlowHistory.length,
-      sourceCurrencies: evidence.sourceCurrencies,
-      fxRateSource: evidence.fxRateSource,
-      fxRateDateBasis: evidence.fxRateDateBasis,
-      fxRates: [...new Map(evidence.conversionAudit.map((rate) => [
-        `${rate.currencyCode}:${rate.rateDate}`,
-        {
-          rateDate: rate.rateDate,
-          currencyCode: rate.currencyCode,
-          usdNgnCentralRate: rate.usdNgnCentralRate,
-          gbpNgnCentralRate: rate.gbpNgnCentralRate,
-        },
-      ])).values()].sort((a, b) => b.rateDate.localeCompare(a.rateDate)).slice(0, 10),
     })),
-    destinationBaselines,
-    policyStatus: activePolicy ? "active" : "not_configured",
-    policyVersion: activePolicy?.row.version ?? null,
     schemaReady: true,
     monoDataReady: monoData.monoDataReady,
   };

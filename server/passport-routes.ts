@@ -37,13 +37,13 @@ function applyV2Calculation<T extends mem.MemPassport>(
     score: calculation.cushScore,
     provisionalScore: calculation.provisionalScore,
     scoreCoveragePercent: calculation.scoreCoveragePercent,
-    scoredComponentCount: calculation.scoredComponentCount,
+    scoredComponentCount: 0,
     confidenceScore: calculation.confidenceScore,
     assessmentStatus: calculation.assessmentStatus,
     algorithmVersion: calculation.algorithmVersion,
     missingRequirements: calculation.missingRequirements,
-    weightedContributions: calculation.weightedContributions,
-    scoreBreakdown: calculation.componentScores,
+    weightedContributions: null,
+    scoreBreakdown: null,
     reasonCodes: null,
     generatedAt: calculation.cushScore === null && calculation.provisionalScore === null
       ? null
@@ -52,10 +52,15 @@ function applyV2Calculation<T extends mem.MemPassport>(
   };
 }
 
-function omitLegacyDataNotice<T extends { legacyDataNotice: unknown }>(passport: T) {
-  const userFacingPassport = { ...passport };
-  delete (userFacingPassport as Partial<T>).legacyDataNotice;
-  return userFacingPassport;
+function sanitizePassportForCustomer<T extends mem.MemPassport>(passport: T) {
+  const {
+    legacyDataNotice: _legacyDataNotice,
+    scoredComponentCount: _scoredComponentCount,
+    weightedContributions: _weightedContributions,
+    scoreBreakdown: _scoreBreakdown,
+    ...passportData
+  } = passport;
+  return passportData;
 }
 
 // ─── Route Registration ──────────────────────────────────────────────────────
@@ -74,13 +79,13 @@ export function registerPassportRoutes(app: Express) {
       try {
         const assessment = await getV2Assessment(userId);
         return res.json({
-          passport: omitLegacyDataNotice(applyV2Calculation(storedPassport, assessment.calculation)),
+          passport: sanitizePassportForCustomer(applyV2Calculation(storedPassport, assessment.calculation)),
           evidence,
           v2SchemaReady: true,
         });
       } catch (error) {
         if (!isV2SchemaMissing(error)) throw error;
-        return res.json({ passport: omitLegacyDataNotice(storedPassport), evidence, v2SchemaReady: false });
+        return res.json({ passport: sanitizePassportForCustomer(storedPassport), evidence, v2SchemaReady: false });
       }
     } catch (err) {
       console.error("GET /api/passport/me error:", err);
@@ -227,7 +232,7 @@ export function registerPassportRoutes(app: Express) {
       });
 
       const updatedPassport = mem.recalculatePassport(passport.id, userId);
-      return res.status(201).json({ signal, passport: updatedPassport });
+      return res.status(201).json({ signal, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: err.errors[0].message });
@@ -250,7 +255,7 @@ export function registerPassportRoutes(app: Express) {
 
       mem.deleteSignal(signalId, userId);
       const updatedPassport = mem.recalculatePassport(existing.passportId, userId);
-      return res.json({ success: true, passport: updatedPassport });
+      return res.json({ success: true, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       return res.status(500).json({ error: "Failed to delete signal" });
     }
@@ -274,7 +279,7 @@ export function registerPassportRoutes(app: Express) {
       });
 
       const updatedPassport = mem.recalculatePassport(passport.id, userId);
-      return res.status(201).json({ item, passport: updatedPassport });
+      return res.status(201).json({ item, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: err.errors[0].message });
@@ -297,7 +302,7 @@ export function registerPassportRoutes(app: Express) {
 
       mem.deleteEvidence(itemId, userId);
       const updatedPassport = mem.recalculatePassport(existing.passportId, userId);
-      return res.json({ success: true, passport: updatedPassport });
+      return res.json({ success: true, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       return res.status(500).json({ error: "Failed to delete evidence" });
     }
@@ -323,7 +328,7 @@ export function registerPassportRoutes(app: Express) {
 
       const passport = mem.getOrCreatePassport(userId);
       const updated = mem.updatePassportMode(passport.id, mode);
-      return res.json({ passport: updated });
+      return res.json({ passport: sanitizePassportForCustomer(updated) });
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ error: err.errors[0].message });
@@ -339,7 +344,7 @@ export function registerPassportRoutes(app: Express) {
       const passport = mem.getOrCreatePassport(userId);
       const token = mem.generateShareToken(passport.id);
       const updated = mem.getOrCreatePassport(userId);
-      return res.json({ shareToken: token, passport: updated });
+      return res.json({ shareToken: token, passport: sanitizePassportForCustomer(updated) });
     } catch (err) {
       return res.status(500).json({ error: "Failed to generate share token" });
     }
@@ -384,9 +389,7 @@ export function registerPassportRoutes(app: Express) {
         assessmentStatus: passport.assessmentStatus,
         algorithmVersion: passport.algorithmVersion,
         missingRequirements: passport.missingRequirements,
-        weightedContributions: passport.weightedContributions,
         mode: passport.mode,
-        scoreBreakdown: passport.scoreBreakdown,
         reasonCodes: passport.reasonCodes ?? [],
         lastUpdated: passport.lastUpdated,
         evidence,
@@ -407,7 +410,9 @@ export function registerPassportRoutes(app: Express) {
         const assessment = await getV2Assessment(userId);
         return res.json({ passport: applyV2Calculation(updated, assessment.calculation) });
       } catch (error) {
-        if (isV2SchemaMissing(error)) return res.json({ passport: updated, v2SchemaReady: false });
+        if (isV2SchemaMissing(error)) {
+          return res.json({ passport: sanitizePassportForCustomer(updated), v2SchemaReady: false });
+        }
         throw error;
       }
     } catch (err) {

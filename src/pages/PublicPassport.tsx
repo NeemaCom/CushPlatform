@@ -11,18 +11,6 @@ interface PublicPassportData {
   assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
   missingRequirements: string[];
   mode: string;
-  scoreBreakdown: {
-    availableFunds: number | null;
-    incomeStrength: number | null;
-    cashFlow: number | null;
-    creditHistory: number | null;
-  } | null;
-  weightedContributions: {
-    availableFunds: number | null;
-    incomeStrength: number | null;
-    cashFlow: number | null;
-    creditHistory: number | null;
-  } | null;
   reasonCodes: string[];
   lastUpdated: string | null;
   evidence: {
@@ -124,12 +112,6 @@ export default function PublicPassport() {
     );
   }
 
-  const breakdown = data.scoreBreakdown ?? {
-    availableFunds: null,
-    incomeStrength: null,
-    cashFlow: null,
-    creditHistory: null,
-  };
   const verifiedCount = data.evidence.filter((e) => e.status === "VERIFIED").length;
   const pendingCount = data.evidence.filter((e) => e.status === "PENDING_REVIEW").length;
   const formattedDate = data.lastUpdated
@@ -198,8 +180,8 @@ export default function PublicPassport() {
             <div>
               <p className="text-sm font-semibold text-blue-900 mb-0.5">About this assessment</p>
               <p className="text-xs text-blue-700 leading-relaxed">
-                The individual Cush Score combines available funds (35%), income strength (30%), cash-flow behaviour (20%), and credit history (15%).
-                Missing information is shown as unavailable, not treated as poor financial behaviour.
+                This individual assessment updates as supported information is reviewed. Missing information is shown as unavailable,
+                not treated as poor financial behaviour.
               </p>
             </div>
           </div>
@@ -213,40 +195,6 @@ export default function PublicPassport() {
             </ul>
           </div>
         )}
-
-        {/* Score Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <h2 className="font-bold text-slate-900 mb-5">Score Breakdown</h2>
-          <div className="space-y-4">
-            {[
-              { label: "Available funds", value: breakdown.availableFunds, contribution: data.weightedContributions?.availableFunds, weight: 35, color: "#2563eb" },
-              { label: "Income strength", value: breakdown.incomeStrength, contribution: data.weightedContributions?.incomeStrength, weight: 30, color: "#10b981" },
-              { label: "Cash-flow behaviour", value: breakdown.cashFlow, contribution: data.weightedContributions?.cashFlow, weight: 20, color: "#7c3aed" },
-              { label: "Credit history", value: breakdown.creditHistory, contribution: data.weightedContributions?.creditHistory, weight: 15, color: "#f59e0b" },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex justify-between mb-1.5">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                    <p className="text-xs text-slate-400">{item.weight}% of score</p>
-                  </div>
-                  <span className="text-sm font-bold text-slate-900">
-                    {item.value === null ? "Not available" : <>{item.value}<span className="text-sm text-slate-400">/100</span></>}
-                  </span>
-                </div>
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${item.value ?? 0}%`, backgroundColor: item.color }}
-                  />
-                </div>
-                {item.contribution !== null && item.contribution !== undefined && (
-                  <p className="text-xs text-slate-400 mt-1">Weighted contribution: {item.contribution}/1000</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
 
         {/* Reason Codes */}
         {data.reasonCodes.length > 0 && (

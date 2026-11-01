@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, ShieldCheck } from "lucide-react";
+import { AlertCircle, Landmark, ShieldCheck } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
 import AssessmentStep from "@/components/passport/AssessmentStep";
 
@@ -199,8 +199,11 @@ export default function MonoBankDataPanel() {
       <AssessmentStep
         id="assessment-bank-statements"
         step={1}
+        tone="violet"
+        icon={<Landmark className="h-5 w-5" aria-hidden="true" />}
         title="Connect a bank for statements"
         description="Authorize account access, then review statement activity for your assessment."
+        defaultOpen
       >
         <p className="text-xs leading-relaxed text-slate-600">
           Connect your bank to review account statements and add selected balance, recurring income, and expenses to V2. Raw statements are not retained; imports save reviewed monthly aggregates and exchange-rate provenance. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.

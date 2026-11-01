@@ -6,18 +6,6 @@ const SAMPLE_DATA = {
   confidenceScore: 72,
   confidenceLabel: "High",
   mode: "pre_arrival",
-  scoreBreakdown: {
-    availableFunds: 82,
-    incomeStrength: 82,
-    cashFlow: 74,
-    creditHistory: 79,
-  },
-  weightedContributions: {
-    availableFunds: 287,
-    incomeStrength: 246,
-    cashFlow: 148,
-    creditHistory: 118.5,
-  },
   evidence: [
     { documentType: "payslip", label: "Monthly Payslip Declaration", status: "VERIFIED", tier: 1 },
     { documentType: "employment_contract", label: "Employment Status", status: "VERIFIED", tier: 1 },
@@ -61,7 +49,6 @@ function ScoreGauge({ score }: { score: number }) {
 
 export default function SamplePassport() {
   const data = SAMPLE_DATA;
-  const breakdown = data.scoreBreakdown;
   const verifiedCount = data.evidence.filter((e) => e.status === "VERIFIED").length;
   const pendingCount = data.evidence.filter((e) => e.status === "PENDING_REVIEW").length;
 
@@ -126,39 +113,11 @@ export default function SamplePassport() {
               <span className="text-white text-xs font-bold">i</span>
             </div>
             <div>
-              <p className="text-sm font-semibold text-blue-900 mb-0.5">How the V2 score is weighted</p>
+              <p className="text-sm font-semibold text-blue-900 mb-0.5">About this assessment</p>
               <p className="text-xs text-blue-700 leading-relaxed">
-                Available funds account for 35%, income strength 30%, cash-flow behaviour 20%, and credit history 15%.
-                Real assessments remain incomplete until the required evidence and history checks pass.
+                Your score updates as supported information is reviewed. Missing information is not treated as poor financial behaviour.
               </p>
             </div>
-          </div>
-        </div>
-
-        {/* Score Breakdown */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <h2 className="font-bold text-slate-900 mb-5">Score Breakdown</h2>
-          <div className="space-y-4">
-            {[
-              { label: "Available funds", value: breakdown.availableFunds, contribution: data.weightedContributions.availableFunds, weight: 35, color: "#2563eb" },
-              { label: "Income strength", value: breakdown.incomeStrength, contribution: data.weightedContributions.incomeStrength, weight: 30, color: "#10b981" },
-              { label: "Cash-flow behaviour", value: breakdown.cashFlow, contribution: data.weightedContributions.cashFlow, weight: 20, color: "#7c3aed" },
-              { label: "Credit history", value: breakdown.creditHistory, contribution: data.weightedContributions.creditHistory, weight: 15, color: "#f59e0b" },
-            ].map((item) => (
-              <div key={item.label}>
-                <div className="flex justify-between mb-1.5">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{item.label}</p>
-                    <p className="text-xs text-slate-400">{item.weight}% of score</p>
-                  </div>
-                  <span className="text-lg font-bold text-slate-900">{item.value}<span className="text-sm text-slate-400">/100</span></span>
-                </div>
-                <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${item.value}%`, backgroundColor: item.color }} />
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Weighted contribution: {item.contribution}/1000</p>
-              </div>
-            ))}
           </div>
         </div>
 
