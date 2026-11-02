@@ -6,6 +6,7 @@ import AssessmentStep from "@/components/passport/AssessmentStep";
 
 interface MonoStatus {
   configured: boolean;
+  environment: "live" | "sandbox";
   callbackConfigured: boolean;
   schemaReady: boolean;
 }
@@ -217,7 +218,9 @@ export default function MonoBankDataPanel() {
               {!status?.schemaReady
                 ? "Mono database tables are not ready. In the intended Supabase SQL Editor, run migrations/manual/create-mono-account-data-tables.sql first if needed, then migrations/manual/create-mono-v2-assessment-evidence.sql."
                 : !status?.configured || !status?.callbackConfigured
-                  ? "Mono is not ready yet. Set MONO_SECRET_KEY and MONO_REDIRECT_URL on the Render service, then redeploy."
+                  ? `Mono is not ready for ${status?.environment ?? "this"} mode. Configure ${
+                    status?.environment === "live" ? "MONO_LIVE_SECRET_KEY" : "MONO_SANDBOX_SECRET_KEY"
+                  } on the API server and set MONO_REDIRECT_URL to the dashboard callback ending in /dashboard.`
                   : "Mono setup is incomplete. Refresh this panel to check the service configuration."}
             </p>
           </div>

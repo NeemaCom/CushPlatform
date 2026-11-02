@@ -12,6 +12,7 @@ import { getV2Assessment } from "./cush-score-v2";
 import {
   getMonoCallbackUrl,
   getMonoClient,
+  resolveMonoSettings,
   MonoNotConfiguredError,
   MonoRequestError,
 } from "./mono-service";
@@ -68,6 +69,7 @@ function providerFailure(res: import("express").Response, error: unknown) {
 export function registerMonoRoutes(app: Express) {
   app.get("/api/mono/status", isAuthenticated, async (_req, res) => {
     noStore(res);
+    const monoSettings = resolveMonoSettings();
     let schemaReady = true;
     try {
       await db.select({ id: monoLinkedAccounts.id }).from(monoLinkedAccounts).limit(0);
@@ -76,7 +78,8 @@ export function registerMonoRoutes(app: Express) {
       schemaReady = false;
     }
     return res.json({
-      configured: Boolean(process.env.MONO_SECRET_KEY),
+      configured: Boolean(monoSettings.secretKey),
+      environment: monoSettings.environment,
       callbackConfigured: Boolean(getMonoCallbackUrl()),
       schemaReady,
     });

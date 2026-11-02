@@ -1,5 +1,28 @@
 const MONO_API_ROOT = "https://api.withmono.com";
 
+export type MonoEnvironment = "live" | "sandbox";
+
+export interface MonoRuntimeSettings {
+  environment: MonoEnvironment;
+  secretKey: string | null;
+}
+
+export function resolveMonoSettings(
+  runtimeEnvironment: string | undefined = process.env.NODE_ENV,
+  variables: NodeJS.ProcessEnv = process.env,
+): MonoRuntimeSettings {
+  const environment: MonoEnvironment = runtimeEnvironment === "production" ? "live" : "sandbox";
+  const configuredKey = environment === "live"
+    ? variables.MONO_LIVE_SECRET_KEY
+    : variables.MONO_SANDBOX_SECRET_KEY;
+  const secretKey = configuredKey?.trim();
+
+  return {
+    environment,
+    secretKey: secretKey || null,
+  };
+}
+
 export class MonoNotConfiguredError extends Error {
   constructor() {
     super("Mono is not configured on the server.");
@@ -69,7 +92,7 @@ export class MonoClient {
 }
 
 export function getMonoClient(): MonoClient {
-  const secretKey = process.env.MONO_SECRET_KEY;
+  const { secretKey } = resolveMonoSettings();
   if (!secretKey) throw new MonoNotConfiguredError();
   return new MonoClient(secretKey);
 }

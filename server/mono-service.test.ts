@@ -1,7 +1,44 @@
 import { describe, expect, it, vi } from "vitest";
-import { MonoClient, MonoNotConfiguredError, MonoRequestError } from "./mono-service";
+import {
+  MonoClient,
+  MonoNotConfiguredError,
+  MonoRequestError,
+  resolveMonoSettings,
+} from "./mono-service";
 
 describe("MonoClient", () => {
+  it("selects only the live key in production", () => {
+    expect(resolveMonoSettings("production", {
+      MONO_LIVE_SECRET_KEY: "  live-secret  ",
+      MONO_SANDBOX_SECRET_KEY: "sandbox-secret",
+      MONO_SECRET_KEY: "legacy-secret",
+    })).toEqual({
+      environment: "live",
+      secretKey: "live-secret",
+    });
+  });
+
+  it("does not fall back to sandbox or the legacy key in production", () => {
+    expect(resolveMonoSettings("production", {
+      MONO_SANDBOX_SECRET_KEY: "sandbox-secret",
+      MONO_SECRET_KEY: "legacy-secret",
+    })).toEqual({
+      environment: "live",
+      secretKey: null,
+    });
+  });
+
+  it("selects only the sandbox key outside production", () => {
+    expect(resolveMonoSettings("development", {
+      MONO_LIVE_SECRET_KEY: "live-secret",
+      MONO_SANDBOX_SECRET_KEY: "sandbox-secret",
+      MONO_SECRET_KEY: "legacy-secret",
+    })).toEqual({
+      environment: "sandbox",
+      secretKey: "sandbox-secret",
+    });
+  });
+
   it("sends the secret and session ID only in server-side headers", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ status: "successful" }), { status: 200 }),
