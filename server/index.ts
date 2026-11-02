@@ -3,8 +3,10 @@ import cors from "cors";
 import { registerRoutes } from "./routes";
 import path from "path";
 import { createServer as createViteServer } from "vite";
+import { createApiOriginGuard, createSecurityHeaders } from "./http-security";
 
 const app = express();
+const isProduction = process.env.NODE_ENV === "production";
 
 // Logging function
 export function log(message: string, source = "express") {
@@ -20,6 +22,7 @@ export function log(message: string, source = "express") {
 
 // Express configuration
 app.set('trust proxy', 1);
+app.use(createSecurityHeaders(isProduction));
 
 const localOrigins = [
   "http://localhost:3000", "http://127.0.0.1:3000",
@@ -29,6 +32,13 @@ const allowedOrigins = new Set([
   ...(process.env.NODE_ENV === "production" ? [] : localOrigins),
   ...(process.env.FRONTEND_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
 ]);
+
+app.use("/api", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
+app.use("/api", createApiOriginGuard(allowedOrigins));
 
 app.use("/api", (req, res, next) => {
   const origin = req.get("Origin");
@@ -84,7 +94,9 @@ export async function createServer() {
     const message = err.message || "Internal Server Error";
     
     log(`Error ${status}: ${message}`);
-    res.status(status).json({ message });
+    res.status(status).json({
+      message: isProduction && status >= 500 ? "Internal Server Error" : message,
+    });
   });
 
   const port = Number(process.env.PORT || 5000);
