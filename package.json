@@ -118,7 +118,7 @@
     "bufferutil": "^4.0.8"
   },
   "overrides": {
-    "qs": "6.16.0",
+    "qs": "6.16.1",
     "websocket-driver": "0.7.5"
   }
 }
