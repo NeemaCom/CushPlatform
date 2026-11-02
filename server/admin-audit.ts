@@ -9,15 +9,18 @@ export interface AdminAuditEvent {
   outcome?: "success" | "denied" | "failed";
 }
 
+export type AdminAuditExecutor = Pick<typeof db, "insert">;
+
 export async function recordAdminAuditEvent(
   req: Request & { userId?: number },
   event: AdminAuditEvent,
+  executor: AdminAuditExecutor = db,
 ): Promise<void> {
   if (!req.userId) {
     throw new Error("An authenticated admin user is required for audit records.");
   }
 
-  await db.insert(adminAuditLogs).values({
+  await executor.insert(adminAuditLogs).values({
     adminUserId: req.userId,
     action: event.action,
     resourceType: event.resourceType ?? null,

@@ -238,53 +238,59 @@ export function registerAdminRoutes(app: Express): void {
         return res.status(400).json({ error: "Enter a valid source date that is not in the future." });
       }
       try {
-        const target = source === "mono" ? "mono" : "credit";
-        const [evidence] = target === "mono"
-          ? await db.select({
-              id: monoV2AssessmentEvidence.id,
-              userId: monoV2AssessmentEvidence.userId,
-            fetchedAt: monoV2AssessmentEvidence.fetchedAt,
-            }).from(monoV2AssessmentEvidence).where(eq(monoV2AssessmentEvidence.id, evidenceId)).limit(1)
-          : await db.select({
-              id: interswitchCreditHistoryEvidence.id,
-              userId: interswitchCreditHistoryEvidence.userId,
-            fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
-            }).from(interswitchCreditHistoryEvidence).where(eq(interswitchCreditHistoryEvidence.id, evidenceId)).limit(1);
-        if (!evidence) return res.status(404).json({ error: "Evidence record not found." });
-
-        const isMono = target === "mono";
-        const existingRows = isMono
-          ? await db.select({ id: cushEvidenceFreshnessReviews.id })
-              .from(cushEvidenceFreshnessReviews)
-              .where(eq(cushEvidenceFreshnessReviews.monoEvidenceId, evidenceId)).limit(1)
-          : await db.select({ id: cushEvidenceFreshnessReviews.id })
-              .from(cushEvidenceFreshnessReviews)
-              .where(eq(cushEvidenceFreshnessReviews.creditEvidenceId, evidenceId)).limit(1);
         const decision = sourceDate ? "confirm_source_date" : "confirm_retrieval_date";
-        const reviewValues = {
-          userId: evidence.userId,
-          monoEvidenceId: isMono ? evidenceId : null,
-          creditEvidenceId: isMono ? null : evidenceId,
-          decision,
-          confirmedSourceDate: sourceDate,
-          evidenceFetchedAt: evidence.fetchedAt,
-          reviewedBy: req.userId!,
-          reviewedAt: new Date(),
-        };
-        if (existingRows[0]) {
-          await db.update(cushEvidenceFreshnessReviews).set(reviewValues)
-            .where(eq(cushEvidenceFreshnessReviews.id, existingRows[0].id));
-        } else {
-          await db.insert(cushEvidenceFreshnessReviews).values(reviewValues);
-        }
-        await recordAdminAuditEvent(req, {
-          action: sourceDate
-            ? "admin.evidence_freshness.source_date_confirmed"
-            : "admin.evidence_freshness.retrieval_date_confirmed",
-          resourceType: `${source}_evidence`,
-          resourceId: evidenceId,
+        const saved = await db.transaction(async (tx) => {
+          const isMono = source === "mono";
+          const [evidence] = isMono
+            ? await tx.select({
+                id: monoV2AssessmentEvidence.id,
+                userId: monoV2AssessmentEvidence.userId,
+                fetchedAt: monoV2AssessmentEvidence.fetchedAt,
+              }).from(monoV2AssessmentEvidence)
+                .where(eq(monoV2AssessmentEvidence.id, evidenceId)).limit(1)
+            : await tx.select({
+                id: interswitchCreditHistoryEvidence.id,
+                userId: interswitchCreditHistoryEvidence.userId,
+                fetchedAt: interswitchCreditHistoryEvidence.fetchedAt,
+              }).from(interswitchCreditHistoryEvidence)
+                .where(eq(interswitchCreditHistoryEvidence.id, evidenceId)).limit(1);
+          if (!evidence) return null;
+
+          const existingRows = isMono
+            ? await tx.select({ id: cushEvidenceFreshnessReviews.id })
+                .from(cushEvidenceFreshnessReviews)
+                .where(eq(cushEvidenceFreshnessReviews.monoEvidenceId, evidenceId)).limit(1)
+            : await tx.select({ id: cushEvidenceFreshnessReviews.id })
+                .from(cushEvidenceFreshnessReviews)
+                .where(eq(cushEvidenceFreshnessReviews.creditEvidenceId, evidenceId)).limit(1);
+          const reviewValues = {
+            userId: evidence.userId,
+            monoEvidenceId: isMono ? evidenceId : null,
+            creditEvidenceId: isMono ? null : evidenceId,
+            decision,
+            confirmedSourceDate: sourceDate,
+            evidenceFetchedAt: evidence.fetchedAt,
+            reviewedBy: req.userId!,
+            reviewedAt: new Date(),
+          };
+          if (existingRows[0]) {
+            await tx.update(cushEvidenceFreshnessReviews).set(reviewValues)
+              .where(eq(cushEvidenceFreshnessReviews.id, existingRows[0].id));
+          } else {
+            await tx.insert(cushEvidenceFreshnessReviews).values(reviewValues);
+          }
+
+          await recordAdminAuditEvent(req, {
+            action: sourceDate
+              ? "admin.evidence_freshness.source_date_confirmed"
+              : "admin.evidence_freshness.retrieval_date_confirmed",
+            resourceType: `${source}_evidence`,
+            resourceId: evidenceId,
+          }, tx);
+          return { decision, sourceDate };
         });
-        return res.json({ success: true, decision, sourceDate });
+        if (!saved) return res.status(404).json({ error: "Evidence record not found." });
+        return res.json({ success: true, ...saved });
       } catch (error) {
         if (isMissingEvidenceReviewSchema(error)) {
           return res.status(503).json({
