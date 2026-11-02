@@ -28,12 +28,6 @@ interface PassportSummary {
     confidenceScore: number | null;
     assessmentStatus: "not_started" | "incomplete" | "provisional" | "complete";
     missingRequirements: string[];
-    scoreBreakdown: {
-      availableFunds: number | null;
-      incomeStrength: number | null;
-      cashFlow: number | null;
-      creditHistory: number | null;
-    } | null;
   };
 }
 
@@ -331,12 +325,6 @@ function FinancialIdentity() {
 
   const passport = data.passport;
   const value = passport.provisionalScore ?? passport.score;
-  const components = [
-    ["Available funds", passport.scoreBreakdown?.availableFunds],
-    ["Income strength", passport.scoreBreakdown?.incomeStrength],
-    ["Cash-flow behaviour", passport.scoreBreakdown?.cashFlow],
-    ["Credit history", passport.scoreBreakdown?.creditHistory],
-  ] as const;
 
   return (
     <div className="space-y-5">
@@ -351,14 +339,6 @@ function FinancialIdentity() {
             <p className="font-semibold">{passport.scoreCoveragePercent}% evidence coverage</p>
             <p className="mt-1 text-xs text-blue-800">Coverage is separate from score and confidence.</p>
           </div>
-        </div>
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {components.map(([label, componentScore]) => (
-            <div key={label} className="flex items-center justify-between rounded-xl border border-slate-100 px-4 py-3">
-              <span className="text-sm text-slate-600">{label}</span>
-              <span className="text-sm font-semibold text-slate-900">{componentScore === null || componentScore === undefined ? "Not available" : `${componentScore}/1000`}</span>
-            </div>
-          ))}
         </div>
         {passport.confidenceScore !== null && (
           <p className="mt-4 text-sm text-slate-500">Evidence confidence: <span className="font-semibold text-slate-700">{passport.confidenceScore}/100</span></p>
