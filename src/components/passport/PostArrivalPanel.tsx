@@ -21,6 +21,7 @@ import { API_BASE_URL } from "@/lib/api-base";
 import PostArrivalRecordForm, { type SavedRecord } from "./PostArrivalRecordForm";
 import type { PostArrivalRecordInput } from "@shared/schema";
 import PlaidConnectionPanel from "./PlaidConnectionPanel";
+import { useToast } from "@/hooks/use-toast";
 
 type ProfileData = {
   currentLocation?: string | null;
@@ -54,6 +55,27 @@ const GROUPS = [
   { type: "financial_activity", title: "Financial activity", description: "Record rent payments, savings, transfers, remittances and other activity.", icon: ArrowDownLeft },
   { type: "other_change", title: "Other changes", description: "Capture a relevant change since arriving in the UK.", icon: Building2 },
 ] as const;
+
+const PROFILE_DETAIL_FIELDS: (keyof ProfileData)[] = [
+  "accountHolderName",
+  "accountHolderEmail",
+  "accountHolderPhone",
+  "currentLocation",
+  "accommodationArrangement",
+  "employmentStatus",
+  "startedWorking",
+  "studying",
+  "changesSinceArrival",
+];
+
+function hasProfileValue(value: unknown) {
+  return typeof value === "boolean" || (typeof value === "string" && value.trim().length > 0);
+}
+
+function normalizeProfileValue(value: unknown) {
+  if (typeof value === "string") return value.trim() || null;
+  return value ?? null;
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -93,12 +115,14 @@ function recordSummary(record: SavedRecord) {
 
 export default function PostArrivalPanel() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [showArrivalDate, setShowArrivalDate] = useState(false);
   const [showArrivalDateEditor, setShowArrivalDateEditor] = useState(false);
   const [arrivalDate, setArrivalDate] = useState("");
   const [notYetAcknowledged, setNotYetAcknowledged] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileData>({});
   const [profileFormReady, setProfileFormReady] = useState(false);
+  const [profileDetailsOpen, setProfileDetailsOpen] = useState(true);
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SavedRecord | undefined>();
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -133,6 +157,12 @@ export default function PostArrivalPanel() {
     onSuccess: async () => {
       setOperationError(null);
       await refresh();
+      setProfileDetailsOpen(false);
+      toast({
+        title: "Your details are saved",
+        description: "They are stored in your profile and do not change your score.",
+        className: "border-emerald-300 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl",
+      });
     },
     onError: (error: Error) => setOperationError(error.message),
   });
@@ -141,11 +171,16 @@ export default function PostArrivalPanel() {
       request(id ? "PUT" : "POST", id
         ? `/api/passport/post-arrival/records/${id}`
         : "/api/passport/post-arrival/records", payload),
-    onSuccess: async () => {
+    onSuccess: async (_data, { id }) => {
       setOperationError(null);
       setEditingRecord(undefined);
       setShowRecordForm(false);
       await refresh();
+      toast({
+        title: id ? "Record updated" : "Information saved",
+        description: "Saved to your UK history. Adding a record does not change your score by itself.",
+        className: "border-emerald-300 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl",
+      });
     },
     onError: (error: Error) => setOperationError(error.message),
   });
@@ -160,6 +195,12 @@ export default function PostArrivalPanel() {
 
   const records = profileQuery.data?.records ?? [];
   const profile = profileQuery.data?.profile;
+  const displayedProfileForm = profileFormReady ? profileForm : profile?.data ?? {};
+  const filledProfileDetails = PROFILE_DETAIL_FIELDS.filter((field) => hasProfileValue(displayedProfileForm[field])).length;
+  const profileDetailsProgress = Math.round((filledProfileDetails / PROFILE_DETAIL_FIELDS.length) * 100);
+  const profileDetailsDirty = profileFormReady && PROFILE_DETAIL_FIELDS.some(
+    (field) => normalizeProfileValue(profileForm[field]) !== normalizeProfileValue(profile?.data[field]),
+  );
   const completion = useMemo(() => {
     if (!profile) return { percent: 0, completed: 0, total: 8, label: "Not yet activated" };
     const checks = [
@@ -323,15 +364,54 @@ export default function PostArrivalPanel() {
 
         <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] sm:p-6">
           <div className="rounded-xl border border-slate-200 p-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700"><CalendarDays className="h-4 w-4" aria-hidden="true" /></div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-900">Arrival and personal circumstances</h3>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Optional details help keep your profile current. Leave anything blank if you prefer.</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700"><CalendarDays className="h-4 w-4" aria-hidden="true" /></div>
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900">Arrival and personal circumstances</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Optional details help keep your profile current. Leave anything blank if you prefer.</p>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-[11px] font-bold text-indigo-800">
+                  {filledProfileDetails}/{PROFILE_DETAIL_FIELDS.length} filled
+                </span>
+                <button
+                  type="button"
+                  aria-expanded={profileDetailsOpen}
+                  aria-controls="post-arrival-profile-details"
+                  onClick={() => setProfileDetailsOpen((open) => !open)}
+                  className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                >
+                  {profileDetailsOpen ? "Hide details" : filledProfileDetails ? "Edit details" : "Add details"}
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${profileDetailsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+                </button>
               </div>
             </div>
-            {profileFormReady && (
+            <div className="mt-3">
+              <div
+                className="h-2 overflow-hidden rounded-full bg-slate-100"
+                role="progressbar"
+                aria-label="Optional Post-Arrival details filled"
+                aria-valuemin={0}
+                aria-valuemax={PROFILE_DETAIL_FIELDS.length}
+                aria-valuenow={filledProfileDetails}
+              >
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-emerald-400 transition-all duration-300"
+                  style={{ width: `${profileDetailsProgress}%` }}
+                />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+                <span className={profileDetailsDirty ? "font-semibold text-amber-700" : "text-slate-500"}>
+                  {profileDetailsDirty ? "Unsaved changes" : filledProfileDetails ? "Details saved" : "No optional details added"}
+                </span>
+                <span className="text-slate-400">Profile only · not score points</span>
+              </div>
+            </div>
+            {profileDetailsOpen && profileFormReady ? (
               <form
+                id="post-arrival-profile-details"
                 className="mt-4 space-y-3"
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -439,11 +519,39 @@ export default function PostArrivalPanel() {
                     onChange={(event) => setProfileForm((current) => ({ ...current, changesSinceArrival: event.target.value || null }))}
                   />
                 </label>
-                <button type="submit" disabled={saveProfile.isPending} className={saveButtonClass}>
-                  {saveProfile.isPending ? "Saving…" : "Save circumstances"}
+                <button type="submit" disabled={saveProfile.isPending || !profileDetailsDirty} className={saveButtonClass}>
+                  {saveProfile.isPending ? "Saving…" : profileDetailsDirty ? "Save details" : "All changes saved"}
                 </button>
               </form>
-            )}
+            ) : !profileDetailsOpen ? (
+              <div
+                id="post-arrival-profile-details"
+                role="status"
+                className={`mt-4 flex items-start gap-3 rounded-xl border p-3 ${
+                  profileDetailsDirty
+                    ? "border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 text-amber-900"
+                    : filledProfileDetails
+                      ? "border-emerald-200 bg-gradient-to-r from-emerald-50 to-teal-50 text-emerald-900"
+                      : "border-indigo-200 bg-gradient-to-r from-indigo-50 to-violet-50 text-indigo-900"
+                }`}
+              >
+                {profileDetailsDirty || filledProfileDetails
+                  ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  : <CalendarDays className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+                <div>
+                  <p className="text-xs font-bold">
+                    {profileDetailsDirty ? "Your edits are not saved yet" : filledProfileDetails ? "Profile details saved" : "No details added yet"}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-5 opacity-90">
+                    {profileDetailsDirty
+                      ? "Your entries are still here. Open the section and save them when ready."
+                      : filledProfileDetails
+                        ? `${filledProfileDetails} optional details saved. They are not verified and do not affect your score.`
+                        : "Add only the optional information you choose to share. You can reopen this section at any time."}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4">
