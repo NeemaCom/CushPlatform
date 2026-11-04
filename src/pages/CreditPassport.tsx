@@ -556,16 +556,18 @@ export default function CreditPassport() {
               </div>
             </motion.div>
 
-            <section id="assessment-tasks" className="space-y-4">
-              <div>
-                <h2 className="font-bold text-slate-900 text-base">Financial assessment</h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Complete the two steps below. Your score updates as eligible information is reviewed.
-                </p>
-              </div>
-              {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
-              <V2AssessmentPanel />
-            </section>
+            {passport.mode !== "post_arrival" && (
+              <section id="assessment-tasks" className="space-y-4">
+                <div>
+                  <h2 className="font-bold text-slate-900 text-base">Financial assessment</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Complete the two steps below. Your score updates as eligible information is reviewed.
+                  </p>
+                </div>
+                {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
+                <V2AssessmentPanel />
+              </section>
+            )}
             {passport.mode === "post_arrival" && <PostArrivalPanel />}
           </div>
 
@@ -602,23 +604,25 @@ export default function CreditPassport() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#2926a5] to-[#5148df] p-5 text-white shadow-sm">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">Your next steps</p>
-              <h3 className="mt-2 text-lg font-bold">Build your Cush Score</h3>
-              <p className="mt-2 text-sm leading-relaxed text-indigo-50">
-                Connect a bank for statements and complete the required Credit Check. Your score updates as supported information is reviewed.
-              </p>
-              <button
-                type="button"
-                onClick={() => document.getElementById("assessment-tasks")?.scrollIntoView({ behavior: "smooth" })}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#2926a5] transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2926a5]"
-              >
-                Open assessment <ChevronRight className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <p className="mt-3 text-xs text-indigo-100">
-                Missing inputs are excluded from your provisional score, not counted as zero.
-              </p>
-            </div>
+            {passport.mode !== "post_arrival" && (
+              <div className="overflow-hidden rounded-2xl bg-gradient-to-br from-[#2926a5] to-[#5148df] p-5 text-white shadow-sm">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-100">Your next steps</p>
+                <h3 className="mt-2 text-lg font-bold">Build your Cush Score</h3>
+                <p className="mt-2 text-sm leading-relaxed text-indigo-50">
+                  Connect a bank for statements and complete the required Credit Check. Your score updates as supported information is reviewed.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById("assessment-tasks")?.scrollIntoView({ behavior: "smooth" })}
+                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-[#2926a5] transition hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-[#2926a5]"
+                >
+                  Open assessment <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+                <p className="mt-3 text-xs text-indigo-100">
+                  Missing inputs are excluded from your provisional score, not counted as zero.
+                </p>
+              </div>
+            )}
 
             {passport.lastUpdated && (
               <p className="text-xs text-slate-400 text-center">
