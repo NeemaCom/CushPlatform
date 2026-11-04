@@ -10,3 +10,15 @@ Post-Arrival profile completion and user-entered records do not award points or 
 **Why:** The user approved persistent Post-Arrival storage and specified arrival status as the activation criterion while preserving the existing score policy.
 
 **How to apply:** Keep arrival activation independent from document uploads, store user-entered records separately from verified evidence, and keep score updates restricted to the existing eligibility rules.
+
+For Plaid, keep bank linking within Post-Arrival: show account-holder name, email, and phone for user review and optional profile copy; show transaction history only as temporary review data. Do not copy addresses, change sign-in identity, persist transaction details, or feed Plaid transactions into V2 scoring. Keep the existing Mono V2 statement/scoring flow separate.
+
+**Why:** The user selected Plaid identity/contact and transaction review for Post-Arrival while keeping Cush scoring separate.
+
+**How to apply:** Require confirmed UK arrival and explicit consent, encrypt the Plaid connection token, let users disconnect, and require separate policy approval before using Plaid transactions as score evidence.
+
+Keep Plaid in sandbox mode until live credentials and production access are ready. If sandbox is intentionally enabled on the production-hosted service for testing, require an explicit opt-in and show users a clear test-data warning.
+
+**Why:** The user wants to test Plaid in sandbox before moving to production details.
+
+**How to apply:** Use sandbox credentials with `PLAID_ENV=sandbox`; require the production sandbox opt-in flag on Render and remove it when switching to live credentials.

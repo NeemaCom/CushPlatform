@@ -9,6 +9,11 @@ declare module "express-session" {
     userId?: number;
     role?: string;
     lastActivity?: number;
+    plaidConsent?: {
+      userId: number;
+      acceptedAt: string;
+      expiresAt: number;
+    };
   }
 }
 

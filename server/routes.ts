@@ -32,6 +32,7 @@ import {
 import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
 import { registerPostArrivalRoutes } from "./post-arrival-routes";
+import { registerPlaidRoutes } from "./plaid-routes";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
@@ -102,6 +103,7 @@ export async function registerRoutes(
   registerAdminRoutes(app);
   registerPassportRoutes(app);
   registerPostArrivalRoutes(app);
+  registerPlaidRoutes(app);
   registerMonoRoutes(app);
   registerInterswitchCreditHistoryRoutes(app);
 

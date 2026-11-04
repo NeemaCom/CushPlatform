@@ -120,6 +120,22 @@ export const cushPostArrivalProfiles = pgTable("cush_post_arrival_profiles", {
   statusIndex: index("cush_post_arrival_profiles_status_idx").on(table.arrivalStatus),
 })).enableRLS();
 
+export const cushPlaidConnections = pgTable("cush_plaid_connections", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  plaidItemId: text("plaid_item_id").notNull().unique(),
+  institutionName: text("institution_name"),
+  accessTokenCiphertext: text("access_token_ciphertext").notNull(),
+  accessTokenIv: text("access_token_iv").notNull(),
+  accessTokenAuthTag: text("access_token_auth_tag").notNull(),
+  identityConsentAcceptedAt: timestamp("identity_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
+  transactionsConsentAcceptedAt: timestamp("transactions_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
+  linkedAt: timestamp("linked_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userLinkedAtIndex: index("cush_plaid_connections_user_linked_at_idx").on(table.userId, table.linkedAt),
+})).enableRLS();
+
 export const cushPostArrivalRecords = pgTable("cush_post_arrival_records", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -385,6 +401,9 @@ const postArrivalCommonRecordSchema = {
 
 export const postArrivalProfileDataSchema = z.object({
   currentLocation: z.string().trim().max(160).nullable().optional(),
+  accountHolderName: z.string().trim().max(160).nullable().optional(),
+  accountHolderEmail: z.string().trim().email().max(254).nullable().optional(),
+  accountHolderPhone: z.string().trim().max(40).nullable().optional(),
   accommodationArrangement: z.enum([
     "private_rent", "family_or_friends", "temporary", "student", "owned", "other",
   ]).nullable().optional(),
