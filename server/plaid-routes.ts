@@ -5,6 +5,7 @@ import { cushPlaidConnections, cushPostArrivalProfiles } from "@shared/schema";
 import { db } from "./db";
 import { isAuthenticated, type AuthenticatedRequest } from "./auth";
 import { authRateLimit } from "./security";
+import { isMissingPlaidSchema } from "./plaid-errors";
 import {
   createPlaidLinkToken,
   decryptPlaidAccessToken,
@@ -38,11 +39,6 @@ const PLAID_CONSENT_LIFETIME_MS = 3 * 60 * 60 * 1000;
 function noStore(res: Response) {
   res.setHeader("Cache-Control", "no-store, private");
   res.setHeader("Pragma", "no-cache");
-}
-
-function isMissingPlaidSchema(error: unknown): boolean {
-  return typeof error === "object" && error !== null &&
-    "code" in error && ["42P01", "42703"].includes(String((error as { code?: unknown }).code));
 }
 
 function storageFailure(res: Response, error: unknown) {
