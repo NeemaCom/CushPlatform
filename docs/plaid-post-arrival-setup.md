@@ -14,13 +14,13 @@ Add these environment variables to the Render service that handles the Cush API:
 
 - `PLAID_CLIENT_ID` — from the Plaid dashboard.
 - `PLAID_SECRET` — the secret for the selected Plaid environment.
-- `PLAID_ENV` — `sandbox` for testing or `production` after Plaid production access is approved.
+- `PLAID_ENV` — set to `production` on the Render production service. Use `sandbox` only in a development runtime.
 - `PLAID_TOKEN_ENCRYPTION_KEY` — a dedicated 32-byte key encoded as Base64.
 - `PLAID_REDIRECT_URI` — optional; set this only if Plaid requires OAuth redirect setup, and register the identical URL in the Plaid dashboard.
 
 Generate an encryption key locally with `openssl rand -base64 32`, then add its output directly in Render's environment settings. Do not paste it into chat, commit it, or reuse `SESSION_SECRET`. Losing or replacing this key makes existing encrypted Plaid tokens unreadable; affected users would need to reconnect.
 
-Production runtime requires `PLAID_ENV=production`; it will not silently fall back to sandbox or vice versa. Configure both credentials and access to the UK Identity and Transactions products in Plaid before enabling the production connection.
+The Render service runs in production mode, so it requires `PLAID_ENV=production` and matching live Plaid credentials. The app intentionally will not enable sandbox credentials on that production service. Use `PLAID_ENV=sandbox` with sandbox credentials only in a development runtime. Configure production access to the UK Identity and Transactions products in Plaid before enabling live connections.
 
 ## User data boundaries
 
