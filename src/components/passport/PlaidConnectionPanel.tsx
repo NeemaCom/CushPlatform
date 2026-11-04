@@ -279,6 +279,14 @@ export default function PlaidConnectionPanel({ request, onProfileDetails }: Prop
 
         {status && (
           <>
+            {status.environment === "sandbox" && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
+                <p className="font-semibold">Sandbox mode — test data only</p>
+                <p className="mt-1 text-xs leading-5">
+                  Use Plaid sandbox institutions and test credentials. Real bank accounts and live financial data are not connected in this mode.
+                </p>
+              </div>
+            )}
             {!setupReady && (
               <div className="flex items-start gap-2 rounded-xl border border-[#e8d7ad] bg-[#fff9eb] p-4 text-sm text-[#705525]" role="status">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

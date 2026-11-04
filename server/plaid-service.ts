@@ -83,8 +83,10 @@ function readConfiguration(): { status: PlaidRuntimeStatus; config: PlaidConfigu
   const environment: PlaidEnvironment = requestedEnvironment === "sandbox" || requestedEnvironment === "production"
     ? requestedEnvironment
     : isProductionRuntime ? "production" : "sandbox";
+  const sandboxProductionOptIn = process.env.PLAID_ALLOW_SANDBOX_IN_PRODUCTION === "true";
   const environmentMatchesRuntime = isProductionRuntime
-    ? requestedEnvironment === "production"
+    ? requestedEnvironment === "production" ||
+      (requestedEnvironment === "sandbox" && sandboxProductionOptIn)
     : environment === "sandbox";
   const clientId = process.env.PLAID_CLIENT_ID?.trim() ?? "";
   const secret = process.env.PLAID_SECRET?.trim() ?? "";

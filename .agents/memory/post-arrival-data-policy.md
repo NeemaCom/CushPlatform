@@ -16,3 +16,9 @@ For Plaid, keep bank linking within Post-Arrival: show account-holder name, emai
 **Why:** The user selected Plaid identity/contact and transaction review for Post-Arrival while keeping Cush scoring separate.
 
 **How to apply:** Require confirmed UK arrival and explicit consent, encrypt the Plaid connection token, let users disconnect, and require separate policy approval before using Plaid transactions as score evidence.
+
+Keep Plaid in sandbox mode until live credentials and production access are ready. If sandbox is intentionally enabled on the production-hosted service for testing, require an explicit opt-in and show users a clear test-data warning.
+
+**Why:** The user wants to test Plaid in sandbox before moving to production details.
+
+**How to apply:** Use sandbox credentials with `PLAID_ENV=sandbox`; require the production sandbox opt-in flag on Render and remove it when switching to live credentials.

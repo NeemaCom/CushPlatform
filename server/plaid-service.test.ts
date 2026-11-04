@@ -3,6 +3,7 @@ import {
   decryptPlaidAccessToken,
   encryptPlaidAccessToken,
   getPlaidReview,
+  getPlaidRuntimeStatus,
 } from "./plaid-service";
 
 afterEach(() => {
@@ -22,6 +23,19 @@ describe("Plaid access-token encryption", () => {
 });
 
 describe("Plaid temporary review normalization", () => {
+  it("requires an explicit opt-in before sandbox can run on production hosting", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PLAID_ENV", "sandbox");
+    vi.stubEnv("PLAID_CLIENT_ID", "test-client");
+    vi.stubEnv("PLAID_SECRET", "test-secret");
+    vi.stubEnv("PLAID_TOKEN_ENCRYPTION_KEY", Buffer.alloc(32, 4).toString("base64"));
+    vi.stubEnv("PLAID_ALLOW_SANDBOX_IN_PRODUCTION", "");
+    expect(getPlaidRuntimeStatus().configured).toBe(false);
+
+    vi.stubEnv("PLAID_ALLOW_SANDBOX_IN_PRODUCTION", "true");
+    expect(getPlaidRuntimeStatus()).toEqual({ environment: "sandbox", configured: true });
+  });
+
   it("requests only selected identity fields and 90 days of transactions", async () => {
     vi.stubEnv("NODE_ENV", "test");
     vi.stubEnv("PLAID_ENV", "sandbox");
