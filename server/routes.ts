@@ -36,6 +36,7 @@ import { registerPlaidRoutes } from "./plaid-routes";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
+import { registerCushVerifyRoutes } from "./cush-verify-routes";
 import { firebaseProfileNamePatch } from "./firebase-profile-name";
 
 const profilePictureSchema = z.object({
@@ -106,6 +107,7 @@ export async function registerRoutes(
   registerPlaidRoutes(app);
   registerMonoRoutes(app);
   registerInterswitchCreditHistoryRoutes(app);
+  registerCushVerifyRoutes(app);
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
   app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {

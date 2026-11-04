@@ -8,6 +8,7 @@ import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin
 import CushUserScoreReview from "@/components/passport/CushUserScoreReview";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
+import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
 
 type OverviewMetrics = {
   totalUsers: number;
@@ -103,13 +104,15 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "scoring-policy" | "evidence-freshness" | "score-review">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
   const hasEvidenceFreshnessManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessManage);
+  const hasVerifyInterestRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsRead);
+  const hasVerifyInterestManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsManage);
   const overviewQuery = useQuery<AdminOverview>({
     queryKey: ["/api/admin/overview", range],
     queryFn: async () => {
@@ -219,8 +222,24 @@ export default function AdminDashboard() {
               User score review
             </button>
           )}
+          {hasVerifyInterestRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("cush-verify")}
+              aria-current={activeSection === "cush-verify" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "cush-verify"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Cush Verify interest
+            </button>
+          )}
         </nav>
-        {activeSection === "scoring-policy" ? (
+        {activeSection === "cush-verify" ? (
+          <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
+        ) : activeSection === "scoring-policy" ? (
           <section aria-labelledby="scoring-policy-heading">
             <div className="mb-5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#82847d]">Cush Passport · Admin</p>

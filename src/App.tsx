@@ -12,6 +12,7 @@ import SamplePassport from '@/pages/SamplePassport'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
 const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
+const CushVerify = lazy(() => import('@/pages/CushVerify'))
 import { useAuth } from '@/hooks/useAuth'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
@@ -66,6 +67,11 @@ function App() {
               <Route path="/login" component={Login} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
+              <Route path="/verify">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerify />
+                </Suspense>
+              </Route>
 
               {/* Sample passport — public demo */}
               <Route path="/sample" component={SamplePassport} />
@@ -107,6 +113,10 @@ function App() {
 
 function AccountLoading() {
   return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading account…</div>
+}
+
+function PageLoading() {
+  return <div className="flex min-h-screen items-center justify-center text-sm text-slate-500">Loading Cush Verify…</div>
 }
 
 export default App

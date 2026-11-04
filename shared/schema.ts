@@ -68,6 +68,34 @@ export const userConsentRecords = pgTable("user_consent_records", {
     .on(table.userId, table.acceptedAt),
 })).enableRLS();
 
+export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_interests", {
+  id: serial("id").primaryKey(),
+  institutionName: text("institution_name").notNull(),
+  institutionType: text("institution_type").notNull(),
+  contactName: text("contact_name").notNull(),
+  jobTitle: text("job_title").notNull(),
+  email: text("email").notNull(),
+  country: text("country").notNull(),
+  intendedUse: text("intended_use"),
+  contactConsentAcceptedAt: timestamp("contact_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
+  status: text("status").notNull().default("pending_review"),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  institutionTypeCheck: check(
+    "cush_verify_institution_interests_type_check",
+    sql`${table.institutionType} in ('bank', 'lender', 'housing', 'employer', 'other')`,
+  ),
+  statusCheck: check(
+    "cush_verify_institution_interests_status_check",
+    sql`${table.status} in ('pending_review', 'in_review', 'approved_for_follow_up', 'not_approved')`,
+  ),
+  statusCreatedIndex: index("cush_verify_institution_interests_status_created_idx").on(table.status, table.createdAt),
+  emailIndex: index("cush_verify_institution_interests_email_idx").on(table.email),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });

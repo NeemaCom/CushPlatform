@@ -200,25 +200,37 @@ function ModeCard({
 function Nav() {
   return (
     <nav className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-slate-100">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="min-h-16 flex items-center justify-between gap-2">
         <Link href="/">
           <div className="flex items-center gap-2.5 cursor-pointer">
             <div className="w-8 h-8 bg-[#2563eb] rounded-lg flex items-center justify-center">
               <span className="text-white font-black text-sm">C</span>
             </div>
-            <span className="font-bold text-[#0f172a] text-base tracking-tight">Cush Passport</span>
+            <span className="font-bold text-[#0f172a] text-sm sm:text-base tracking-tight">Cush Passport</span>
           </div>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
+          <Link href="/verify" className="hidden items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#342ca8] md:inline-flex">
+            Cush Verify
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-slate-600">Beta</span>
+          </Link>
           <Link href="/login">
-            <button className="text-sm font-medium text-slate-600 hover:text-slate-900 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
+            <button className="text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 px-2 sm:px-3 md:px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors">
               Sign In
             </button>
           </Link>
           <Link href="/login">
-            <button className="text-sm font-semibold bg-[#2563eb] text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200">
+            <button className="text-xs sm:text-sm font-semibold bg-[#2563eb] text-white px-2.5 sm:px-4 md:px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm shadow-blue-200">
               Get Your Passport
             </button>
+          </Link>
+        </div>
+        </div>
+        <div className="flex justify-end border-t border-slate-100 py-1.5 md:hidden">
+          <Link href="/verify" className="inline-flex min-h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#342ca8]">
+            Cush Verify
+            <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold leading-none text-slate-600">Beta</span>
           </Link>
         </div>
       </div>
