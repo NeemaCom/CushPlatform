@@ -314,18 +314,6 @@ export function registerPassportRoutes(app: Express) {
       const userId = req.userId!;
       const { mode } = updatePassportModeSchema.parse(req.body);
 
-      if (mode === "post_arrival") {
-        const passport = mem.getOrCreatePassport(userId);
-        const evs = mem.getPassportEvidence(passport.id);
-        const hasProof = evs.some((e) => e.documentType === "proof_of_residency");
-        if (!hasProof) {
-          return res.status(400).json({
-            error: "Proof of Residency required to switch to Post-Arrival mode",
-            code: "REQUIRES_PROOF_OF_RESIDENCY",
-          });
-        }
-      }
-
       const passport = mem.getOrCreatePassport(userId);
       const updated = mem.updatePassportMode(passport.id, mode);
       return res.json({ passport: sanitizePassportForCustomer(updated) });

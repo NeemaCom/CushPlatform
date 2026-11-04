@@ -8,6 +8,7 @@ import AccountDropdown from "@/components/AccountDropdown";
 import { logoutFromCush } from "@/lib/logout";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
+import PostArrivalPanel from "@/components/passport/PostArrivalPanel";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import {
   ChevronRight, Link2,
@@ -382,7 +383,7 @@ export default function CreditPassport() {
   const toggleModeMutation = useMutation({
     mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); toast({ title: "Mode updated" }); },
-    onError: (e: any) => toast({ title: "Cannot switch mode", description: e.message?.includes("Proof of Residency") ? "Upload Proof of Residency first." : e.message, variant: "destructive" }),
+    onError: (e: Error) => toast({ title: "Cannot switch mode", description: e.message, variant: "destructive" }),
   });
   const generateTokenMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/passport/generate-token"),
@@ -557,7 +558,7 @@ export default function CreditPassport() {
 
             <section id="assessment-tasks" className="space-y-4">
               <div>
-                <h2 className="font-bold text-slate-900 text-base">Your assessment</h2>
+                <h2 className="font-bold text-slate-900 text-base">Financial assessment</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
                   Complete the two steps below. Your score updates as eligible information is reviewed.
                 </p>
@@ -565,6 +566,7 @@ export default function CreditPassport() {
               {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}
               <V2AssessmentPanel />
             </section>
+            {passport.mode === "post_arrival" && <PostArrivalPanel />}
           </div>
 
           {/* ── Right Sidebar ────────────────────────────────────────────── */}

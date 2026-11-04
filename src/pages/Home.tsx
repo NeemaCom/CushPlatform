@@ -321,12 +321,12 @@ export default function Home() {
               title="Recently Arrived?"
               description="Keep your individual financial assessment clear as you settle in a new destination."
               bullets={[
-                "Upload proof of residency to unlock this mode",
-                "Combine home-country and local financial data",
-                "Share a supported financial assessment with prospective landlords",
-                "Instant shareable link for landlords and agents",
+                "Confirm your arrival date to activate UK profile details",
+                "Record employment, income, accommodation and expenses over time",
+                "Keep UK and home-country records on one timeline",
+                "Add supporting evidence later when available",
               ]}
-              cta="Unlock Post-Arrival Mode"
+              cta="Explore Post-Arrival"
               accent="border-emerald-200 bg-emerald-50/40"
               href="/login"
             />

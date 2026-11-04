@@ -98,6 +98,66 @@ export const passports = pgTable("passports", {
   createdAt: timestamp("created_at").defaultNow(),
 }).enableRLS();
 
+// ─── Post-Arrival Profile ─────────────────────────────────────────────────────
+
+export const cushPostArrivalProfiles = pgTable("cush_post_arrival_profiles", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  arrivalStatus: text("arrival_status").notNull().default("awaiting_arrival"),
+  arrivalDate: date("arrival_date"),
+  arrivalConfirmedAt: timestamp("arrival_confirmed_at", { withTimezone: true, mode: "date" }),
+  profileData: jsonb("profile_data").$type<unknown>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_post_arrival_profiles_status_check",
+    sql`${table.arrivalStatus} in ('awaiting_arrival', 'arrived')`,
+  ),
+  arrivedDateCheck: check(
+    "cush_post_arrival_profiles_arrived_date_check",
+    sql`(${table.arrivalStatus} <> 'arrived') or ${table.arrivalDate} is null or ${table.arrivalDate} <= CURRENT_DATE`,
+  ),
+  statusIndex: index("cush_post_arrival_profiles_status_idx").on(table.arrivalStatus),
+})).enableRLS();
+
+export const cushPostArrivalRecords = pgTable("cush_post_arrival_records", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  recordType: text("record_type").notNull(),
+  label: text("label").notNull(),
+  details: jsonb("details").$type<unknown>().notNull(),
+  activityDate: date("activity_date"),
+  countryCode: text("country_code").notNull().default("GB"),
+  currencyCode: text("currency_code").notNull().default("GBP"),
+  evidenceStatus: text("evidence_status").notNull().default("user_recorded"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  typeCheck: check(
+    "cush_post_arrival_records_type_check",
+    sql`${table.recordType} in ('employment', 'income', 'accommodation', 'banking_savings', 'expense', 'financial_activity', 'other_change')`,
+  ),
+  countryCodeCheck: check("cush_post_arrival_records_country_check", sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
+  currencyCodeCheck: check("cush_post_arrival_records_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
+  evidenceStatusCheck: check(
+    "cush_post_arrival_records_evidence_status_check",
+    sql`${table.evidenceStatus} in ('user_recorded', 'pending_review', 'document_supported', 'independently_verified', 'disputed_or_rejected')`,
+  ),
+  userDateIndex: index("cush_post_arrival_records_user_date_idx").on(table.userId, table.activityDate),
+  userTypeIndex: index("cush_post_arrival_records_user_type_idx").on(table.userId, table.recordType),
+})).enableRLS();
+
+export const cushPostArrivalAuditLogs = pgTable("cush_post_arrival_audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  userCreatedAtIndex: index("cush_post_arrival_audit_user_created_at_idx").on(table.userId, table.createdAt),
+})).enableRLS();
+
 // ─── Cush Score V2 Inputs and Policy ──────────────────────────────────────────
 
 export const cushAssessmentInputs = pgTable("cush_assessment_inputs", {
@@ -307,6 +367,122 @@ export const addEvidenceSchema = z.object({
   fileData: z.string().optional(),
   fileName: z.string().optional(),
 });
+
+const postArrivalDateSchema = z.string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD dates.")
+  .refine((value) => Number.isFinite(Date.parse(`${value}T00:00:00Z`)) &&
+    new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value, "Enter a valid calendar date.");
+const postArrivalMoneySchema = z.string()
+  .regex(/^\d{1,15}(?:\.\d{1,4})?$/, "Enter a positive amount using up to four decimal places.")
+  .refine((value) => Number.isFinite(Number(value)), "Amount is too large.");
+const postArrivalPositiveMoneySchema = postArrivalMoneySchema.refine((value) => Number(value) > 0, "Amount must be greater than zero.");
+const postArrivalCommonRecordSchema = {
+  label: z.string().trim().min(1).max(120),
+  activityDate: postArrivalDateSchema.nullable().optional(),
+  countryCode: z.string().regex(/^[A-Z]{2}$/).default("GB"),
+  currencyCode: z.string().regex(/^[A-Z]{3}$/).default("GBP"),
+};
+
+export const postArrivalProfileDataSchema = z.object({
+  currentLocation: z.string().trim().max(160).nullable().optional(),
+  accommodationArrangement: z.enum([
+    "private_rent", "family_or_friends", "temporary", "student", "owned", "other",
+  ]).nullable().optional(),
+  employmentStatus: z.enum([
+    "employed", "self_employed", "freelance", "seeking_work", "studying", "not_working", "other",
+  ]).nullable().optional(),
+  startedWorking: z.boolean().nullable().optional(),
+  studying: z.boolean().nullable().optional(),
+  changesSinceArrival: z.string().trim().max(1000).nullable().optional(),
+}).strict();
+
+export const postArrivalRecordSchema = z.discriminatedUnion("recordType", [
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("employment"),
+    details: z.object({
+      employer: z.string().trim().max(160).nullable().optional(),
+      employmentType: z.enum(["permanent", "fixed_term", "part_time", "self_employed", "freelance", "other"]),
+      jobTitle: z.string().trim().max(120).nullable().optional(),
+      startDate: postArrivalDateSchema.nullable().optional(),
+      salaryAmount: postArrivalMoneySchema.nullable().optional(),
+      salaryFrequency: z.enum(["weekly", "fortnightly", "monthly", "annual", "irregular"]).nullable().optional(),
+      salaryBasis: z.enum(["gross", "net", "unknown"]).nullable().optional(),
+      firstSalaryDate: postArrivalDateSchema.nullable().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("income"),
+    activityDate: postArrivalDateSchema,
+    details: z.object({
+      sourceType: z.enum(["salary", "self_employment", "freelance", "business", "scholarship", "family_support", "other"]),
+      payer: z.string().trim().max(160).nullable().optional(),
+      amount: postArrivalPositiveMoneySchema,
+      paymentFrequency: z.enum(["one_off", "weekly", "fortnightly", "monthly", "annual", "irregular"]),
+      grossOrNet: z.enum(["gross", "net", "unknown"]).optional(),
+      note: z.string().trim().max(500).nullable().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("accommodation"),
+    details: z.object({
+      arrangementType: z.enum(["private_rent", "family_or_friends", "temporary", "student", "owned", "other"]),
+      provider: z.string().trim().max(160).nullable().optional(),
+      tenancyStartDate: postArrivalDateSchema.nullable().optional(),
+      rentAmount: postArrivalMoneySchema.nullable().optional(),
+      rentFrequency: z.enum(["weekly", "fortnightly", "monthly", "annual", "irregular"]).nullable().optional(),
+      hasFormalTenancy: z.boolean().nullable().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("banking_savings"),
+    details: z.object({
+      institution: z.string().trim().max(160).nullable().optional(),
+      availableSavings: postArrivalMoneySchema.nullable().optional(),
+      balanceDate: postArrivalDateSchema.nullable().optional(),
+      savingsActivity: z.string().trim().max(500).nullable().optional(),
+    }).strict().refine((value) =>
+      Boolean(value.institution?.trim() || value.availableSavings || value.savingsActivity?.trim()),
+    "Add an institution, a savings balance, or a savings note."),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("expense"),
+    details: z.object({
+      category: z.enum(["food", "transport", "utilities", "internet_phone", "insurance", "subscription", "loan", "education", "other"]),
+      amount: postArrivalPositiveMoneySchema,
+      frequency: z.enum(["one_off", "weekly", "fortnightly", "monthly", "annual", "irregular"]),
+      provider: z.string().trim().max(160).nullable().optional(),
+      note: z.string().trim().max(500).nullable().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("financial_activity"),
+    activityDate: postArrivalDateSchema,
+    details: z.object({
+      activityType: z.enum(["salary", "freelance_income", "rent_payment", "savings_contribution", "international_transfer", "remittance", "other"]),
+      amount: postArrivalPositiveMoneySchema,
+      counterparty: z.string().trim().max(160).nullable().optional(),
+      note: z.string().trim().max(500).nullable().optional(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ...postArrivalCommonRecordSchema,
+    recordType: z.literal("other_change"),
+    details: z.object({
+      description: z.string().trim().min(1).max(1000),
+    }).strict(),
+  }).strict(),
+]);
+export type PostArrivalRecordInput = z.infer<typeof postArrivalRecordSchema>;
+
+export const confirmUkArrivalSchema = z.object({
+  arrivalDate: postArrivalDateSchema,
+}).strict();
 
 export const updatePassportModeSchema = z.object({
   mode: z.enum(["pre_arrival", "post_arrival"]),
