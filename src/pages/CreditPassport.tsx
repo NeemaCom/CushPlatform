@@ -382,7 +382,19 @@ export default function CreditPassport() {
   });
   const toggleModeMutation = useMutation({
     mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/passport/me"] }); toast({ title: "Mode updated" }); },
+    onSuccess: (_data, mode) => {
+      qc.invalidateQueries({ queryKey: ["/api/passport/me"] });
+      const isPostArrival = mode === "post_arrival";
+      toast({
+        title: isPostArrival ? "Post-Arrival selected" : "Pre-Arrival selected",
+        description: isPostArrival
+          ? "Your UK profile and financial-history tools are ready."
+          : "Your Pre-Arrival assessment steps are ready.",
+        className: isPostArrival
+          ? "border-emerald-300 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl"
+          : "border-indigo-300 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-700 text-white shadow-xl",
+      });
+    },
     onError: (e: Error) => toast({ title: "Cannot switch mode", description: e.message, variant: "destructive" }),
   });
   const generateTokenMutation = useMutation({
