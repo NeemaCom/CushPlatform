@@ -20,6 +20,7 @@ import {
 import { API_BASE_URL } from "@/lib/api-base";
 import PostArrivalRecordForm, { type SavedRecord } from "./PostArrivalRecordForm";
 import type { PostArrivalRecordInput } from "@shared/schema";
+import PlaidConnectionPanel from "./PlaidConnectionPanel";
 
 type ProfileData = {
   currentLocation?: string | null;
@@ -28,6 +29,9 @@ type ProfileData = {
   startedWorking?: boolean | null;
   studying?: boolean | null;
   changesSinceArrival?: string | null;
+  accountHolderName?: string | null;
+  accountHolderEmail?: string | null;
+  accountHolderPhone?: string | null;
 };
 
 type PostArrivalResponse = {
@@ -334,6 +338,44 @@ export default function PostArrivalPanel() {
                   saveProfile.mutate();
                 }}
               >
+                <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-3">
+                  <p className="text-xs font-semibold text-slate-700">Account holder contact details</p>
+                  <p className="mt-1 text-[11px] leading-5 text-slate-500">Optional and editable. Details from a bank review only fill these fields after you choose them.</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <label className="block text-sm font-medium text-slate-700">
+                      Name
+                      <input
+                        className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        maxLength={160}
+                        autoComplete="name"
+                        value={profileForm.accountHolderName ?? ""}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, accountHolderName: event.target.value || null }))}
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700">
+                      Email
+                      <input
+                        className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        type="email"
+                        maxLength={254}
+                        autoComplete="email"
+                        value={profileForm.accountHolderEmail ?? ""}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, accountHolderEmail: event.target.value || null }))}
+                      />
+                    </label>
+                    <label className="block text-sm font-medium text-slate-700 sm:col-span-2">
+                      Phone
+                      <input
+                        className="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm"
+                        type="tel"
+                        maxLength={40}
+                        autoComplete="tel"
+                        value={profileForm.accountHolderPhone ?? ""}
+                        onChange={(event) => setProfileForm((current) => ({ ...current, accountHolderPhone: event.target.value || null }))}
+                      />
+                    </label>
+                  </div>
+                </div>
                 <label className="block text-sm font-medium text-slate-700">
                   Current UK location or address (optional)
                   <input
@@ -420,6 +462,16 @@ export default function PostArrivalPanel() {
           </div>
         </div>
       </div>
+
+      <PlaidConnectionPanel
+        request={request}
+        onProfileDetails={(details) => setProfileForm((current) => ({
+          ...current,
+          ...(details.accountHolderName ? { accountHolderName: details.accountHolderName } : {}),
+          ...(details.accountHolderEmail ? { accountHolderEmail: details.accountHolderEmail } : {}),
+          ...(details.accountHolderPhone ? { accountHolderPhone: details.accountHolderPhone } : {}),
+        }))}
+      />
 
       {operationError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{operationError}</p>}
 
