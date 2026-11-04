@@ -13,6 +13,8 @@ type Interest = {
   email: string;
   country: string;
   intendedUse: string | null;
+  verificationRequirements: string | null;
+  preferredEngagementModel: string | null;
   contactConsentAcceptedAt: string;
   status: CushVerifyReviewStatus;
   reviewedAt: string | null;
@@ -24,6 +26,12 @@ const statusLabels: Record<CushVerifyReviewStatus, string> = {
   in_review: "In review",
   approved_for_follow_up: "Approved for follow-up",
   not_approved: "Not approved",
+};
+
+const engagementModelLabels: Record<string, string> = {
+  institutional_portal: "Institutional portal",
+  api_integration: "API integration",
+  partnership_discussion: "Partnership discussion",
 };
 
 function readableError(error: unknown) {
@@ -119,7 +127,14 @@ export default function CushVerifyInterestAdmin({ canManage }: { canManage: bool
                     <p className="mt-1 text-sm text-[#555750]">{interest.contactName} · {interest.jobTitle}</p>
                     <p className="mt-1 break-all text-sm font-medium text-[#39358b]">{interest.email}</p>
                     <p className="mt-1 text-xs text-[#777973]">{interest.institutionType.replace(/_/g, " ")} · {interest.country} · Submitted {dateLabel(interest.createdAt)}</p>
+                    <p className="mt-2 text-xs font-medium text-[#555750]">Preferred engagement: {interest.preferredEngagementModel ? engagementModelLabels[interest.preferredEngagementModel] ?? interest.preferredEngagementModel : "Not specified"}</p>
                     {interest.intendedUse && <p className="mt-3 whitespace-pre-wrap rounded-lg bg-white p-3 text-sm leading-6 text-[#555750]">{interest.intendedUse}</p>}
+                    {interest.verificationRequirements && (
+                      <div className="mt-2 rounded-lg border border-[#e4e2d9] bg-white p-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#777973]">Verification requirements</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[#555750]">{interest.verificationRequirements}</p>
+                      </div>
+                    )}
                     <p className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-[#777973]">
                       <CheckCircle2 className="h-3.5 w-3.5 text-[#438471]" /> Contact permission recorded {dateLabel(interest.contactConsentAcceptedAt)}
                     </p>

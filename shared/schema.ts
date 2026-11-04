@@ -77,6 +77,8 @@ export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_i
   email: text("email").notNull(),
   country: text("country").notNull(),
   intendedUse: text("intended_use"),
+  verificationRequirements: text("verification_requirements"),
+  preferredEngagementModel: text("preferred_engagement_model"),
   contactConsentAcceptedAt: timestamp("contact_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("pending_review"),
   reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
@@ -86,7 +88,15 @@ export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_i
 }, (table) => ({
   institutionTypeCheck: check(
     "cush_verify_institution_interests_type_check",
-    sql`${table.institutionType} in ('bank', 'lender', 'housing', 'employer', 'other')`,
+    sql`${table.institutionType} in ('bank', 'lender', 'housing', 'employer', 'university', 'other')`,
+  ),
+  engagementModelCheck: check(
+    "cush_verify_institution_interests_engagement_model_check",
+    sql`${table.preferredEngagementModel} in ('institutional_portal', 'api_integration', 'partnership_discussion')`,
+  ),
+  verificationRequirementsLengthCheck: check(
+    "cush_verify_institution_interests_verification_requirements_length_check",
+    sql`${table.verificationRequirements} is null or char_length(${table.verificationRequirements}) <= 1200`,
   ),
   statusCheck: check(
     "cush_verify_institution_interests_status_check",

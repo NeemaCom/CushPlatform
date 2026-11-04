@@ -26,13 +26,13 @@ const publicInterestRateLimit = rateLimit({
   message: { error: "Too many submissions. Please try again later." },
 });
 
-function isInterestTableMissing(error: unknown): boolean {
+function isInterestSchemaMissing(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; current && depth < 6; depth += 1) {
     if (typeof current === "object" && "code" in current) {
       const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
       if (
-        candidate.code === "42P01" &&
+        (candidate.code === "42P01" || candidate.code === "42703") &&
         String(candidate.message ?? "").toLowerCase().includes("cush_verify_institution_interests")
       ) {
         return true;
@@ -53,7 +53,7 @@ function schemaNotReady(res: Parameters<Parameters<Express["get"]>[1]>[1]) {
 }
 
 const confirmationMessage =
-  "Thank you for your interest in Cush Verify. We are currently developing our institutional platform and will contact you regarding early access and partnership opportunities.";
+  "Your institutional interest has been received. The Cush team will be in touch.";
 
 export function registerCushVerifyRoutes(app: Express): void {
   app.post("/api/verify/institution-interest", publicInterestRateLimit, async (req, res) => {
@@ -76,11 +76,13 @@ export function registerCushVerifyRoutes(app: Express): void {
         email: parsed.data.email,
         country: parsed.data.country,
         intendedUse: parsed.data.intendedUse || null,
+        verificationRequirements: parsed.data.verificationRequirements || null,
+        preferredEngagementModel: parsed.data.preferredEngagementModel ?? null,
         contactConsentAcceptedAt: new Date(),
       });
       return res.status(201).json({ success: true, message: confirmationMessage });
     } catch (error) {
-      if (isInterestTableMissing(error)) return schemaNotReady(res);
+      if (isInterestSchemaMissing(error)) return schemaNotReady(res);
       console.error("Cush Verify interest submission failed", {
         errorType: error instanceof Error ? error.name : "UnknownError",
       });
@@ -103,6 +105,8 @@ export function registerCushVerifyRoutes(app: Express): void {
           email: cushVerifyInstitutionInterests.email,
           country: cushVerifyInstitutionInterests.country,
           intendedUse: cushVerifyInstitutionInterests.intendedUse,
+          verificationRequirements: cushVerifyInstitutionInterests.verificationRequirements,
+          preferredEngagementModel: cushVerifyInstitutionInterests.preferredEngagementModel,
           contactConsentAcceptedAt: cushVerifyInstitutionInterests.contactConsentAcceptedAt,
           status: cushVerifyInstitutionInterests.status,
           reviewedAt: cushVerifyInstitutionInterests.reviewedAt,
@@ -112,7 +116,7 @@ export function registerCushVerifyRoutes(app: Express): void {
           .limit(100);
         return res.json({ interests });
       } catch (error) {
-        if (isInterestTableMissing(error)) return schemaNotReady(res);
+        if (isInterestSchemaMissing(error)) return schemaNotReady(res);
         console.error("Cush Verify interest queue failed", {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
@@ -156,7 +160,7 @@ export function registerCushVerifyRoutes(app: Express): void {
         if (!updated) return res.status(404).json({ error: "Interest request not found." });
         return res.json({ interest: updated, accessGranted: false });
       } catch (error) {
-        if (isInterestTableMissing(error)) return schemaNotReady(res);
+        if (isInterestSchemaMissing(error)) return schemaNotReady(res);
         console.error("Cush Verify interest review failed", {
           adminUserId: req.userId,
           errorType: error instanceof Error ? error.name : "UnknownError",
