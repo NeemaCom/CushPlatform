@@ -397,12 +397,13 @@ export default function Login() {
       <div className="w-full max-w-md space-y-6">
         {/* Brand */}
         <div className="text-center">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-sm">C</span>
-            </div>
-            <span className="text-xl font-bold text-slate-900 dark:text-white">Cush Passport</span>
-          </div>
+          <img
+            src="/cush-wordmark.png"
+            alt="Cush Passport"
+            className="mx-auto mb-4 h-9 w-40 object-cover object-center"
+            width={160}
+            height={36}
+          />
           <p className="text-sm text-slate-500">Your global credit identity — verified anywhere</p>
         </div>
 

@@ -203,11 +203,14 @@ function Nav() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
         <div className="min-h-16 flex items-center justify-between gap-2">
         <Link href="/">
-          <div className="flex items-center gap-2.5 cursor-pointer">
-            <div className="w-8 h-8 bg-[#2563eb] rounded-lg flex items-center justify-center">
-              <span className="text-white font-black text-sm">C</span>
-            </div>
-            <span className="font-bold text-[#0f172a] text-sm sm:text-base tracking-tight">Cush Passport</span>
+          <div className="flex items-center cursor-pointer" aria-label="Cush Passport home">
+            <img
+              src="/cush-wordmark.png"
+              alt="Cush Passport"
+              className="h-7 w-32 object-cover object-center sm:h-8 sm:w-36"
+              width={144}
+              height={32}
+            />
           </div>
         </Link>
         <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
@@ -437,11 +440,14 @@ export default function Home() {
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="bg-slate-50 border-t border-slate-100 py-10 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 bg-[#2563eb] rounded-md flex items-center justify-center">
-              <span className="text-white font-black text-xs">C</span>
-            </div>
-            <span className="font-bold text-slate-700 text-sm">Cush Passport</span>
+          <div className="flex items-center">
+            <img
+              src="/cush-wordmark.png"
+              alt="Cush Passport"
+              className="h-6 w-28 object-cover object-center"
+              width={112}
+              height={24}
+            />
           </div>
           <div className="flex items-center gap-6 text-xs text-slate-400">
             <Link href="/privacy-policy"><span className="hover:text-slate-600 cursor-pointer transition-colors">Privacy Policy</span></Link>
