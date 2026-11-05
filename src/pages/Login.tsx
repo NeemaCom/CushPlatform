@@ -12,7 +12,9 @@ import { API_BASE_URL } from '@/lib/api-base'
 import {
   auth,
   googleProvider,
+  getRedirectResult,
   signInWithPopup,
+  signInWithRedirect,
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
@@ -31,6 +33,41 @@ type GoogleSignInDiagnostic = {
   callbackUrl: string
 }
 
+type GoogleRedirectIntent = {
+  mode: 'signin' | 'signup'
+  marketingConsent: boolean
+}
+
+const GOOGLE_REDIRECT_INTENT_KEY = 'cush.google-signin-intent'
+
+function isMobileAuthBrowser() {
+  return typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+}
+
+function clearGoogleRedirectIntent() {
+  try {
+    sessionStorage.removeItem(GOOGLE_REDIRECT_INTENT_KEY)
+  } catch {
+    // Storage may be unavailable in a restricted browser context.
+  }
+}
+
+function readGoogleRedirectIntent(): GoogleRedirectIntent | null {
+  try {
+    const value = sessionStorage.getItem(GOOGLE_REDIRECT_INTENT_KEY)
+    if (!value) return null
+    const parsed = JSON.parse(value)
+    if ((parsed.mode !== 'signin' && parsed.mode !== 'signup') || typeof parsed.marketingConsent !== 'boolean') {
+      clearGoogleRedirectIntent()
+      return null
+    }
+    return parsed
+  } catch {
+    clearGoogleRedirectIntent()
+    return null
+  }
+}
+
 function safeDiagnosticText(value: unknown, fallback: string) {
   return String(value ?? fallback)
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted email]')
@@ -44,7 +81,8 @@ function createGoogleSignInDiagnostic(stage: string, error: unknown): GoogleSign
   const authError = error && typeof error === 'object'
     ? error as { code?: unknown; message?: unknown }
     : {}
-  const authDomain = auth.app.options.authDomain || 'not configured'
+  const authOptions = auth?.app?.options
+  const authDomain = authOptions?.authDomain || 'not configured'
 
   return {
     stage,
@@ -52,7 +90,7 @@ function createGoogleSignInDiagnostic(stage: string, error: unknown): GoogleSign
     message: safeDiagnosticText(authError.message, 'No error message provided'),
     appOrigin: window.location.origin,
     authDomain,
-    projectId: auth.app.options.projectId || 'not configured',
+    projectId: authOptions?.projectId || 'not configured',
     callbackUrl: authDomain === 'not configured'
       ? 'not available'
       : `https://${authDomain}/__/auth/handler`,
@@ -128,6 +166,97 @@ export default function Login() {
     }
   }, [toast])
 
+  useEffect(() => {
+    const intent = readGoogleRedirectIntent()
+    if (!intent) return
+    const redirectIntent: GoogleRedirectIntent = { ...intent }
+
+    clearGoogleRedirectIntent()
+    setMode(redirectIntent.mode)
+    let stage = 'Reading Google redirect result'
+
+    async function completeRedirectSignIn() {
+      setLoading(true)
+      setGoogleSignInDiagnostic(null)
+      setDiagnosticCopied(false)
+      try {
+        const result = await getRedirectResult(auth)
+        if (!result) {
+          toast({
+            title: 'Google sign-in was cancelled',
+            description: 'You can try again whenever you’re ready.',
+          })
+          return
+        }
+
+        const fbUser = result.user
+        stage = 'Refreshing Google account'
+        await reload(fbUser)
+
+        if (!fbUser.emailVerified) {
+          if (redirectIntent.mode === 'signup') {
+            stage = 'Syncing new Google account'
+            try {
+              const syncResult = await firebaseSync(fbUser, {
+                acceptTerms: true,
+                acceptPrivacy: true,
+                marketingConsent: redirectIntent.marketingConsent,
+              })
+              if (!syncResult.requiresEmailVerification) {
+                throw new Error('Email verification is required before signing in.')
+              }
+            } catch (syncError: any) {
+              if (!syncError.requiresEmailVerification) throw syncError
+            }
+          }
+
+          showVerificationPending(fbUser)
+          try {
+            stage = 'Sending verification email'
+            await sendEmailVerification(fbUser, getAuthActionSettings('emailVerified'))
+          } catch (sendError: any) {
+            setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, sendError))
+            toast({
+              title: 'Verification email not sent',
+              description: sendError.code === 'auth/unauthorized-continue-uri'
+                ? 'Add this website domain to Firebase Authentication’s authorized domains, then resend the link.'
+                : sendError.message || 'Please try resending the verification email.',
+              variant: 'destructive',
+            })
+          }
+          return
+        }
+
+        stage = 'Refreshing Firebase sign-in token'
+        await fbUser.getIdToken(true)
+        stage = 'Syncing Google account with Cush'
+        await firebaseSync(fbUser, redirectIntent.mode === 'signup'
+          ? {
+              acceptTerms: true,
+              acceptPrivacy: true,
+              marketingConsent: redirectIntent.marketingConsent,
+            }
+          : undefined)
+        stage = 'Finishing sign-in'
+        await afterLogin()
+      } catch (err: any) {
+        setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
+        if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
+          setSignInMessage({
+            text: err.message,
+            support: err.code === 'PERMANENT_ACCOUNT_LOCK',
+          })
+          return
+        }
+        toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void completeRedirectSignIn()
+  }, [toast])
+
   function showVerificationPending(user: FirebaseUser) {
     setPendingVerificationUser(user)
     setPasswordLoginPending(false)
@@ -152,11 +281,20 @@ export default function Login() {
   async function handleGoogle() {
     if (mode === 'signup' && !hasRequiredConsent()) return
 
-    let stage = 'Opening Google sign-in'
+    let stage = isMobileAuthBrowser() ? 'Starting mobile Google redirect' : 'Opening Google sign-in'
     setGoogleSignInDiagnostic(null)
     setDiagnosticCopied(false)
     setLoading(true)
     try {
+      if (isMobileAuthBrowser()) {
+        sessionStorage.setItem(GOOGLE_REDIRECT_INTENT_KEY, JSON.stringify({
+          mode,
+          marketingConsent: consent.marketing,
+        }))
+        await signInWithRedirect(auth, googleProvider)
+        return
+      }
+
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
       stage = 'Refreshing Google account'
@@ -206,6 +344,7 @@ export default function Login() {
       stage = 'Finishing sign-in'
       await afterLogin()
     } catch (err: any) {
+      clearGoogleRedirectIntent()
       setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
       if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
         setSignInMessage({
