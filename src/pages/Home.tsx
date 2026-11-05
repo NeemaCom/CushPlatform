@@ -303,6 +303,31 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ── Institutional Enquiry ─────────────────────────────────────────── */}
+      <section aria-labelledby="institution-callout-title" className="px-4 py-12 sm:px-6 sm:py-16">
+        <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[1.75rem] border border-blue-900/20 bg-[#101c35] px-6 py-8 text-white shadow-xl shadow-slate-900/10 sm:px-10 sm:py-9">
+          <div aria-hidden="true" className="pointer-events-none absolute -right-14 -top-32 h-72 w-72 rounded-full border border-blue-300/15" />
+          <div aria-hidden="true" className="pointer-events-none absolute -right-2 -top-20 h-52 w-52 rounded-full border border-emerald-300/20" />
+          <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="mb-3 text-[11px] font-bold tracking-[0.08em] text-emerald-300">For institutions</p>
+              <h2 id="institution-callout-title" className="text-xl font-bold leading-snug tracking-tight text-white sm:text-2xl">
+                Access authorised cross-border financial identity information through Cush Verify.
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                Institutional enquiries are reviewed by Cush before access.
+              </p>
+            </div>
+            <Link
+              href="/verify"
+              className="group inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#2563eb] px-5 text-sm font-semibold text-white transition hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300"
+            >
+              Explore Cush Verify <span aria-hidden="true">→</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── Dual-Mode Section ─────────────────────────────────────────────── */}
       <section className="bg-slate-50 py-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
