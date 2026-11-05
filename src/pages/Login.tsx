@@ -21,6 +21,57 @@ import {
 } from '@/firebase.js'
 import { LOGIN_SUPPORT_EMAIL } from '@shared/auth-constants'
 
+type GoogleSignInDiagnostic = {
+  stage: string
+  code: string
+  message: string
+  appOrigin: string
+  authDomain: string
+  projectId: string
+  callbackUrl: string
+}
+
+function safeDiagnosticText(value: unknown, fallback: string) {
+  return String(value ?? fallback)
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted email]')
+    .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted URL]')
+    .replace(/\beyJ[a-zA-Z0-9._-]{20,}\b/g, '[redacted token]')
+    .replace(/\bBearer\s+[a-zA-Z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+    .slice(0, 240)
+}
+
+function createGoogleSignInDiagnostic(stage: string, error: unknown): GoogleSignInDiagnostic {
+  const authError = error && typeof error === 'object'
+    ? error as { code?: unknown; message?: unknown }
+    : {}
+  const authDomain = auth.app.options.authDomain || 'not configured'
+
+  return {
+    stage,
+    code: safeDiagnosticText(authError.code, 'not provided'),
+    message: safeDiagnosticText(authError.message, 'No error message provided'),
+    appOrigin: window.location.origin,
+    authDomain,
+    projectId: auth.app.options.projectId || 'not configured',
+    callbackUrl: authDomain === 'not configured'
+      ? 'not available'
+      : `https://${authDomain}/__/auth/handler`,
+  }
+}
+
+function formatGoogleSignInDiagnostic(diagnostic: GoogleSignInDiagnostic) {
+  return [
+    'Cush Google sign-in diagnostic',
+    `Stage: ${diagnostic.stage}`,
+    `Error code: ${diagnostic.code}`,
+    `Message: ${diagnostic.message}`,
+    `App origin: ${diagnostic.appOrigin}`,
+    `Firebase auth domain: ${diagnostic.authDomain}`,
+    `Expected callback: ${diagnostic.callbackUrl}`,
+    `Firebase project: ${diagnostic.projectId}`,
+  ].join('\n')
+}
+
 function getAuthActionSettings(returnTo: 'emailVerified' | 'passwordReset') {
   const url = new URL('/login', window.location.origin)
   url.searchParams.set(returnTo, '1')
@@ -61,6 +112,8 @@ export default function Login() {
   const [passwordLoginPending, setPasswordLoginPending] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
   const [signInMessage, setSignInMessage] = useState<{ text: string; support: boolean } | null>(null)
+  const [googleSignInDiagnostic, setGoogleSignInDiagnostic] = useState<GoogleSignInDiagnostic | null>(null)
+  const [diagnosticCopied, setDiagnosticCopied] = useState(false)
   const [resetLinkSent, setResetLinkSent] = useState(false)
   const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
@@ -99,13 +152,18 @@ export default function Login() {
   async function handleGoogle() {
     if (mode === 'signup' && !hasRequiredConsent()) return
 
+    let stage = 'Opening Google sign-in'
+    setGoogleSignInDiagnostic(null)
+    setDiagnosticCopied(false)
     setLoading(true)
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
+      stage = 'Refreshing Google account'
       await reload(fbUser)
       if (!fbUser.emailVerified) {
         if (mode === 'signup') {
+          stage = 'Syncing new Google account'
           try {
             const syncResult = await firebaseSync(fbUser, {
               acceptTerms: true,
@@ -121,8 +179,10 @@ export default function Login() {
         }
         showVerificationPending(fbUser)
         try {
+          stage = 'Sending verification email'
           await sendEmailVerification(fbUser, getAuthActionSettings('emailVerified'))
         } catch (sendError: any) {
+          setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, sendError))
           toast({
             title: 'Verification email not sent',
             description: sendError.code === 'auth/unauthorized-continue-uri'
@@ -133,7 +193,9 @@ export default function Login() {
         }
         return
       }
+      stage = 'Refreshing Firebase sign-in token'
       await fbUser.getIdToken(true)
+      stage = 'Syncing Google account with Cush'
       await firebaseSync(fbUser, mode === 'signup'
         ? {
             acceptTerms: true,
@@ -141,8 +203,10 @@ export default function Login() {
             marketingConsent: consent.marketing,
           }
         : undefined)
+      stage = 'Finishing sign-in'
       await afterLogin()
     } catch (err: any) {
+      setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
       if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
         setSignInMessage({
           text: err.message,
@@ -416,6 +480,8 @@ export default function Login() {
                   onClick={() => {
                     setMode(t)
                     setSignInMessage(null)
+                    setGoogleSignInDiagnostic(null)
+                    setDiagnosticCopied(false)
                   }}
                   className={`flex-1 py-3 text-sm font-medium transition-colors ${
                     mode === t
@@ -528,6 +594,53 @@ export default function Login() {
             </>
           ) : (
           <CardContent className="pt-6 space-y-4">
+            {googleSignInDiagnostic && (
+              <section
+                role="alert"
+                aria-live="assertive"
+                className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+              >
+                <div>
+                  <p className="font-semibold">Sign-in diagnostic</p>
+                  <p className="mt-1"><strong>Stage:</strong> {googleSignInDiagnostic.stage}</p>
+                  <p><strong>Error code:</strong> {googleSignInDiagnostic.code}</p>
+                  <p className="break-words"><strong>Message:</strong> {googleSignInDiagnostic.message}</p>
+                  <p className="break-all"><strong>App origin:</strong> {googleSignInDiagnostic.appOrigin}</p>
+                  <p className="break-all"><strong>Firebase auth domain:</strong> {googleSignInDiagnostic.authDomain}</p>
+                  <p className="break-all"><strong>Expected callback:</strong> {googleSignInDiagnostic.callbackUrl}</p>
+                  <p><strong>Firebase project:</strong> {googleSignInDiagnostic.projectId}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-10 w-full border-amber-700 bg-white text-amber-950 hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-100"
+                  onClick={async () => {
+                    const text = formatGoogleSignInDiagnostic(googleSignInDiagnostic)
+                    try {
+                      await navigator.clipboard.writeText(text)
+                      setDiagnosticCopied(true)
+                    } catch {
+                      const textarea = document.createElement('textarea')
+                      textarea.value = text
+                      textarea.setAttribute('readonly', '')
+                      textarea.style.position = 'fixed'
+                      textarea.style.opacity = '0'
+                      document.body.appendChild(textarea)
+                      textarea.select()
+                      const copied = document.execCommand('copy')
+                      textarea.remove()
+                      setDiagnosticCopied(copied)
+                    }
+                  }}
+                >
+                  {diagnosticCopied ? 'Diagnostic copied' : 'Copy diagnostic details'}
+                </Button>
+                <p className="text-[11px]">
+                  These details exclude your email, password, and sign-in tokens.
+                </p>
+              </section>
+            )}
             {/* Google Button */}
             <Button
               onClick={handleGoogle}
