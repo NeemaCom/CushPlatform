@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 import { storage } from "./storage";
 import type { Request } from "express";
+import { createIpRateLimit } from "./ip-rate-limit";
 
 // Password encryption service
 export class EncryptionService {
@@ -72,49 +73,19 @@ export class SecurityLogger {
 }
 
 // Rate limiting middleware
-export const authRateLimit = rateLimit({
+export const authRateLimit = createIpRateLimit({
+  scope: "auth",
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 requests per windowMs
-  message: {
-    error: "Too many authentication attempts from this IP, please try again later.",
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: false,
-  skipFailedRequests: false,
-  handler: (req, res) => {
-    SecurityLogger.logSecurityEvent(
-      'Rate limit exceeded for authentication endpoint',
-      'warn',
-      { 
-        ip: req.ip,
-        endpoint: req.originalUrl,
-        userAgent: req.get('User-Agent')
-      }
-    );
-    res.status(429).json({
-      error: "Too many authentication attempts from this IP, please try again later.",
-    });
-  },
+  maxRequests: 5,
+  message: "Too many authentication attempts from this IP. Please try again later.",
+  includeError: true,
 });
 
-export const passwordSignInRateLimit = rateLimit({
+export const passwordSignInRateLimit = createIpRateLimit({
+  scope: "password-signin",
   windowMs: 15 * 60 * 1000,
-  max: 15,
-  message: { error: "Too many sign-in requests from this IP. Please try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    SecurityLogger.logSecurityEvent(
-      "Password sign-in rate limit exceeded",
-      "warn",
-      { ip: req.ip, endpoint: req.originalUrl, userAgent: req.get("User-Agent") },
-    );
-    res.status(429).json({
-      code: "IP_RATE_LIMIT",
-      message: "Too many sign-in requests from this IP. Please try again later.",
-    });
-  },
+  maxRequests: 15,
+  message: "Too many sign-in requests from this IP. Please try again later.",
 });
 
 export const generalRateLimit = rateLimit({

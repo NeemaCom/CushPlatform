@@ -7,3 +7,4 @@
 - [Mono bank data](mono-bank-data.md) — BVN account discovery and Mono Connect statements are separate consented flows; never store BVN/OTP or auto-score NGN data.
 - [Interswitch production checks](interswitch-production-checks.md) — provider sample did not establish BVN identity matching, inquiry effects, or fees; require written confirmation before live lookups.
 - [Post-Arrival data policy](post-arrival-data-policy.md) — arrival confirmation activates optional UK financial records; user-entered information is not verification and does not itself change scores.
+- [Shared IP rate limits](shared-ip-rate-limits.md) — authentication limits must use shared, keyed storage so restarts or extra Render instances do not reset counters.

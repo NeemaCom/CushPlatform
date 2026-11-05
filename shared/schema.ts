@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, date, check, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, date, check, index, primaryKey, unique, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -47,6 +47,29 @@ export const cushLoginAttempts = pgTable("cush_login_attempts", {
     sql`${table.email} = lower(btrim(${table.email}))`,
   ),
   lockedUntilIndex: index("cush_login_attempts_locked_until_idx").on(table.lockedUntil),
+})).enableRLS();
+
+export const cushIpRateLimits = pgTable("cush_ip_rate_limits", {
+  scope: text("scope").notNull(),
+  ipHash: text("ip_hash").notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true, mode: "date" }).notNull(),
+  requestCount: integer("request_count").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  primaryKey: primaryKey({ name: "cush_ip_rate_limits_pkey", columns: [table.scope, table.ipHash] }),
+  scopeCheck: check(
+    "cush_ip_rate_limits_scope_check",
+    sql`${table.scope} in ('auth', 'password-signin')`,
+  ),
+  ipHashCheck: check(
+    "cush_ip_rate_limits_ip_hash_check",
+    sql`${table.ipHash} ~ '^[a-f0-9]{64}$'`,
+  ),
+  requestCountCheck: check(
+    "cush_ip_rate_limits_request_count_check",
+    sql`${table.requestCount} >= 0`,
+  ),
+  updatedAtIndex: index("cush_ip_rate_limits_updated_at_idx").on(table.updatedAt),
 })).enableRLS();
 
 export const adminAuditLogs = pgTable("admin_audit_logs", {
