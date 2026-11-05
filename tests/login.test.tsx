@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Login from "@/pages/Login";
 
 const mocks = vi.hoisted(() => ({
+  getRedirectResult: vi.fn(),
   signInWithPopup: vi.fn(),
+  signInWithRedirect: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
   sendEmailVerification: vi.fn(),
   sendPasswordResetEmail: vi.fn(),
@@ -17,7 +19,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/firebase.js", () => ({
   auth: {},
   googleProvider: {},
+  getRedirectResult: mocks.getRedirectResult,
   signInWithPopup: mocks.signInWithPopup,
+  signInWithRedirect: mocks.signInWithRedirect,
   createUserWithEmailAndPassword: mocks.createUserWithEmailAndPassword,
   sendEmailVerification: mocks.sendEmailVerification,
   sendPasswordResetEmail: mocks.sendPasswordResetEmail,
@@ -109,10 +113,15 @@ describe("Login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", vi.fn());
+    sessionStorage.clear();
     mocks.sendEmailVerification.mockResolvedValue(undefined);
     mocks.sendPasswordResetEmail.mockResolvedValue(undefined);
     mocks.reload.mockResolvedValue(undefined);
     mocks.signOut.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("creates a server session for a successful password sign-in", async () => {
@@ -225,6 +234,63 @@ describe("Login", () => {
     );
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
     expect(mocks.toast).not.toHaveBeenCalled();
+  });
+
+  it("uses Firebase redirect sign-in on mobile and preserves sign-in intent", async () => {
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Linux; Android 14; Mobile)" });
+    mocks.signInWithRedirect.mockResolvedValue(undefined);
+
+    renderLogin();
+    fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() => expect(mocks.signInWithRedirect).toHaveBeenCalled());
+    expect(mocks.signInWithPopup).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("cush.google-signin-intent")).toBe(
+      JSON.stringify({ mode: "signin", marketingConsent: false }),
+    );
+  });
+
+  it("restores Google signup consent after Firebase redirects back", async () => {
+    sessionStorage.setItem(
+      "cush.google-signin-intent",
+      JSON.stringify({ mode: "signup", marketingConsent: false }),
+    );
+    mocks.getRedirectResult.mockResolvedValue({ user: firebaseUser });
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+    );
+
+    renderLogin();
+
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(mocks.getRedirectResult).toHaveBeenCalled();
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual({
+      idToken: "verified-id-token",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      marketingConsent: false,
+    });
+    expect(sessionStorage.getItem("cush.google-signin-intent")).toBeNull();
+  });
+
+  it("returns to signup with a message when a mobile Google redirect is cancelled", async () => {
+    sessionStorage.setItem(
+      "cush.google-signin-intent",
+      JSON.stringify({ mode: "signup", marketingConsent: false }),
+    );
+    mocks.getRedirectResult.mockResolvedValue(null);
+
+    renderLogin();
+
+    await waitFor(() =>
+      expect(mocks.toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Google sign-in was cancelled",
+        }),
+      ),
+    );
+    expect(screen.getAllByRole("button", { name: "Create Account" })[0]).toHaveClass("border-blue-600");
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it.each([
