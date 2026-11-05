@@ -5,7 +5,10 @@ import {
   shouldRejectUnsafeRequest,
 } from "./http-security";
 
-const allowedOrigins = new Set(["https://cush-platform.vercel.app"]);
+const allowedOrigins = new Set([
+  "https://app.we-cush.com",
+  "https://cush-platform.vercel.app",
+]);
 
 describe("API request origin checks", () => {
   it("does not reject safe methods based on Origin", () => {
@@ -22,6 +25,16 @@ describe("API request origin checks", () => {
     expect(shouldRejectUnsafeRequest(
       "POST",
       "https://cush-platform.vercel.app",
+      undefined,
+      "connect.sid=session",
+      allowedOrigins,
+    )).toBe(false);
+  });
+
+  it("allows state-changing requests from the Cush custom domain", () => {
+    expect(shouldRejectUnsafeRequest(
+      "POST",
+      "https://app.we-cush.com",
       undefined,
       "connect.sid=session",
       allowedOrigins,

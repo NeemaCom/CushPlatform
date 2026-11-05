@@ -30,6 +30,7 @@ const localOrigins = [
 ];
 const allowedOrigins = new Set([
   ...(process.env.NODE_ENV === "production" ? [] : localOrigins),
+  "https://app.we-cush.com",
   ...(process.env.FRONTEND_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
 ]);
 
