@@ -41,6 +41,7 @@ const storedUser = {
   role: "customer",
   firstName: "Test",
   lastName: "User",
+  isEmailVerified: true,
 };
 
 describe("server authentication middleware", () => {
@@ -83,6 +84,26 @@ describe("server authentication middleware", () => {
     }));
     expect(req.userId).toBe(storedUser.id);
     expect(req.session.lastActivity).toBeGreaterThan(0);
+  });
+
+  it("destroys and rejects sessions for accounts without verified email", async () => {
+    mocks.getUser.mockResolvedValue({ ...storedUser, isEmailVerified: false });
+    const destroy = vi.fn((callback: (error?: Error) => void) => callback());
+    const req = requestWithSession({
+      userId: storedUser.id,
+      lastActivity: Date.now(),
+      destroy,
+    });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: "Email verification required" });
+    expect(res.clearCookie).toHaveBeenCalledWith("connect.sid", expect.any(Object));
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("rejects a session whose user no longer exists", async () => {

@@ -43,7 +43,7 @@ import { registerRoutes } from "../server/routes";
 const user = {
   id: 12, email: "owner@example.com", username: "owner@example.com",
   firebaseUid: "trusted-uid", role: "customer", firstName: "Owner", lastName: "Test",
-  passwordHash: "hash", acceptTerms: false, acceptPrivacy: false,
+  passwordHash: "hash", acceptTerms: false, acceptPrivacy: false, isEmailVerified: true,
 };
 const identity = {
   uid: "trusted-uid", email: "owner@example.com", emailVerified: true,
@@ -157,6 +157,83 @@ describe("Firebase session sync", () => {
     expect(second.headers.get("set-cookie")?.split(";")[0]).not.toBe(firstCookie);
   });
 
+  it("records consent for a new account but does not create a session before email verification", async () => {
+    mocks.verify.mockResolvedValueOnce({ ...identity, emailVerified: false });
+    mocks.getByUid.mockResolvedValueOnce(undefined);
+
+    const res = await sync({
+      idToken: "valid",
+      acceptTerms: true,
+      acceptPrivacy: true,
+      marketingConsent: false,
+    });
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      success: true,
+      requiresEmailVerification: true,
+      isNewUser: true,
+    });
+    expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
+      firebaseUid: "trusted-uid",
+      isEmailVerified: false,
+      acceptTerms: true,
+      acceptPrivacy: true,
+    }));
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("refuses to create a session for an existing unverified Firebase account", async () => {
+    mocks.verify.mockResolvedValueOnce({ ...identity, emailVerified: false });
+
+    const res = await sync({ idToken: "valid" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({
+      error: "Verify your email before signing in.",
+      requiresEmailVerification: true,
+    });
+    expect(mocks.updateUser).toHaveBeenCalledWith(user.id, { isEmailVerified: false });
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("disables legacy registration and reset routes that bypass Firebase activation", async () => {
+    const signup = await fetch(`${baseUrl}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const forgotPassword = await fetch(`${baseUrl}/api/auth/forgot-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email }),
+    });
+    const resetPassword = await fetch(`${baseUrl}/api/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: "legacy-token", password: "ValidPass123!" }),
+    });
+
+    expect(signup.status).toBe(410);
+    expect(forgotPassword.status).toBe(410);
+    expect(resetPassword.status).toBe(410);
+    expect(mocks.createUser).not.toHaveBeenCalled();
+    expect(mocks.getByEmailForLogin).not.toHaveBeenCalled();
+  });
+
+  it("expires an existing Firebase session if the stored email is unverified", async () => {
+    const signIn = await sync({ idToken: "valid" });
+    const cookie = signIn.headers.get("set-cookie")?.split(";")[0];
+    mocks.getUser.mockResolvedValueOnce({ ...user, isEmailVerified: false });
+
+    const currentUser = await fetch(`${baseUrl}/api/auth/me`, {
+      headers: { Cookie: cookie! },
+    });
+
+    expect(currentUser.status).toBe(401);
+    expect(await currentUser.json()).toEqual({ error: "Email verification required" });
+  });
+
   it("logs out successfully, expires the cookie, and rejects the old session", async () => {
     mocks.getByUid.mockResolvedValueOnce(undefined);
     const signIn = await sync({
@@ -210,6 +287,19 @@ describe("Firebase session sync", () => {
       body: JSON.stringify({ email: user.email, password: "oauth-user-no-password" }),
     });
     expect(res.status).toBe(401);
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("does not allow legacy password login until email is verified", async () => {
+    mocks.getByEmailForLogin.mockResolvedValue({ ...user, isEmailVerified: false });
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, password: "correct-password" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "Verify your email before signing in." });
     expect(res.headers.get("set-cookie")).toBeNull();
   });
 

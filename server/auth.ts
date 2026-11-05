@@ -115,6 +115,22 @@ export async function isAuthenticated(
       return;
     }
 
+    if (!user.isEmailVerified) {
+      clearAuthSessionCookie(req, res);
+      req.session.destroy((err) => {
+        if (err) console.error("Unverified account session destruction error:", err);
+      });
+      SecurityLogger.logAuthEvent(
+        "unverified_account_session",
+        userId,
+        false,
+        req.ip,
+        req.get("User-Agent"),
+      );
+      res.status(401).json({ error: "Email verification required" });
+      return;
+    }
+
     // Create safe user object (without sensitive data)
     const safeUser: SafeUser = {
       id: user.id,

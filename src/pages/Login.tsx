@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
+import type { User as FirebaseUser } from 'firebase/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,7 +15,17 @@ import {
   signInWithPopup,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  reload,
+  signOut,
 } from '@/firebase.js'
+
+function getAuthActionSettings(returnTo: 'emailVerified' | 'passwordReset') {
+  const url = new URL('/login', window.location.origin)
+  url.searchParams.set(returnTo, '1')
+  return { url: url.toString() }
+}
 
 async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra?: Record<string, unknown>) {
   const idToken = await fbUser.getIdToken()
@@ -27,21 +38,43 @@ async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra
       ...extra,
     }),
   })
+  const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body.error || 'Auth failed')
+    const error = new Error(body.error || 'Auth failed') as Error & {
+      requiresEmailVerification?: boolean
+    }
+    error.requiresEmailVerification = body.requiresEmailVerification === true
+    throw error
   }
-  return res.json()
+  return body
 }
 
 export default function Login() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
   const qc = useQueryClient()
-  const [tab, setTab] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
   const [loading, setLoading] = useState(false)
+  const [pendingVerificationUser, setPendingVerificationUser] = useState<FirebaseUser | null>(null)
+  const [verificationEmail, setVerificationEmail] = useState('')
+  const [resetLinkSent, setResetLinkSent] = useState(false)
   const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('emailVerified') === '1') {
+      toast({ title: 'Email verified', description: 'Sign in to activate your Cush account.' })
+    }
+    if (params.get('passwordReset') === '1') {
+      toast({ title: 'Password updated', description: 'Sign in using your new password.' })
+    }
+  }, [toast])
+
+  function showVerificationPending(user: FirebaseUser) {
+    setPendingVerificationUser(user)
+    setVerificationEmail(user.email || form.email)
+  }
 
   function hasRequiredConsent() {
     if (consent.terms && consent.privacy) return true
@@ -59,22 +92,50 @@ export default function Login() {
   }
 
   async function handleGoogle() {
-    if (tab === 'signup' && !hasRequiredConsent()) return
+    if (mode === 'signup' && !hasRequiredConsent()) return
 
     setLoading(true)
     try {
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
-      await firebaseSync(
-        fbUser,
-        tab === 'signup'
-          ? {
+      await reload(fbUser)
+      if (!fbUser.emailVerified) {
+        if (mode === 'signup') {
+          try {
+            const syncResult = await firebaseSync(fbUser, {
               acceptTerms: true,
               acceptPrivacy: true,
               marketingConsent: consent.marketing,
+            })
+            if (!syncResult.requiresEmailVerification) {
+              throw new Error('Email verification is required before signing in.')
             }
-          : undefined,
-      )
+          } catch (syncError: any) {
+            if (!syncError.requiresEmailVerification) throw syncError
+          }
+        }
+        showVerificationPending(fbUser)
+        try {
+          await sendEmailVerification(fbUser, getAuthActionSettings('emailVerified'))
+        } catch (sendError: any) {
+          toast({
+            title: 'Verification email not sent',
+            description: sendError.code === 'auth/unauthorized-continue-uri'
+              ? 'Add this website domain to Firebase Authentication’s authorized domains, then resend the link.'
+              : sendError.message || 'Please try resending the verification email.',
+            variant: 'destructive',
+          })
+        }
+        return
+      }
+      await fbUser.getIdToken(true)
+      await firebaseSync(fbUser, mode === 'signup'
+        ? {
+            acceptTerms: true,
+            acceptPrivacy: true,
+            marketingConsent: consent.marketing,
+          }
+        : undefined)
       await afterLogin()
     } catch (err: any) {
       toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
@@ -88,6 +149,12 @@ export default function Login() {
     setLoading(true)
     try {
       const result = await signInWithEmailAndPassword(auth, form.email, form.password)
+      await reload(result.user)
+      if (!result.user.emailVerified) {
+        showVerificationPending(result.user)
+        return
+      }
+      await result.user.getIdToken(true)
       await firebaseSync(result.user)
       await afterLogin()
     } catch (err: any) {
@@ -110,13 +177,32 @@ export default function Login() {
     setLoading(true)
     try {
       const result = await createUserWithEmailAndPassword(auth, form.email, form.password)
-      await firebaseSync(result.user, {
+      const syncResult = await firebaseSync(result.user, {
         firstName: form.firstName,
         lastName: form.lastName,
         acceptTerms: true,
         acceptPrivacy: true,
         marketingConsent: consent.marketing,
       })
+      if (!result.user.emailVerified || syncResult.requiresEmailVerification) {
+        showVerificationPending(result.user)
+        try {
+          await sendEmailVerification(result.user, getAuthActionSettings('emailVerified'))
+          toast({
+            title: 'Check your email',
+            description: `We sent an activation link to ${result.user.email || form.email}.`,
+          })
+        } catch (sendError: any) {
+          toast({
+            title: 'Verification email not sent',
+            description: sendError.code === 'auth/unauthorized-continue-uri'
+              ? 'Add this website domain to Firebase Authentication’s authorized domains, then resend the link.'
+              : sendError.message || 'Please try resending the verification email.',
+            variant: 'destructive',
+          })
+        }
+        return
+      }
       toast({ title: 'Account created!', description: 'Welcome to Cush Passport.' })
       await afterLogin()
     } catch (err: any) {
@@ -134,6 +220,105 @@ export default function Login() {
     }
   }
 
+  async function handleResendVerification() {
+    const user = pendingVerificationUser || auth.currentUser
+    if (!user) {
+      toast({ title: 'Sign in to resend', description: 'Enter your email and password, then choose resend verification.' })
+      setPendingVerificationUser(null)
+      setMode('signin')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await reload(user)
+      if (user.emailVerified) {
+        await handleContinueAfterVerification(user)
+        return
+      }
+      await sendEmailVerification(user, getAuthActionSettings('emailVerified'))
+      toast({
+        title: 'Verification link sent',
+        description: `Check ${user.email || verificationEmail} for the activation link.`,
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Could not send verification link',
+        description: err.code === 'auth/unauthorized-continue-uri'
+          ? 'Add this website domain to Firebase Authentication’s authorized domains.'
+          : err.message || 'Please try again shortly.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleContinueAfterVerification(user = pendingVerificationUser) {
+    if (!user) return
+    setLoading(true)
+    try {
+      await reload(user)
+      if (!user.emailVerified) {
+        toast({
+          title: 'Verification not detected yet',
+          description: 'Open the link in your email, then try this button again.',
+          variant: 'destructive',
+        })
+        return
+      }
+      await user.getIdToken(true)
+      await firebaseSync(user)
+      setPendingVerificationUser(null)
+      await afterLogin()
+    } catch (err: any) {
+      toast({
+        title: 'Account activation failed',
+        description: err.message || 'Sign in again after verifying your email.',
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleUseAnotherAccount() {
+    setLoading(true)
+    try {
+      await signOut(auth)
+      setPendingVerificationUser(null)
+      setVerificationEmail('')
+      setMode('signin')
+      setForm({ email: '', password: '', firstName: '', lastName: '' })
+    } catch (err: any) {
+      toast({ title: 'Could not switch accounts', description: err.message, variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleSendPasswordReset(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      await sendPasswordResetEmail(auth, form.email.trim(), getAuthActionSettings('passwordReset'))
+      setResetLinkSent(true)
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-email') {
+        setResetLinkSent(true)
+      } else {
+        toast({
+          title: 'Could not send reset link',
+          description: err.code === 'auth/unauthorized-continue-uri'
+            ? 'Add this website domain to Firebase Authentication’s authorized domains.'
+            : err.message || 'Please try again shortly.',
+          variant: 'destructive',
+        })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 py-12 px-4">
       <div className="w-full max-w-md space-y-6">
@@ -149,23 +334,112 @@ export default function Login() {
         </div>
 
         <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-          {/* Tab Toggle */}
-          <div className="flex border-b border-slate-200 dark:border-slate-700">
-            {(['signin', 'signup'] as const).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`flex-1 py-3 text-sm font-medium transition-colors ${
-                  tab === t
-                    ? 'border-b-2 border-blue-600 text-blue-600'
-                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                }`}
-              >
-                {t === 'signin' ? 'Sign In' : 'Create Account'}
-              </button>
-            ))}
-          </div>
+          {!pendingVerificationUser && mode !== 'forgot' && (
+            <div className="flex border-b border-slate-200 dark:border-slate-700">
+              {(['signin', 'signup'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setMode(t)}
+                  className={`flex-1 py-3 text-sm font-medium transition-colors ${
+                    mode === t
+                      ? 'border-b-2 border-blue-600 text-blue-600'
+                      : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                  }`}
+                >
+                  {t === 'signin' ? 'Sign In' : 'Create Account'}
+                </button>
+              ))}
+            </div>
+          )}
 
+          {pendingVerificationUser ? (
+            <CardContent className="space-y-4 pt-6">
+              <div role="status" aria-live="polite" className="space-y-2 text-center">
+                <CardTitle className="text-xl">Verify your email to activate your account</CardTitle>
+                <CardDescription>
+                  Open the verification link sent to <strong>{verificationEmail}</strong>. You can resend it if needed.
+                </CardDescription>
+              </div>
+              <Button
+                className="w-full"
+                disabled={loading}
+                onClick={() => handleContinueAfterVerification()}
+              >
+                {loading ? 'Checking verification…' : 'I’ve verified my email'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+                onClick={handleResendVerification}
+              >
+                Resend verification email
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                disabled={loading}
+                onClick={handleUseAnotherAccount}
+              >
+                Use another account
+              </Button>
+            </CardContent>
+          ) : mode === 'forgot' ? (
+            <>
+              <CardHeader>
+                <CardTitle>Reset your password</CardTitle>
+                <CardDescription>
+                  We’ll email a secure link if an account exists for that address.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                {resetLinkSent ? (
+                  <div role="status" aria-live="polite" className="space-y-4 text-sm text-slate-600">
+                    <p>If an account exists for that email, a password reset link has been sent.</p>
+                    <Button
+                      type="button"
+                      className="w-full"
+                      onClick={() => {
+                        setResetLinkSent(false)
+                        setMode('signin')
+                      }}
+                    >
+                      Back to Sign In
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendPasswordReset} className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="reset-email" className="text-xs">Email</Label>
+                      <Input
+                        id="reset-email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        className="h-9 text-sm"
+                      />
+                    </div>
+                    <Button type="submit" className="w-full h-9" disabled={loading}>
+                      {loading ? 'Sending link…' : 'Send reset link'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full"
+                      disabled={loading}
+                      onClick={() => setMode('signin')}
+                    >
+                      Back to Sign In
+                    </Button>
+                  </form>
+                )}
+              </CardContent>
+            </>
+          ) : (
           <CardContent className="pt-6 space-y-4">
             {/* Google Button */}
             <Button
@@ -190,7 +464,7 @@ export default function Login() {
               </span>
             </div>
 
-            {tab === 'signup' && (
+            {mode === 'signup' && (
               <fieldset className="space-y-3 rounded-md border border-slate-200 p-3 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
                 <legend className="sr-only">Required agreements and optional marketing preference</legend>
                 <label htmlFor="accept-terms" className="flex cursor-pointer items-start gap-2 leading-relaxed">
@@ -248,7 +522,7 @@ export default function Login() {
               </fieldset>
             )}
 
-            {tab === 'signin' ? (
+            {mode === 'signin' ? (
               <form onSubmit={handleEmailSignIn} className="space-y-3">
                 <div className="space-y-1">
                   <Label htmlFor="email" className="text-xs">Email</Label>
@@ -273,6 +547,19 @@ export default function Login() {
                     onChange={(e) => setForm({ ...form, password: e.target.value })}
                     className="h-9 text-sm"
                   />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto px-0 text-xs"
+                    onClick={() => {
+                      setResetLinkSent(false)
+                      setMode('forgot')
+                    }}
+                  >
+                    Forgot password?
+                  </Button>
                 </div>
                 <Button type="submit" className="w-full h-9" disabled={loading}>
                   {loading ? 'Signing in…' : 'Sign In'}
@@ -334,6 +621,7 @@ export default function Login() {
               </form>
             )}
           </CardContent>
+          )}
         </Card>
 
         <p className="text-center text-xs text-slate-400">

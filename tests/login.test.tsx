@@ -7,6 +7,10 @@ const mocks = vi.hoisted(() => ({
   signInWithPopup: vi.fn(),
   signInWithEmailAndPassword: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
+  sendEmailVerification: vi.fn(),
+  sendPasswordResetEmail: vi.fn(),
+  reload: vi.fn(),
+  signOut: vi.fn(),
   setLocation: vi.fn(),
   toast: vi.fn(),
 }));
@@ -17,6 +21,10 @@ vi.mock("@/firebase.js", () => ({
   signInWithPopup: mocks.signInWithPopup,
   signInWithEmailAndPassword: mocks.signInWithEmailAndPassword,
   createUserWithEmailAndPassword: mocks.createUserWithEmailAndPassword,
+  sendEmailVerification: mocks.sendEmailVerification,
+  sendPasswordResetEmail: mocks.sendPasswordResetEmail,
+  reload: mocks.reload,
+  signOut: mocks.signOut,
 }));
 
 vi.mock("wouter", () => ({
@@ -103,6 +111,10 @@ describe("Login", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", vi.fn());
+    mocks.sendEmailVerification.mockResolvedValue(undefined);
+    mocks.sendPasswordResetEmail.mockResolvedValue(undefined);
+    mocks.reload.mockResolvedValue(undefined);
+    mocks.signOut.mockResolvedValue(undefined);
   });
 
   it("syncs a successful Firebase sign-in and redirects to the dashboard", async () => {
@@ -268,11 +280,11 @@ describe("Login", () => {
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
   });
 
-  it("syncs a created account, shows loading, and redirects", async () => {
+  it("creates a pending account, sends an activation link, and blocks dashboard access", async () => {
     const accountCreation = deferred<{ user: typeof firebaseUser }>();
     mocks.createUserWithEmailAndPassword.mockReturnValue(accountCreation.promise);
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+      syncResponse(200, { success: true, requiresEmailVerification: true }) as Response,
     );
 
     renderLogin();
@@ -284,7 +296,7 @@ describe("Login", () => {
     expect(mocks.setLocation).not.toHaveBeenCalled();
 
     accountCreation.resolve({ user: { ...firebaseUser, emailVerified: false } });
-    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
 
     expect(mocks.createUserWithEmailAndPassword).toHaveBeenCalledWith(
       {},
@@ -305,10 +317,88 @@ describe("Login", () => {
         marketingConsent: false,
       },
     );
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Account created!" }),
+    expect(mocks.sendEmailVerification).toHaveBeenCalledWith(
+      expect.objectContaining({ emailVerified: false }),
+      expect.objectContaining({ url: expect.stringContaining("emailVerified=1") }),
     );
-    expect(getSignUpSubmitButton()).toBeEnabled();
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+  });
+
+  it("does not sync an unverified sign-in and offers a resend action", async () => {
+    mocks.signInWithEmailAndPassword.mockResolvedValue({
+      user: { ...firebaseUser, emailVerified: false },
+    });
+
+    renderLogin();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct-password" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
+
+    expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
+    await waitFor(() => expect(mocks.sendEmailVerification).toHaveBeenCalled());
+    expect(mocks.toast).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Verification link sent" }),
+    );
+  });
+
+  it("activates the server session after the verification link is confirmed", async () => {
+    const unverifiedUser = { ...firebaseUser, emailVerified: false };
+    mocks.signInWithEmailAndPassword.mockResolvedValue({ user: unverifiedUser });
+    mocks.reload
+      .mockImplementationOnce(async () => {})
+      .mockImplementationOnce(async (user: typeof unverifiedUser) => {
+      user.emailVerified = true;
+      });
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+    );
+
+    renderLogin();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "correct-password" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
+    fireEvent.click(await screen.findByRole("button", { name: "I’ve verified my email" }));
+
+    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(unverifiedUser.getIdToken).toHaveBeenCalledWith(true);
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/auth/firebase-sync",
+      expect.objectContaining({ method: "POST", credentials: "include" }),
+    );
+  });
+
+  it("sends a Firebase password reset link with a generic response", async () => {
+    renderLogin();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText(
+      "If an account exists for that email, a password reset link has been sent.",
+    )).toBeInTheDocument();
+    expect(mocks.sendPasswordResetEmail).toHaveBeenCalledWith(
+      {},
+      "user@example.com",
+      expect.objectContaining({ url: expect.stringContaining("passwordReset=1") }),
+    );
+  });
+
+  it("does not reveal whether an email has a Firebase account during password reset", async () => {
+    mocks.sendPasswordResetEmail.mockRejectedValue({ code: "auth/user-not-found" });
+
+    renderLogin();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "unknown@example.com" } });
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    fireEvent.click(screen.getByRole("button", { name: "Send reset link" }));
+
+    expect(await screen.findByText(
+      "If an account exists for that email, a password reset link has been sent.",
+    )).toBeInTheDocument();
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -383,9 +473,11 @@ describe("Login", () => {
   });
 
   it("allows email signup with required policies accepted but marketing left unchecked", async () => {
-    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({
+      user: { ...firebaseUser, emailVerified: false },
+    });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+      syncResponse(200, { success: true, requiresEmailVerification: true }) as Response,
     );
 
     renderLogin();
@@ -399,7 +491,7 @@ describe("Login", () => {
     expect(marketingCheckbox).not.toBeRequired();
 
     submitSignUpForm();
-    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
 
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
       acceptTerms: true,
@@ -409,9 +501,11 @@ describe("Login", () => {
   });
 
   it("sends marketing consent when the user opts in during email signup", async () => {
-    mocks.createUserWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+    mocks.createUserWithEmailAndPassword.mockResolvedValue({
+      user: { ...firebaseUser, emailVerified: false },
+    });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+      syncResponse(200, { success: true, requiresEmailVerification: true }) as Response,
     );
 
     renderLogin();
@@ -420,7 +514,7 @@ describe("Login", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Email me product updates and offers/ }));
     submitSignUpForm();
 
-    await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
+    expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
       acceptTerms: true,
       acceptPrivacy: true,

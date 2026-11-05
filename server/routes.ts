@@ -8,11 +8,8 @@ import type { User } from "@shared/schema";
 import { createPostgresSessionStore } from "./session-store";
 import { ensureFirebaseConfigured, verifyFirebaseIdentity } from "./firebase-auth";
 import {
-  registerSchema,
   loginSchema,
   updateProfileSchema,
-  passwordRecoverySchema,
-  resetPasswordSchema,
 } from "@shared/schema";
 import {
   EncryptionService,
@@ -21,7 +18,6 @@ import {
   generalRateLimit,
   sanitizeRequest,
   validatePasswordStrength,
-  isValidEmail,
 } from "./security";
 import {
   isAuthenticated,
@@ -155,19 +151,51 @@ export async function registerRoutes(
           marketingConsent: req.body.marketingConsent === true,
           role: "user",
         });
+        if (!emailVerified) {
+          if (req.session.userId) {
+            clearAuthSessionCookie(req, res);
+            req.session.destroy((error) => {
+              if (error) console.error("[Unverified Signup Session Destruction Error]:", error);
+            });
+          }
+          return res.json({
+            success: true,
+            requiresEmailVerification: true,
+            isNewUser: true,
+          });
+        }
         await createLoginSession(req, user);
         SecurityLogger.logAuthEvent("firebase_signup_success", user.id, true, req.ip, req.get("User-Agent"));
         return res.json({ success: true, user: createSafeUser(user), isNewUser: true });
       }
 
-      await createLoginSession(req, user);
+      if (!emailVerified) {
+        await storage.updateUser(user.id, { isEmailVerified: false });
+        if (req.session.userId) {
+          clearAuthSessionCookie(req, res);
+          req.session.destroy((error) => {
+            if (error) console.error("[Unverified Firebase Session Destruction Error]:", error);
+          });
+        }
+        return res.status(403).json({
+          error: "Verify your email before signing in.",
+          requiresEmailVerification: true,
+        });
+      }
+
       try {
         const profileName = firebaseProfileNamePatch(user, displayName);
-        await storage.updateUser(user.id, { ...profileName, lastLoginAt: new Date() });
+        user = await storage.updateUser(user.id, {
+          ...profileName,
+          isEmailVerified: true,
+          lastLoginAt: new Date(),
+        });
       } catch (error) {
-        // Profile hydration and last-login tracking are best effort; do not block sign-in.
+        // Do not create a session if the verified state could not be persisted.
         console.error("[Firebase Sync Profile Update Error]:", error);
+        throw error;
       }
+      await createLoginSession(req, user);
       SecurityLogger.logAuthEvent("firebase_sync_success", user.id, true, req.ip, req.get("User-Agent"));
       return res.json({ success: true, user: createSafeUser(user) });
     } catch (error) {
@@ -183,43 +211,13 @@ export async function registerRoutes(
   });
 
   // ── Sign up ───────────────────────────────────────────────────────────────
-  app.post("/api/auth/signup", authRateLimit, async (req: AuthenticatedRequest, res) => {
-    try {
-      const data = registerSchema.parse(req.body);
-
-      const pwCheck = validatePasswordStrength(data.password);
-      if (!pwCheck.isValid) return res.status(400).json({ error: "Password does not meet requirements", details: pwCheck.errors });
-
-      const [byUsername, byEmail] = await Promise.all([
-        storage.getUserByUsername(data.username),
-        storage.getUserByEmail(data.email),
-      ]);
-      if (byUsername) return res.status(400).json({ error: "Username already exists" });
-      if (byEmail)    return res.status(400).json({ error: "Email already exists" });
-
-      const passwordHash = await EncryptionService.hashPassword(data.password);
-      const user = await storage.createUser({
-        username: data.username, email: data.email, passwordHash,
-        firstName: data.firstName, lastName: data.lastName,
-        phoneNumber: data.phoneNumber || null, nationality: data.nationality || null,
-        acceptTerms: data.acceptTerms, acceptPrivacy: data.acceptPrivacy,
-        marketingConsent: data.marketingConsent || false,
-      });
-
-      await createLoginSession(req, user);
-
-      SecurityLogger.logAuthEvent("user_registration", user.id, true, req.ip, req.get("User-Agent"));
-      return res.status(201).json(createSafeUser(user));
-    } catch (error) {
-      console.error("Registration error:", error);
-      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid input", details: error.errors.map(e => e.message) });
-      res.status(500).json({ error: "Registration failed" });
-    }
-  });
+  app.post("/api/auth/signup", authRateLimit, (_req, res) =>
+    res.status(410).json({ error: "Account registration is handled by Firebase Authentication." })
+  );
 
   // Alias
   app.post("/api/auth/register", authRateLimit, (_req, res) =>
-    res.status(400).json({ error: "Deprecated. Use /api/auth/signup or Firebase authentication." })
+    res.status(410).json({ error: "Account registration is handled by Firebase Authentication." })
   );
 
   // ── Sign in ───────────────────────────────────────────────────────────────
@@ -239,6 +237,9 @@ export async function registerRoutes(
       }
       const ok = await EncryptionService.verifyPassword(password, user.passwordHash);
       if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+      if (!user.isEmailVerified) {
+        return res.status(403).json({ error: "Verify your email before signing in." });
+      }
 
       await storage.updateUser(user.id, { lastLoginAt: new Date() }).catch(() => {});
       await createLoginSession(req, user);
@@ -346,41 +347,14 @@ export async function registerRoutes(
     }
   });
 
-  // ── Forgot / reset password ───────────────────────────────────────────────
-  app.post("/api/auth/forgot-password", authRateLimit, async (req, res) => {
-    try {
-      const { email } = req.body;
-      if (!email || !isValidEmail(email)) return res.status(400).json({ error: "Valid email required" });
-      const user = await storage.getUserByEmail(email).catch(() => null);
-      if (user) {
-        const token = EncryptionService.generateSecureToken();
-        await storage.savePasswordResetToken(user.id, token, new Date(Date.now() + 3600000));
-        console.log(`[PASSWORD RESET] Link for ${email}: ${req.protocol}://${req.get("host")}/reset-password?token=${token}`);
-      }
-      res.json({ message: "If an account exists for that email, a reset link has been sent." });
-    } catch {
-      res.status(500).json({ error: "Failed to process request" });
-    }
-  });
-
-  app.post("/api/auth/reset-password", authRateLimit, async (req, res) => {
-    try {
-      const { token, password } = resetPasswordSchema.parse(req.body);
-      const user = await storage.getUserByResetToken(token).catch(() => null);
-      if (!user || !user.passwordResetExpires || user.passwordResetExpires < new Date()) {
-        return res.status(400).json({ error: "Invalid or expired reset token" });
-      }
-      const pwCheck = validatePasswordStrength(password);
-      if (!pwCheck.isValid) return res.status(400).json({ error: "Password does not meet requirements", details: pwCheck.errors });
-
-      const hash = await EncryptionService.hashPassword(password);
-      await storage.updateUser(user.id, { passwordHash: hash, passwordResetToken: null, passwordResetExpires: null });
-      res.json({ message: "Password reset successfully" });
-    } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid input" });
-      res.status(500).json({ error: "Password reset failed" });
-    }
-  });
+  // Firebase Auth sends the reset link and handles its one-time code.
+  // These legacy endpoints are disabled; they previously logged reset links.
+  app.post("/api/auth/forgot-password", authRateLimit, (_req, res) =>
+    res.status(410).json({ error: "Use the password reset link on the sign-in page." })
+  );
+  app.post("/api/auth/reset-password", authRateLimit, (_req, res) =>
+    res.status(410).json({ error: "Password resets are handled by Firebase Authentication." })
+  );
 
   // ── HTTP Server ───────────────────────────────────────────────────────────
   const httpServer = createServer(app);
