@@ -13,13 +13,13 @@ import {
   auth,
   googleProvider,
   signInWithPopup,
-  signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendEmailVerification,
   sendPasswordResetEmail,
   reload,
   signOut,
 } from '@/firebase.js'
+import { LOGIN_SUPPORT_EMAIL } from '@shared/auth-constants'
 
 function getAuthActionSettings(returnTo: 'emailVerified' | 'passwordReset') {
   const url = new URL('/login', window.location.origin)
@@ -40,10 +40,12 @@ async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const error = new Error(body.error || 'Auth failed') as Error & {
+      const error = new Error(body.message || body.error || 'Auth failed') as Error & {
       requiresEmailVerification?: boolean
+        code?: string
     }
     error.requiresEmailVerification = body.requiresEmailVerification === true
+      error.code = body.code
     throw error
   }
   return body
@@ -56,7 +58,9 @@ export default function Login() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
   const [loading, setLoading] = useState(false)
   const [pendingVerificationUser, setPendingVerificationUser] = useState<FirebaseUser | null>(null)
+  const [passwordLoginPending, setPasswordLoginPending] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
+  const [signInMessage, setSignInMessage] = useState<{ text: string; support: boolean } | null>(null)
   const [resetLinkSent, setResetLinkSent] = useState(false)
   const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
@@ -73,6 +77,7 @@ export default function Login() {
 
   function showVerificationPending(user: FirebaseUser) {
     setPendingVerificationUser(user)
+    setPasswordLoginPending(false)
     setVerificationEmail(user.email || form.email)
   }
 
@@ -138,33 +143,69 @@ export default function Login() {
         : undefined)
       await afterLogin()
     } catch (err: any) {
+      if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
+        setSignInMessage({
+          text: err.message,
+          support: err.code === 'PERMANENT_ACCOUNT_LOCK',
+        })
+        return
+      }
       toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
     } finally {
       setLoading(false)
     }
   }
 
+  async function performPasswordSignIn() {
+    const response = await fetch(`${API_BASE_URL}/api/auth/password-signin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email: form.email.trim(), password: form.password }),
+    })
+    const body = await response.json().catch(() => ({}))
+
+    if (body.requiresEmailVerification === true) {
+      setPendingVerificationUser(null)
+      setPasswordLoginPending(true)
+      setVerificationEmail(body.email || form.email.trim())
+      setSignInMessage(body.verificationEmailSent
+        ? null
+        : { text: 'We could not send the activation email. Try resending it, or contact support if this continues.', support: true })
+      if (body.verificationEmailSent) {
+        toast({
+          title: 'Verify your email',
+          description: `We sent an activation link to ${body.email || form.email.trim()}.`,
+        })
+      }
+      return
+    }
+
+    if (!response.ok) {
+      setSignInMessage({
+        text: body.message || 'Sign-in could not be completed. Please try again.',
+        support: body.code === 'PERMANENT_ACCOUNT_LOCK',
+      })
+      return
+    }
+
+    setSignInMessage(null)
+    setPasswordLoginPending(false)
+    await afterLogin()
+  }
+
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault()
+    setSignInMessage(null)
     setLoading(true)
     try {
-      const result = await signInWithEmailAndPassword(auth, form.email, form.password)
-      await reload(result.user)
-      if (!result.user.emailVerified) {
-        showVerificationPending(result.user)
-        return
-      }
-      await result.user.getIdToken(true)
-      await firebaseSync(result.user)
-      await afterLogin()
+      await performPasswordSignIn()
     } catch (err: any) {
-      const msg =
-        err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found'
-          ? 'Invalid email or password.'
-          : err.code === 'auth/too-many-requests'
-          ? 'Too many attempts. Please wait and try again.'
-          : err.message
-      toast({ title: 'Sign-in failed', description: msg, variant: 'destructive' })
+      toast({
+        title: 'Sign-in unavailable',
+        description: err.message || 'Please check your connection and try again.',
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -221,6 +262,21 @@ export default function Login() {
   }
 
   async function handleResendVerification() {
+    if (passwordLoginPending) {
+      setLoading(true)
+      try {
+        await performPasswordSignIn()
+      } catch (err: any) {
+        toast({
+          title: 'Could not resend verification email',
+          description: err.message || 'Please try again shortly.',
+          variant: 'destructive',
+        })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
     const user = pendingVerificationUser || auth.currentUser
     if (!user) {
       toast({ title: 'Sign in to resend', description: 'Enter your email and password, then choose resend verification.' })
@@ -255,6 +311,21 @@ export default function Login() {
   }
 
   async function handleContinueAfterVerification(user = pendingVerificationUser) {
+    if (!user && passwordLoginPending) {
+      setLoading(true)
+      try {
+        await performPasswordSignIn()
+      } catch (err: any) {
+        toast({
+          title: 'Account activation failed',
+          description: err.message || 'Please sign in again after verifying your email.',
+          variant: 'destructive',
+        })
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
     if (!user) return
     setLoading(true)
     try {
@@ -287,6 +358,8 @@ export default function Login() {
     try {
       await signOut(auth)
       setPendingVerificationUser(null)
+      setPasswordLoginPending(false)
+      setSignInMessage(null)
       setVerificationEmail('')
       setMode('signin')
       setForm({ email: '', password: '', firstName: '', lastName: '' })
@@ -334,12 +407,15 @@ export default function Login() {
         </div>
 
         <Card className="border-slate-200 dark:border-slate-800 shadow-sm">
-          {!pendingVerificationUser && mode !== 'forgot' && (
+          {!pendingVerificationUser && !passwordLoginPending && mode !== 'forgot' && (
             <div className="flex border-b border-slate-200 dark:border-slate-700">
               {(['signin', 'signup'] as const).map((t) => (
                 <button
                   key={t}
-                  onClick={() => setMode(t)}
+                  onClick={() => {
+                    setMode(t)
+                    setSignInMessage(null)
+                  }}
                   className={`flex-1 py-3 text-sm font-medium transition-colors ${
                     mode === t
                       ? 'border-b-2 border-blue-600 text-blue-600'
@@ -352,7 +428,7 @@ export default function Login() {
             </div>
           )}
 
-          {pendingVerificationUser ? (
+          {pendingVerificationUser || passwordLoginPending ? (
             <CardContent className="space-y-4 pt-6">
               <div role="status" aria-live="polite" className="space-y-2 text-center">
                 <CardTitle className="text-xl">Verify your email to activate your account</CardTitle>
@@ -360,6 +436,16 @@ export default function Login() {
                   Open the verification link sent to <strong>{verificationEmail}</strong>. You can resend it if needed.
                 </CardDescription>
               </div>
+              {signInMessage && (
+                <div role="alert" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+                  <p>{signInMessage.text}</p>
+                  {signInMessage.support && (
+                    <a className="mt-1 inline-block font-medium underline" href={`mailto:${LOGIN_SUPPORT_EMAIL}`}>
+                      Contact support
+                    </a>
+                  )}
+                </div>
+              )}
               <Button
                 className="w-full"
                 disabled={loading}
@@ -548,6 +634,20 @@ export default function Login() {
                     className="h-9 text-sm"
                   />
                 </div>
+                {signInMessage && (
+                  <div role="alert" className={`rounded-md border p-3 text-sm ${
+                    signInMessage.support
+                      ? 'border-rose-300 bg-rose-50 text-rose-900'
+                      : 'border-amber-300 bg-amber-50 text-amber-950'
+                  }`}>
+                    <p>{signInMessage.text}</p>
+                    {signInMessage.support && (
+                      <a className="mt-1 inline-block font-medium underline" href={`mailto:${LOGIN_SUPPORT_EMAIL}`}>
+                        Contact support
+                      </a>
+                    )}
+                  </div>
+                )}
                 <div className="flex justify-end">
                   <Button
                     type="button"

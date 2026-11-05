@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
+  passwordSignIn: vi.fn(),
+  sendVerificationEmail: vi.fn(),
   getUser: vi.fn(),
   getByUid: vi.fn(),
   getByEmail: vi.fn(),
@@ -12,11 +14,27 @@ const mocks = vi.hoisted(() => ({
   getByUsername: vi.fn(),
   createUser: vi.fn(),
   updateUser: vi.fn(),
+  getLoginAttemptState: vi.fn(),
+  getLockoutResponse: vi.fn(),
+  recordFailedLogin: vi.fn(),
+  getFailedLoginResponse: vi.fn(),
+  clearLoginAttemptState: vi.fn(),
+  revokeUserSessions: vi.fn(),
+  FirebaseAuthError: class extends Error {
+    code: string;
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  },
 }));
 
 vi.mock("../server/firebase-auth", () => ({
   ensureFirebaseConfigured: vi.fn(),
   verifyFirebaseIdentity: mocks.verify,
+  signInWithFirebasePassword: mocks.passwordSignIn,
+  sendFirebaseVerificationEmail: mocks.sendVerificationEmail,
+  FirebaseAuthError: mocks.FirebaseAuthError,
 }));
 vi.mock("../server/storage", () => ({
   storage: {
@@ -33,9 +51,19 @@ vi.mock("../server/passport-routes", () => ({ registerPassportRoutes: vi.fn() })
 vi.mock("../server/security", () => ({
   generalRateLimit: (_req: unknown, _res: unknown, next: () => void) => next(),
   authRateLimit: (_req: unknown, _res: unknown, next: () => void) => next(),
+  passwordSignInRateLimit: (_req: unknown, _res: unknown, next: () => void) => next(),
   sanitizeRequest: (_req: unknown, _res: unknown, next: () => void) => next(),
   SecurityLogger: { logAuthEvent: vi.fn() },
   EncryptionService: { verifyPassword: vi.fn().mockResolvedValue(true) },
+}));
+vi.mock("../server/login-attempts", () => ({
+  getLoginAttemptState: mocks.getLoginAttemptState,
+  getLockoutResponse: mocks.getLockoutResponse,
+  recordFailedLogin: mocks.recordFailedLogin,
+  getFailedLoginResponse: mocks.getFailedLoginResponse,
+  clearLoginAttemptState: mocks.clearLoginAttemptState,
+  revokeUserSessions: mocks.revokeUserSessions,
+  normalizeLoginEmail: (email: string) => email.trim().toLowerCase(),
 }));
 
 import { registerRoutes } from "../server/routes";
@@ -59,6 +87,8 @@ describe("Firebase session sync", () => {
     vi.clearAllMocks();
     process.env.SESSION_SECRET = "test-only-unique-secret-with-32-plus-characters";
     mocks.verify.mockResolvedValue(identity);
+    mocks.passwordSignIn.mockResolvedValue("firebase-id-token");
+    mocks.sendVerificationEmail.mockResolvedValue(undefined);
     mocks.getUser.mockResolvedValue(user);
     mocks.getByUid.mockResolvedValue(user);
     mocks.getByEmail.mockResolvedValue(undefined);
@@ -66,6 +96,23 @@ describe("Firebase session sync", () => {
     mocks.getByUsername.mockResolvedValue(undefined);
     mocks.updateUser.mockResolvedValue(user);
     mocks.createUser.mockResolvedValue(user);
+    mocks.getLoginAttemptState.mockResolvedValue({
+      failedAttempts: 0,
+      lockedUntil: null,
+      permanentlyLocked: false,
+    });
+    mocks.getLockoutResponse.mockReturnValue(null);
+    mocks.recordFailedLogin.mockResolvedValue({
+      failedAttempts: 1,
+      lockedUntil: null,
+      permanentlyLocked: false,
+    });
+    mocks.getFailedLoginResponse.mockReturnValue({
+      status: 401,
+      body: { code: "INVALID_CREDENTIALS", attemptsRemaining: 2, message: "Incorrect password." },
+    });
+    mocks.clearLoginAttemptState.mockResolvedValue(undefined);
+    mocks.revokeUserSessions.mockResolvedValue(undefined);
     const app = express();
     app.use(express.json());
     server = await registerRoutes(app, async () => new session.MemoryStore());
@@ -89,6 +136,14 @@ describe("Firebase session sync", () => {
     });
   }
 
+  function passwordSignIn(email: string, password: string) {
+    return fetch(`${baseUrl}/api/auth/password-signin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+  }
+
   it("requires a valid token and never trusts forged identity fields", async () => {
     expect((await sync({ uid: "trusted-uid", email: identity.email })).status).toBe(401);
     mocks.verify.mockRejectedValueOnce(new Error("expired or invalid"));
@@ -100,6 +155,101 @@ describe("Firebase session sync", () => {
     expect(mocks.getByUid).toHaveBeenCalledWith("trusted-uid");
     expect(mocks.getByEmail).not.toHaveBeenCalled();
     expect((await res.json()).user.email).toBe("owner@example.com");
+  });
+
+  it("blocks Firebase sync while the account is temporarily or permanently locked", async () => {
+    mocks.getLockoutResponse.mockReturnValueOnce({
+      status: 423,
+      body: { code: "TEMPORARY_ACCOUNT_LOCK", message: "Try again in five minutes." },
+    });
+
+    const res = await sync({ idToken: "valid" });
+
+    expect(res.status).toBe(423);
+    expect(await res.json()).toEqual({
+      code: "TEMPORARY_ACCOUNT_LOCK",
+      message: "Try again in five minutes.",
+    });
+    expect(mocks.getByUid).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("tracks failed password attempts and returns the remaining-attempt warning", async () => {
+    mocks.passwordSignIn.mockRejectedValue(
+      new mocks.FirebaseAuthError("INVALID_CREDENTIALS", "Invalid email or password."),
+    );
+    mocks.recordFailedLogin
+      .mockResolvedValueOnce({ failedAttempts: 1, lockedUntil: null, permanentlyLocked: false })
+      .mockResolvedValueOnce({ failedAttempts: 2, lockedUntil: null, permanentlyLocked: false });
+    mocks.getFailedLoginResponse
+      .mockReturnValueOnce({
+        status: 401,
+        body: { code: "INVALID_CREDENTIALS", attemptsRemaining: 2, message: "2 more attempts before lockout." },
+      })
+      .mockReturnValueOnce({
+        status: 401,
+        body: { code: "INVALID_CREDENTIALS", attemptsRemaining: 1, message: "1 more attempt before lockout." },
+      });
+
+    const first = await passwordSignIn("Owner@Example.com", "wrong-one");
+    const second = await passwordSignIn("owner@example.com", "wrong-two");
+
+    expect(first.status).toBe(401);
+    expect(await first.json()).toMatchObject({ attemptsRemaining: 2 });
+    expect(second.status).toBe(401);
+    expect(await second.json()).toMatchObject({ attemptsRemaining: 1 });
+    expect(mocks.recordFailedLogin).toHaveBeenNthCalledWith(1, "owner@example.com");
+    expect(mocks.recordFailedLogin).toHaveBeenNthCalledWith(2, "owner@example.com");
+  });
+
+  it("permanently locks after the fifth failed password and revokes that user's sessions", async () => {
+    mocks.getByEmail.mockResolvedValueOnce(user);
+    mocks.passwordSignIn.mockRejectedValue(
+      new mocks.FirebaseAuthError("INVALID_CREDENTIALS", "Invalid email or password."),
+    );
+    mocks.recordFailedLogin.mockResolvedValue({
+      failedAttempts: 5,
+      lockedUntil: null,
+      permanentlyLocked: true,
+    });
+    mocks.getFailedLoginResponse.mockReturnValue({
+      status: 423,
+      body: {
+        code: "PERMANENT_ACCOUNT_LOCK",
+        message: "Contact support@we-cush.com to restore access.",
+      },
+    });
+
+    const res = await passwordSignIn("owner@example.com", "wrong-password");
+
+    expect(res.status).toBe(423);
+    expect((await res.json()).message).toContain("support@we-cush.com");
+    expect(mocks.revokeUserSessions).toHaveBeenCalledWith(user.id);
+  });
+
+  it("creates a session after verified Firebase password sign-in", async () => {
+    const res = await passwordSignIn("owner@example.com", "correct-password");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ success: true, user: { id: user.id } });
+    expect(res.headers.get("set-cookie")).toContain("connect.sid=");
+    expect(mocks.passwordSignIn).toHaveBeenCalledWith("owner@example.com", "correct-password");
+    expect(mocks.clearLoginAttemptState).toHaveBeenCalledWith("owner@example.com");
+  });
+
+  it("sends activation email without creating a session for an unverified password account", async () => {
+    mocks.verify.mockResolvedValueOnce({ ...identity, emailVerified: false });
+
+    const res = await passwordSignIn("owner@example.com", "correct-password");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      requiresEmailVerification: true,
+      verificationEmailSent: true,
+      email: identity.email,
+    });
+    expect(mocks.sendVerificationEmail).toHaveBeenCalledWith("firebase-id-token");
+    expect(res.headers.get("set-cookie")).toBeNull();
   });
 
   it("refuses to link an existing account by matching email alone", async () => {

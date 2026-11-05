@@ -3,6 +3,7 @@ import { storage } from "./storage";
 import { SecurityLogger } from "./security";
 import type { User, SafeUser } from "@shared/schema";
 import { hasAdminPermission, type AdminPermission } from "@shared/admin-permissions";
+import { getLoginAttemptState, getLockoutResponse } from "./login-attempts";
 
 declare module "express-session" {
   interface SessionData {
@@ -112,6 +113,23 @@ export async function isAuthenticated(
       );
       
       res.status(401).json({ error: "Invalid session" });
+      return;
+    }
+
+    const lockout = getLockoutResponse(await getLoginAttemptState(user.email));
+    if (lockout) {
+      clearAuthSessionCookie(req, res);
+      req.session.destroy((err) => {
+        if (err) console.error("Locked account session destruction error:", err);
+      });
+      SecurityLogger.logAuthEvent(
+        "locked_account_session",
+        userId,
+        false,
+        req.ip,
+        req.get("User-Agent"),
+      );
+      res.status(lockout.status).json(lockout.body);
       return;
     }
 

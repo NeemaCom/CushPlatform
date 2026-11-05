@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   logAuthEvent: vi.fn(),
+  getLoginAttemptState: vi.fn(),
+  getLockoutResponse: vi.fn(),
 }));
 
 vi.mock("../server/storage", () => ({
@@ -11,6 +13,11 @@ vi.mock("../server/storage", () => ({
 
 vi.mock("../server/security", () => ({
   SecurityLogger: { logAuthEvent: mocks.logAuthEvent },
+}));
+
+vi.mock("../server/login-attempts", () => ({
+  getLoginAttemptState: mocks.getLoginAttemptState,
+  getLockoutResponse: mocks.getLockoutResponse,
 }));
 
 import { isAuthenticated } from "../server/auth";
@@ -48,6 +55,12 @@ describe("server authentication middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getUser.mockResolvedValue(storedUser);
+    mocks.getLoginAttemptState.mockResolvedValue({
+      failedAttempts: 0,
+      lockedUntil: null,
+      permanentlyLocked: false,
+    });
+    mocks.getLockoutResponse.mockReturnValue(null);
   });
 
   it("rejects requests without a session user", async () => {
@@ -84,6 +97,32 @@ describe("server authentication middleware", () => {
     }));
     expect(req.userId).toBe(storedUser.id);
     expect(req.session.lastActivity).toBeGreaterThan(0);
+  });
+
+  it("destroys an active session when the account is locked", async () => {
+    mocks.getLockoutResponse.mockReturnValue({
+      status: 423,
+      body: { code: "PERMANENT_ACCOUNT_LOCK", message: "Contact support." },
+    });
+    const destroy = vi.fn((callback: (error?: Error) => void) => callback());
+    const req = requestWithSession({
+      userId: storedUser.id,
+      lastActivity: Date.now(),
+      destroy,
+    });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(423);
+    expect(res.json).toHaveBeenCalledWith({
+      code: "PERMANENT_ACCOUNT_LOCK",
+      message: "Contact support.",
+    });
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(res.clearCookie).toHaveBeenCalledWith("connect.sid", expect.any(Object));
+    expect(next).not.toHaveBeenCalled();
   });
 
   it("destroys and rejects sessions for accounts without verified email", async () => {

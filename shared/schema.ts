@@ -31,6 +31,24 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }).enableRLS();
 
+export const cushLoginAttempts = pgTable("cush_login_attempts", {
+  email: text("email").primaryKey(),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+  permanentlyLocked: boolean("permanently_locked").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  failedAttemptsCheck: check(
+    "cush_login_attempts_failed_attempts_check",
+    sql`${table.failedAttempts} between 0 and 5`,
+  ),
+  normalizedEmailCheck: check(
+    "cush_login_attempts_normalized_email_check",
+    sql`${table.email} = lower(btrim(${table.email}))`,
+  ),
+  lockedUntilIndex: index("cush_login_attempts_locked_until_idx").on(table.lockedUntil),
+})).enableRLS();
+
 export const adminAuditLogs = pgTable("admin_audit_logs", {
   id: serial("id").primaryKey(),
   adminUserId: integer("admin_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),

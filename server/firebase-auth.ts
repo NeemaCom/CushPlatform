@@ -1,5 +1,59 @@
 import { cert, initializeApp, getApps, type AppOptions } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { firebaseConfig } from "@shared/firebase-config";
+
+export class FirebaseAuthError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "FirebaseAuthError";
+  }
+}
+
+export async function signInWithFirebasePassword(email: string, password: string): Promise<string> {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, returnSecureToken: true }),
+    },
+  );
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const providerCode = body?.error?.message;
+    if (["INVALID_LOGIN_CREDENTIALS", "EMAIL_NOT_FOUND", "INVALID_PASSWORD"].includes(providerCode)) {
+      throw new FirebaseAuthError("INVALID_CREDENTIALS", "Invalid email or password.");
+    }
+    if (providerCode === "TOO_MANY_ATTEMPTS_TRY_LATER") {
+      throw new FirebaseAuthError("PROVIDER_RATE_LIMIT", "Firebase temporarily limited sign-in attempts.");
+    }
+    if (providerCode === "USER_DISABLED") {
+      throw new FirebaseAuthError("USER_DISABLED", "This account is disabled.");
+    }
+    throw new FirebaseAuthError("PROVIDER_ERROR", "Firebase sign-in could not be completed.");
+  }
+  if (typeof body?.idToken !== "string" || !body.idToken) {
+    throw new FirebaseAuthError("PROVIDER_ERROR", "Firebase sign-in response did not contain an ID token.");
+  }
+  return body.idToken;
+}
+
+export async function sendFirebaseVerificationEmail(idToken: string): Promise<void> {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestType: "VERIFY_EMAIL", idToken }),
+    },
+  );
+  if (!response.ok) {
+    throw new FirebaseAuthError("VERIFICATION_EMAIL_FAILED", "Firebase could not send a verification email.");
+  }
+}
 
 export function ensureFirebaseConfigured(): void {
   if (!configuredProjectId()) {

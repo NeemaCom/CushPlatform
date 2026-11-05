@@ -5,7 +5,6 @@ import Login from "@/pages/Login";
 
 const mocks = vi.hoisted(() => ({
   signInWithPopup: vi.fn(),
-  signInWithEmailAndPassword: vi.fn(),
   createUserWithEmailAndPassword: vi.fn(),
   sendEmailVerification: vi.fn(),
   sendPasswordResetEmail: vi.fn(),
@@ -19,7 +18,6 @@ vi.mock("@/firebase.js", () => ({
   auth: {},
   googleProvider: {},
   signInWithPopup: mocks.signInWithPopup,
-  signInWithEmailAndPassword: mocks.signInWithEmailAndPassword,
   createUserWithEmailAndPassword: mocks.createUserWithEmailAndPassword,
   sendEmailVerification: mocks.sendEmailVerification,
   sendPasswordResetEmail: mocks.sendPasswordResetEmail,
@@ -117,8 +115,7 @@ describe("Login", () => {
     mocks.signOut.mockResolvedValue(undefined);
   });
 
-  it("syncs a successful Firebase sign-in and redirects to the dashboard", async () => {
-    mocks.signInWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+  it("creates a server session for a successful password sign-in", async () => {
     vi.mocked(fetch).mockResolvedValue(
       syncResponse(200, { success: true, user: { id: 1 } }) as Response,
     );
@@ -134,22 +131,19 @@ describe("Login", () => {
 
     await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
     expect(fetch).toHaveBeenCalledWith(
-      "/api/auth/firebase-sync",
+      "/api/auth/password-signin",
       expect.objectContaining({
         method: "POST",
         credentials: "include",
+        body: JSON.stringify({ email: "user@example.com", password: "correct-password" }),
       }),
-    );
-    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual(
-      { idToken: "verified-id-token" },
     );
     expect(mocks.toast).not.toHaveBeenCalled();
   });
 
-  it("shows a session error when Firebase sync fails after authentication", async () => {
-    mocks.signInWithEmailAndPassword.mockResolvedValue({ user: firebaseUser });
+  it("shows a server sign-in error and does not redirect", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(500, { error: "Session creation failed" }) as Response,
+      syncResponse(500, { message: "Session creation failed" }) as Response,
     );
 
     renderLogin();
@@ -161,23 +155,18 @@ describe("Login", () => {
     });
     fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
 
-    await waitFor(() =>
-      expect(mocks.toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Sign-in failed",
-          description: "Session creation failed",
-          variant: "destructive",
-        }),
-      ),
-    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Session creation failed");
     expect(mocks.setLocation).not.toHaveBeenCalled();
   });
 
-  it("maps a failed Firebase credential check to a safe error", async () => {
-    mocks.signInWithEmailAndPassword.mockRejectedValue({
-      code: "auth/invalid-credential",
-      message: "Firebase credential details",
-    });
+  it("shows the number of attempts remaining after an incorrect password", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(401, {
+        code: "INVALID_CREDENTIALS",
+        attemptsRemaining: 2,
+        message: "Invalid email or password. 2 more attempts before a five-minute lockout.",
+      }) as Response,
+    );
 
     renderLogin();
     fireEvent.change(screen.getByLabelText("Email"), {
@@ -188,16 +177,26 @@ describe("Login", () => {
     });
     fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
 
-    await waitFor(() =>
-      expect(mocks.toast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Sign-in failed",
-          description: "Invalid email or password.",
-          variant: "destructive",
-        }),
-      ),
+    expect(await screen.findByRole("alert")).toHaveTextContent("2 more attempts");
+    expect(fetch).toHaveBeenCalledWith("/api/auth/password-signin", expect.any(Object));
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+  });
+
+  it("shows a support link after a permanent account lock", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      syncResponse(423, {
+        code: "PERMANENT_ACCOUNT_LOCK",
+        message: "This account is locked. Contact support@we-cush.com to restore access.",
+      }) as Response,
     );
-    expect(fetch).not.toHaveBeenCalled();
+
+    renderLogin();
+    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "wrong-password" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
+
+    const supportLink = await screen.findByRole("link", { name: "Contact support" });
+    expect(supportLink).toHaveAttribute("href", "mailto:support@we-cush.com");
     expect(mocks.setLocation).not.toHaveBeenCalled();
   });
 
@@ -324,10 +323,20 @@ describe("Login", () => {
     expect(mocks.setLocation).not.toHaveBeenCalled();
   });
 
-  it("does not sync an unverified sign-in and offers a resend action", async () => {
-    mocks.signInWithEmailAndPassword.mockResolvedValue({
-      user: { ...firebaseUser, emailVerified: false },
-    });
+  it("shows the server email-verification step and can resend the activation link", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(syncResponse(200, {
+        success: true,
+        requiresEmailVerification: true,
+        verificationEmailSent: true,
+        email: "user@example.com",
+      }) as Response)
+      .mockResolvedValueOnce(syncResponse(200, {
+        success: true,
+        requiresEmailVerification: true,
+        verificationEmailSent: true,
+        email: "user@example.com",
+      }) as Response);
 
     renderLogin();
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
@@ -335,27 +344,27 @@ describe("Login", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Sign In" })[1]);
 
     expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
-    expect(fetch).not.toHaveBeenCalled();
     expect(mocks.setLocation).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Resend verification email" }));
-    await waitFor(() => expect(mocks.sendEmailVerification).toHaveBeenCalled());
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
     expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Verification link sent" }),
+      expect.objectContaining({ title: "Verify your email" }),
     );
+    expect(mocks.sendEmailVerification).not.toHaveBeenCalled();
   });
 
-  it("activates the server session after the verification link is confirmed", async () => {
-    const unverifiedUser = { ...firebaseUser, emailVerified: false };
-    mocks.signInWithEmailAndPassword.mockResolvedValue({ user: unverifiedUser });
-    mocks.reload
-      .mockImplementationOnce(async () => {})
-      .mockImplementationOnce(async (user: typeof unverifiedUser) => {
-      user.emailVerified = true;
-      });
-    vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
-    );
+  it("creates the server session after an unverified password account is activated", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(syncResponse(200, {
+        success: true,
+        requiresEmailVerification: true,
+        verificationEmailSent: true,
+        email: "user@example.com",
+      }) as Response)
+      .mockResolvedValueOnce(
+        syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+      );
 
     renderLogin();
     fireEvent.change(screen.getByLabelText("Email"), { target: { value: "user@example.com" } });
@@ -364,11 +373,11 @@ describe("Login", () => {
     fireEvent.click(await screen.findByRole("button", { name: "I’ve verified my email" }));
 
     await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
-    expect(unverifiedUser.getIdToken).toHaveBeenCalledWith(true);
-    expect(fetch).toHaveBeenCalledWith(
-      "/api/auth/firebase-sync",
-      expect.objectContaining({ method: "POST", credentials: "include" }),
-    );
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual([
+      "/api/auth/password-signin",
+      "/api/auth/password-signin",
+    ]);
   });
 
   it("sends a Firebase password reset link with a generic response", async () => {

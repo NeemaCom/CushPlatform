@@ -98,6 +98,25 @@ export const authRateLimit = rateLimit({
   },
 });
 
+export const passwordSignInRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { error: "Too many sign-in requests from this IP. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    SecurityLogger.logSecurityEvent(
+      "Password sign-in rate limit exceeded",
+      "warn",
+      { ip: req.ip, endpoint: req.originalUrl, userAgent: req.get("User-Agent") },
+    );
+    res.status(429).json({
+      code: "IP_RATE_LIMIT",
+      message: "Too many sign-in requests from this IP. Please try again later.",
+    });
+  },
+});
+
 export const generalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs

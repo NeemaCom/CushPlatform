@@ -6,7 +6,13 @@ import type { Store } from "express-session";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
 import { createPostgresSessionStore } from "./session-store";
-import { ensureFirebaseConfigured, verifyFirebaseIdentity } from "./firebase-auth";
+import {
+  ensureFirebaseConfigured,
+  verifyFirebaseIdentity,
+  signInWithFirebasePassword,
+  sendFirebaseVerificationEmail,
+  FirebaseAuthError,
+} from "./firebase-auth";
 import {
   loginSchema,
   updateProfileSchema,
@@ -15,6 +21,7 @@ import {
   EncryptionService,
   SecurityLogger,
   authRateLimit,
+  passwordSignInRateLimit,
   generalRateLimit,
   sanitizeRequest,
   validatePasswordStrength,
@@ -34,6 +41,16 @@ import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
 import { registerCushVerifyRoutes } from "./cush-verify-routes";
 import { firebaseProfileNamePatch } from "./firebase-profile-name";
+import {
+  clearLoginAttemptState,
+  getFailedLoginResponse,
+  getLoginAttemptState,
+  getLockoutResponse,
+  normalizeLoginEmail,
+  recordFailedLogin,
+  revokeUserSessions,
+} from "./login-attempts";
+import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -50,6 +67,32 @@ async function createLoginSession(req: Request, user: Pick<User, "id" | "role">)
   req.session.role = user.role || "user";
   req.session.lastActivity = Date.now();
   await new Promise<void>((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
+}
+
+async function respondToFailedLogin(req: Request, res: Response, identifier: string) {
+  const state = await recordFailedLogin(identifier);
+  if (state.permanentlyLocked) {
+    const user = await storage.getUserByEmailCaseInsensitive(identifier).catch(() => undefined);
+    if (user) {
+      await revokeUserSessions(user.id).catch((error) => {
+        console.error("[Permanent Login Lock Session Revocation Error]:", error);
+      });
+      if (req.session.userId === user.id) {
+        clearAuthSessionCookie(req, res);
+        req.session.destroy((error) => {
+          if (error) console.error("[Permanent Login Lock Current Session Error]:", error);
+        });
+      }
+    }
+  }
+  const response = getFailedLoginResponse(state);
+  if (!response) {
+    return res.status(401).json({
+      code: "INVALID_CREDENTIALS",
+      message: "Invalid email or password.",
+    });
+  }
+  return res.status(response.status).json(response.body);
 }
 
 export async function registerRoutes(
@@ -123,6 +166,8 @@ export async function registerRoutes(
 
     try {
       const { uid, email, displayName, photoURL, emailVerified } = identity;
+      const lockout = getLockoutResponse(await getLoginAttemptState(email));
+      if (lockout) return res.status(lockout.status).json(lockout.body);
       const { firstName, lastName } = req.body;
       let user = await storage.getUserByFirebaseUid(uid);
       if (!user) {
@@ -210,6 +255,100 @@ export async function registerRoutes(
     }
   });
 
+  // ── Firebase email/password sign-in with progressive lockout ──────────────
+  app.post("/api/auth/password-signin", passwordSignInRateLimit, async (req, res) => {
+    const email = typeof req.body?.email === "string" ? normalizeLoginEmail(req.body.email) : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    if (!email || email.length > 254 || !password || password.length > 4096) {
+      return res.status(400).json({
+        code: "INVALID_INPUT",
+        message: "Enter a valid email address and password.",
+      });
+    }
+
+    try {
+      const currentLock = getLockoutResponse(await getLoginAttemptState(email));
+      if (currentLock) return res.status(currentLock.status).json(currentLock.body);
+
+      ensureFirebaseConfigured();
+      const idToken = await signInWithFirebasePassword(email, password);
+      const identity = await verifyFirebaseIdentity(idToken);
+      if (identity.email !== email) {
+        return await respondToFailedLogin(req, res, email);
+      }
+      await clearLoginAttemptState(email);
+
+      const existingUser = await storage.getUserByFirebaseUid(identity.uid);
+      if (!existingUser) {
+        const matchingEmail = await storage.getUserByEmailCaseInsensitive(identity.email);
+        if (matchingEmail) {
+          return res.status(409).json({
+            code: "ACCOUNT_METHOD_MISMATCH",
+            message: "Sign in using the method originally connected to this account.",
+          });
+        }
+        return res.status(401).json({
+          code: "ACCOUNT_NOT_READY",
+          message: "This Cush account is not ready for sign-in. Contact support if the issue continues.",
+        });
+      }
+
+      if (!identity.emailVerified) {
+        await storage.updateUser(existingUser.id, { isEmailVerified: false });
+        let verificationEmailSent = true;
+        try {
+          await sendFirebaseVerificationEmail(idToken);
+        } catch (error) {
+          verificationEmailSent = false;
+          console.error(
+            "[Firebase Verification Email Error]:",
+            error instanceof FirebaseAuthError ? error.code : "unknown",
+          );
+        }
+        return res.json({
+          success: true,
+          requiresEmailVerification: true,
+          verificationEmailSent,
+          email: identity.email,
+        });
+      }
+
+      const profileName = firebaseProfileNamePatch(existingUser, identity.displayName);
+      const user = await storage.updateUser(existingUser.id, {
+        ...profileName,
+        isEmailVerified: true,
+        lastLoginAt: new Date(),
+      });
+      await createLoginSession(req, user);
+      SecurityLogger.logAuthEvent("firebase_password_login_success", user.id, true, req.ip, req.get("User-Agent"));
+      return res.json({ success: true, user: createSafeUser(user) });
+    } catch (error) {
+      if (error instanceof FirebaseAuthError && error.code === "INVALID_CREDENTIALS") {
+        return respondToFailedLogin(req, res, email);
+      }
+      if (error instanceof FirebaseAuthError && error.code === "PROVIDER_RATE_LIMIT") {
+        return res.status(429).json({
+          code: "PROVIDER_RATE_LIMIT",
+          message: "Firebase temporarily limited sign-in attempts. Please try again later.",
+        });
+      }
+      if (error instanceof FirebaseAuthError && error.code === "USER_DISABLED") {
+        return res.status(403).json({
+          code: "ACCOUNT_UNAVAILABLE",
+          message: `This account is unavailable. Contact ${LOGIN_SUPPORT_EMAIL} for help.`,
+        });
+      }
+      console.error(
+        "[Firebase Password Sign-In Error]:",
+        error instanceof FirebaseAuthError ? error.code : "unknown",
+      );
+      return res.status(500).json({
+        code: "SIGN_IN_UNAVAILABLE",
+        message: "Sign-in could not be completed. Please try again shortly.",
+      });
+    }
+  });
+
   // ── Sign up ───────────────────────────────────────────────────────────────
   app.post("/api/auth/signup", authRateLimit, (_req, res) =>
     res.status(410).json({ error: "Account registration is handled by Firebase Authentication." })
@@ -227,16 +366,20 @@ export async function registerRoutes(
       const id = email || username;
       let user = await storage.getUserByEmail(id!).catch(() => null);
       if (!user) user = await storage.getUserByUsername(id!).catch(() => null);
-      if (!user) return res.status(401).json({ error: "Invalid credentials" });
+      const lockKey = normalizeLoginEmail(user?.email || id || "");
+      const lockout = getLockoutResponse(await getLoginAttemptState(lockKey));
+      if (lockout) return res.status(lockout.status).json(lockout.body);
+      if (!user) return await respondToFailedLogin(req, res, lockKey);
 
       // Older Firebase signups used a publicly known placeholder password.
       // Never accept it as a password for those accounts.
       const bcrypt = await import("bcrypt");
       if (await bcrypt.compare("oauth-user-no-password", user.passwordHash)) {
-        return res.status(401).json({ error: "Invalid credentials" });
+        return await respondToFailedLogin(req, res, lockKey);
       }
       const ok = await EncryptionService.verifyPassword(password, user.passwordHash);
-      if (!ok) return res.status(401).json({ error: "Invalid credentials" });
+      if (!ok) return await respondToFailedLogin(req, res, lockKey);
+      await clearLoginAttemptState(lockKey);
       if (!user.isEmailVerified) {
         return res.status(403).json({ error: "Verify your email before signing in." });
       }
@@ -252,8 +395,8 @@ export async function registerRoutes(
     }
   };
 
-  app.post("/api/auth/signin", authRateLimit, loginHandler);
-  app.post("/api/auth/login",  authRateLimit, loginHandler);
+  app.post("/api/auth/signin", passwordSignInRateLimit, loginHandler);
+  app.post("/api/auth/login",  passwordSignInRateLimit, loginHandler);
 
   // ── Logout ────────────────────────────────────────────────────────────────
   app.post("/api/auth/logout", async (req: AuthenticatedRequest, res) => {
