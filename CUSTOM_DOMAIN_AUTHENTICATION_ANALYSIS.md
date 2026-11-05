@@ -1,5 +1,11 @@
 # Firebase Custom Domain Authentication Analysis & Implementation
 
+> **Historical note:** This document contains stale `portal.we-cush.com` examples
+> and should not be used as the current setup guide. Production now uses
+> `app.we-cush.com` for the web app and `auth.we-cush.com` for Firebase Auth.
+> See `FIREBASE_SETUP.md` and `FIREBASE_CUSTOM_DOMAIN_SETUP.md` for current
+> configuration.
+
 ## Current Implementation Status ✅
 
 ### Firebase Configuration Analysis

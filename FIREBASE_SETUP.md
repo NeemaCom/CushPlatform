@@ -1,60 +1,44 @@
-# Firebase Authentication Setup Instructions - Production Configuration
+# Firebase Authentication Setup
 
-## Production Domain Configuration
+## Production domains
 
-### 1. Firebase Console Configuration Required
-Go to [Firebase Console](https://console.firebase.google.com/) → Select "cushportal" project → Authentication → Settings → Authorized domains
+- App: `https://app.we-cush.com`
+- Firebase authentication handler: `https://auth.we-cush.com`
+- Firebase project: `cushportal`
 
-**Production Configuration:**
-- **Authorized JavaScript Origins:** `https://portal.we-cush.com`
-- **Authorized Redirect URIs:** `https://portal.we-cush.com/__/auth/handler`
+The app domain and auth-handler domain serve different purposes. Do not point
+`app.we-cush.com` at Firebase Hosting or redirect `auth.we-cush.com` to the app.
 
-### 1.1 Firebase Custom Domain Setup (Required for Custom URL in Popup)
-To show "portal.we-cush.com" instead of "cushportal.firebase.com" in the Google Sign-In popup:
+## Firebase Authentication authorized domains
 
-Go to [Firebase Console](https://console.firebase.google.com/) → Project "cushportal" → Hosting → Custom domain
+In Firebase Console → Authentication → Settings → Authorized domains, keep the
+Firebase default domain and include:
 
-**Add Custom Domain:**
-1. Click "Add custom domain"
-2. Enter: `portal.we-cush.com`
-3. Follow DNS verification steps (add TXT record to your domain DNS)
-4. Add A and AAAA records provided by Firebase to point portal.we-cush.com to Firebase hosting
-5. Wait for SSL certificate provisioning (can take up to 24 hours)
+- `app.we-cush.com`
+- `auth.we-cush.com`
 
-### 2. Google Cloud Console OAuth Configuration Required
-Go to [Google Cloud Console](https://console.cloud.google.com/) → APIs & Services → Credentials → OAuth 2.0 Client IDs
+## Firebase Hosting custom domain
 
-**Required Settings:**
-- **Authorized JavaScript Origins:** `https://portal.we-cush.com`
-- **Authorized Redirect URIs:** `https://portal.we-cush.com/__/auth/handler`
+`auth.we-cush.com` must be configured as a Firebase Hosting custom domain so
+Firebase can serve the OAuth handler at
+`https://auth.we-cush.com/__/auth/handler`. DNS records must be the exact ones
+shown by Firebase for the `auth` subdomain.
 
-### 3. Current Firebase Configuration
-- **Project ID:** cushportal
-- **API Key:** AIzaSyD06ZHGJlv-1g0WqfymtGkiHAHeX1O1UGI
-- **Auth Domain:** portal.we-cush.com (Updated for production)
-- **App ID:** 1:304174661302:web:8bc1e5f413aae91336f017
+The handler URL was checked and returned HTTP 200 over HTTPS.
 
-### 3. What Works Now
-- ✅ Email/password authentication (both login and signup)
-- ✅ Password reset functionality
-- ✅ User synchronization with backend database
-- ✅ Automatic redirect to dashboard after authentication
-- ✅ Enhanced error handling with Firebase-specific messages
+## Google OAuth client
 
-### 4. What Needs Domain Authorization
-- ❌ Google Sign-In (requires domain authorization)
-- ❌ Google Sign-Up (requires domain authorization)
+In Google Cloud Console → APIs & Services → Credentials → the OAuth 2.0 Web
+client used by Firebase, configure:
 
-## Temporary Workaround
-The system now shows a clear error message: "Google Sign-In is temporarily unavailable. Please use email/password authentication or contact support. Domain authorization is pending."
+- Authorized JavaScript origin: `https://app.we-cush.com`
+- Authorized redirect URI: `https://auth.we-cush.com/__/auth/handler`
 
-## Test Accounts Available
-- **Demo Account:** demo@cush.com / demo123
-- **Admin Account:** admin@cush.com / admin123
-- **Customer Account:** customer@cush.com / customer123
+Do not remove other required origins or redirect URIs used by development or
+other Firebase environments.
 
-## Current Status
-- Firebase authentication is fully integrated
-- Email/password authentication works perfectly
-- Google OAuth requires domain authorization in Firebase console
-- All error handling is comprehensive with user-friendly messages
+## App configuration
+
+The web app uses `auth.we-cush.com` as its Firebase `authDomain`. After
+publishing, test Google sign-in on `https://app.we-cush.com` and confirm the
+callback returns to the app and completes sign-in.

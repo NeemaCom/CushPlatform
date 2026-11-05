@@ -1,108 +1,56 @@
-# Firebase Custom Domain Setup for portal.we-cush.com
+# Firebase Custom Authentication Domain
 
-## Overview
-To display "portal.we-cush.com" instead of "cushportal.firebase.com" in the Google Sign-In popup, you need to set up a custom domain in Firebase Hosting.
+## Domains and purpose
 
-## Step-by-Step Setup
+- `app.we-cush.com` serves the Cush web application.
+- `auth.we-cush.com` serves Firebase's authentication callback.
 
-### 1. Access Firebase Console
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Select project "cushportal"
-3. Navigate to **Hosting** → **Custom domain**
+Keep the DNS for `app.we-cush.com` unchanged. Do not enable a redirect from
+`auth.we-cush.com` to the app; Firebase must serve its handler path.
 
-### 2. Add Custom Domain
-1. Click **"Add custom domain"**
-2. Enter: `portal.we-cush.com`
-3. Click **"Continue"**
+## Firebase Hosting
 
-### 3. Verify Domain Ownership
-Firebase will provide a TXT record for DNS verification:
+In the `cushportal` Firebase project, add `auth.we-cush.com` under Hosting
+custom domains. Follow the exact DNS instructions displayed in Firebase and
+wait for the domain and HTTPS certificate to be ready. DNS record types and
+values must come from the Firebase setup screen; do not substitute guessed
+records.
 
-**Add this TXT record to your domain DNS:**
-- **Type:** TXT
-- **Name:** `portal.we-cush.com` (or `@` if your DNS provider uses root domain)
-- **Value:** `firebase=cushportal` (Firebase will provide the exact value)
-- **TTL:** 3600 (or default)
+The handler endpoint was verified from the command line:
 
-### 4. Configure DNS Records
-After verification, Firebase will provide IP addresses. Add these to your DNS:
-
-**A Records:**
-```
-Type: A
-Name: portal
-Value: [Firebase will provide IPv4 addresses]
-TTL: 3600
+```text
+https://auth.we-cush.com/__/auth/handler
+HTTP 200 over HTTPS
 ```
 
-**AAAA Records:**
-```
-Type: AAAA  
-Name: portal
-Value: [Firebase will provide IPv6 addresses]
-TTL: 3600
-```
+## Firebase Authentication
 
-### 5. SSL Certificate Provisioning
-- Firebase automatically provisions SSL certificates
-- This process can take up to 24 hours
-- You'll receive email confirmation when complete
+In Authentication → Settings → Authorized domains, include both:
 
-### 6. Update Firebase Configuration (Already Done)
-The application is already configured with:
-```javascript
-authDomain: "portal.we-cush.com"
+```text
+app.we-cush.com
+auth.we-cush.com
 ```
 
-## Expected Results
+Keep the Firebase default authorized domain if it is still used by other
+environments or flows.
 
-### Before Custom Domain Setup:
-- Google Sign-In popup shows: `cushportal.firebaseapp.com`
-- Authentication works but shows Firebase subdomain
+## Google OAuth client
 
-### After Custom Domain Setup:
-- Google Sign-In popup shows: `portal.we-cush.com`
-- Professional branded authentication experience
-- Same functionality with custom domain
+For the Google OAuth Web client used by Firebase, configure:
 
-## Verification Steps
+- Authorized JavaScript origin: `https://app.we-cush.com`
+- Authorized redirect URI: `https://auth.we-cush.com/__/auth/handler`
 
-1. **DNS Propagation:** Use tools like `dig` or online DNS checkers
-   ```bash
-   dig portal.we-cush.com A
-   dig portal.we-cush.com AAAA
-   ```
+Preserve any other origins and redirect URIs required for development.
 
-2. **SSL Certificate:** Check certificate validity
-   ```bash
-   openssl s_client -connect portal.we-cush.com:443 -servername portal.we-cush.com
-   ```
+## Application configuration and test
 
-3. **Firebase Hosting:** Test direct access to custom domain
-   - Visit `https://portal.we-cush.com`
-   - Should serve Firebase content
+The app's Firebase config must use:
 
-4. **Authentication Flow:** Test Google Sign-In
-   - Popup should show `portal.we-cush.com` URL
-   - Authentication should complete successfully
+```ts
+authDomain: "auth.we-cush.com"
+```
 
-## Troubleshooting
-
-### Common Issues:
-- **DNS Propagation Delay:** Can take up to 48 hours globally
-- **SSL Certificate Pending:** Wait up to 24 hours for provisioning
-- **Cache Issues:** Clear browser cache after DNS changes
-
-### DNS Providers:
-- **Cloudflare:** Set proxy status to "DNS only" (gray cloud) during setup
-- **GoDaddy/Namecheap:** Use standard A/AAAA record configuration
-- **Route 53:** Create record sets for A and AAAA records
-
-## Timeline
-- **DNS Verification:** 5-10 minutes after adding TXT record
-- **A/AAAA Record Setup:** 5-10 minutes after adding records
-- **SSL Certificate:** Up to 24 hours
-- **Global Propagation:** Up to 48 hours
-
-## Status Check
-Once setup is complete, the Google Sign-In popup will display the custom domain, providing a professional branded authentication experience.
+After deploying, hard-refresh `https://app.we-cush.com`, run Google sign-in,
+and verify that it returns to the app with the user signed in.
