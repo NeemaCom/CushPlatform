@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { count, desc, eq, gte } from "drizzle-orm";
+import { count, desc, eq, gte, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
 import {
@@ -23,6 +23,10 @@ import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
 import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
 import { normalizedCreditHistorySchema } from "./interswitch-credit-history-scoring";
 import { getAdminV2Assessment, isV2SchemaMissing } from "./cush-score-v2";
+import {
+  adminUserDirectoryQuerySchema,
+  userDirectorySearchPattern,
+} from "./admin-user-directory";
 
 const allowedRanges = [7, 30, 90] as const;
 const evidenceReviewSchema = z.object({
@@ -44,6 +48,78 @@ function isMissingEvidenceReviewSchema(error: unknown): boolean {
 }
 
 export function registerAdminRoutes(app: Express): void {
+  app.get(
+    "/api/admin/users",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.usersRead),
+    async (req: AuthenticatedRequest, res) => {
+      const parsed = adminUserDirectoryQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Use a valid search and page range." });
+      }
+
+      const { q, limit, offset } = parsed.data;
+      const searchFilter = q
+        ? or(
+            ilike(users.email, userDirectorySearchPattern(q)),
+            ilike(users.username, userDirectorySearchPattern(q)),
+            ilike(users.firstName, userDirectorySearchPattern(q)),
+            ilike(users.lastName, userDirectorySearchPattern(q)),
+          )
+        : undefined;
+
+      try {
+        // Fail closed if the access itself cannot be recorded.
+        await recordAdminAuditEvent(req, {
+          action: "admin.users.directory_read",
+          resourceType: "user_directory",
+        });
+
+        const [countRows, rows] = await Promise.all([
+          db.select({ total: count() }).from(users).where(searchFilter),
+          db.select({
+            id: users.id,
+            email: users.email,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            role: users.role,
+            isEmailVerified: users.isEmailVerified,
+            createdAt: users.createdAt,
+            lastLoginAt: users.lastLoginAt,
+          })
+            .from(users)
+            .where(searchFilter)
+            .orderBy(desc(users.createdAt), desc(users.id))
+            .limit(limit)
+            .offset(offset),
+        ]);
+
+        return res.json({
+          users: rows.map((row) => ({
+            ...row,
+            createdAt: row.createdAt?.toISOString() ?? null,
+            lastLoginAt: row.lastLoginAt?.toISOString() ?? null,
+          })),
+          total: Number(countRows[0]?.total ?? 0),
+          limit,
+          offset,
+        });
+      } catch (error) {
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin user directory query failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to load the user directory." });
+      }
+    },
+  );
+
   app.post(
     "/api/admin/score-breakdown",
     isAuthenticated,

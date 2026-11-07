@@ -9,6 +9,7 @@ import CushUserScoreReview from "@/components/passport/CushUserScoreReview";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
 import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
+import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
 
 type OverviewMetrics = {
   totalUsers: number;
@@ -104,9 +105,10 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
+  const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
@@ -180,6 +182,20 @@ export default function AdminDashboard() {
           >
             Overview
           </button>
+          {hasUsersRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("users")}
+              aria-current={activeSection === "users" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "users"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Users
+            </button>
+          )}
           {hasPolicyAccess && (
             <button
               type="button"
@@ -237,7 +253,9 @@ export default function AdminDashboard() {
             </button>
           )}
         </nav>
-        {activeSection === "cush-verify" ? (
+        {activeSection === "users" ? (
+          <UserDirectoryAdmin />
+        ) : activeSection === "cush-verify" ? (
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
         ) : activeSection === "scoring-policy" ? (
           <section aria-labelledby="scoring-policy-heading">
