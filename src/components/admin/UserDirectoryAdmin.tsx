@@ -66,6 +66,7 @@ type AccountStatusChangeResponse = {
   changed: boolean;
   status: "active" | "suspended";
   sessionsRevoked?: boolean;
+  notificationStatus?: "sent" | "failed" | "not_configured" | "not_sent";
 };
 
 type PendingRoleChange = {
@@ -211,11 +212,22 @@ export default function UserDirectoryAdmin({
     onSuccess: async (result) => {
       setPendingAccountStatusChange(null);
       await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      const statusDescription = result.status === "suspended"
+        ? "The account is blocked from signing in and its stored sessions were revoked."
+        : "The account is active again; the user must sign in. Any separate password lockout remains unchanged.";
+      const notificationDescription = result.notificationStatus === "sent"
+        ? " A notification email was sent."
+        : result.notificationStatus === "not_sent"
+          ? ""
+          : " The status changed, but the email was not sent; check the Resend settings on Render.";
+      const notificationFailed = result.notificationStatus === "failed"
+        || result.notificationStatus === "not_configured";
       toast({
-        title: result.status === "suspended" ? "Account suspended" : "Account reactivated",
-        description: result.status === "suspended"
-          ? "The account is blocked from signing in and its stored sessions were revoked."
-          : "The account is active again; the user must sign in. Any separate password lockout remains unchanged.",
+        title: notificationFailed
+          ? "Account status changed; email not sent"
+          : result.status === "suspended" ? "Account suspended" : "Account reactivated",
+        description: `${statusDescription}${notificationDescription}`,
+        ...(notificationFailed ? { variant: "destructive" as const } : {}),
       });
     },
     onError: (error: Error) => {

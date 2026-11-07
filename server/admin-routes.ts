@@ -24,6 +24,7 @@ import {
   type AuthenticatedRequest,
 } from "./auth";
 import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
+import { sendAccountStatusEmail } from "./account-status-email";
 import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
 import { normalizedCreditHistorySchema } from "./interswitch-credit-history-scoring";
 import { getAdminV2Assessment, isV2SchemaMissing } from "./cush-score-v2";
@@ -429,6 +430,7 @@ export function registerAdminRoutes(app: Express): void {
             id: users.id,
             role: users.role,
             isActive: users.isActive,
+            email: users.email,
           }).from(users)
             .where(eq(users.id, userId))
             .limit(1)
@@ -493,8 +495,9 @@ export function registerAdminRoutes(app: Express): void {
             return { kind: "unchanged" as const, isActive: nextIsActive };
           }
 
+          const changedAt = new Date();
           await tx.update(users)
-            .set({ isActive: nextIsActive, updatedAt: new Date() })
+            .set({ isActive: nextIsActive, updatedAt: changedAt })
             .where(eq(users.id, userId));
 
           await recordAdminAuditEvent(req, {
@@ -509,6 +512,8 @@ export function registerAdminRoutes(app: Express): void {
             kind: "updated" as const,
             previousStatus: target.isActive ? "active" : "suspended",
             status: parsed.data.status,
+            email: target.email,
+            changedAt,
           };
         });
 
@@ -533,6 +538,40 @@ export function registerAdminRoutes(app: Express): void {
             changed: false,
             status: result.isActive ? "active" : "suspended",
             sessionsRevoked: !result.isActive,
+            notificationStatus: "not_sent",
+          });
+        }
+        if (result.kind !== "updated") {
+          return res.status(500).json({ error: "Unable to change the account status." });
+        }
+        const notification = await sendAccountStatusEmail({
+          userId,
+          email: result.email,
+          status: result.status,
+          changedAt: result.changedAt,
+        });
+        try {
+          await recordAdminAuditEvent(req, {
+            action: notification.status === "sent"
+              ? "admin.users.account_status_email_sent"
+              : "admin.users.account_status_email_failed",
+            resourceType: "user_account",
+            resourceId: userId,
+            outcome: notification.status === "sent" ? "success" : "failed",
+          });
+        } catch {
+          console.error("Account status notification audit failed", {
+            adminUserId: req.userId,
+            targetUserId: userId,
+            notificationStatus: notification.status,
+          });
+        }
+        if (notification.status !== "sent") {
+          console.warn("Account status notification was not sent", {
+            adminUserId: req.userId,
+            targetUserId: userId,
+            status: notification.status,
+            reason: notification.status === "failed" ? notification.reason : undefined,
           });
         }
         return res.json({
@@ -541,6 +580,7 @@ export function registerAdminRoutes(app: Express): void {
           previousStatus: result.previousStatus,
           status: result.status,
           sessionsRevoked: result.status === "suspended",
+          notificationStatus: notification.status,
         });
       } catch (error) {
         if (isUserAccountStatusColumnMissing(error)) {
