@@ -4,9 +4,11 @@ import { registerRoutes } from "./routes";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createApiOriginGuard, createSecurityHeaders } from "./http-security";
+import { clearExpiredAdminAuditIps, isAdminAuditTableMissing } from "./admin-audit";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
+const AUDIT_IP_RETENTION_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 // Logging function
 export function log(message: string, source = "express") {
@@ -18,6 +20,27 @@ export function log(message: string, source = "express") {
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
+}
+
+function startAuditIpRetentionCleanup() {
+  const runCleanup = async () => {
+    try {
+      const clearedCount = await clearExpiredAdminAuditIps();
+      if (clearedCount > 0) {
+        log(`Removed expired IP addresses from ${clearedCount} admin audit records`, "retention");
+      }
+    } catch (error) {
+      if (isAdminAuditTableMissing(error)) {
+        log("Admin audit table is unavailable; IP cleanup will retry later", "retention");
+        return;
+      }
+      console.error("[retention] Admin audit IP cleanup failed", error);
+    }
+  };
+
+  void runCleanup();
+  const timer = setInterval(() => void runCleanup(), AUDIT_IP_RETENTION_CLEANUP_INTERVAL_MS);
+  timer.unref();
 }
 
 // Express configuration
@@ -105,6 +128,7 @@ export async function createServer() {
     
     server.listen(port, host, () => {
       log(`Server successfully started on ${host}:${port}`);
+      if (isProduction) startAuditIpRetentionCleanup();
       log(`Environment: ${process.env.NODE_ENV || 'development'}`);
       log(`Health checks available at: /health, /ready, /live, /startup, /api/health, /`);
       

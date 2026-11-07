@@ -18,14 +18,6 @@ const STATIC_ASSETS = [
   '/icons/icon-512x512.png'
 ];
 
-// API endpoints that should use network-first strategy
-const API_ENDPOINTS = [
-  '/api/dashboard',
-  '/api/analytics',
-  '/api/transactions',
-  '/api/auth/me'
-];
-
 // API endpoints that can use cache-first strategy (less frequently changing)
 const CACHEABLE_API_ENDPOINTS = [
   '/api/subscription-status',

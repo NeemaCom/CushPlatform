@@ -1,6 +1,31 @@
 import type { Request } from "express";
 import { adminAuditLogs } from "@shared/schema";
 import { db } from "./db";
+import { and, gte, isNotNull, lt } from "drizzle-orm";
+
+// Existing audit rows are intentionally outside this policy's new retention window.
+export const ADMIN_AUDIT_IP_RETENTION_EFFECTIVE_AT = new Date("2026-11-07T09:33:00.000Z");
+
+export function getAdminAuditIpRetentionCutoff(now = new Date()): Date {
+  const cutoff = new Date(now);
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - 1);
+  return cutoff;
+}
+
+export async function clearExpiredAdminAuditIps(now = new Date()): Promise<number> {
+  const cutoff = getAdminAuditIpRetentionCutoff(now);
+  const cleared = await db
+    .update(adminAuditLogs)
+    .set({ ipAddress: null })
+    .where(and(
+      isNotNull(adminAuditLogs.ipAddress),
+      gte(adminAuditLogs.createdAt, ADMIN_AUDIT_IP_RETENTION_EFFECTIVE_AT),
+      lt(adminAuditLogs.createdAt, cutoff),
+    ))
+    .returning({ id: adminAuditLogs.id });
+
+  return cleared.length;
+}
 
 export interface AdminAuditEvent {
   action: string;

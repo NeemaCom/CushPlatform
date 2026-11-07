@@ -17,120 +17,205 @@ export default function PrivacyPolicy() {
       <main className="mx-auto max-w-4xl px-5 py-10 sm:px-8 sm:py-14">
         <div className="mb-7">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#5148d8]">
-            Supplemental privacy notice
+            Cush Passport and Cush Verify
           </p>
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
-            Visitor analytics addendum
+            Privacy Policy
           </h1>
-          <p className="mt-3 text-sm text-slate-500">Published 7 November 2026</p>
+          <p className="mt-3 text-sm text-slate-500">Version 2 · Effective 7 November 2026</p>
         </div>
 
-        <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-950">
-          <p className="font-semibold">This is not the full Cush Privacy Policy.</p>
+        <div className="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm leading-6 text-indigo-950">
+          <p className="font-semibold">Analytics are not enabled.</p>
           <p className="mt-1">
-            This addendum covers optional visitor analytics only. It does not describe all handling of
-            account, identity, bank, credit, or uploaded-document data. The general privacy policy is
-            still being prepared. This notice is general information, not legal advice, and should be
-            reviewed by qualified privacy counsel.
-          </p>
-        </div>
-
-        <div className="mb-8 rounded-2xl border border-indigo-200 bg-indigo-50 p-5">
-          <p className="font-semibold text-indigo-950">Current status</p>
-          <p className="mt-1 text-sm leading-6 text-indigo-900">
-            Optional visitor analytics are not currently enabled. Cush will not start collecting
-            these analytics until an opt-in control is available and the remaining retention settings
-            are settled.
+            Cush currently has no in-app analytics event collector, behavioral tracking service, or
+            advertising tracker. Hosting and security providers may create operational logs under
+            their own settings.
           </p>
         </div>
 
         <div className="space-y-5">
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Who manages this data</h2>
+            <h2 className="text-lg font-bold text-slate-950">1. Who operates Cush</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Bluebird Integrated Ltd (UK) and Target Lab HQ (Nigeria) jointly manage the personal
-              data processing described in this addendum. For privacy requests, contact{" "}
+              Cush is jointly operated by Bluebird Integrated Ltd (United Kingdom) and Target Lab HQ
+              (Nigeria). For privacy questions, access or correction requests, or to request account
+              closure and deletion, contact{" "}
               <a className="font-semibold text-[#3530a8] underline underline-offset-2" href="mailto:support@we-cush.com">
                 support@we-cush.com
               </a>.
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              The organisations’ formal responsibilities and provider-region details are still being
-              reviewed. Information may be handled in the UK, Nigeria, and locations where service
-              providers operate; required transfer safeguards will be confirmed before analytics is
-              enabled.
+              The service is intended for people aged 18 or older. This notice applies to Cush
+              Passport, Cush Verify, and related account features.
             </p>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">What optional analytics may include</h2>
+            <h2 className="text-lg font-bold text-slate-950">2. Information we handle</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              After you opt in, Cush may collect a pseudonymous visitor identifier, the page or
-              product area visited, approved event names and timestamps, coarse browser or device
-            information, and approximate country. Country is not verified
-              location; Cush will not use it to infer nationality, residence, immigration status, or
-              exact location. Browser fingerprinting is not used.
+              <strong>Account and profile information:</strong> name, email address, username, phone
+              number, nationality, profile image, gender if supplied, account identifiers, verification
+              status, and your recorded acceptance of policy versions and optional marketing consent.
+              Firebase Authentication supports sign-in; Cush also keeps an associated account record.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Analytics is optional and will be used to understand service use and improve Cush. We
-              will not put passwords, authentication tokens, BVNs, financial amounts, bank statements,
-              credit-report contents, uploaded-document contents, or private form values into
-              general analytics events.
-            </p>
-          </section>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Consent and retention</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-700">
-              Optional analytics will start only after you opt in. You will be able to withdraw that
-              choice when the consent controls are introduced. Detailed analytics records will be
-              retained for no more than 90 days.
+              <strong>Financial and assessment information:</strong> details needed to connect
+              accounts, information returned by a financial provider, derived account-history
+              evidence, credit-history evidence, assessment scores and confidence, and information
+              you enter or import into Post-Arrival records.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              The expiry for a browser-held identifier and the retention period for aggregated
-              reports are not set yet. Analytics will remain off until those limits are decided and
-              disclosed.
+              <strong>Provider and security information:</strong> provider connection identifiers,
+              consent records, sign-in and lockout events, support or institution-interest
+              submissions, and security audit information such as request IP addresses. Cush Verify
+              submissions may include an institution, contact person, work email, role, and message.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              <strong>Uploaded evidence:</strong> some evidence-upload flows currently hold files in
+              application memory rather than durable file storage. Such files may be lost when the
+              service restarts; do not treat this feature as a permanent document archive.
             </p>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Security logs are separate</h2>
+            <h2 className="text-lg font-bold text-slate-950">3. How financial-provider data is used</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Raw IP addresses will not be used as visitor analytics identifiers. Cush’s policy is
-              to process raw IP addresses only for security and abuse prevention, and retain them in
-              Cush-controlled security records for no more than 24 hours. Hosting providers may
-              maintain their own request logs under separate retention settings; those details are
-              being confirmed.
+              Mono, Plaid, and Interswitch are used only for the financial features you choose and
+              authorize. Mono may provide connected-account and statement information; Cush stores
+              derived assessment evidence rather than raw statements in the V2 evidence tables.
+              Interswitch receives a BVN for a requested credit-history lookup; the reviewed Cush flow
+              does not store the BVN, OTP, or raw provider response in the Cush database.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              Plaid is used for the Post-Arrival account connection. Cush stores connection
+              information and encrypts the Plaid access token; provider data fetched for review is
+              not kept as a separate raw transaction dataset in the current Cush implementation.
+              Derived evidence or information you choose to save may remain in your assessment.
+              Disconnecting Plaid removes the local connection and requests disconnection from Plaid.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              Provider services may process information under their own privacy terms. Withdrawing
+              consent or disconnecting a provider stops future access where supported; it does not
+              necessarily erase information already held by that provider or records Cush must retain.
             </p>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Service providers</h2>
+            <h2 className="text-lg font-bold text-slate-950">4. Why we use information</h2>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-700">
+              <li>To create and secure accounts, authenticate users, and provide requested features.</li>
+              <li>To retrieve authorized financial or credit-history information and calculate assessments.</li>
+              <li>To record required consent, support requests, institution enquiries, and administrative actions.</li>
+              <li>To detect abuse, protect the service, troubleshoot failures, and meet legal obligations.</li>
+              <li>To send marketing only where you separately opt in; marketing consent is optional.</li>
+            </ul>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">5. Legal grounds for use</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Cush uses Firebase Authentication and Google sign-in, Supabase/PostgreSQL, Render, and
-              Vercel to provide and host the service. Mono, Plaid, and Interswitch support separate
-              user-authorized financial-data features; their bank or credit data is not intended for
-              visitor analytics. The specific provider regions and infrastructure-log retention
-              periods are still being verified.
+              We use information when needed to provide features you request, to perform our
+              agreement with you, or to take steps you request before using Cush. We rely on your
+              consent for financial-provider connections and credit-history checks, and for
+              optional marketing. We may also use limited information for legitimate interests such
+              as account security, abuse prevention, service reliability, and administration, while
+              respecting your rights. We use or disclose information when required by law.
             </p>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-bold text-slate-950">Your choices and requests</h2>
+            <h2 className="text-lg font-bold text-slate-950">6. Service providers and sharing</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              Once analytics consent controls are available, you can change or withdraw your choice.
-              You may also contact{" "}
+              We use Firebase Authentication, Supabase/PostgreSQL, Render, and Vercel to authenticate,
+              store, operate, and deliver Cush. Mono, Plaid, and Interswitch process data for
+              separately authorized financial features. These providers may process information in
+              the United Kingdom, Nigeria, or other locations where their services operate.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We do not sell personal information. We share it with service providers as needed to
+              deliver the service, when you direct us to share it, or where law, safety, or the
+              protection of rights requires it. If you create or use a Cush Passport share link,
+              anyone who has that link may be able to view the information displayed by that link.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              When information crosses borders, we use safeguards required by applicable privacy
+              laws. Provider infrastructure and request logs may have separate settings and retention
+              periods that Cush does not control.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">7. Retention</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We keep account, profile, consent, and account-linked financial or assessment
+              information while your account is active. After we verify an account-closure request,
+              we will delete or anonymize this information within one year, unless it must be kept
+              longer for legal obligations, security, dispute resolution, or the establishment or
+              defense of legal claims. Provider-held copies are governed by the provider’s own
+              retention rules.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              For admin audit records created after this policy takes effect on 7 November 2026, raw
+              IP addresses are kept for up to one year from the audit event and then removed while
+              the admin action record remains. Existing audit rows are not changed by this update;
+              older raw IP addresses may remain longer. HMAC-based rate-limit identifiers are
+              removed by the application after their short security window, currently 24 hours.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">8. Your choices and rights</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              Depending on the law that applies to you, you may request access, correction,
+              deletion, restriction, or a copy of your information, and may object to or withdraw
+              consent for processing that relies on consent. To close your account or make a request,
+              email{" "}
               <a className="font-semibold text-[#3530a8] underline underline-offset-2" href="mailto:support@we-cush.com">
                 support@we-cush.com
-              </a>{" "}
-              to ask about access, correction, or deletion of personal data. Applicable rights depend
-              on your location and the relevant privacy laws.
+              </a>
+              . We may ask you to verify your identity before acting. You can delete some saved
+              records or disconnect supported providers using the available account controls.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">9. Cookies and analytics</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              Cush uses necessary browser storage and session cookies for sign-in, security, and
+              core service functions. Cush does not currently use an in-app analytics SDK, behavioral
+              event collection, or advertising trackers. We will update this policy and provide
+              appropriate choices before introducing optional analytics.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">10. Security</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We use access controls, secure authentication, and technical safeguards such as
+              encryption for stored Plaid connection credentials. No online service can guarantee
+              absolute security. Please protect your sign-in details and contact us promptly if you
+              believe your account has been accessed without permission.
+            </p>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-slate-950">11. Changes and contact</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              We may update this policy as Cush changes or legal requirements evolve. We will update
+              the version and effective date above and provide notice where required. For questions,
+              requests, or complaints, contact{" "}
+              <a className="font-semibold text-[#3530a8] underline underline-offset-2" href="mailto:support@we-cush.com">
+                support@we-cush.com
+              </a>
+              . You may also contact the data-protection authority responsible for your location.
             </p>
           </section>
         </div>
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-slate-200 pt-6 text-sm text-slate-500">
           <span>Minimum age for Cush accounts: 18.</span>
+          <span>This policy is general information, not legal advice. Have qualified privacy counsel review it.</span>
           <Link href="/terms-of-service" className="font-semibold text-[#3530a8] hover:text-[#242080]">
             Terms of Service
           </Link>

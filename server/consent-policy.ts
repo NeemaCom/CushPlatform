@@ -3,7 +3,7 @@ import type { ConsentPolicyType } from "@shared/schema";
 // Increment a policy's version whenever its published text changes.
 export const CURRENT_CONSENT_POLICY_VERSIONS: Record<ConsentPolicyType, string> = {
   terms: "terms-v1",
-  privacy: "privacy-v1",
+  privacy: "privacy-v2",
 };
 
 export interface ConsentAcceptanceInput {

@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockDb } = vi.hoisted(() => ({
-  mockDb: { insert: vi.fn() },
+  mockDb: { insert: vi.fn(), update: vi.fn() },
 }));
 
 vi.mock("./db", () => ({ db: mockDb }));
 
 import { adminAuditLogs } from "@shared/schema";
-import { recordAdminAuditEvent } from "./admin-audit";
+import { getAdminAuditIpRetentionCutoff, recordAdminAuditEvent } from "./admin-audit";
 
 describe("recordAdminAuditEvent", () => {
   beforeEach(() => {
     mockDb.insert.mockReset();
+    mockDb.update.mockReset();
   });
 
   it("writes through the supplied transaction executor", async () => {
@@ -44,5 +45,10 @@ describe("recordAdminAuditEvent", () => {
     })).rejects.toThrow("An authenticated admin user is required for audit records.");
 
     expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("expires new audit IPs one calendar year after their event", () => {
+    expect(getAdminAuditIpRetentionCutoff(new Date("2027-11-07T09:28:36.000Z")))
+      .toEqual(new Date("2026-11-07T09:28:36.000Z"));
   });
 });
