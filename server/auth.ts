@@ -4,6 +4,7 @@ import { SecurityLogger } from "./security";
 import type { User, SafeUser } from "@shared/schema";
 import { hasAdminPermission, type AdminPermission } from "@shared/admin-permissions";
 import { getLoginAttemptState, getLockoutResponse } from "./login-attempts";
+import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
 
 declare module "express-session" {
   interface SessionData {
@@ -113,6 +114,25 @@ export async function isAuthenticated(
       );
       
       res.status(401).json({ error: "Invalid session" });
+      return;
+    }
+
+    if (user.isActive === false) {
+      clearAuthSessionCookie(req, res);
+      req.session.destroy((err) => {
+        if (err) console.error("Suspended account session destruction error:", err);
+      });
+      SecurityLogger.logAuthEvent(
+        "suspended_account_session",
+        userId,
+        false,
+        req.ip,
+        req.get("User-Agent"),
+      );
+      res.status(403).json({
+        code: "ACCOUNT_SUSPENDED",
+        error: `This account is suspended. Contact ${LOGIN_SUPPORT_EMAIL} for help.`,
+      });
       return;
     }
 

@@ -18,6 +18,7 @@ export const users = pgTable("users", {
   nationality: text("nationality"),
   profilePicture: text("profile_picture"),
   gender: text("gender"),
+  isActive: boolean("is_active").notNull().default(true),
   isEmailVerified: boolean("is_email_verified").default(false),
   isPhoneVerified: boolean("is_phone_verified").default(false),
   acceptTerms: boolean("accept_terms").notNull(),
@@ -154,7 +155,10 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type SafeUser = Omit<User, "passwordHash" | "passwordResetToken" | "passwordResetExpires">;
+export type SafeUser = Omit<
+  User,
+  "passwordHash" | "passwordResetToken" | "passwordResetExpires" | "isActive"
+>;
 
 // ─── Passports ────────────────────────────────────────────────────────────────
 

@@ -214,6 +214,14 @@ export async function registerRoutes(
         return res.json({ success: true, user: createSafeUser(user), isNewUser: true });
       }
 
+      if (user.isActive === false) {
+        SecurityLogger.logAuthEvent("suspended_account_signin", user.id, false, req.ip, req.get("User-Agent"));
+        return res.status(403).json({
+          code: "ACCOUNT_SUSPENDED",
+          error: `This account is suspended. Contact ${LOGIN_SUPPORT_EMAIL} for help.`,
+        });
+      }
+
       if (!emailVerified) {
         await storage.updateUser(user.id, { isEmailVerified: false });
         if (req.session.userId) {
@@ -290,6 +298,14 @@ export async function registerRoutes(
         return res.status(401).json({
           code: "ACCOUNT_NOT_READY",
           message: "This Cush account is not ready for sign-in. Contact support if the issue continues.",
+        });
+      }
+
+      if (existingUser.isActive === false) {
+        SecurityLogger.logAuthEvent("suspended_account_signin", existingUser.id, false, req.ip, req.get("User-Agent"));
+        return res.status(403).json({
+          code: "ACCOUNT_SUSPENDED",
+          message: `This account is suspended. Contact ${LOGIN_SUPPORT_EMAIL} for help.`,
         });
       }
 
@@ -380,6 +396,13 @@ export async function registerRoutes(
       const ok = await EncryptionService.verifyPassword(password, user.passwordHash);
       if (!ok) return await respondToFailedLogin(req, res, lockKey);
       await clearLoginAttemptState(lockKey);
+      if (user.isActive === false) {
+        SecurityLogger.logAuthEvent("suspended_account_signin", user.id, false, req.ip, req.get("User-Agent"));
+        return res.status(403).json({
+          code: "ACCOUNT_SUSPENDED",
+          error: `This account is suspended. Contact ${LOGIN_SUPPORT_EMAIL} for help.`,
+        });
+      }
       if (!user.isEmailVerified) {
         return res.status(403).json({ error: "Verify your email before signing in." });
       }

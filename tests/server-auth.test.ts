@@ -99,6 +99,36 @@ describe("server authentication middleware", () => {
     expect(req.session.lastActivity).toBeGreaterThan(0);
   });
 
+  it("destroys and rejects sessions for suspended accounts", async () => {
+    mocks.getUser.mockResolvedValue({ ...storedUser, isActive: false });
+    const destroy = vi.fn((callback: (error?: Error) => void) => callback());
+    const req = requestWithSession({
+      userId: storedUser.id,
+      lastActivity: Date.now(),
+      destroy,
+    });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(403);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
+      code: "ACCOUNT_SUSPENDED",
+      error: expect.stringContaining("support@we-cush.com"),
+    }));
+    expect(res.clearCookie).toHaveBeenCalledWith("connect.sid", expect.any(Object));
+    expect(destroy).toHaveBeenCalledOnce();
+    expect(mocks.logAuthEvent).toHaveBeenCalledWith(
+      "suspended_account_session",
+      storedUser.id,
+      false,
+      "127.0.0.1",
+      "vitest",
+    );
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("destroys an active session when the account is locked", async () => {
     mocks.getLockoutResponse.mockReturnValue({
       status: 423,

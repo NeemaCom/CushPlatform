@@ -1,7 +1,11 @@
 import type { Express } from "express";
-import { count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import { ADMIN_PERMISSION, canManageUserRoles } from "@shared/admin-permissions";
+import {
+  ADMIN_PERMISSION,
+  canManageUserRoles,
+  hasAdminPermission,
+} from "@shared/admin-permissions";
 import {
   adminAuditLogs,
   cushAssessmentInputs,
@@ -31,8 +35,12 @@ import {
   adminUserRoleChangeSchema,
   getUserRoleChangeBlockReason,
 } from "./admin-user-roles";
+import {
+  adminUserStatusSchema,
+  getUserStatusBlockReason,
+} from "./admin-user-status";
 
-const USER_ROLE_CHANGE_ADVISORY_LOCK_KEY = 847_216_319;
+const ADMIN_ACCESS_CHANGE_ADVISORY_LOCK_KEY = 847_216_319;
 
 const allowedRanges = [7, 30, 90] as const;
 const evidenceReviewSchema = z.object({
@@ -51,6 +59,53 @@ function isMissingEvidenceReviewSchema(error: unknown): boolean {
     current = "cause" in current ? (current as { cause?: unknown }).cause : null;
   }
   return false;
+}
+
+function isUserAccountStatusColumnMissing(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 6; depth += 1) {
+    if (typeof current === "object") {
+      const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
+      if (
+        candidate.code === "42703" &&
+        typeof candidate.message === "string" &&
+        candidate.message.toLowerCase().includes("is_active")
+      ) {
+        return true;
+      }
+      current = candidate.cause;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
+function isCushSessionTableMissing(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 6; depth += 1) {
+    if (typeof current === "object") {
+      const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
+      if (
+        candidate.code === "42P01" &&
+        typeof candidate.message === "string" &&
+        candidate.message.toLowerCase().includes("cush_sessions")
+      ) {
+        return true;
+      }
+      current = candidate.cause;
+    } else {
+      break;
+    }
+  }
+  return false;
+}
+
+function accountStatusMigrationResponse(res: import("express").Response) {
+  return res.status(503).json({
+    code: "ACCOUNT_STATUS_SCHEMA_MISSING",
+    error: "Account status storage is not initialized. Apply migrations/manual/add-user-account-status.sql first.",
+  });
 }
 
 export function registerAdminRoutes(app: Express): void {
@@ -89,6 +144,7 @@ export function registerAdminRoutes(app: Express): void {
             firstName: users.firstName,
             lastName: users.lastName,
             role: users.role,
+            isActive: users.isActive,
             isEmailVerified: users.isEmailVerified,
             createdAt: users.createdAt,
             lastLoginAt: users.lastLoginAt,
@@ -111,6 +167,9 @@ export function registerAdminRoutes(app: Express): void {
           offset,
         });
       } catch (error) {
+        if (isUserAccountStatusColumnMissing(error)) {
+          return accountStatusMigrationResponse(res);
+        }
         if (isAdminAuditTableMissing(error)) {
           return res.status(503).json({
             code: "ADMIN_AUDIT_SCHEMA_MISSING",
@@ -149,6 +208,7 @@ export function registerAdminRoutes(app: Express): void {
           firstName: users.firstName,
           lastName: users.lastName,
           role: users.role,
+          isActive: users.isActive,
           isEmailVerified: users.isEmailVerified,
           isPhoneVerified: users.isPhoneVerified,
           mfaEnabled: users.mfaEnabled,
@@ -168,6 +228,9 @@ export function registerAdminRoutes(app: Express): void {
           lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
         });
       } catch (error) {
+        if (isUserAccountStatusColumnMissing(error)) {
+          return accountStatusMigrationResponse(res);
+        }
         if (isAdminAuditTableMissing(error)) {
           return res.status(503).json({
             code: "ADMIN_AUDIT_SCHEMA_MISSING",
@@ -201,7 +264,7 @@ export function registerAdminRoutes(app: Express): void {
       try {
         const result = await db.transaction(async (tx) => {
           // Serialize role changes so concurrent requests cannot demote every full admin.
-          await tx.execute(sql`SELECT pg_advisory_xact_lock(${USER_ROLE_CHANGE_ADVISORY_LOCK_KEY})`);
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${ADMIN_ACCESS_CHANGE_ADVISORY_LOCK_KEY})`);
 
           const [actor] = await tx.select({ role: users.role })
             .from(users)
@@ -324,6 +387,183 @@ export function registerAdminRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(500).json({ error: "Unable to change the account role." });
+      }
+    },
+  );
+
+  app.put(
+    "/api/admin/users/:id/status",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.usersManage),
+    async (req: AuthenticatedRequest, res) => {
+      const userId = Number(req.params.id);
+      if (!Number.isSafeInteger(userId) || userId < 1) {
+        return res.status(400).json({ error: "Provide a valid account ID." });
+      }
+      const parsed = adminUserStatusSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Choose active or suspended account status." });
+      }
+
+      try {
+        const result = await db.transaction(async (tx) => {
+          // Serialize access-state changes with role changes to preserve an active full admin.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${ADMIN_ACCESS_CHANGE_ADVISORY_LOCK_KEY})`);
+
+          const [actor] = await tx.select({ role: users.role })
+            .from(users)
+            .where(eq(users.id, req.userId!))
+            .limit(1)
+            .for("update");
+          if (!actor || !hasAdminPermission(actor.role, ADMIN_PERMISSION.usersManage)) {
+            await recordAdminAuditEvent(req, {
+              action: "admin.users.account_status_denied.permission_changed",
+              resourceType: "user_account",
+              resourceId: userId,
+              outcome: "denied",
+            }, tx);
+            return { kind: "actor_not_allowed" as const };
+          }
+
+          const [target] = await tx.select({
+            id: users.id,
+            role: users.role,
+            isActive: users.isActive,
+          }).from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+            .for("update");
+
+          if (!target) {
+            await recordAdminAuditEvent(req, {
+              action: "admin.users.account_status_target_missing",
+              resourceType: "user_account",
+              resourceId: userId,
+              outcome: "failed",
+            }, tx);
+            return { kind: "not_found" as const };
+          }
+
+          const targetRole = target.role ?? "user";
+          let activeAdminCount = 0;
+          if (parsed.data.status === "suspended" && target.isActive && targetRole === "admin") {
+            const [activeAdmins] = await tx.select({ total: count() })
+              .from(users)
+              .where(and(eq(users.role, "admin"), eq(users.isActive, true)));
+            activeAdminCount = Number(activeAdmins?.total ?? 0);
+          }
+
+          const blockReason = getUserStatusBlockReason({
+            actorUserId: req.userId!,
+            targetUserId: userId,
+            actorRole: actor.role,
+            targetRole,
+            requestedStatus: parsed.data.status,
+            targetIsActive: target.isActive,
+            activeAdminCount,
+          });
+          if (blockReason) {
+            await recordAdminAuditEvent(req, {
+              action: `admin.users.account_status_denied.${blockReason}`,
+              resourceType: "user_account",
+              resourceId: userId,
+              outcome: "denied",
+            }, tx);
+            return { kind: blockReason };
+          }
+
+          const nextIsActive = parsed.data.status === "active";
+          if (!nextIsActive) {
+            // Revoke every stored session before committing suspension.
+            await tx.execute(sql`
+              DELETE FROM public.cush_sessions
+              WHERE sess->>'userId' = ${String(userId)}
+            `);
+          }
+
+          if (target.isActive === nextIsActive) {
+            await recordAdminAuditEvent(req, {
+              action: nextIsActive
+                ? "admin.users.account_status_noop"
+                : "admin.users.account_suspension_reapplied",
+              resourceType: "user_account",
+              resourceId: userId,
+              outcome: "success",
+            }, tx);
+            return { kind: "unchanged" as const, isActive: nextIsActive };
+          }
+
+          await tx.update(users)
+            .set({ isActive: nextIsActive, updatedAt: new Date() })
+            .where(eq(users.id, userId));
+
+          await recordAdminAuditEvent(req, {
+            action: nextIsActive
+              ? "admin.users.account_reactivated"
+              : "admin.users.account_suspended",
+            resourceType: "user_account",
+            resourceId: userId,
+          }, tx);
+
+          return {
+            kind: "updated" as const,
+            previousStatus: target.isActive ? "active" : "suspended",
+            status: parsed.data.status,
+          };
+        });
+
+        if (result.kind === "not_found") {
+          return res.status(404).json({ error: "Account not found." });
+        }
+        if (result.kind === "actor_not_allowed") {
+          return res.status(403).json({ error: "Your current role cannot manage account status." });
+        }
+        if (result.kind === "self_change") {
+          return res.status(403).json({ error: "You cannot suspend or reactivate your own account." });
+        }
+        if (result.kind === "admin_target_requires_full_admin") {
+          return res.status(403).json({ error: "Only a full admin can change another administrator's account status." });
+        }
+        if (result.kind === "last_active_admin") {
+          return res.status(409).json({ error: "At least one active full admin must remain." });
+        }
+        if (result.kind === "unchanged") {
+          return res.json({
+            success: true,
+            changed: false,
+            status: result.isActive ? "active" : "suspended",
+            sessionsRevoked: !result.isActive,
+          });
+        }
+        return res.json({
+          success: true,
+          changed: true,
+          previousStatus: result.previousStatus,
+          status: result.status,
+          sessionsRevoked: result.status === "suspended",
+        });
+      } catch (error) {
+        if (isUserAccountStatusColumnMissing(error)) {
+          return accountStatusMigrationResponse(res);
+        }
+        if (isCushSessionTableMissing(error)) {
+          return res.status(503).json({
+            code: "SESSION_SCHEMA_MISSING",
+            error: "Session storage is not initialized. Apply migrations/manual/create-cush-sessions-table.sql first.",
+          });
+        }
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin user account status change failed", {
+          adminUserId: req.userId,
+          targetUserId: userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to change the account status." });
       }
     },
   );

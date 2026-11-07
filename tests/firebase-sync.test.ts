@@ -157,6 +157,57 @@ describe("Firebase session sync", () => {
     expect((await res.json()).user.email).toBe("owner@example.com");
   });
 
+  it("does not create a session for a suspended Firebase-sync account", async () => {
+    mocks.getByUid.mockResolvedValue({ ...user, isActive: false });
+
+    const res = await sync({ idToken: "valid" });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "ACCOUNT_SUSPENDED",
+      error: expect.stringContaining("support@we-cush.com"),
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("does not create a session for a suspended Firebase password account", async () => {
+    mocks.getByUid.mockResolvedValue({ ...user, isActive: false });
+
+    const res = await passwordSignIn(user.email, "correct-password");
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "ACCOUNT_SUSPENDED",
+      message: expect.stringContaining("support@we-cush.com"),
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("does not create a legacy-password session for a suspended account", async () => {
+    const passwordHash = await bcrypt.hash("test-password", 10);
+    mocks.getByEmailForLogin.mockResolvedValue({
+      ...user,
+      isActive: false,
+      passwordHash,
+    });
+
+    const res = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: user.email, password: "test-password" }),
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({
+      code: "ACCOUNT_SUSPENDED",
+      error: expect.stringContaining("support@we-cush.com"),
+    });
+    expect(mocks.updateUser).not.toHaveBeenCalled();
+    expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
   it("blocks Firebase sync while the account is temporarily or permanently locked", async () => {
     mocks.getLockoutResponse.mockReturnValueOnce({
       status: 423,

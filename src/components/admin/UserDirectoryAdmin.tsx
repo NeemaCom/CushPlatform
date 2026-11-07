@@ -3,7 +3,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ChevronLeft, ChevronRight, Eye, RefreshCw, Search, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { ASSIGNABLE_USER_ROLES, type AssignableUserRole } from "@shared/admin-permissions";
+import {
+  ASSIGNABLE_USER_ROLES,
+  isAdminRole,
+  type AssignableUserRole,
+} from "@shared/admin-permissions";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +32,7 @@ type AdminUser = {
   firstName: string;
   lastName: string;
   role: string | null;
+  isActive: boolean;
   isEmailVerified: boolean | null;
   createdAt: string | null;
   lastLoginAt: string | null;
@@ -56,11 +61,24 @@ type RoleChangeResponse = {
   role: string;
 };
 
+type AccountStatusChangeResponse = {
+  success: true;
+  changed: boolean;
+  status: "active" | "suspended";
+  sessionsRevoked?: boolean;
+};
+
 type PendingRoleChange = {
   userId: number;
   email: string;
   previousRole: string;
   role: AssignableUserRole;
+};
+
+type PendingAccountStatusChange = {
+  userId: number;
+  email: string;
+  status: "active" | "suspended";
 };
 
 const roleLabels: Record<AssignableUserRole, string> = {
@@ -107,9 +125,11 @@ function isAssignableUserRole(role: string): role is AssignableUserRole {
 }
 
 export default function UserDirectoryAdmin({
+  canManageAccounts,
   canManageRoles,
   currentAdminId,
 }: {
+  canManageAccounts: boolean;
   canManageRoles: boolean;
   currentAdminId: number | null;
 }) {
@@ -121,6 +141,7 @@ export default function UserDirectoryAdmin({
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [selectedRoles, setSelectedRoles] = useState<Record<number, string>>({});
   const [pendingRoleChange, setPendingRoleChange] = useState<PendingRoleChange | null>(null);
+  const [pendingAccountStatusChange, setPendingAccountStatusChange] = useState<PendingAccountStatusChange | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -182,6 +203,29 @@ export default function UserDirectoryAdmin({
       });
     },
   });
+  const accountStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: PendingAccountStatusChange) => {
+      const response = await apiRequest("PUT", `/api/admin/users/${userId}/status`, { status });
+      return response.json() as Promise<AccountStatusChangeResponse>;
+    },
+    onSuccess: async (result) => {
+      setPendingAccountStatusChange(null);
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({
+        title: result.status === "suspended" ? "Account suspended" : "Account reactivated",
+        description: result.status === "suspended"
+          ? "The account is blocked from signing in and its stored sessions were revoked."
+          : "The account is active again; the user must sign in. Any separate password lockout remains unchanged.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Account status was not changed",
+        description: readableError(error),
+        variant: "destructive",
+      });
+    },
+  });
 
   const users = usersQuery.data?.users ?? [];
   const total = usersQuery.data?.total ?? 0;
@@ -195,7 +239,7 @@ export default function UserDirectoryAdmin({
           <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#82847d]">Operations · Accounts</p>
           <h1 id="admin-users-heading" className="mt-1 text-2xl font-semibold tracking-tight text-[#24252a]">User management</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#6f706f]">
-            Search account basics and verification status. Role changes require full-admin access and are confirmed and audit-logged.
+            Search account basics and verification status. Account suspensions revoke sessions; role changes require full-admin access.
           </p>
         </div>
         <span className="rounded-full border border-[#e5e3db] bg-[#f5f4ef] px-2.5 py-1 text-[11px] font-medium text-[#656760]">
@@ -263,6 +307,7 @@ export default function UserDirectoryAdmin({
               const currentRole = user.role ?? "user";
               const selectedRole = selectedRoles[user.id] ?? currentRole;
               const isCurrentAdmin = user.id === currentAdminId;
+              const canChangeStatus = canManageAccounts && !isCurrentAdmin && (!isAdminRole(user.role) || canManageRoles);
               return (
                 <article key={user.id} className="rounded-xl border border-[#e4e2d9] bg-[#fbfaf6] p-4 sm:p-5">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -284,6 +329,13 @@ export default function UserDirectoryAdmin({
                       }`}>
                         {user.isEmailVerified ? "Email verified" : "Email not verified"}
                       </span>
+                      <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                        user.isActive
+                          ? "bg-[#e4f4f0] text-[#28685c]"
+                          : "bg-[#f9e7e2] text-[#8e3e2f]"
+                      }`}>
+                        {user.isActive ? "Active" : "Suspended"}
+                      </span>
                       <button
                         type="button"
                         onClick={() => setSelectedUserId(user.id)}
@@ -304,43 +356,68 @@ export default function UserDirectoryAdmin({
                       <dd className="mt-1 text-[#555750]">{dateLabel(user.lastLoginAt, "No sign-in recorded")}</dd>
                     </div>
                   </dl>
-                  {canManageRoles && (
+                  {(canManageRoles || canManageAccounts) && (
                     <div className="mt-4 flex flex-col gap-3 border-t border-[#eeece4] pt-4 sm:flex-row sm:items-end sm:justify-between">
-                      <label className="block min-w-0 flex-1 text-xs font-semibold text-[#555750]" htmlFor={`admin-user-role-${user.id}`}>
-                        Account role
-                        <select
-                          id={`admin-user-role-${user.id}`}
-                          value={selectedRole}
-                          disabled={isCurrentAdmin || roleChangeMutation.isPending}
-                          onChange={(event) => setSelectedRoles((current) => ({ ...current, [user.id]: event.target.value }))}
-                          className="mt-1.5 min-h-10 w-full rounded-lg border border-[#d5d3c9] bg-white px-3 py-2 text-sm font-normal text-[#34353a] outline-none focus:border-[#57539c] focus:ring-2 focus:ring-[#57539c]/15 disabled:cursor-not-allowed disabled:bg-[#f2f1ed] disabled:text-[#85867f]"
-                        >
-                          {!isAssignableUserRole(currentRole) && (
-                            <option value={currentRole} disabled>{roleLabel(currentRole)} (legacy role)</option>
-                          )}
-                          {ASSIGNABLE_USER_ROLES.map((role) => (
-                            <option key={role} value={role}>{roleLabels[role]}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <div className="flex flex-col gap-1.5 sm:items-end">
-                        <button
-                          type="button"
-                          disabled={isCurrentAdmin || !isAssignableUserRole(selectedRole) || selectedRole === currentRole || roleChangeMutation.isPending}
-                          onClick={() => {
-                            if (!isAssignableUserRole(selectedRole)) return;
-                            setPendingRoleChange({
+                      {canManageRoles && (
+                        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">
+                          <label className="block min-w-0 flex-1 text-xs font-semibold text-[#555750]" htmlFor={`admin-user-role-${user.id}`}>
+                            Account role
+                            <select
+                              id={`admin-user-role-${user.id}`}
+                              value={selectedRole}
+                              disabled={isCurrentAdmin || roleChangeMutation.isPending || accountStatusMutation.isPending}
+                              onChange={(event) => setSelectedRoles((current) => ({ ...current, [user.id]: event.target.value }))}
+                              className="mt-1.5 min-h-10 w-full rounded-lg border border-[#d5d3c9] bg-white px-3 py-2 text-sm font-normal text-[#34353a] outline-none focus:border-[#57539c] focus:ring-2 focus:ring-[#57539c]/15 disabled:cursor-not-allowed disabled:bg-[#f2f1ed] disabled:text-[#85867f]"
+                            >
+                              {!isAssignableUserRole(currentRole) && (
+                                <option value={currentRole} disabled>{roleLabel(currentRole)} (legacy role)</option>
+                              )}
+                              {ASSIGNABLE_USER_ROLES.map((role) => (
+                                <option key={role} value={role}>{roleLabels[role]}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <button
+                            type="button"
+                            disabled={isCurrentAdmin || !isAssignableUserRole(selectedRole) || selectedRole === currentRole || roleChangeMutation.isPending || accountStatusMutation.isPending}
+                            onClick={() => {
+                              if (!isAssignableUserRole(selectedRole)) return;
+                              setPendingRoleChange({
+                                userId: user.id,
+                                email: user.email,
+                                previousRole: currentRole,
+                                role: selectedRole,
+                              });
+                            }}
+                            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#29266f] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#39358b] disabled:cursor-not-allowed disabled:opacity-45"
+                          >
+                            Save role
+                          </button>
+                        </div>
+                      )}
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        {canManageAccounts && (
+                          <button
+                            type="button"
+                            disabled={!canChangeStatus || roleChangeMutation.isPending || accountStatusMutation.isPending}
+                            onClick={() => setPendingAccountStatusChange({
                               userId: user.id,
                               email: user.email,
-                              previousRole: currentRole,
-                              role: selectedRole,
-                            });
-                          }}
-                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#29266f] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#39358b] disabled:cursor-not-allowed disabled:opacity-45"
-                        >
-                          Save role
-                        </button>
-                        {isCurrentAdmin && <span className="text-[10px] text-[#777973]">You cannot change your own role.</span>}
+                              status: user.isActive ? "suspended" : "active",
+                            })}
+                            className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                              user.isActive
+                                ? "border-[#e4b9ad] bg-[#fff8f5] text-[#8e3e2f] hover:bg-[#f9e7e2]"
+                                : "border-[#b8d8ce] bg-[#f3faf7] text-[#28685c] hover:bg-[#e4f4f0]"
+                            }`}
+                          >
+                            {user.isActive ? "Suspend account" : "Reactivate account"}
+                          </button>
+                        )}
+                        {isCurrentAdmin && <span className="text-[10px] text-[#777973]">You cannot change your own role or status.</span>}
+                        {!canChangeStatus && canManageAccounts && !isCurrentAdmin && isAdminRole(user.role) && (
+                          <span className="text-[10px] text-[#777973]">Only a full admin can change an administrator’s status.</span>
+                        )}
                       </div>
                     </div>
                   )}
@@ -414,6 +491,9 @@ export default function UserDirectoryAdmin({
                   </span>
                 </div>
                 <p className="mt-3 text-[11px] text-[#777973]">Account ID {detailQuery.data.id}</p>
+                <p className={`mt-2 text-xs font-semibold ${detailQuery.data.isActive ? "text-[#28685c]" : "text-[#8e3e2f]"}`}>
+                  {detailQuery.data.isActive ? "Account active" : "Account suspended"}
+                </p>
               </section>
 
               <DetailGroup title="Security and verification">
@@ -471,6 +551,42 @@ export default function UserDirectoryAdmin({
               }}
             >
               {roleChangeMutation.isPending ? "Saving…" : "Confirm change"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingAccountStatusChange !== null}
+        onOpenChange={(open) => {
+          if (!open && !accountStatusMutation.isPending) setPendingAccountStatusChange(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAccountStatusChange?.status === "suspended" ? "Suspend this account?" : "Reactivate this account?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAccountStatusChange?.status === "suspended"
+                ? `Suspend ${pendingAccountStatusChange.email}? This blocks account access and revokes all stored sign-in sessions. No account or financial data will be deleted.`
+                : `Reactivate ${pendingAccountStatusChange?.email ?? "this account"}? This restores account eligibility, but does not create a session or clear any separate password lockout.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={accountStatusMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={accountStatusMutation.isPending || !pendingAccountStatusChange}
+              className={pendingAccountStatusChange?.status === "suspended" ? "bg-[#8e3e2f] hover:bg-[#703020]" : ""}
+              onClick={() => {
+                if (pendingAccountStatusChange) accountStatusMutation.mutate(pendingAccountStatusChange);
+              }}
+            >
+              {accountStatusMutation.isPending
+                ? "Saving…"
+                : pendingAccountStatusChange?.status === "suspended"
+                  ? "Suspend and revoke sessions"
+                  : "Reactivate account"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -110,6 +110,7 @@ export default function AdminDashboard() {
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
   const canManageRoles = canManageUserRoles(user?.role);
+  const canManageAccounts = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersManage);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
@@ -255,7 +256,11 @@ export default function AdminDashboard() {
           )}
         </nav>
         {activeSection === "users" ? (
-          <UserDirectoryAdmin canManageRoles={canManageRoles} currentAdminId={user?.id ?? null} />
+          <UserDirectoryAdmin
+            canManageAccounts={canManageAccounts}
+            canManageRoles={canManageRoles}
+            currentAdminId={user?.id ?? null}
+          />
         ) : activeSection === "cush-verify" ? (
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
         ) : activeSection === "scoring-policy" ? (
