@@ -22,9 +22,22 @@ export const ADMIN_PERMISSION = {
 
 export type AdminPermission = (typeof ADMIN_PERMISSION)[keyof typeof ADMIN_PERMISSION];
 
+export const ADMIN_ROLES = [
+  "admin",
+  "operations_admin",
+  "financial_identity_admin",
+  "technical_admin",
+  "read_only_admin",
+] as const;
+
+export const ASSIGNABLE_USER_ROLES = ["user", ...ADMIN_ROLES] as const;
+
+export type AdminRole = (typeof ADMIN_ROLES)[number];
+export type AssignableUserRole = (typeof ASSIGNABLE_USER_ROLES)[number];
+
 const allAdminPermissions = Object.values(ADMIN_PERMISSION) as AdminPermission[];
 
-export const ADMIN_ROLE_PERMISSIONS: Record<string, readonly AdminPermission[]> = {
+export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[]> = {
   // Preserve the existing admin role as full access. No public flow assigns it.
   admin: allAdminPermissions,
   operations_admin: [
@@ -78,9 +91,13 @@ export function hasAdminPermission(
   if (!role || !Object.prototype.hasOwnProperty.call(ADMIN_ROLE_PERMISSIONS, role)) {
     return false;
   }
-  return ADMIN_ROLE_PERMISSIONS[role].includes(permission);
+  return ADMIN_ROLE_PERMISSIONS[role as AdminRole].includes(permission);
 }
 
 export function isAdminRole(role: string | null | undefined): boolean {
   return !!role && Object.prototype.hasOwnProperty.call(ADMIN_ROLE_PERMISSIONS, role);
+}
+
+export function canManageUserRoles(role: string | null | undefined): boolean {
+  return role === "admin" && hasAdminPermission(role, ADMIN_PERMISSION.usersManage);
 }

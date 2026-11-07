@@ -1,7 +1,7 @@
 import type { Express } from "express";
-import { count, desc, eq, gte, ilike, or } from "drizzle-orm";
+import { count, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import { z } from "zod";
-import { ADMIN_PERMISSION } from "@shared/admin-permissions";
+import { ADMIN_PERMISSION, canManageUserRoles } from "@shared/admin-permissions";
 import {
   adminAuditLogs,
   cushAssessmentInputs,
@@ -27,6 +27,12 @@ import {
   adminUserDirectoryQuerySchema,
   userDirectorySearchPattern,
 } from "./admin-user-directory";
+import {
+  adminUserRoleChangeSchema,
+  getUserRoleChangeBlockReason,
+} from "./admin-user-roles";
+
+const USER_ROLE_CHANGE_ADVISORY_LOCK_KEY = 847_216_319;
 
 const allowedRanges = [7, 30, 90] as const;
 const evidenceReviewSchema = z.object({
@@ -174,6 +180,150 @@ export function registerAdminRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(500).json({ error: "Unable to load account details." });
+      }
+    },
+  );
+
+  app.put(
+    "/api/admin/users/:id/role",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.usersManage),
+    async (req: AuthenticatedRequest, res) => {
+      const userId = Number(req.params.id);
+      if (!Number.isSafeInteger(userId) || userId < 1) {
+        return res.status(400).json({ error: "Provide a valid account ID." });
+      }
+      const parsed = adminUserRoleChangeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Choose one of the supported account roles." });
+      }
+
+      try {
+        const result = await db.transaction(async (tx) => {
+          // Serialize role changes so concurrent requests cannot demote every full admin.
+          await tx.execute(sql`SELECT pg_advisory_xact_lock(${USER_ROLE_CHANGE_ADVISORY_LOCK_KEY})`);
+
+          const [actor] = await tx.select({ role: users.role })
+            .from(users)
+            .where(eq(users.id, req.userId!))
+            .limit(1)
+            .for("update");
+          if (!actor || !canManageUserRoles(actor.role)) {
+            await recordAdminAuditEvent(req, {
+              action: "admin.users.role_change_denied.non_full_admin",
+              resourceType: "user_role",
+              resourceId: userId,
+              outcome: "denied",
+            }, tx);
+            return { kind: "not_full_admin" as const };
+          }
+
+          const [target] = await tx.select({
+            id: users.id,
+            role: users.role,
+          }).from(users)
+            .where(eq(users.id, userId))
+            .limit(1)
+            .for("update");
+
+          if (!target) {
+            await recordAdminAuditEvent(req, {
+              action: "admin.users.role_change_target_missing",
+              resourceType: "user_role",
+              resourceId: userId,
+              outcome: "failed",
+            }, tx);
+            return { kind: "not_found" as const };
+          }
+
+          const currentRole = target.role ?? "user";
+          let fullAdminCount = 0;
+          if (currentRole === "admin" && parsed.data.role !== "admin") {
+            const [adminCount] = await tx.select({ total: count() })
+              .from(users)
+              .where(eq(users.role, "admin"));
+            fullAdminCount = Number(adminCount?.total ?? 0);
+          }
+
+          const blockReason = getUserRoleChangeBlockReason({
+            actorUserId: req.userId!,
+            targetUserId: userId,
+            currentRole,
+            requestedRole: parsed.data.role,
+            fullAdminCount,
+          });
+
+          if (blockReason === "no_change") {
+            await recordAdminAuditEvent(req, {
+              action: "admin.users.role_change.noop",
+              resourceType: "user_role",
+              resourceId: userId,
+              outcome: "success",
+            }, tx);
+            return { kind: "unchanged" as const, role: currentRole };
+          }
+
+          if (blockReason) {
+            await recordAdminAuditEvent(req, {
+              action: `admin.users.role_change_denied.${blockReason}`,
+              resourceType: "user_role",
+              resourceId: userId,
+              outcome: "denied",
+            }, tx);
+            return { kind: blockReason, role: currentRole };
+          }
+
+          await tx.update(users)
+            .set({ role: parsed.data.role, updatedAt: new Date() })
+            .where(eq(users.id, userId));
+
+          await recordAdminAuditEvent(req, {
+            action: `admin.users.role_changed.${currentRole}_to_${parsed.data.role}`,
+            resourceType: "user_role",
+            resourceId: userId,
+          }, tx);
+
+          return {
+            kind: "updated" as const,
+            previousRole: currentRole,
+            role: parsed.data.role,
+          };
+        });
+
+        if (result.kind === "not_found") {
+          return res.status(404).json({ error: "Account not found." });
+        }
+        if (result.kind === "not_full_admin") {
+          return res.status(403).json({ error: "Only a full admin can change account roles." });
+        }
+        if (result.kind === "self_change") {
+          return res.status(403).json({ error: "You cannot change your own role." });
+        }
+        if (result.kind === "last_admin") {
+          return res.status(409).json({ error: "At least one full admin must remain. Assign another full admin before demoting this account." });
+        }
+        if (result.kind === "unchanged") {
+          return res.json({ success: true, changed: false, role: result.role });
+        }
+        return res.json({
+          success: true,
+          changed: true,
+          previousRole: result.previousRole,
+          role: result.role,
+        });
+      } catch (error) {
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin user role change failed", {
+          adminUserId: req.userId,
+          targetUserId: userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to change the account role." });
       }
     },
   );

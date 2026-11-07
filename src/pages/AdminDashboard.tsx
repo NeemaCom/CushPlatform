@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
 import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin";
 import CushUserScoreReview from "@/components/passport/CushUserScoreReview";
-import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
+import { ADMIN_PERMISSION, canManageUserRoles, hasAdminPermission } from "@shared/admin-permissions";
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
 import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
 import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
@@ -109,6 +109,7 @@ export default function AdminDashboard() {
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
+  const canManageRoles = canManageUserRoles(user?.role);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
@@ -254,7 +255,7 @@ export default function AdminDashboard() {
           )}
         </nav>
         {activeSection === "users" ? (
-          <UserDirectoryAdmin />
+          <UserDirectoryAdmin canManageRoles={canManageRoles} currentAdminId={user?.id ?? null} />
         ) : activeSection === "cush-verify" ? (
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
         ) : activeSection === "scoring-policy" ? (
