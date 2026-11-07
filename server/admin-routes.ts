@@ -120,6 +120,64 @@ export function registerAdminRoutes(app: Express): void {
     },
   );
 
+  app.get(
+    "/api/admin/users/:id",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.usersRead),
+    async (req: AuthenticatedRequest, res) => {
+      const userId = Number(req.params.id);
+      if (!Number.isSafeInteger(userId) || userId < 1) {
+        return res.status(400).json({ error: "Provide a valid account ID." });
+      }
+
+      try {
+        await recordAdminAuditEvent(req, {
+          action: "admin.users.account_detail_read",
+          resourceType: "user_account",
+          resourceId: userId,
+        });
+
+        const [account] = await db.select({
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          role: users.role,
+          isEmailVerified: users.isEmailVerified,
+          isPhoneVerified: users.isPhoneVerified,
+          mfaEnabled: users.mfaEnabled,
+          acceptTerms: users.acceptTerms,
+          acceptPrivacy: users.acceptPrivacy,
+          marketingConsent: users.marketingConsent,
+          createdAt: users.createdAt,
+          updatedAt: users.updatedAt,
+          lastLoginAt: users.lastLoginAt,
+        }).from(users).where(eq(users.id, userId)).limit(1);
+
+        if (!account) return res.status(404).json({ error: "Account not found." });
+        return res.json({
+          ...account,
+          createdAt: account.createdAt?.toISOString() ?? null,
+          updatedAt: account.updatedAt?.toISOString() ?? null,
+          lastLoginAt: account.lastLoginAt?.toISOString() ?? null,
+        });
+      } catch (error) {
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin user account detail lookup failed", {
+          adminUserId: req.userId,
+          targetUserId: userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to load account details." });
+      }
+    },
+  );
+
   app.post(
     "/api/admin/score-breakdown",
     isAuthenticated,

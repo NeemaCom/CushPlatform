@@ -1,7 +1,14 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ChevronLeft, ChevronRight, RefreshCw, Search, UsersRound } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Eye, RefreshCw, Search, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type AdminUser = {
   id: number;
@@ -19,6 +26,15 @@ type UserDirectoryResponse = {
   total: number;
   limit: number;
   offset: number;
+};
+
+type AdminUserDetail = AdminUser & {
+  isPhoneVerified: boolean | null;
+  mfaEnabled: boolean | null;
+  acceptTerms: boolean;
+  acceptPrivacy: boolean;
+  marketingConsent: boolean | null;
+  updatedAt: string | null;
 };
 
 const pageSize = 25;
@@ -48,6 +64,7 @@ export default function UserDirectoryAdmin() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [offset, setOffset] = useState(0);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -68,6 +85,16 @@ export default function UserDirectoryAdmin() {
       const response = await apiRequest("GET", `/api/admin/users?${params.toString()}`);
       return response.json() as Promise<UserDirectoryResponse>;
     },
+    retry: false,
+    staleTime: 30_000,
+  });
+  const detailQuery = useQuery<AdminUserDetail>({
+    queryKey: ["/api/admin/users", "detail", selectedUserId],
+    queryFn: async () => {
+      const response = await apiRequest("GET", `/api/admin/users/${selectedUserId}`);
+      return response.json() as Promise<AdminUserDetail>;
+    },
+    enabled: selectedUserId !== null,
     retry: false,
     staleTime: 30_000,
   });
@@ -162,13 +189,23 @@ export default function UserDirectoryAdmin() {
                       <p className="mt-1 break-all text-sm text-[#39358b]">{user.email}</p>
                       <p className="mt-1 text-[11px] text-[#777973]">Account ID {user.id}</p>
                     </div>
-                    <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
-                      user.isEmailVerified
-                        ? "bg-[#e4f4f0] text-[#28685c]"
-                        : "bg-[#fbf0dc] text-[#8b6324]"
-                    }`}>
-                      {user.isEmailVerified ? "Email verified" : "Email not verified"}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                        user.isEmailVerified
+                          ? "bg-[#e4f4f0] text-[#28685c]"
+                          : "bg-[#fbf0dc] text-[#8b6324]"
+                      }`}>
+                        {user.isEmailVerified ? "Email verified" : "Email not verified"}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedUserId(user.id)}
+                        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#d5d3c9] bg-white px-3 text-xs font-semibold text-[#39358b] transition hover:bg-[#f6f5f0] focus:outline-none focus:ring-2 focus:ring-[#57539c]/30"
+                        aria-label={`View details for ${displayName}`}
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View details
+                      </button>
+                    </div>
                   </div>
                   <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-[#eeece4] pt-3 text-xs sm:grid-cols-2">
                     <div>
@@ -208,6 +245,91 @@ export default function UserDirectoryAdmin() {
           </div>
         </>
       )}
+
+      <Dialog
+        open={selectedUserId !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedUserId(null);
+        }}
+      >
+        <DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto border-[#e4e2d9] bg-[#fbfaf6]">
+          <DialogHeader>
+            <DialogTitle className="text-[#24252a]">User account details</DialogTitle>
+            <DialogDescription>
+              Read-only account, security, and consent status. Credentials, provider IDs, and financial records are excluded.
+            </DialogDescription>
+          </DialogHeader>
+          {detailQuery.isLoading ? (
+            <div className="space-y-3 py-3" aria-label="Loading account details">
+              <div className="h-20 animate-pulse rounded-xl bg-[#eeede7]" />
+              <div className="h-32 animate-pulse rounded-xl bg-[#eeede7]" />
+            </div>
+          ) : detailQuery.isError ? (
+            <div className="rounded-xl border border-[#e5c9b9] bg-[#fbf2ec] p-4" role="alert">
+              <p className="text-sm font-semibold text-[#5b3226]">Account details unavailable</p>
+              <p className="mt-1 break-words text-sm leading-6 text-[#79594c]">{readableError(detailQuery.error)}</p>
+              <button type="button" onClick={() => detailQuery.refetch()} className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d9b6a5] bg-[#fffaf7] px-3 py-2 text-sm font-semibold text-[#70402f]">
+                <RefreshCw className="h-3.5 w-3.5" /> Retry
+              </button>
+            </div>
+          ) : detailQuery.data ? (
+            <div className="space-y-4">
+              <section className="rounded-xl border border-[#e4e2d9] bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-base font-semibold text-[#24252a]">
+                      {[detailQuery.data.firstName, detailQuery.data.lastName].filter(Boolean).join(" ") || "Name unavailable"}
+                    </h3>
+                    <p className="mt-1 break-all text-sm text-[#39358b]">{detailQuery.data.email}</p>
+                  </div>
+                  <span className="rounded-full border border-[#deddd4] bg-[#f6f5f0] px-2.5 py-1 text-[10px] font-semibold text-[#656760]">
+                    {detailQuery.data.role || "user"}
+                  </span>
+                </div>
+                <p className="mt-3 text-[11px] text-[#777973]">Account ID {detailQuery.data.id}</p>
+              </section>
+
+              <DetailGroup title="Security and verification">
+                <DetailItem label="Email verification" value={detailQuery.data.isEmailVerified ? "Verified" : "Not verified"} />
+                <DetailItem label="Phone verification" value={detailQuery.data.isPhoneVerified ? "Verified" : "Not verified"} />
+                <DetailItem label="Multi-factor authentication" value={detailQuery.data.mfaEnabled ? "Enabled" : "Not enabled"} />
+              </DetailGroup>
+
+              <DetailGroup title="Consent status">
+                <DetailItem label="Terms acceptance" value={detailQuery.data.acceptTerms ? "Recorded" : "Not recorded"} />
+                <DetailItem label="Privacy acceptance" value={detailQuery.data.acceptPrivacy ? "Recorded" : "Not recorded"} />
+                <DetailItem label="Marketing updates" value={detailQuery.data.marketingConsent ? "Opted in" : "Not opted in"} />
+              </DetailGroup>
+
+              <DetailGroup title="Account dates">
+                <DetailItem label="Registered" value={dateLabel(detailQuery.data.createdAt, "Unavailable")} />
+                <DetailItem label="Last updated" value={dateLabel(detailQuery.data.updatedAt, "Unavailable")} />
+                <DetailItem label="Last sign-in" value={dateLabel(detailQuery.data.lastLoginAt, "No sign-in recorded")} />
+              </DetailGroup>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </section>
+  );
+}
+
+function DetailGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-xl border border-[#e4e2d9] bg-white p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[#777973]">{title}</h3>
+      <dl className="mt-3 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2">
+        {children}
+      </dl>
+    </section>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] text-[#85867f]">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-medium text-[#393a39]">{value}</dd>
+    </div>
   );
 }
