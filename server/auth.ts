@@ -5,6 +5,7 @@ import type { User, SafeUser } from "@shared/schema";
 import { hasAdminPermission, type AdminPermission } from "@shared/admin-permissions";
 import { getLoginAttemptState, getLockoutResponse } from "./login-attempts";
 import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
+import { getAllowedFrontendOrigins } from "./origin-policy";
 
 declare module "express-session" {
   interface SessionData {
@@ -239,20 +240,7 @@ export function requireTrustedAdminOrigin(
   next: NextFunction,
 ): void {
   const origin = req.get("Origin");
-  const configuredOrigins = (process.env.FRONTEND_ORIGIN || "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean);
-  const localOrigins = process.env.NODE_ENV === "production"
-    ? []
-    : [
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5000",
-        "http://127.0.0.1:5000",
-      ];
-
-  if (!origin || !new Set([...configuredOrigins, ...localOrigins]).has(origin)) {
+  if (!origin || !getAllowedFrontendOrigins().has(origin)) {
     SecurityLogger.logAuthEvent(
       "admin_origin_rejected",
       req.userId || null,

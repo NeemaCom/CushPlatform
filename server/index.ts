@@ -5,6 +5,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { createApiOriginGuard, createSecurityHeaders } from "./http-security";
 import { clearExpiredAdminAuditIps, isAdminAuditTableMissing } from "./admin-audit";
+import { getAllowedFrontendOrigins } from "./origin-policy";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -47,15 +48,7 @@ function startAuditIpRetentionCleanup() {
 app.set('trust proxy', 1);
 app.use(createSecurityHeaders(isProduction));
 
-const localOrigins = [
-  "http://localhost:3000", "http://127.0.0.1:3000",
-  "http://localhost:5000", "http://127.0.0.1:5000",
-];
-const allowedOrigins = new Set([
-  ...(process.env.NODE_ENV === "production" ? [] : localOrigins),
-  "https://app.we-cush.com",
-  ...(process.env.FRONTEND_ORIGIN || "").split(",").map((origin) => origin.trim()).filter(Boolean),
-]);
+const allowedOrigins = getAllowedFrontendOrigins();
 
 app.use("/api", (req, res, next) => {
   res.setHeader("Cache-Control", "no-store");
