@@ -91,7 +91,7 @@ const roleLabels: Record<AssignableUserRole, string> = {
   read_only_admin: "Read-only admin",
 };
 
-const pageSize = 25;
+const pageSize = 50;
 
 function readableError(error: unknown) {
   const message = error instanceof Error ? error.message : "Request failed.";
@@ -313,7 +313,7 @@ export default function UserDirectoryAdmin({
         </div>
       ) : (
         <>
-          <div className="space-y-3" aria-label="User accounts">
+          <div className="space-y-2" aria-label="User accounts">
             {users.map((user) => {
               const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "Name unavailable";
               const currentRole = user.role ?? "user";
@@ -321,27 +321,29 @@ export default function UserDirectoryAdmin({
               const isCurrentAdmin = user.id === currentAdminId;
               const canChangeStatus = canManageAccounts && !isCurrentAdmin && (!isAdminRole(user.role) || canManageRoles);
               return (
-                <article key={user.id} className="rounded-xl border border-[#e4e2d9] bg-[#fbfaf6] p-4 sm:p-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <article key={user.id} className="rounded-xl border border-[#e4e2d9] bg-[#fbfaf6] p-3 sm:p-3.5">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h2 className="break-words text-sm font-semibold text-[#24252a]">{displayName}</h2>
-                        <span className="rounded-full border border-[#deddd4] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#656760]">
+                        <span className="rounded-full border border-[#deddd4] bg-white px-1.5 py-0.5 text-[9px] font-semibold text-[#656760]">
                           {roleLabel(user.role)}
                         </span>
                       </div>
-                      <p className="mt-1 break-all text-sm text-[#39358b]">{user.email}</p>
-                      <p className="mt-1 text-[11px] text-[#777973]">Account ID {user.id}</p>
+                      <div className="mt-0.5 flex min-w-0 items-center gap-2">
+                        <p className="min-w-0 flex-1 truncate text-xs text-[#39358b]" title={user.email}>{user.email}</p>
+                        <span className="shrink-0 text-[10px] text-[#85867f]">ID {user.id}</span>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className={`w-fit rounded-full px-2 py-0.5 text-[9px] font-semibold ${
                         user.isEmailVerified
                           ? "bg-[#e4f4f0] text-[#28685c]"
                           : "bg-[#fbf0dc] text-[#8b6324]"
                       }`}>
                         {user.isEmailVerified ? "Email verified" : "Email not verified"}
                       </span>
-                      <span className={`w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                      <span className={`w-fit rounded-full px-2 py-0.5 text-[9px] font-semibold ${
                         user.isActive
                           ? "bg-[#e4f4f0] text-[#28685c]"
                           : "bg-[#f9e7e2] text-[#8e3e2f]"
@@ -351,35 +353,25 @@ export default function UserDirectoryAdmin({
                       <button
                         type="button"
                         onClick={() => setSelectedUserId(user.id)}
-                        className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-[#d5d3c9] bg-white px-3 text-xs font-semibold text-[#39358b] transition hover:bg-[#f6f5f0] focus:outline-none focus:ring-2 focus:ring-[#57539c]/30"
+                        className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#d5d3c9] bg-white px-2.5 text-[11px] font-semibold text-[#39358b] transition hover:bg-[#f6f5f0] focus:outline-none focus:ring-2 focus:ring-[#57539c]/30"
                         aria-label={`View details for ${displayName}`}
                       >
-                        <Eye className="h-3.5 w-3.5" /> View details
+                        <Eye className="h-3 w-3" /> Details
                       </button>
                     </div>
                   </div>
-                  <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-[#eeece4] pt-3 text-xs sm:grid-cols-2">
-                    <div>
-                      <dt className="font-medium text-[#85867f]">Registered</dt>
-                      <dd className="mt-1 text-[#555750]">{dateLabel(user.createdAt, "Date unavailable")}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-medium text-[#85867f]">Last sign-in</dt>
-                      <dd className="mt-1 text-[#555750]">{dateLabel(user.lastLoginAt, "No sign-in recorded")}</dd>
-                    </div>
-                  </dl>
                   {(canManageRoles || canManageAccounts) && (
-                    <div className="mt-4 flex flex-col gap-3 border-t border-[#eeece4] pt-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="mt-2.5 flex flex-col gap-2 border-t border-[#eeece4] pt-2.5 sm:flex-row sm:items-center sm:justify-between">
                       {canManageRoles && (
-                        <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-end">
-                          <label className="block min-w-0 flex-1 text-xs font-semibold text-[#555750]" htmlFor={`admin-user-role-${user.id}`}>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-row sm:items-center">
+                          <label className="block min-w-0 flex-1 text-[11px] font-semibold text-[#555750]" htmlFor={`admin-user-role-${user.id}`}>
                             Account role
                             <select
                               id={`admin-user-role-${user.id}`}
                               value={selectedRole}
                               disabled={isCurrentAdmin || roleChangeMutation.isPending || accountStatusMutation.isPending}
                               onChange={(event) => setSelectedRoles((current) => ({ ...current, [user.id]: event.target.value }))}
-                              className="mt-1.5 min-h-10 w-full rounded-lg border border-[#d5d3c9] bg-white px-3 py-2 text-sm font-normal text-[#34353a] outline-none focus:border-[#57539c] focus:ring-2 focus:ring-[#57539c]/15 disabled:cursor-not-allowed disabled:bg-[#f2f1ed] disabled:text-[#85867f]"
+                              className="mt-1 min-h-9 w-full rounded-lg border border-[#d5d3c9] bg-white px-2.5 py-1.5 text-xs font-normal text-[#34353a] outline-none focus:border-[#57539c] focus:ring-2 focus:ring-[#57539c]/15 disabled:cursor-not-allowed disabled:bg-[#f2f1ed] disabled:text-[#85867f]"
                             >
                               {!isAssignableUserRole(currentRole) && (
                                 <option value={currentRole} disabled>{roleLabel(currentRole)} (legacy role)</option>
@@ -401,13 +393,13 @@ export default function UserDirectoryAdmin({
                                 role: selectedRole,
                               });
                             }}
-                            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#29266f] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#39358b] disabled:cursor-not-allowed disabled:opacity-45"
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-[#29266f] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[#39358b] disabled:cursor-not-allowed disabled:opacity-45"
                           >
                             Save role
                           </button>
                         </div>
                       )}
-                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
                         {canManageAccounts && (
                           <button
                             type="button"
@@ -417,7 +409,7 @@ export default function UserDirectoryAdmin({
                               email: user.email,
                               status: user.isActive ? "suspended" : "active",
                             })}
-                            className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
+                            className={`inline-flex min-h-9 items-center justify-center rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${
                               user.isActive
                                 ? "border-[#e4b9ad] bg-[#fff8f5] text-[#8e3e2f] hover:bg-[#f9e7e2]"
                                 : "border-[#b8d8ce] bg-[#f3faf7] text-[#28685c] hover:bg-[#e4f4f0]"
