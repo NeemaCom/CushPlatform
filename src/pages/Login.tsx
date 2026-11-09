@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
 import { API_BASE_URL } from '@/lib/api-base'
+import { getFirebaseEmailActionSettings } from '@/lib/firebase-email-action-settings'
 import {
   auth,
   googleProvider,
@@ -111,9 +112,11 @@ function formatGoogleSignInDiagnostic(diagnostic: GoogleSignInDiagnostic) {
 }
 
 function getAuthActionSettings(returnTo: 'emailVerified' | 'passwordReset') {
-  const url = new URL('/login', window.location.origin)
-  url.searchParams.set(returnTo, '1')
-  return { url: url.toString() }
+  return getFirebaseEmailActionSettings(
+    returnTo,
+    window.location.origin,
+    import.meta.env.PROD,
+  )
 }
 
 async function firebaseSync(fbUser: { getIdToken: () => Promise<string> }, extra?: Record<string, unknown>) {
