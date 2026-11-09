@@ -52,7 +52,7 @@ import {
   recordFailedLogin,
   revokeUserSessions,
 } from "./login-attempts";
-import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
+import { LOGIN_SUPPORT_EMAIL, SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 import { sendWelcomeEmail } from "./welcome-email";
 import { registerVisitorIntelligenceRoutes } from "./visitor-intelligence-routes";
 
@@ -133,12 +133,13 @@ export async function registerRoutes(
   app.use(session({
     secret: sessionSecret,
     store: sessionStore,
+    rolling: true,
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: crossSiteCookies,
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24, // 24 hours
+      maxAge: SESSION_IDLE_TIMEOUT_MS,
       sameSite: crossSiteCookies ? "none" : "strict",
     },
   }));

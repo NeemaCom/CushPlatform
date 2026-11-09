@@ -15,13 +15,23 @@ const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 const CushVerify = lazy(() => import('@/pages/CushVerify'))
 import { useAuth } from '@/hooks/useAuth'
 import VisitorAnalytics from '@/components/visitor-intelligence/VisitorAnalytics'
+import SessionInactivityGuard from '@/components/auth/SessionInactivityGuard'
+import { auth, onAuthStateChanged, signOut } from '@/firebase'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const [, setLocation] = useLocation()
 
   useEffect(() => {
-    if (!isLoading && !user) setLocation('/login')
+    if (!isLoading && !user) {
+      setLocation('/login')
+      if (user === null) {
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) void signOut(auth).catch(() => undefined)
+        })
+        return unsubscribe
+      }
+    }
   }, [isLoading, user, setLocation])
 
   if (isLoading) {
@@ -61,6 +71,7 @@ function App() {
     <ThemeProvider defaultTheme="light" enableSystem={false}>
       <QueryProvider>
         <Router>
+          <SessionInactivityGuard />
           <VisitorAnalytics />
           <div className="min-h-screen bg-white">
             <Switch>

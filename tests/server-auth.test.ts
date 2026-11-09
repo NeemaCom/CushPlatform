@@ -21,6 +21,7 @@ vi.mock("../server/login-attempts", () => ({
 }));
 
 import { isAuthenticated } from "../server/auth";
+import { SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 
 function requestWithSession(session: Record<string, unknown>) {
   return {
@@ -200,7 +201,7 @@ describe("server authentication middleware", () => {
     const destroy = vi.fn((callback: (error?: Error) => void) => callback());
     const req = requestWithSession({
       userId: storedUser.id,
-      lastActivity: Date.now() - 24 * 60 * 60 * 1000 - 1000,
+      lastActivity: Date.now() - SESSION_IDLE_TIMEOUT_MS,
       cookie: { path: "/", httpOnly: true, secure: true, sameSite: "none" },
       destroy,
     });
@@ -218,6 +219,21 @@ describe("server authentication middleware", () => {
     expect(destroy).toHaveBeenCalledOnce();
     expect(mocks.getUser).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
+  });
+
+  it("accepts a session with activity just before the 20-minute idle limit", async () => {
+    const req = requestWithSession({
+      userId: storedUser.id,
+      lastActivity: Date.now() - SESSION_IDLE_TIMEOUT_MS + 1,
+    });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.session.lastActivity).toBeGreaterThan(Date.now() - SESSION_IDLE_TIMEOUT_MS);
+    expect(res.status).not.toHaveBeenCalled();
   });
 
   it("fails closed when the database is unavailable", async () => {

@@ -6,6 +6,7 @@ import { hasAdminPermission, type AdminPermission } from "@shared/admin-permissi
 import { getLoginAttemptState, getLockoutResponse } from "./login-attempts";
 import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
 import { getAllowedFrontendOrigins } from "./origin-policy";
+import { SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 
 declare module "express-session" {
   interface SessionData {
@@ -61,12 +62,12 @@ export async function isAuthenticated(
       return;
     }
 
-    // Check session timeout (24 hours)
+    // The client signs out after 20 idle minutes; enforce the same limit on
+    // every authenticated request so stale browser state cannot revive a session.
     const lastActivity = req.session.lastActivity || 0;
     const now = Date.now();
-    const SESSION_TIMEOUT = 24 * 60 * 60 * 1000; // 24 hours
 
-    if (now - lastActivity > SESSION_TIMEOUT) {
+    if (now - lastActivity >= SESSION_IDLE_TIMEOUT_MS) {
       clearAuthSessionCookie(req, res);
       req.session.destroy((err) => {
         if (err) {
