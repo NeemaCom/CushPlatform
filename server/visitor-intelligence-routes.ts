@@ -36,6 +36,34 @@ const analyticsRangeSchema = z.coerce.number().int().refine((value) => [7, 30, 9
 const visitorKindSchema = z.enum(["all", "registered", "anonymous"]);
 const MAX_VISITOR_EXPORT_ROWS = 5_000;
 
+type VisitorExportAuditRow = {
+  id: number;
+  admin_user_id: number;
+  resource_id: string | null;
+  outcome: "success" | "denied" | "failed";
+  created_at: Date | string;
+};
+
+function parseVisitorExportAuditResource(resourceId: string | null) {
+  const match = resourceId?.match(/^(7|30|90)d:(all|registered|anonymous):rows=(\d+):truncated=(true|false):searched=(true|false)$/);
+  if (!match) {
+    return {
+      rangeDays: null,
+      visitorKind: null,
+      rowCount: null,
+      truncated: null,
+      searchApplied: null,
+    };
+  }
+  return {
+    rangeDays: Number(match[1]),
+    visitorKind: match[2],
+    rowCount: Number(match[3]),
+    truncated: match[4] === "true",
+    searchApplied: match[5] === "true",
+  };
+}
+
 function isMissingTable(error: unknown) {
   return !!error && typeof error === "object" && "code" in error && error.code === "42P01";
 }
@@ -413,6 +441,48 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
         }
         console.error("[visitor-intelligence] Visitor list failed:", error);
         return res.status(500).json({ error: "Could not load the visitor list." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/visitor-intelligence/exports",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
+    async (req: AuthenticatedRequest, res) => {
+      try {
+        await recordAdminAuditEvent(req, {
+          action: "visitor_analytics.export_history.read",
+          resourceType: "visitor_analytics",
+        });
+        const result = await pgPool.query<VisitorExportAuditRow>(
+          `SELECT id, admin_user_id, resource_id, outcome, created_at
+           FROM public.admin_audit_logs
+           WHERE action = 'visitor_analytics.export'
+             AND resource_type = 'visitor_analytics'
+           ORDER BY created_at DESC
+           LIMIT 50`,
+        );
+        return res.json({
+          exports: result.rows.map((row) => ({
+            id: row.id,
+            adminUserId: row.admin_user_id,
+            outcome: row.outcome,
+            createdAt: row.created_at instanceof Date
+              ? row.created_at.toISOString()
+              : new Date(row.created_at).toISOString(),
+            ...parseVisitorExportAuditResource(row.resource_id),
+          })),
+        });
+      } catch (error) {
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            error: "Admin audit storage is unavailable; report history cannot be shown.",
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+          });
+        }
+        console.error("[visitor-intelligence] Export history failed:", error);
+        return res.status(500).json({ error: "Could not load visitor report history." });
       }
     },
   );

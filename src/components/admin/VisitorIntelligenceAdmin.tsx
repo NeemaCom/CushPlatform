@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Clock3, Download, Eye, Fingerprint, Globe2, Loader2, MonitorSmartphone, Search, ShieldAlert, UsersRound } from "lucide-react";
+import { Activity, Clock3, Download, Eye, Fingerprint, Globe2, History, Loader2, MonitorSmartphone, RefreshCw, Search, ShieldAlert, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/lib/api-base";
 
@@ -66,6 +66,18 @@ type VisitorDetail = {
     email: string | null;
   }[];
   events: ActivityRow[];
+};
+
+type VisitorExportAudit = {
+  id: number;
+  adminUserId: number;
+  outcome: "success" | "denied" | "failed";
+  createdAt: string;
+  rangeDays: number | null;
+  visitorKind: "all" | "registered" | "anonymous" | null;
+  rowCount: number | null;
+  truncated: boolean | null;
+  searchApplied: boolean | null;
 };
 
 function apiError(error: unknown) {
@@ -150,6 +162,13 @@ export default function VisitorIntelligenceAdmin() {
     queryFn: async () => (await apiRequest("GET", `/api/admin/visitor-intelligence/visitors/${selectedVisitor}`)).json(),
     enabled: Boolean(selectedVisitor),
     retry: false,
+  });
+  const exportHistoryQuery = useQuery<{ exports: VisitorExportAudit[] }>({
+    queryKey: ["/api/admin/visitor-intelligence/exports"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/visitor-intelligence/exports")).json(),
+    retry: false,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   });
 
   async function downloadVisitorReport() {
@@ -388,6 +407,92 @@ export default function VisitorIntelligenceAdmin() {
           </div>
         </>
       )}
+
+      <section aria-labelledby="visitor-export-history-heading" className="overflow-hidden rounded-xl border border-[#e4e1d8] bg-[#fbfaf6]">
+        <header className="flex flex-col gap-3 border-b border-[#e7e5dc] p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <div>
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-[#57539c]" />
+              <h2 id="visitor-export-history-heading" className="font-semibold text-[#24252a]">Visitor report downloads</h2>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-[#777973]">
+              Recent export activity. Search terms, visitor identifiers, and report contents are not stored here.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void exportHistoryQuery.refetch()}
+            disabled={exportHistoryQuery.isFetching}
+            className="inline-flex min-h-9 items-center justify-center gap-2 self-start rounded-lg border border-[#deddd4] bg-white px-3 py-2 text-xs font-semibold text-[#555750] hover:bg-[#f5f4ef] disabled:cursor-wait disabled:opacity-60 sm:self-auto"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${exportHistoryQuery.isFetching ? "animate-spin" : ""}`} />
+            Refresh history
+          </button>
+        </header>
+        {exportHistoryQuery.isLoading ? (
+          <p className="p-6 text-center text-sm text-[#777973]"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading report history…</p>
+        ) : exportHistoryQuery.isError ? (
+          <p role="alert" className="p-5 text-sm text-[#81412e]">{apiError(exportHistoryQuery.error)}</p>
+        ) : exportHistoryQuery.data?.exports.length ? (
+          <>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[760px] text-left text-xs">
+                <thead className="bg-[#f4f3ee] text-[10px] uppercase tracking-wide text-[#777973]">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Admin</th>
+                    <th className="px-4 py-3 font-semibold">Filters</th>
+                    <th className="px-4 py-3 font-semibold">Rows</th>
+                    <th className="px-4 py-3 font-semibold">Result</th>
+                    <th className="px-4 py-3 font-semibold">Downloaded</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#eeece5]">
+                  {exportHistoryQuery.data.exports.map((entry) => (
+                    <tr key={entry.id}>
+                      <td className="px-4 py-3.5 font-medium text-[#34353a]">Admin account #{entry.adminUserId}</td>
+                      <td className="px-4 py-3.5 text-[#555750]">
+                        {entry.rangeDays ? `${entry.rangeDays} days` : "Unknown window"}
+                        {" · "}
+                        {entry.visitorKind === "registered" ? "Signed in" : entry.visitorKind === "anonymous" ? "Anonymous" : entry.visitorKind === "all" ? "All visitors" : "Unknown type"}
+                        {entry.searchApplied ? " · Search applied" : ""}
+                      </td>
+                      <td className="px-4 py-3.5 text-[#555750]">
+                        {entry.rowCount === null ? "—" : entry.truncated ? `${entry.rowCount.toLocaleString("en-GB")} (limit reached)` : entry.rowCount.toLocaleString("en-GB")}
+                      </td>
+                      <td className="px-4 py-3.5 capitalize text-[#555750]">{entry.outcome}</td>
+                      <td className="px-4 py-3.5 text-[#777973]">{formatTime(entry.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <ol className="divide-y divide-[#eeece5] md:hidden">
+              {exportHistoryQuery.data.exports.map((entry) => (
+                <li key={entry.id} className="space-y-1.5 p-4">
+                  <p className="text-xs font-semibold text-[#34353a]">Admin account #{entry.adminUserId} · {entry.outcome}</p>
+                  <p className="text-xs text-[#555750]">
+                    {entry.rangeDays ? `${entry.rangeDays} days` : "Unknown window"}
+                    {" · "}
+                    {entry.visitorKind === "registered" ? "Signed in" : entry.visitorKind === "anonymous" ? "Anonymous" : entry.visitorKind === "all" ? "All visitors" : "Unknown type"}
+                    {entry.searchApplied ? " · Search applied" : ""}
+                  </p>
+                  <p className="text-[11px] text-[#777973]">
+                    {entry.rowCount === null ? "Rows: —" : `Rows: ${entry.rowCount.toLocaleString("en-GB")}${entry.truncated ? " (limit reached)" : ""}`}
+                    {" · "}
+                    {formatTime(entry.createdAt)}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          </>
+        ) : (
+          <div className="p-7 text-center">
+            <Download className="mx-auto h-6 w-6 text-[#aaa99f]" />
+            <p className="mt-2 text-sm font-semibold text-[#555750]">No report downloads yet</p>
+            <p className="mt-1 text-xs text-[#85867f]">Successful downloads will appear here with their safe filter summary.</p>
+          </div>
+        )}
+      </section>
 
       {selectedVisitor && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/40 p-0 sm:items-center sm:p-5" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedVisitor(null); }}>

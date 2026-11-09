@@ -133,4 +133,46 @@ describe("visitor analytics export route", () => {
     expect(res.headers.get("x-export-truncated")).toBe("true");
     expect(lines).toHaveLength(5001);
   });
+
+  it("shows only safe summaries of recent export audit records", async () => {
+    poolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 41,
+        admin_user_id: 12,
+        resource_id: "30d:anonymous:rows=14:truncated=false:searched=true",
+        outcome: "success",
+        created_at: new Date("2026-11-09T11:30:00.000Z"),
+      }],
+    });
+    const { app, routes } = createTestApp();
+    registerVisitorIntelligenceRoutes(app);
+    const route = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/exports");
+    expect(route).toBeDefined();
+
+    const req = { userId: 12, ip: "127.0.0.1" } as any;
+    const res = createResponse();
+    await route!.handlers.at(-1)!(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.payload).toEqual({
+      exports: [{
+        id: 41,
+        adminUserId: 12,
+        outcome: "success",
+        createdAt: "2026-11-09T11:30:00.000Z",
+        rangeDays: 30,
+        visitorKind: "anonymous",
+        rowCount: 14,
+        truncated: false,
+        searchApplied: true,
+      }],
+    });
+    expect(JSON.stringify(res.payload)).not.toContain("resource_id");
+    expect(JSON.stringify(res.payload)).not.toContain("127.0.0.1");
+    expect(poolQuery).toHaveBeenCalledWith(expect.stringContaining("FROM public.admin_audit_logs"));
+    expect(recordAdminAuditEvent).toHaveBeenCalledWith(req, expect.objectContaining({
+      action: "visitor_analytics.export_history.read",
+      resourceType: "visitor_analytics",
+    }));
+  });
 });
