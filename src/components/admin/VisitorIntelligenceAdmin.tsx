@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Clock3, Eye, Fingerprint, Globe2, Loader2, MonitorSmartphone, Search, ShieldAlert, UsersRound } from "lucide-react";
+import { Activity, Clock3, Download, Eye, Fingerprint, Globe2, Loader2, MonitorSmartphone, Search, ShieldAlert, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import { API_BASE_URL } from "@/lib/api-base";
 
 type Overview = {
   rangeDays: number;
@@ -124,6 +125,9 @@ export default function VisitorIntelligenceAdmin() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [selectedVisitor, setSelectedVisitor] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
+  const [exportError, setExportError] = useState("");
   const overviewQuery = useQuery<Overview>({
     queryKey: ["/api/admin/visitor-intelligence/overview", range],
     queryFn: async () => (await apiRequest("GET", `/api/admin/visitor-intelligence/overview?range=${range}`)).json(),
@@ -148,6 +152,43 @@ export default function VisitorIntelligenceAdmin() {
     retry: false,
   });
 
+  async function downloadVisitorReport() {
+    setExporting(true);
+    setExportMessage("");
+    setExportError("");
+    try {
+      const params = new URLSearchParams({
+        range: String(range),
+        kind,
+        search,
+      });
+      const response = await fetch(`${API_BASE_URL}/api/admin/visitor-intelligence/export?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(typeof payload?.error === "string" ? payload.error : "The report could not be downloaded.");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `cush-visitor-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+
+      const rowCount = response.headers.get("X-Export-Row-Count") ?? "Unknown";
+      const truncated = response.headers.get("X-Export-Truncated") === "true";
+      setExportMessage(`${rowCount} visitor rows downloaded${truncated ? " (limited to 5,000 rows)." : "."}`);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : "The report could not be downloaded.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   const overviewError = overviewQuery.error;
   const schemaMissing = apiError(overviewError).includes("migration");
   const metrics = overviewQuery.data?.metrics;
@@ -162,20 +203,34 @@ export default function VisitorIntelligenceAdmin() {
             Live and recent activity from visitors who opted in. This view contains no raw IP addresses.
           </p>
         </div>
-        <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c7c5ee]">
-          Reporting window
-          <select
-            value={range}
-            onChange={(event) => { setRange(Number(event.target.value) as 7 | 30 | 90); setPage(1); }}
-            className="mt-1.5 block min-w-[160px] rounded-lg border border-white/20 bg-[#383581] px-3 py-2.5 text-sm font-medium normal-case tracking-normal text-white outline-none focus:ring-2 focus:ring-[#d5d3ff]/40"
-            aria-label="Visitor analytics reporting window"
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c7c5ee]">
+            Reporting window
+            <select
+              value={range}
+              onChange={(event) => { setRange(Number(event.target.value) as 7 | 30 | 90); setPage(1); }}
+              className="mt-1.5 block min-w-[160px] rounded-lg border border-white/20 bg-[#383581] px-3 py-2.5 text-sm font-medium normal-case tracking-normal text-white outline-none focus:ring-2 focus:ring-[#d5d3ff]/40"
+              aria-label="Visitor analytics reporting window"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
+          </label>
+          <button
+            type="button"
+            onClick={() => void downloadVisitorReport()}
+            disabled={exporting}
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2 text-xs font-semibold text-[#29266f] shadow-sm transition hover:bg-[#f0efff] disabled:cursor-wait disabled:opacity-60"
           >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
-        </label>
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? "Preparing…" : "Download CSV"}
+          </button>
+        </div>
       </header>
+
+      {exportMessage && <p role="status" className="rounded-lg border border-[#c8e4db] bg-[#edf7f3] px-4 py-2.5 text-xs text-[#28685c]">{exportMessage}</p>}
+      {exportError && <p role="alert" className="rounded-lg border border-[#e5c9b9] bg-[#fbf2ec] px-4 py-2.5 text-xs text-[#81412e]">{exportError}</p>}
 
       <div className="rounded-xl border border-[#dcdaf6] bg-[#f0efff] px-4 py-3 text-sm leading-5 text-[#353174]">
         <div className="flex items-start gap-2.5">

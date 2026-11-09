@@ -1,10 +1,13 @@
 import type { Express, Request } from "express";
 import type { PoolClient } from "pg";
+import { randomBytes } from "node:crypto";
 import { z } from "zod";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
-import { isAuthenticated, requireAdminPermission, requireTrustedAdminOrigin } from "./auth";
+import { isAuthenticated, requireAdminPermission, requireTrustedAdminOrigin, type AuthenticatedRequest } from "./auth";
 import { pgPool } from "./db";
 import { storage } from "./storage";
+import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
+import { createVisitorAnalyticsCsv, type VisitorAnalyticsExportRow } from "./visitor-analytics-export";
 import {
   VISITOR_ANALYTICS_POLICY_VERSION,
   VISITOR_ANALYTICS_RETENTION_DAYS,
@@ -30,6 +33,8 @@ const eventSchema = z.object({
 const SAFE_ROUTES = new Set<string>(VISITOR_ROUTE_ALLOWLIST);
 
 const analyticsRangeSchema = z.coerce.number().int().refine((value) => [7, 30, 90].includes(value));
+const visitorKindSchema = z.enum(["all", "registered", "anonymous"]);
+const MAX_VISITOR_EXPORT_ROWS = 5_000;
 
 function isMissingTable(error: unknown) {
   return !!error && typeof error === "object" && "code" in error && error.code === "42P01";
@@ -408,6 +413,106 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
         }
         console.error("[visitor-intelligence] Visitor list failed:", error);
         return res.status(500).json({ error: "Could not load the visitor list." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/visitor-intelligence/export",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
+    async (req: AuthenticatedRequest, res) => {
+      const rangeDays = validateRange(req.query.range);
+      const kind = visitorKindSchema.safeParse(req.query.kind ?? "all");
+      const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 100) : "";
+      if (!rangeDays || !kind.success) {
+        return res.status(400).json({ error: "Invalid visitor export filter." });
+      }
+
+      try {
+        const result = await pgPool.query<VisitorAnalyticsExportRow>(
+          `WITH summaries AS (
+             SELECT visitor_id,
+                    COUNT(*)::int AS session_count,
+                    MIN(started_at) AS first_seen,
+                    MAX(last_seen_at) AS last_seen,
+                    (ARRAY_AGG(current_route ORDER BY last_seen_at DESC))[1] AS current_route,
+                    (ARRAY_AGG(device_type ORDER BY last_seen_at DESC))[1] AS device_type,
+                    (ARRAY_AGG(browser ORDER BY last_seen_at DESC))[1] AS browser,
+                    (ARRAY_AGG(operating_system ORDER BY last_seen_at DESC))[1] AS operating_system,
+                    (ARRAY_AGG(user_id ORDER BY last_seen_at DESC)
+                      FILTER (WHERE user_id IS NOT NULL))[1] AS user_id
+             FROM public.cush_visitor_sessions
+             WHERE last_seen_at >= now() - ($1::int * interval '1 day')
+             GROUP BY visitor_id
+           ),
+           filtered AS MATERIALIZED (
+             SELECT s.*, u.email, u.first_name, u.last_name
+             FROM summaries s
+             LEFT JOIN public.users u ON u.id = s.user_id
+             WHERE ($2 = 'all'
+               OR ($2 = 'registered' AND s.user_id IS NOT NULL)
+               OR ($2 = 'anonymous' AND s.user_id IS NULL))
+               AND ($3 = '' OR s.visitor_id::text ILIKE '%' || $3 || '%'
+                 OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
+                 OR COALESCE(u.first_name, '') ILIKE '%' || $3 || '%'
+                 OR COALESCE(u.last_name, '') ILIKE '%' || $3 || '%')
+             ORDER BY s.last_seen DESC
+             LIMIT $4
+           ),
+           event_counts AS (
+             SELECT visitor_id,
+                    COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+                    COUNT(*) FILTER (WHERE event_type = 'signup_completed')::int AS signup_completions,
+                    COUNT(*) FILTER (WHERE event_type = 'login_completed')::int AS logins
+             FROM public.cush_visitor_events
+             WHERE occurred_at >= now() - ($1::int * interval '1 day')
+             GROUP BY visitor_id
+           )
+           SELECT f.visitor_id,
+                  CASE WHEN f.user_id IS NULL THEN 'anonymous' ELSE 'signed-in' END AS visitor_type,
+                  f.session_count, f.first_seen, f.last_seen, f.current_route,
+                  f.device_type, f.browser, f.operating_system,
+                  COALESCE(e.page_views, 0)::int AS page_views,
+                  COALESCE(e.signup_completions, 0)::int AS signup_completions,
+                  COALESCE(e.logins, 0)::int AS logins
+           FROM filtered f
+           LEFT JOIN event_counts e ON e.visitor_id = f.visitor_id
+           ORDER BY f.last_seen DESC`,
+          [rangeDays, kind.data, search, MAX_VISITOR_EXPORT_ROWS + 1],
+        );
+        const truncated = result.rows.length > MAX_VISITOR_EXPORT_ROWS;
+        const rows = result.rows.slice(0, MAX_VISITOR_EXPORT_ROWS);
+        const csv = createVisitorAnalyticsCsv(rows, randomBytes(32));
+
+        await recordAdminAuditEvent(req, {
+          action: "visitor_analytics.export",
+          resourceType: "visitor_analytics",
+          resourceId: `${rangeDays}d:${kind.data}:rows=${rows.length}:truncated=${truncated}:searched=${Boolean(search)}`,
+        });
+
+        const date = new Date().toISOString().slice(0, 10);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="cush-visitor-report-${date}.csv"`);
+        res.setHeader("Access-Control-Expose-Headers", "X-Export-Row-Count, X-Export-Truncated");
+        res.setHeader("X-Export-Row-Count", String(rows.length));
+        res.setHeader("X-Export-Truncated", String(truncated));
+        return res.status(200).send(csv);
+      } catch (error) {
+        if (isMissingTable(error)) {
+          return res.status(503).json({
+            error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+            code: "VISITOR_SCHEMA_MISSING",
+          });
+        }
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            error: "The admin audit log is unavailable; the visitor report was not exported.",
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+          });
+        }
+        console.error("[visitor-intelligence] Export failed:", error);
+        return res.status(500).json({ error: "Could not export visitor analytics." });
       }
     },
   );
