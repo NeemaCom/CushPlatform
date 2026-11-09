@@ -100,3 +100,63 @@ export async function sendAccountStatusEmail(
     return { status: "failed", reason: "request_failed" };
   }
 }
+
+export interface AccountStatusEmailTestInput {
+  adminUserId: number;
+  email: string;
+  requestedAt: Date;
+}
+
+export async function sendAccountStatusEmailTest(
+  input: AccountStatusEmailTestInput,
+  options: AccountStatusEmailOptions = {},
+): Promise<AccountStatusEmailResult> {
+  const apiKey = options.apiKey ?? process.env.RESEND_API_KEY;
+  const from = options.from ?? process.env.RESEND_FROM_EMAIL;
+  if (!apiKey || !from) return { status: "not_configured" };
+
+  const fetcher = options.fetcher ?? fetch;
+  const timeWindow = Math.floor(input.requestedAt.getTime() / 60_000);
+  const content = {
+    subject: "Cush account-status email test",
+    text: [
+      "This is a test email initiated from the Cush admin area.",
+      "It confirms that the account-status email delivery connection is working.",
+      "This test did not suspend or reactivate any account.",
+      "Use a dedicated test account to test the actual suspension and reactivation notices.",
+    ].join("\n\n"),
+    html: `
+      <p>This is a test email initiated from the Cush admin area.</p>
+      <p>It confirms that the account-status email delivery connection is working.</p>
+      <p><strong>This test did not suspend or reactivate any account.</strong></p>
+      <p>Use a dedicated test account to test the actual suspension and reactivation notices.</p>
+    `,
+  };
+
+  try {
+    const response = await fetcher("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `cush-account-status-test-${input.adminUserId}-${timeWindow}`,
+        "User-Agent": "CushPlatform/1.0",
+      },
+      body: JSON.stringify({
+        from,
+        to: [input.email],
+        reply_to: SUPPORT_EMAIL,
+        subject: content.subject,
+        text: content.text,
+        html: content.html,
+      }),
+      signal: AbortSignal.timeout(EMAIL_TIMEOUT_MS),
+    });
+
+    return response.ok
+      ? { status: "sent" }
+      : { status: "failed", reason: "provider_rejected" };
+  } catch {
+    return { status: "failed", reason: "request_failed" };
+  }
+}

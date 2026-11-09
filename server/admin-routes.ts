@@ -24,7 +24,7 @@ import {
   type AuthenticatedRequest,
 } from "./auth";
 import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
-import { sendAccountStatusEmail } from "./account-status-email";
+import { sendAccountStatusEmail, sendAccountStatusEmailTest } from "./account-status-email";
 import { ageInDays, resolveEvidenceFreshnessDate } from "./evidence-freshness";
 import { normalizedCreditHistorySchema } from "./interswitch-credit-history-scoring";
 import { getAdminV2Assessment, isV2SchemaMissing } from "./cush-score-v2";
@@ -42,6 +42,9 @@ import {
 } from "./admin-user-status";
 
 const ADMIN_ACCESS_CHANGE_ADVISORY_LOCK_KEY = 847_216_319;
+const ADMIN_EMAIL_TEST_ADVISORY_LOCK_KEY = 847_216_320;
+const ADMIN_EMAIL_TEST_ACTION = "admin.email.account_status_test";
+const ADMIN_EMAIL_TEST_COOLDOWN_MS = 60_000;
 
 const allowedRanges = [7, 30, 90] as const;
 const evidenceReviewSchema = z.object({
@@ -110,6 +113,104 @@ function accountStatusMigrationResponse(res: import("express").Response) {
 }
 
 export function registerAdminRoutes(app: Express): void {
+  app.post(
+    "/api/admin/email/account-status-test",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.integrationsManage),
+    requireTrustedAdminOrigin,
+    async (req: AuthenticatedRequest, res) => {
+      const admin = req.user;
+      if (!admin?.email || admin.isEmailVerified !== true) {
+        return res.status(400).json({
+          error: "A verified email address is required to send the test to your own account.",
+        });
+      }
+
+      const now = new Date();
+      try {
+        const reservation = await db.transaction(async (tx) => {
+          await tx.execute(sql`
+            SELECT pg_advisory_xact_lock(${ADMIN_EMAIL_TEST_ADVISORY_LOCK_KEY}, ${req.userId!})
+          `);
+
+          const [recentAttempt] = await tx.select({ id: adminAuditLogs.id })
+            .from(adminAuditLogs)
+            .where(and(
+              eq(adminAuditLogs.adminUserId, req.userId!),
+              eq(adminAuditLogs.action, ADMIN_EMAIL_TEST_ACTION),
+              gte(
+                adminAuditLogs.createdAt,
+                new Date(now.getTime() - ADMIN_EMAIL_TEST_COOLDOWN_MS),
+              ),
+            ))
+            .orderBy(desc(adminAuditLogs.createdAt))
+            .limit(1);
+
+          if (recentAttempt) return { kind: "cooldown" as const };
+
+          const [auditEvent] = await tx.insert(adminAuditLogs).values({
+            adminUserId: req.userId!,
+            action: ADMIN_EMAIL_TEST_ACTION,
+            resourceType: "resend_email_test",
+            resourceId: String(req.userId!),
+            outcome: "failed",
+            ipAddress: req.ip ?? null,
+          }).returning({ id: adminAuditLogs.id });
+
+          return { kind: "reserved" as const, auditId: auditEvent.id };
+        });
+
+        if (reservation.kind === "cooldown") {
+          return res.status(429).json({
+            error: "A test email was requested recently. Wait one minute before trying again.",
+          });
+        }
+
+        const result = await sendAccountStatusEmailTest({
+          adminUserId: req.userId!,
+          email: admin.email,
+          requestedAt: now,
+        });
+
+        try {
+          await db.update(adminAuditLogs)
+            .set({ outcome: result.status === "sent" ? "success" : "failed" })
+            .where(eq(adminAuditLogs.id, reservation.auditId));
+        } catch {
+          console.error("Admin email test audit update failed", {
+            adminUserId: req.userId,
+            auditId: reservation.auditId,
+          });
+        }
+
+        if (result.status === "not_configured") {
+          return res.status(503).json({
+            error: "Resend is not configured for this service. Check the Render email settings.",
+          });
+        }
+        if (result.status === "failed") {
+          return res.status(502).json({
+            error: "Resend did not accept the test email. Check the sender configuration and Resend logs.",
+          });
+        }
+
+        return res.json({ success: true, sentToAccountEmail: true });
+      } catch (error) {
+        if (isAdminAuditTableMissing(error)) {
+          return res.status(503).json({
+            code: "ADMIN_AUDIT_SCHEMA_MISSING",
+            error: "Admin audit storage is not initialized. Apply migrations/manual/create-admin-audit-logs.sql first.",
+          });
+        }
+        console.error("Admin account-status email test failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to send the account-status email test." });
+      }
+    },
+  );
+
   app.get(
     "/api/admin/users",
     isAuthenticated,

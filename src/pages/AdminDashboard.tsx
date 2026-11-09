@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Activity, ArrowUpRight, CalendarDays, CircleAlert, Clock3, Database, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Activity, ArrowUpRight, CalendarDays, CircleAlert, Clock3, Database, Loader2, MailCheck, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
@@ -111,6 +111,7 @@ export default function AdminDashboard() {
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
   const canManageRoles = canManageUserRoles(user?.role);
   const canManageAccounts = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersManage);
+  const canTestEmailDelivery = hasAdminPermission(user?.role, ADMIN_PERMISSION.integrationsManage);
   const hasPolicyAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoringPolicyRead);
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
@@ -125,6 +126,12 @@ export default function AdminDashboard() {
     },
     enabled: !authLoading && hasOverviewAccess && activeSection === "overview",
     retry: false,
+  });
+  const emailTestMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/email/account-status-test", {});
+      return response.json() as Promise<{ success: boolean; sentToAccountEmail: boolean }>;
+    },
   });
 
   if (authLoading) {
@@ -320,6 +327,45 @@ export default function AdminDashboard() {
             </div>
           </div>
         </section>
+
+        {canTestEmailDelivery && (
+          <section className="mt-5 flex flex-col gap-4 rounded-xl border border-[#d9d7ce] bg-[#fbfaf6] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#e8eff8] text-[#426087]">
+                <MailCheck className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="text-sm font-semibold text-[#292a2c]">Test account-status email</h2>
+                <p className="mt-1 max-w-2xl text-xs leading-5 text-[#6f706f]">
+                  Sends a test message only to your verified admin email. It does not change any account status.
+                  You can send another test after one minute.
+                </p>
+                {emailTestMutation.isSuccess && (
+                  <p className="mt-2 text-xs font-medium text-[#28685c]" role="status">
+                    Test email accepted by Resend for delivery to your account email.
+                  </p>
+                )}
+                {emailTestMutation.isError && (
+                  <p className="mt-2 text-xs font-medium text-[#9b543a]" role="alert">
+                    {readableApiError(emailTestMutation.error)}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => emailTestMutation.mutate()}
+              disabled={emailTestMutation.isPending}
+              className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-[#29266f] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#37338d] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {emailTestMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+              ) : (
+                <><MailCheck className="h-4 w-4" /> Send test email</>
+              )}
+            </button>
+          </section>
+        )}
 
         <div className="mb-4 mt-8 flex flex-wrap items-end justify-between gap-3">
           <div>

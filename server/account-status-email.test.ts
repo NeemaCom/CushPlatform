@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { sendAccountStatusEmail } from "./account-status-email";
+import { sendAccountStatusEmail, sendAccountStatusEmailTest } from "./account-status-email";
 
 const input = {
   userId: 24,
@@ -84,5 +84,54 @@ describe("account status email", () => {
       from: "support@example.com",
       fetcher: networkErrorFetcher,
     })).resolves.toEqual({ status: "failed", reason: "request_failed" });
+  });
+
+  it("sends a clearly labeled test only to the admin account email", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    const requestedAt = new Date("2026-11-09T12:00:00.000Z");
+
+    const result = await sendAccountStatusEmailTest({
+      adminUserId: 7,
+      email: "admin@example.com",
+      requestedAt,
+    }, {
+      apiKey: "test-api-key",
+      from: "Cush Support <support@example.com>",
+      fetcher,
+    });
+
+    expect(result).toEqual({ status: "sent" });
+    const [url, request] = fetcher.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.resend.com/emails");
+    expect(request.headers).toMatchObject({
+      Authorization: "Bearer test-api-key",
+      "Idempotency-Key": `cush-account-status-test-7-${Math.floor(requestedAt.getTime() / 60_000)}`,
+    });
+    expect(JSON.parse(String(request.body))).toMatchObject({
+      to: ["admin@example.com"],
+      subject: "Cush account-status email test",
+      text: expect.stringContaining("This test did not suspend or reactivate any account."),
+    });
+  });
+
+  it("does not send the test email without Render settings or when Resend rejects it", async () => {
+    const fetcher = vi.fn().mockResolvedValue({ ok: false, status: 422 });
+    const testInput = {
+      adminUserId: 7,
+      email: "admin@example.com",
+      requestedAt: new Date("2026-11-09T12:00:00.000Z"),
+    };
+
+    vi.stubEnv("RESEND_API_KEY", "");
+    vi.stubEnv("RESEND_FROM_EMAIL", "");
+    await expect(sendAccountStatusEmailTest(testInput, { fetcher }))
+      .resolves.toEqual({ status: "not_configured" });
+    expect(fetcher).not.toHaveBeenCalled();
+
+    await expect(sendAccountStatusEmailTest(testInput, {
+      apiKey: "test-api-key",
+      from: "support@example.com",
+      fetcher,
+    })).resolves.toEqual({ status: "failed", reason: "provider_rejected" });
   });
 });

@@ -28,3 +28,16 @@ admin response and audit record indicate that the notice was not sent.
 - Reactivation notices include the Cush sign-in URL.
 - Email delivery happens after the account/session transaction commits. A mail
   failure never rolls back a suspension or reactivation.
+
+## Test delivery from the admin dashboard
+
+An authenticated administrator with integration-management permission can use
+**Test account-status email** on the admin overview. The endpoint sends only to
+that administrator's verified account email, requires the normal admin session
+and trusted app origin, and is limited to one request per minute. The test
+message confirms Resend delivery and explicitly states that it did not change
+any account status.
+
+Use a dedicated test account if you also need to verify the actual suspension
+and reactivation templates. The test-email action does not exercise or mutate
+those account-status flows.
