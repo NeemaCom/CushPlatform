@@ -35,6 +35,16 @@ const SAFE_ROUTES = new Set<string>(VISITOR_ROUTE_ALLOWLIST);
 const analyticsRangeSchema = z.coerce.number().int().refine((value) => [7, 30, 90].includes(value));
 const visitorKindSchema = z.enum(["all", "registered", "anonymous"]);
 const MAX_VISITOR_EXPORT_ROWS = 5_000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type VisitorAnalyticsWindow = {
+  start: Date;
+  endExclusive: Date;
+  rangeDays: number | null;
+  startDate: string;
+  endDate: string;
+  custom: boolean;
+};
 
 type VisitorExportAuditRow = {
   id: number;
@@ -45,22 +55,28 @@ type VisitorExportAuditRow = {
 };
 
 function parseVisitorExportAuditResource(resourceId: string | null) {
-  const match = resourceId?.match(/^(7|30|90)d:(all|registered|anonymous):rows=(\d+):truncated=(true|false):searched=(true|false)$/);
-  if (!match) {
+  const presetMatch = resourceId?.match(/^(7|30|90)d:(all|registered|anonymous):rows=(\d+):truncated=(true|false):searched=(true|false)$/);
+  const customMatch = resourceId?.match(/^custom:(\d{4}-\d{2}-\d{2}):(\d{4}-\d{2}-\d{2}):(all|registered|anonymous):rows=(\d+):truncated=(true|false):searched=(true|false)$/);
+  if (!presetMatch && !customMatch) {
     return {
       rangeDays: null,
+      startDate: null,
+      endDate: null,
       visitorKind: null,
       rowCount: null,
       truncated: null,
       searchApplied: null,
     };
   }
+  const match = presetMatch ?? customMatch!;
   return {
-    rangeDays: Number(match[1]),
-    visitorKind: match[2],
-    rowCount: Number(match[3]),
-    truncated: match[4] === "true",
-    searchApplied: match[5] === "true",
+    rangeDays: presetMatch ? Number(match[1]) : null,
+    startDate: customMatch ? match[1] : null,
+    endDate: customMatch ? match[2] : null,
+    visitorKind: customMatch ? match[3] : match[2],
+    rowCount: Number(customMatch ? match[4] : match[3]),
+    truncated: (customMatch ? match[5] : match[4]) === "true",
+    searchApplied: (customMatch ? match[6] : match[5]) === "true",
   };
 }
 
@@ -154,9 +170,60 @@ export async function purgeExpiredVisitorAnalytics(now = new Date()) {
   );
 }
 
-function validateRange(value: unknown) {
-  const parsed = analyticsRangeSchema.safeParse(value ?? "7");
-  return parsed.success ? parsed.data : null;
+function parseDateOnly(value: unknown): Date | null {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value
+    ? parsed
+    : null;
+}
+
+function getVisitorAnalyticsWindow(
+  rangeValue: unknown,
+  startDateValue: unknown,
+  endDateValue: unknown,
+  now = new Date(),
+): VisitorAnalyticsWindow | null {
+  const hasCustomDate = startDateValue !== undefined || endDateValue !== undefined;
+  if (hasCustomDate) {
+    const start = parseDateOnly(startDateValue);
+    const endDate = parseDateOnly(endDateValue);
+    if (!start || !endDate) return null;
+
+    const todayStart = new Date(`${now.toISOString().slice(0, 10)}T00:00:00.000Z`);
+    const oldestAllowed = new Date(todayStart.getTime() - 89 * DAY_MS);
+    const dayCount = Math.floor((endDate.getTime() - start.getTime()) / DAY_MS) + 1;
+    if (
+      endDate < start
+      || endDate > todayStart
+      || start < oldestAllowed
+      || dayCount < 1
+      || dayCount > 90
+    ) {
+      return null;
+    }
+
+    return {
+      start,
+      endExclusive: new Date(Math.min(endDate.getTime() + DAY_MS, now.getTime())),
+      rangeDays: null,
+      startDate: start.toISOString().slice(0, 10),
+      endDate: endDate.toISOString().slice(0, 10),
+      custom: true,
+    };
+  }
+
+  const parsedRange = analyticsRangeSchema.safeParse(rangeValue ?? "7");
+  if (!parsedRange.success) return null;
+  const start = new Date(now.getTime() - parsedRange.data * DAY_MS);
+  return {
+    start,
+    endExclusive: now,
+    rangeDays: parsedRange.data,
+    startDate: start.toISOString().slice(0, 10),
+    endDate: now.toISOString().slice(0, 10),
+    custom: false,
+  };
 }
 
 export function registerVisitorIntelligenceRoutes(app: Express) {
@@ -301,15 +368,21 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
     isAuthenticated,
     requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
     async (req, res) => {
-      const rangeDays = validateRange(req.query.range);
-      if (!rangeDays) return res.status(400).json({ error: "Range must be 7, 30, or 90 days." });
+      const window = getVisitorAnalyticsWindow(req.query.range, req.query.startDate, req.query.endDate);
+      if (!window) {
+        return res.status(400).json({
+          error: "Choose a valid date range within the most recent 90 days, or select a 7-, 30-, or 90-day window.",
+        });
+      }
       try {
         const [metrics, topRoutes, recent] = await Promise.all([
           pgPool.query(
             `SELECT
                COUNT(DISTINCT visitor_id)::int AS unique_visitors,
                COUNT(*)::int AS sessions,
-               COUNT(DISTINCT visitor_id) FILTER (WHERE last_seen_at >= now() - interval '5 minutes')::int AS active_visitors,
+               (SELECT COUNT(DISTINCT active.visitor_id)::int
+                FROM public.cush_visitor_sessions active
+                WHERE active.last_seen_at >= now() - interval '5 minutes') AS active_visitors,
                COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS identified_users,
                COUNT(DISTINCT s.visitor_id) FILTER (
                  WHERE s.user_id IS NULL
@@ -317,32 +390,36 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
                      SELECT 1 FROM public.cush_visitor_sessions identified
                      WHERE identified.visitor_id = s.visitor_id
                        AND identified.user_id IS NOT NULL
-                       AND identified.last_seen_at >= now() - ($1::int * interval '1 day')
+                       AND identified.last_seen_at >= $1::timestamptz
+                       AND identified.last_seen_at < $2::timestamptz
                    )
                )::int AS anonymous_visitors
              FROM public.cush_visitor_sessions s
-             WHERE s.last_seen_at >= now() - ($1::int * interval '1 day')`,
-            [rangeDays],
+             WHERE s.last_seen_at >= $1::timestamptz
+               AND s.last_seen_at < $2::timestamptz`,
+            [window.start.toISOString(), window.endExclusive.toISOString()],
           ),
           pgPool.query(
             `SELECT route, COUNT(*)::int AS page_views
              FROM public.cush_visitor_events
              WHERE event_type = 'page_view'
-               AND occurred_at >= now() - ($1::int * interval '1 day')
+               AND occurred_at >= $1::timestamptz
+               AND occurred_at < $2::timestamptz
              GROUP BY route
              ORDER BY page_views DESC, route
              LIMIT 8`,
-            [rangeDays],
+            [window.start.toISOString(), window.endExclusive.toISOString()],
           ),
           pgPool.query(
             `SELECT e.id, e.event_type, e.route, e.occurred_at, e.visitor_id,
                     e.user_id, u.first_name, u.last_name, u.email
              FROM public.cush_visitor_events e
              LEFT JOIN public.users u ON u.id = e.user_id
-             WHERE e.occurred_at >= now() - ($1::int * interval '1 day')
+             WHERE e.occurred_at >= $1::timestamptz
+               AND e.occurred_at < $2::timestamptz
              ORDER BY e.occurred_at DESC
              LIMIT 30`,
-            [rangeDays],
+            [window.start.toISOString(), window.endExclusive.toISOString()],
           ),
         ]);
         const events = await pgPool.query(
@@ -351,11 +428,15 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
              COUNT(*) FILTER (WHERE event_type = 'signup_completed')::int AS signups,
              COUNT(*) FILTER (WHERE event_type = 'login_completed')::int AS logins
            FROM public.cush_visitor_events
-           WHERE occurred_at >= now() - ($1::int * interval '1 day')`,
-          [rangeDays],
+           WHERE occurred_at >= $1::timestamptz
+             AND occurred_at < $2::timestamptz`,
+          [window.start.toISOString(), window.endExclusive.toISOString()],
         );
         return res.json({
-          rangeDays,
+          rangeDays: window.rangeDays,
+          startDate: window.startDate,
+          endDate: window.endDate,
+          customDateRange: window.custom,
           generatedAt: new Date().toISOString(),
           metrics: {
             ...metrics.rows[0],
@@ -387,11 +468,11 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
     isAuthenticated,
     requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
     async (req, res) => {
-      const rangeDays = validateRange(req.query.range);
+      const window = getVisitorAnalyticsWindow(req.query.range, req.query.startDate, req.query.endDate);
       const page = z.coerce.number().int().min(1).max(10_000).safeParse(req.query.page ?? "1");
       const kind = z.enum(["all", "registered", "anonymous"]).safeParse(req.query.kind ?? "all");
       const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 100) : "";
-      if (!rangeDays || !page.success || !kind.success) {
+      if (!window || !page.success || !kind.success) {
         return res.status(400).json({ error: "Invalid visitor filter." });
       }
       try {
@@ -406,7 +487,8 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
                     (ARRAY_AGG(browser ORDER BY last_seen_at DESC))[1] AS browser,
                     (ARRAY_AGG(user_id ORDER BY last_seen_at DESC) FILTER (WHERE user_id IS NOT NULL))[1] AS user_id
              FROM public.cush_visitor_sessions
-             WHERE last_seen_at >= now() - ($1::int * interval '1 day')
+             WHERE last_seen_at >= $1::timestamptz
+               AND last_seen_at < $2::timestamptz
              GROUP BY visitor_id
            )
            SELECT s.visitor_id, s.session_count, s.first_seen, s.last_seen,
@@ -416,22 +498,37 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
            FROM summaries s
            LEFT JOIN public.users u ON u.id = s.user_id
            LEFT JOIN public.cush_visitor_events e ON e.visitor_id = s.visitor_id
-             AND e.occurred_at >= now() - ($1::int * interval '1 day')
-           WHERE ($2 = 'all'
-             OR ($2 = 'registered' AND s.user_id IS NOT NULL)
-             OR ($2 = 'anonymous' AND s.user_id IS NULL))
-             AND ($3 = '' OR s.visitor_id::text ILIKE '%' || $3 || '%'
-               OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
-               OR COALESCE(u.first_name, '') ILIKE '%' || $3 || '%'
-               OR COALESCE(u.last_name, '') ILIKE '%' || $3 || '%')
+              AND e.occurred_at >= $1::timestamptz
+              AND e.occurred_at < $2::timestamptz
+            WHERE ($3 = 'all'
+              OR ($3 = 'registered' AND s.user_id IS NOT NULL)
+              OR ($3 = 'anonymous' AND s.user_id IS NULL))
+              AND ($4 = '' OR s.visitor_id::text ILIKE '%' || $4 || '%'
+                OR COALESCE(u.email, '') ILIKE '%' || $4 || '%'
+                OR COALESCE(u.first_name, '') ILIKE '%' || $4 || '%'
+                OR COALESCE(u.last_name, '') ILIKE '%' || $4 || '%')
            GROUP BY s.visitor_id, s.session_count, s.first_seen, s.last_seen,
                     s.current_route, s.device_type, s.browser, s.user_id,
                     u.first_name, u.last_name, u.email
            ORDER BY s.last_seen DESC
-           LIMIT 50 OFFSET $4`,
-          [rangeDays, kind.data, search, (page.data - 1) * 50],
+            LIMIT 50 OFFSET $5`,
+          [
+            window.start.toISOString(),
+            window.endExclusive.toISOString(),
+            kind.data,
+            search,
+            (page.data - 1) * 50,
+          ],
         );
-        return res.json({ rangeDays, page: page.data, pageSize: 50, visitors: result.rows });
+        return res.json({
+          rangeDays: window.rangeDays,
+          startDate: window.startDate,
+          endDate: window.endDate,
+          customDateRange: window.custom,
+          page: page.data,
+          pageSize: 50,
+          visitors: result.rows,
+        });
       } catch (error) {
         if (isMissingTable(error)) {
           return res.status(503).json({
@@ -492,10 +589,10 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
     isAuthenticated,
     requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
     async (req: AuthenticatedRequest, res) => {
-      const rangeDays = validateRange(req.query.range);
+      const window = getVisitorAnalyticsWindow(req.query.range, req.query.startDate, req.query.endDate);
       const kind = visitorKindSchema.safeParse(req.query.kind ?? "all");
       const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 100) : "";
-      if (!rangeDays || !kind.success) {
+      if (!window || !kind.success) {
         return res.status(400).json({ error: "Invalid visitor export filter." });
       }
 
@@ -513,22 +610,23 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
                     (ARRAY_AGG(user_id ORDER BY last_seen_at DESC)
                       FILTER (WHERE user_id IS NOT NULL))[1] AS user_id
              FROM public.cush_visitor_sessions
-             WHERE last_seen_at >= now() - ($1::int * interval '1 day')
+              WHERE last_seen_at >= $1::timestamptz
+                AND last_seen_at < $2::timestamptz
              GROUP BY visitor_id
            ),
            filtered AS MATERIALIZED (
              SELECT s.*, u.email, u.first_name, u.last_name
              FROM summaries s
              LEFT JOIN public.users u ON u.id = s.user_id
-             WHERE ($2 = 'all'
-               OR ($2 = 'registered' AND s.user_id IS NOT NULL)
-               OR ($2 = 'anonymous' AND s.user_id IS NULL))
-               AND ($3 = '' OR s.visitor_id::text ILIKE '%' || $3 || '%'
-                 OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
-                 OR COALESCE(u.first_name, '') ILIKE '%' || $3 || '%'
-                 OR COALESCE(u.last_name, '') ILIKE '%' || $3 || '%')
+              WHERE ($3 = 'all'
+                OR ($3 = 'registered' AND s.user_id IS NOT NULL)
+                OR ($3 = 'anonymous' AND s.user_id IS NULL))
+                AND ($4 = '' OR s.visitor_id::text ILIKE '%' || $4 || '%'
+                  OR COALESCE(u.email, '') ILIKE '%' || $4 || '%'
+                  OR COALESCE(u.first_name, '') ILIKE '%' || $4 || '%'
+                  OR COALESCE(u.last_name, '') ILIKE '%' || $4 || '%')
              ORDER BY s.last_seen DESC
-             LIMIT $4
+              LIMIT $5
            ),
            event_counts AS (
              SELECT visitor_id,
@@ -536,7 +634,8 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
                     COUNT(*) FILTER (WHERE event_type = 'signup_completed')::int AS signup_completions,
                     COUNT(*) FILTER (WHERE event_type = 'login_completed')::int AS logins
              FROM public.cush_visitor_events
-             WHERE occurred_at >= now() - ($1::int * interval '1 day')
+              WHERE occurred_at >= $1::timestamptz
+                AND occurred_at < $2::timestamptz
              GROUP BY visitor_id
            )
            SELECT f.visitor_id,
@@ -549,7 +648,13 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
            FROM filtered f
            LEFT JOIN event_counts e ON e.visitor_id = f.visitor_id
            ORDER BY f.last_seen DESC`,
-          [rangeDays, kind.data, search, MAX_VISITOR_EXPORT_ROWS + 1],
+          [
+            window.start.toISOString(),
+            window.endExclusive.toISOString(),
+            kind.data,
+            search,
+            MAX_VISITOR_EXPORT_ROWS + 1,
+          ],
         );
         const truncated = result.rows.length > MAX_VISITOR_EXPORT_ROWS;
         const rows = result.rows.slice(0, MAX_VISITOR_EXPORT_ROWS);
@@ -558,7 +663,9 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
         await recordAdminAuditEvent(req, {
           action: "visitor_analytics.export",
           resourceType: "visitor_analytics",
-          resourceId: `${rangeDays}d:${kind.data}:rows=${rows.length}:truncated=${truncated}:searched=${Boolean(search)}`,
+          resourceId: `${window.custom
+            ? `custom:${window.startDate}:${window.endDate}`
+            : `${window.rangeDays}d`}:${kind.data}:rows=${rows.length}:truncated=${truncated}:searched=${Boolean(search)}`,
         });
 
         const date = new Date().toISOString().slice(0, 10);
@@ -594,6 +701,12 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
     async (req, res) => {
       const visitorId = visitorIdSchema.safeParse(req.params.visitorId);
       if (!visitorId.success) return res.status(400).json({ error: "Invalid visitor identifier." });
+      const window = getVisitorAnalyticsWindow(
+        req.query.range ?? "90",
+        req.query.startDate,
+        req.query.endDate,
+      );
+      if (!window) return res.status(400).json({ error: "Invalid visitor date range." });
       try {
         const [sessions, events] = await Promise.all([
           pgPool.query(
@@ -603,23 +716,33 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
              FROM public.cush_visitor_sessions s
              LEFT JOIN public.users u ON u.id = s.user_id
              WHERE s.visitor_id = $1::uuid
-               AND s.last_seen_at >= now() - ($2::int * interval '1 day')
+               AND s.last_seen_at >= $2::timestamptz
+               AND s.last_seen_at < $3::timestamptz
              ORDER BY s.last_seen_at DESC`,
-            [visitorId.data, VISITOR_ANALYTICS_RETENTION_DAYS],
+            [visitorId.data, window.start.toISOString(), window.endExclusive.toISOString()],
           ),
           pgPool.query(
             `SELECT event_type, route, occurred_at, u.first_name, u.last_name, u.email
              FROM public.cush_visitor_events e
              LEFT JOIN public.users u ON u.id = e.user_id
              WHERE visitor_id = $1::uuid
-               AND occurred_at >= now() - ($2::int * interval '1 day')
+               AND occurred_at >= $2::timestamptz
+               AND occurred_at < $3::timestamptz
              ORDER BY occurred_at DESC
              LIMIT 200`,
-            [visitorId.data, VISITOR_ANALYTICS_RETENTION_DAYS],
+            [visitorId.data, window.start.toISOString(), window.endExclusive.toISOString()],
           ),
         ]);
         if (sessions.rowCount === 0) return res.status(404).json({ error: "Visitor not found." });
-        return res.json({ visitorId: visitorId.data, sessions: sessions.rows, events: events.rows });
+        return res.json({
+          visitorId: visitorId.data,
+          rangeDays: window.rangeDays,
+          startDate: window.startDate,
+          endDate: window.endDate,
+          customDateRange: window.custom,
+          sessions: sessions.rows,
+          events: events.rows,
+        });
       } catch (error) {
         if (isMissingTable(error)) {
           return res.status(503).json({

@@ -5,7 +5,10 @@ import { apiRequest } from "@/lib/queryClient";
 import { API_BASE_URL } from "@/lib/api-base";
 
 type Overview = {
-  rangeDays: number;
+  rangeDays: number | null;
+  startDate: string;
+  endDate: string;
+  customDateRange: boolean;
   generatedAt: string;
   metrics: {
     unique_visitors: number;
@@ -74,6 +77,8 @@ type VisitorExportAudit = {
   outcome: "success" | "denied" | "failed";
   createdAt: string;
   rangeDays: number | null;
+  startDate: string | null;
+  endDate: string | null;
   visitorKind: "all" | "registered" | "anonymous" | null;
   rowCount: number | null;
   truncated: boolean | null;
@@ -99,6 +104,57 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime())
     ? "—"
     : new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function utcDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function shiftUtcDate(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return utcDateInputValue(date);
+}
+
+function customDateRangeError(startDate: string, endDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
+    return "Select both a start date and an end date.";
+  }
+  const start = new Date(`${startDate}T00:00:00.000Z`);
+  const end = new Date(`${endDate}T00:00:00.000Z`);
+  const today = utcDateInputValue(new Date());
+  const oldestAllowed = shiftUtcDate(today, -89);
+  if (
+    Number.isNaN(start.getTime())
+    || Number.isNaN(end.getTime())
+    || start.toISOString().slice(0, 10) !== startDate
+    || end.toISOString().slice(0, 10) !== endDate
+  ) {
+    return "Enter valid calendar dates.";
+  }
+  if (endDate < startDate) return "The end date must be on or after the start date.";
+  if (endDate > today) return "The end date cannot be in the future.";
+  if (startDate < oldestAllowed || Math.floor((end.getTime() - start.getTime()) / DAY_MS) + 1 > 90) {
+    return "Choose a date range of up to 90 days within the current retention window.";
+  }
+  return null;
+}
+
+function dateFilterParams(
+  range: 7 | 30 | 90 | "custom",
+  startDate: string,
+  endDate: string,
+) {
+  return range === "custom"
+    ? new URLSearchParams({ startDate, endDate })
+    : new URLSearchParams({ range: String(range) });
+}
+
+function exportRangeLabel(entry: VisitorExportAudit) {
+  if (entry.startDate && entry.endDate) return `${entry.startDate} – ${entry.endDate} UTC`;
+  return entry.rangeDays ? `${entry.rangeDays} days` : "Unknown window";
 }
 
 function readableEvent(event: string) {
@@ -132,7 +188,9 @@ function MetricCard({ label, value, detail, icon: Icon, tone }: {
 }
 
 export default function VisitorIntelligenceAdmin() {
-  const [range, setRange] = useState<7 | 30 | 90>(7);
+  const [range, setRange] = useState<7 | 30 | 90 | "custom">(7);
+  const [customEndDate, setCustomEndDate] = useState(() => utcDateInputValue(new Date()));
+  const [customStartDate, setCustomStartDate] = useState(() => shiftUtcDate(utcDateInputValue(new Date()), -6));
   const [kind, setKind] = useState<"all" | "registered" | "anonymous">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -140,27 +198,40 @@ export default function VisitorIntelligenceAdmin() {
   const [exporting, setExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
   const [exportError, setExportError] = useState("");
+  const customRangeError = range === "custom" ? customDateRangeError(customStartDate, customEndDate) : null;
+  const dateQueriesEnabled = !customRangeError;
   const overviewQuery = useQuery<Overview>({
-    queryKey: ["/api/admin/visitor-intelligence/overview", range],
-    queryFn: async () => (await apiRequest("GET", `/api/admin/visitor-intelligence/overview?range=${range}`)).json(),
+    queryKey: ["/api/admin/visitor-intelligence/overview", range, customStartDate, customEndDate],
+    queryFn: async () => {
+      const params = dateFilterParams(range, customStartDate, customEndDate);
+      return (await apiRequest("GET", `/api/admin/visitor-intelligence/overview?${params.toString()}`)).json();
+    },
+    enabled: dateQueriesEnabled,
     retry: false,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   });
   const visitorsQuery = useQuery<{ visitors: VisitorRow[]; page: number; pageSize: number }>({
-    queryKey: ["/api/admin/visitor-intelligence/visitors", range, kind, search, page],
+    queryKey: ["/api/admin/visitor-intelligence/visitors", range, customStartDate, customEndDate, kind, search, page],
     queryFn: async () => {
-      const params = new URLSearchParams({ range: String(range), kind, page: String(page), search });
+      const params = dateFilterParams(range, customStartDate, customEndDate);
+      params.set("kind", kind);
+      params.set("page", String(page));
+      params.set("search", search);
       return (await apiRequest("GET", `/api/admin/visitor-intelligence/visitors?${params.toString()}`)).json();
     },
+    enabled: dateQueriesEnabled,
     retry: false,
     refetchInterval: 30_000,
     refetchIntervalInBackground: false,
   });
   const detailQuery = useQuery<VisitorDetail>({
-    queryKey: ["/api/admin/visitor-intelligence/visitors", selectedVisitor],
-    queryFn: async () => (await apiRequest("GET", `/api/admin/visitor-intelligence/visitors/${selectedVisitor}`)).json(),
-    enabled: Boolean(selectedVisitor),
+    queryKey: ["/api/admin/visitor-intelligence/visitors", selectedVisitor, range, customStartDate, customEndDate],
+    queryFn: async () => {
+      const params = dateFilterParams(range, customStartDate, customEndDate);
+      return (await apiRequest("GET", `/api/admin/visitor-intelligence/visitors/${selectedVisitor}?${params.toString()}`)).json();
+    },
+    enabled: Boolean(selectedVisitor) && dateQueriesEnabled,
     retry: false,
   });
   const exportHistoryQuery = useQuery<{ exports: VisitorExportAudit[] }>({
@@ -176,11 +247,9 @@ export default function VisitorIntelligenceAdmin() {
     setExportMessage("");
     setExportError("");
     try {
-      const params = new URLSearchParams({
-        range: String(range),
-        kind,
-        search,
-      });
+      const params = dateFilterParams(range, customStartDate, customEndDate);
+      params.set("kind", kind);
+      params.set("search", search);
       const response = await fetch(`${API_BASE_URL}/api/admin/visitor-intelligence/export?${params.toString()}`, {
         credentials: "include",
       });
@@ -192,7 +261,10 @@ export default function VisitorIntelligenceAdmin() {
       const objectUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = objectUrl;
-      link.download = `cush-visitor-report-${new Date().toISOString().slice(0, 10)}.csv`;
+      const reportPeriod = range === "custom"
+        ? `${customStartDate}-to-${customEndDate}`
+        : new Date().toISOString().slice(0, 10);
+      link.download = `cush-visitor-report-${reportPeriod}.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -222,24 +294,58 @@ export default function VisitorIntelligenceAdmin() {
             Live and recent activity from visitors who opted in. This view contains no raw IP addresses.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
           <label className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c7c5ee]">
             Reporting window
             <select
               value={range}
-              onChange={(event) => { setRange(Number(event.target.value) as 7 | 30 | 90); setPage(1); }}
+              onChange={(event) => {
+                const value = event.target.value;
+                setRange(value === "custom" ? "custom" : Number(value) as 7 | 30 | 90);
+                setPage(1);
+                setSelectedVisitor(null);
+              }}
               className="mt-1.5 block min-w-[160px] rounded-lg border border-white/20 bg-[#383581] px-3 py-2.5 text-sm font-medium normal-case tracking-normal text-white outline-none focus:ring-2 focus:ring-[#d5d3ff]/40"
               aria-label="Visitor analytics reporting window"
             >
               <option value={7}>Last 7 days</option>
               <option value={30}>Last 30 days</option>
               <option value={90}>Last 90 days</option>
+              <option value="custom">Custom dates (UTC)</option>
             </select>
           </label>
+          {range === "custom" && (
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c7c5ee]">
+                From
+                <input
+                  type="date"
+                  value={customStartDate}
+                  min={shiftUtcDate(utcDateInputValue(new Date()), -89)}
+                  max={customEndDate || utcDateInputValue(new Date())}
+                  onChange={(event) => { setCustomStartDate(event.target.value); setPage(1); setSelectedVisitor(null); }}
+                  className="mt-1.5 block min-h-10 rounded-lg border border-white/20 bg-[#383581] px-2 text-xs font-medium normal-case tracking-normal text-white outline-none focus:ring-2 focus:ring-[#d5d3ff]/40"
+                  aria-label="Visitor report start date in UTC"
+                />
+              </label>
+              <label className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#c7c5ee]">
+                To
+                <input
+                  type="date"
+                  value={customEndDate}
+                  min={customStartDate || shiftUtcDate(utcDateInputValue(new Date()), -89)}
+                  max={utcDateInputValue(new Date())}
+                  onChange={(event) => { setCustomEndDate(event.target.value); setPage(1); setSelectedVisitor(null); }}
+                  className="mt-1.5 block min-h-10 rounded-lg border border-white/20 bg-[#383581] px-2 text-xs font-medium normal-case tracking-normal text-white outline-none focus:ring-2 focus:ring-[#d5d3ff]/40"
+                  aria-label="Visitor report end date in UTC"
+                />
+              </label>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => void downloadVisitorReport()}
-            disabled={exporting}
+            disabled={exporting || Boolean(customRangeError)}
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-white/30 bg-white px-4 py-2 text-xs font-semibold text-[#29266f] shadow-sm transition hover:bg-[#f0efff] disabled:cursor-wait disabled:opacity-60"
           >
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
@@ -248,6 +354,14 @@ export default function VisitorIntelligenceAdmin() {
         </div>
       </header>
 
+      {range === "custom" && (
+        <p
+          role={customRangeError ? "alert" : "note"}
+          className={`rounded-lg border px-4 py-2.5 text-xs ${customRangeError ? "border-[#e5c9b9] bg-[#fbf2ec] text-[#81412e]" : "border-[#dcdaf6] bg-[#f0efff] text-[#353174]"}`}
+        >
+          {customRangeError ?? "Custom dates include both selected UTC calendar days and are limited to the most recent 90 days."}
+        </p>
+      )}
       {exportMessage && <p role="status" className="rounded-lg border border-[#c8e4db] bg-[#edf7f3] px-4 py-2.5 text-xs text-[#28685c]">{exportMessage}</p>}
       {exportError && <p role="alert" className="rounded-lg border border-[#e5c9b9] bg-[#fbf2ec] px-4 py-2.5 text-xs text-[#81412e]">{exportError}</p>}
 
@@ -260,7 +374,11 @@ export default function VisitorIntelligenceAdmin() {
         </div>
       </div>
 
-      {overviewQuery.isLoading ? (
+      {customRangeError ? (
+        <div className="rounded-xl border border-[#e5c9b9] bg-[#fbf2ec] p-5 text-sm text-[#81412e]">
+          Visitor metrics and report downloads are paused until the selected date range is valid.
+        </div>
+      ) : overviewQuery.isLoading ? (
         <div className="flex min-h-40 items-center justify-center rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] text-sm text-[#777973]">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading visitor data…
         </div>
@@ -451,7 +569,7 @@ export default function VisitorIntelligenceAdmin() {
                     <tr key={entry.id}>
                       <td className="px-4 py-3.5 font-medium text-[#34353a]">Admin account #{entry.adminUserId}</td>
                       <td className="px-4 py-3.5 text-[#555750]">
-                        {entry.rangeDays ? `${entry.rangeDays} days` : "Unknown window"}
+                        {exportRangeLabel(entry)}
                         {" · "}
                         {entry.visitorKind === "registered" ? "Signed in" : entry.visitorKind === "anonymous" ? "Anonymous" : entry.visitorKind === "all" ? "All visitors" : "Unknown type"}
                         {entry.searchApplied ? " · Search applied" : ""}
@@ -471,7 +589,7 @@ export default function VisitorIntelligenceAdmin() {
                 <li key={entry.id} className="space-y-1.5 p-4">
                   <p className="text-xs font-semibold text-[#34353a]">Admin account #{entry.adminUserId} · {entry.outcome}</p>
                   <p className="text-xs text-[#555750]">
-                    {entry.rangeDays ? `${entry.rangeDays} days` : "Unknown window"}
+                    {exportRangeLabel(entry)}
                     {" · "}
                     {entry.visitorKind === "registered" ? "Signed in" : entry.visitorKind === "anonymous" ? "Anonymous" : entry.visitorKind === "all" ? "All visitors" : "Unknown type"}
                     {entry.searchApplied ? " · Search applied" : ""}

@@ -80,6 +80,20 @@ const exportRow = {
   logins: 0,
 };
 
+function utcDateOffset(daysFromToday: number) {
+  const date = new Date();
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCDate(date.getUTCDate() + daysFromToday);
+  return date.toISOString().slice(0, 10);
+}
+
+function dateRangeParams(startDate: string, endDate: string) {
+  return [
+    new Date(`${startDate}T00:00:00.000Z`).toISOString(),
+    new Date(new Date(`${endDate}T00:00:00.000Z`).getTime() + 24 * 60 * 60 * 1000).toISOString(),
+  ];
+}
+
 describe("visitor analytics export route", () => {
   beforeEach(() => {
     poolQuery.mockReset();
@@ -105,7 +119,12 @@ describe("visitor analytics export route", () => {
     expect(String(res.payload)).toContain('"visitor_reference"');
     expect(String(res.payload)).not.toContain(exportRow.visitor_id);
     expect(String(res.payload)).not.toContain("email");
-    expect(poolQuery).toHaveBeenCalledWith(expect.stringContaining("FROM public.cush_visitor_sessions"), [30, "anonymous", "sample", 5001]);
+    const [, params] = poolQuery.mock.calls[0] as [string, unknown[]];
+    expect(poolQuery).toHaveBeenCalledWith(expect.stringContaining("FROM public.cush_visitor_sessions"), params);
+    expect(params[2]).toBe("anonymous");
+    expect(params[3]).toBe("sample");
+    expect(params[4]).toBe(5001);
+    expect(Date.parse(String(params[0]))).toBeLessThan(Date.parse(String(params[1])));
     expect(requireAdminPermission).toHaveBeenCalledWith(ADMIN_PERMISSION.visitorAnalyticsRead);
     expect(recordAdminAuditEvent).toHaveBeenCalledWith(req, expect.objectContaining({
       action: "visitor_analytics.export",
@@ -161,6 +180,8 @@ describe("visitor analytics export route", () => {
         outcome: "success",
         createdAt: "2026-11-09T11:30:00.000Z",
         rangeDays: 30,
+        startDate: null,
+        endDate: null,
         visitorKind: "anonymous",
         rowCount: 14,
         truncated: false,
@@ -174,5 +195,126 @@ describe("visitor analytics export route", () => {
       action: "visitor_analytics.export_history.read",
       resourceType: "visitor_analytics",
     }));
+  });
+
+  it("exports a custom UTC date window and records the exact dates in audit metadata", async () => {
+    poolQuery.mockResolvedValueOnce({ rows: [exportRow] });
+    const { app, routes } = createTestApp();
+    registerVisitorIntelligenceRoutes(app);
+    const route = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/export")!;
+    const startDate = utcDateOffset(-6);
+    const endDate = utcDateOffset(-2);
+    const res = createResponse();
+    await route.handlers.at(-1)!({
+      query: { startDate, endDate, kind: "registered", search: "" },
+      userId: 12,
+    } as any, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(poolQuery.mock.calls[0]?.[1]).toEqual([
+      ...dateRangeParams(startDate, endDate),
+      "registered",
+      "",
+      5001,
+    ]);
+    expect(recordAdminAuditEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      resourceId: `custom:${startDate}:${endDate}:registered:rows=1:truncated=false:searched=false`,
+    }));
+  });
+
+  it("rejects custom ranges beyond 90 days without querying visitor data", async () => {
+    const { app, routes } = createTestApp();
+    registerVisitorIntelligenceRoutes(app);
+    const route = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/export")!;
+    const res = createResponse();
+    await route.handlers.at(-1)!({
+      query: { startDate: utcDateOffset(-90), endDate: utcDateOffset(0), kind: "all" },
+      userId: 12,
+    } as any, res);
+
+    expect(res.statusCode).toBe(400);
+    expect(poolQuery).not.toHaveBeenCalled();
+    expect(recordAdminAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("applies the same custom UTC window to dashboard, visitor, and detail queries", async () => {
+    const { app, routes } = createTestApp();
+    registerVisitorIntelligenceRoutes(app);
+    const startDate = utcDateOffset(-5);
+    const endDate = utcDateOffset(-3);
+    const expectedWindow = dateRangeParams(startDate, endDate);
+
+    poolQuery.mockResolvedValue({ rows: [{}], rowCount: 1 });
+    const overview = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/overview")!;
+    const overviewResponse = createResponse();
+    await overview.handlers.at(-1)!({ query: { startDate, endDate } } as any, overviewResponse);
+    expect(overviewResponse.statusCode).toBe(200);
+    expect(poolQuery).toHaveBeenCalledTimes(4);
+    for (const [, params] of poolQuery.mock.calls) {
+      expect(params).toEqual(expectedWindow);
+    }
+
+    poolQuery.mockClear();
+    const visitors = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/visitors")!;
+    const visitorsResponse = createResponse();
+    await visitors.handlers.at(-1)!({
+      query: { startDate, endDate, kind: "all", search: "", page: "1" },
+    } as any, visitorsResponse);
+    expect(visitorsResponse.statusCode).toBe(200);
+    expect(poolQuery).toHaveBeenCalledWith(
+      expect.stringContaining("FROM public.cush_visitor_sessions"),
+      [...expectedWindow, "all", "", 0],
+    );
+
+    poolQuery.mockReset()
+      .mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 });
+    const visitorId = "d943c21e-f715-47a4-b087-8cc56350fa4f";
+    const detail = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/visitors/:visitorId")!;
+    const detailResponse = createResponse();
+    await detail.handlers.at(-1)!({
+      params: { visitorId },
+      query: { startDate, endDate },
+    } as any, detailResponse);
+    expect(detailResponse.statusCode).toBe(200);
+    expect(poolQuery).toHaveBeenCalledTimes(2);
+    for (const [, params] of poolQuery.mock.calls) {
+      expect(params).toEqual([visitorId, ...expectedWindow]);
+    }
+  });
+
+  it("includes custom UTC dates in the report download history", async () => {
+    const startDate = utcDateOffset(-8);
+    const endDate = utcDateOffset(-4);
+    poolQuery.mockResolvedValueOnce({
+      rows: [{
+        id: 52,
+        admin_user_id: 9,
+        resource_id: `custom:${startDate}:${endDate}:registered:rows=7:truncated=false:searched=false`,
+        outcome: "success",
+        created_at: new Date("2026-11-09T11:30:00.000Z"),
+      }],
+    });
+    const { app, routes } = createTestApp();
+    registerVisitorIntelligenceRoutes(app);
+    const route = routes.find(({ path }) => path === "/api/admin/visitor-intelligence/exports")!;
+    const response = createResponse();
+    await route.handlers.at(-1)!({ userId: 9 } as any, response);
+
+    expect(response.payload).toEqual({
+      exports: [{
+        id: 52,
+        adminUserId: 9,
+        outcome: "success",
+        createdAt: "2026-11-09T11:30:00.000Z",
+        rangeDays: null,
+        startDate,
+        endDate,
+        visitorKind: "registered",
+        rowCount: 7,
+        truncated: false,
+        searchApplied: false,
+      }],
+    });
   });
 });
