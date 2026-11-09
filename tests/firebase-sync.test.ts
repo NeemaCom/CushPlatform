@@ -299,8 +299,33 @@ describe("Firebase session sync", () => {
       verificationEmailSent: true,
       email: identity.email,
     });
-    expect(mocks.sendVerificationEmail).toHaveBeenCalledWith("firebase-id-token");
+    expect(mocks.sendVerificationEmail).toHaveBeenCalledWith(
+      "firebase-id-token",
+      "https://app.we-cush.com/login?emailVerified=1",
+    );
     expect(res.headers.get("set-cookie")).toBeNull();
+  });
+
+  it("only creates a password session after Firebase reports email-link confirmation", async () => {
+    mocks.verify
+      .mockResolvedValueOnce({ ...identity, emailVerified: false })
+      .mockResolvedValueOnce({ ...identity, emailVerified: true });
+    mocks.updateUser
+      .mockResolvedValueOnce({ ...user, isEmailVerified: false })
+      .mockResolvedValueOnce({ ...user, isEmailVerified: true });
+
+    const pending = await passwordSignIn("owner@example.com", "correct-password");
+    expect(pending.status).toBe(200);
+    expect((await pending.json()).requiresEmailVerification).toBe(true);
+    expect(pending.headers.get("set-cookie")).toBeNull();
+
+    const confirmed = await passwordSignIn("owner@example.com", "correct-password");
+    expect(confirmed.status).toBe(200);
+    expect(confirmed.headers.get("set-cookie")).toContain("connect.sid=");
+    expect(mocks.updateUser).toHaveBeenCalledWith(
+      user.id,
+      expect.objectContaining({ isEmailVerified: true }),
+    );
   });
 
   it("refuses to link an existing account by matching email alone", async () => {

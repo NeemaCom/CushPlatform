@@ -15,6 +15,20 @@ Google sign-in continues to use Firebase's provider-reported email verification 
 
 The Sign In page's **Forgot password?** action calls Firebase's password-reset email service. Firebase's hosted action page validates the one-time code and updates the Firebase password, then returns the user to Sign In. Responses do not reveal whether an email address has an account.
 
+## Delivery and end-to-end checks
+
+These activation and password-reset messages are delivered by Firebase Authentication, not Resend. The Resend sender configured for Cush account-status notices does not change Firebase Auth's sender or templates.
+
+Use a dedicated test inbox and account in the `cushportal` project:
+
+1. Register with email/password and accepted required consent. Confirm the pending screen appears and no Cush dashboard session is created.
+2. Check inbox and spam for Firebase's verification message. Open its link and confirm it returns to `/login?emailVerified=1`.
+3. Try signing in before opening the link; it must remain pending. After opening the link, sign in again; the server must see Firebase's verified claim before it creates a Cush session.
+4. Request a password reset for the test account, confirm the generic success message, open Firebase's reset link, and set a new password.
+5. Confirm the new password signs in and the old password does not. Firebase validates and consumes the reset code; Cush never stores it.
+
+Automated tests mock Firebase's mail service. They verify the request, continuation URL, generic reset response, and the server-side verified-claim gate; they do not deliver real email. Confirm inbox delivery with the dedicated test account before relying on production delivery.
+
 ## Firebase Console setup
 
 In Firebase Console for the `cushportal` project:

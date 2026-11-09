@@ -41,13 +41,20 @@ export async function signInWithFirebasePassword(email: string, password: string
   return body.idToken;
 }
 
-export async function sendFirebaseVerificationEmail(idToken: string): Promise<void> {
+export async function sendFirebaseVerificationEmail(
+  idToken: string,
+  continueUrl?: string,
+): Promise<void> {
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestType: "VERIFY_EMAIL", idToken }),
+      body: JSON.stringify({
+        requestType: "VERIFY_EMAIL",
+        idToken,
+        ...(continueUrl ? { continueUrl } : {}),
+      }),
     },
   );
   if (!response.ok) {

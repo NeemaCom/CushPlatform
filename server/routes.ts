@@ -41,6 +41,8 @@ import { registerMonoRoutes } from "./mono-routes";
 import { registerInterswitchCreditHistoryRoutes } from "./interswitch-credit-history-routes";
 import { registerCushVerifyRoutes } from "./cush-verify-routes";
 import { firebaseProfileNamePatch } from "./firebase-profile-name";
+import { getFirebaseVerificationContinueUrl } from "./auth-action-url";
+import { getAllowedFrontendOrigins } from "./origin-policy";
 import {
   clearLoginAttemptState,
   getFailedLoginResponse,
@@ -313,7 +315,14 @@ export async function registerRoutes(
         await storage.updateUser(existingUser.id, { isEmailVerified: false });
         let verificationEmailSent = true;
         try {
-          await sendFirebaseVerificationEmail(idToken);
+          const origin = req.get("Origin");
+          await sendFirebaseVerificationEmail(
+            idToken,
+            getFirebaseVerificationContinueUrl(
+              origin,
+              getAllowedFrontendOrigins(),
+            ),
+          );
         } catch (error) {
           verificationEmailSent = false;
           console.error(
