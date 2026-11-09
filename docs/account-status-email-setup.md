@@ -1,8 +1,9 @@
 # Account status email setup
 
-Account suspension and reactivation emails are sent by the Render-hosted API
-through Resend. The Replit Resend connection is not available to the Render
-service, so production must have its own Resend credentials.
+Account suspension, reactivation, and new-account welcome emails are sent by
+the Render-hosted API through Resend. The Replit Resend connection is not
+available to the Render service, so production must have its own Resend
+credentials.
 
 ## Render environment variables
 
@@ -19,6 +20,9 @@ The API replies to `support@we-cush.com`. If either variable is missing or
 Resend rejects delivery, the account status change still completes, but the
 admin response and audit record indicate that the notice was not sent.
 
+New-account welcome emails use these same two settings. Firebase continues to
+send email activation and password-reset messages independently.
+
 ## Email behavior
 
 - A notice is sent only when an account status actually changes.
@@ -28,6 +32,9 @@ admin response and audit record indicate that the notice was not sent.
 - Reactivation notices include the Cush sign-in URL.
 - Email delivery happens after the account/session transaction commits. A mail
   failure never rolls back a suspension or reactivation.
+- A welcome message is sent once when a new Firebase-backed Cush account is
+  created. If delivery is not configured or fails, account creation continues
+  and the signup response reports the email delivery status.
 
 ## Test delivery from the admin dashboard
 

@@ -399,6 +399,7 @@ describe("Firebase session sync", () => {
       success: true,
       requiresEmailVerification: true,
       isNewUser: true,
+      welcomeEmailStatus: "not_configured",
     });
     expect(mocks.createUser).toHaveBeenCalledWith(expect.objectContaining({
       firebaseUid: "trusted-uid",

@@ -34,13 +34,14 @@ function openMenu() {
 }
 
 describe("AccountDropdown", () => {
-  it("shows the authenticated user's identity and an accurate partial verification status", () => {
+  it("shows the authenticated user's identity without calling phone verification partial", () => {
     renderMenu();
     openMenu();
 
     expect(screen.getAllByText("Ada Lovelace").length).toBeGreaterThan(0);
     expect(screen.getAllByText("ada@example.com").length).toBeGreaterThan(0);
-    expect(screen.getByText("Partially verified")).toBeInTheDocument();
+    expect(screen.getByText("Email verified")).toBeInTheDocument();
+    expect(screen.queryByText("Partially verified")).not.toBeInTheDocument();
   });
 
   it("navigates to account sections and closes after a section is selected", () => {

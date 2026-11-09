@@ -1,10 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import type { User as FirebaseUser } from 'firebase/auth'
+import { ArrowRight, BadgeCheck, FileCheck2, MailCheck, ShieldCheck, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
 import { useQueryClient } from '@tanstack/react-query'
@@ -37,6 +45,12 @@ type GoogleSignInDiagnostic = {
 type GoogleRedirectIntent = {
   mode: 'signin' | 'signup'
   marketingConsent: boolean
+}
+
+type WelcomeState = {
+  nextStep: 'dashboard' | 'verification'
+  email: string
+  emailStatus?: 'sent' | 'not_configured' | 'failed'
 }
 
 const GOOGLE_REDIRECT_INTENT_KEY = 'cush.google-signin-intent'
@@ -156,6 +170,8 @@ export default function Login() {
   const [googleSignInDiagnostic, setGoogleSignInDiagnostic] = useState<GoogleSignInDiagnostic | null>(null)
   const [diagnosticCopied, setDiagnosticCopied] = useState(false)
   const [resetLinkSent, setResetLinkSent] = useState(false)
+  const [termsNoticeOpen, setTermsNoticeOpen] = useState(false)
+  const [welcomeState, setWelcomeState] = useState<WelcomeState | null>(null)
   const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
 
@@ -205,6 +221,7 @@ export default function Login() {
                 acceptPrivacy: true,
                 marketingConsent: redirectIntent.marketingConsent,
               })
+              showWelcome(syncResult, 'verification', fbUser.email || '')
               if (!syncResult.requiresEmailVerification) {
                 throw new Error('Email verification is required before signing in.')
               }
@@ -233,7 +250,7 @@ export default function Login() {
         stage = 'Refreshing Firebase sign-in token'
         await fbUser.getIdToken(true)
         stage = 'Syncing Google account with Cush'
-        await firebaseSync(fbUser, redirectIntent.mode === 'signup'
+        const syncResult = await firebaseSync(fbUser, redirectIntent.mode === 'signup'
           ? {
               acceptTerms: true,
               acceptPrivacy: true,
@@ -241,6 +258,7 @@ export default function Login() {
             }
           : undefined)
         stage = 'Finishing sign-in'
+        if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
         await afterLogin()
       } catch (err: any) {
         setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
@@ -266,13 +284,24 @@ export default function Login() {
     setVerificationEmail(user.email || form.email)
   }
 
+  function showWelcome(syncResult: any, nextStep: WelcomeState['nextStep'], email: string) {
+    if (!syncResult?.isNewUser) return false
+    const emailStatus = ['sent', 'not_configured', 'failed'].includes(syncResult.welcomeEmailStatus)
+      ? syncResult.welcomeEmailStatus as WelcomeState['emailStatus']
+      : undefined
+    setWelcomeState({ nextStep, email, emailStatus })
+    return true
+  }
+
+  function continueFromWelcome() {
+    const nextStep = welcomeState?.nextStep
+    setWelcomeState(null)
+    if (nextStep === 'dashboard') void afterLogin()
+  }
+
   function hasRequiredConsent() {
     if (consent.terms && consent.privacy) return true
-    toast({
-      title: 'Consent required',
-      description: 'Please accept the Terms of Service and Privacy Policy to create an account.',
-      variant: 'destructive',
-    })
+    setTermsNoticeOpen(true)
     return false
   }
 
@@ -311,6 +340,7 @@ export default function Login() {
               acceptPrivacy: true,
               marketingConsent: consent.marketing,
             })
+            showWelcome(syncResult, 'verification', fbUser.email || '')
             if (!syncResult.requiresEmailVerification) {
               throw new Error('Email verification is required before signing in.')
             }
@@ -337,7 +367,7 @@ export default function Login() {
       stage = 'Refreshing Firebase sign-in token'
       await fbUser.getIdToken(true)
       stage = 'Syncing Google account with Cush'
-      await firebaseSync(fbUser, mode === 'signup'
+      const syncResult = await firebaseSync(fbUser, mode === 'signup'
         ? {
             acceptTerms: true,
             acceptPrivacy: true,
@@ -345,6 +375,7 @@ export default function Login() {
           }
         : undefined)
       stage = 'Finishing sign-in'
+      if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
       await afterLogin()
     } catch (err: any) {
       clearGoogleRedirectIntent()
@@ -433,6 +464,7 @@ export default function Login() {
       })
       if (!result.user.emailVerified || syncResult.requiresEmailVerification) {
         showVerificationPending(result.user)
+        showWelcome(syncResult, 'verification', result.user.email || form.email)
         try {
           await sendEmailVerification(result.user, getAuthActionSettings('emailVerified'))
           toast({
@@ -450,6 +482,7 @@ export default function Login() {
         }
         return
       }
+      if (showWelcome(syncResult, 'dashboard', result.user.email || form.email)) return
       toast({ title: 'Account created!', description: 'Welcome to Cush Passport.' })
       await afterLogin()
     } catch (err: any) {
@@ -986,6 +1019,134 @@ export default function Login() {
           <a href="/privacy-policy" className="underline hover:text-slate-700">Privacy Policy</a>.
         </p>
       </div>
+
+      <Dialog open={termsNoticeOpen} onOpenChange={setTermsNoticeOpen}>
+        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto rounded-2xl border border-[#e5c97b] bg-white p-0 shadow-[0_24px_80px_-24px_rgba(28,36,81,0.45)]">
+          <div className="rounded-t-2xl bg-[linear-gradient(125deg,#25238f_0%,#4439c4_65%,#6856da_100%)] px-6 pb-6 pt-7 text-white">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/12 shadow-inner">
+              <ShieldCheck className="h-6 w-6 text-[#ffe69b]" aria-hidden="true" />
+            </div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f6dda0]">One quick step</p>
+            <DialogHeader className="mt-2 space-y-2 text-left">
+              <DialogTitle className="text-2xl font-semibold tracking-tight text-white">
+                Review your agreements
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-indigo-100">
+                Please accept both the Terms of Service and Privacy Policy before creating your Cush account.
+                Marketing updates remain optional.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-3 px-6 py-5">
+            <a
+              href="/terms-of-service"
+              target="_blank"
+              rel="noreferrer"
+              className="group flex min-h-14 items-center gap-3 rounded-xl border border-[#e7e9f2] bg-[#f8f9fd] px-4 py-3 transition-colors hover:border-[#b9b7e8] hover:bg-[#f2f2fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5448c8]"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e9e8fb] text-[#39339e]">
+                <FileCheck2 className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-[#242943]">Terms of Service</span>
+                <span className="text-xs text-[#6e7487]">Open and review the terms</span>
+              </span>
+              <ArrowRight className="h-4 w-4 text-[#8589a0] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </a>
+            <a
+              href="/privacy-policy"
+              target="_blank"
+              rel="noreferrer"
+              className="group flex min-h-14 items-center gap-3 rounded-xl border border-[#e7e9f2] bg-[#f8f9fd] px-4 py-3 transition-colors hover:border-[#b9b7e8] hover:bg-[#f2f2fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5448c8]"
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff4d7] text-[#8b6811]">
+                <ShieldCheck className="h-4.5 w-4.5" aria-hidden="true" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-[#242943]">Privacy Policy</span>
+                <span className="text-xs text-[#6e7487]">See how account data is handled</span>
+              </span>
+              <ArrowRight className="h-4 w-4 text-[#8589a0] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+            </a>
+            <Button
+              type="button"
+              className="mt-2 min-h-11 w-full rounded-xl bg-[#3530a8] font-semibold text-white shadow-sm hover:bg-[#292580]"
+              onClick={() => {
+                setTermsNoticeOpen(false)
+                window.setTimeout(() => {
+                  document.getElementById(consent.terms ? 'accept-privacy' : 'accept-terms')?.focus()
+                }, 0)
+              }}
+            >
+              Return to agreements
+            </Button>
+            <p className="text-center text-[11px] leading-5 text-[#85899a]">
+              You can change your marketing preference at any time. It is not needed to create an account.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(welcomeState)}
+        onOpenChange={(open) => {
+          if (!open) continueFromWelcome()
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto rounded-2xl border border-[#e2e4f0] bg-white p-0 shadow-[0_24px_80px_-24px_rgba(28,36,81,0.48)]">
+          <div className="relative overflow-hidden rounded-t-2xl bg-[linear-gradient(125deg,#24228e_0%,#3f37b8_58%,#5748cf_100%)] px-6 pb-7 pt-7 text-white">
+            <div className="pointer-events-none absolute -right-9 -top-12 h-40 w-40 rounded-full border border-white/10 bg-white/5" />
+            <div className="pointer-events-none absolute -right-2 top-10 h-24 w-24 rounded-full border border-[#f6dda0]/30" />
+            <div className="relative mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/10">
+              <Sparkles className="h-6 w-6 text-[#ffe69b]" aria-hidden="true" />
+            </div>
+            <p className="relative text-[11px] font-bold uppercase tracking-[0.2em] text-[#f6dda0]">Cush Passport</p>
+            <DialogHeader className="relative mt-2 space-y-2 text-left">
+              <DialogTitle className="text-3xl font-semibold tracking-tight text-white">
+                Welcome to Cush
+              </DialogTitle>
+              <DialogDescription className="text-sm leading-6 text-indigo-100">
+                Your account has been created. You’re ready to start building your financial identity.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <div className="space-y-4 px-6 py-5">
+            <div className="flex items-start gap-3 rounded-xl border border-[#dce9e2] bg-[#f4faf6] p-3.5">
+              {welcomeState?.nextStep === 'verification'
+                ? <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2f7955]" aria-hidden="true" />
+                : <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2f7955]" aria-hidden="true" />}
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[#244a37]">
+                  {welcomeState?.nextStep === 'verification' ? 'Confirm your email to activate your account' : 'Your account is ready'}
+                </p>
+                <p className="mt-1 break-words text-xs leading-5 text-[#557263]">
+                  {welcomeState?.nextStep === 'verification'
+                    ? `Use the activation link sent to ${welcomeState.email}.`
+                    : 'Your email is verified. Phone verification is optional.'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-xl border border-[#e5e7ef] bg-[#f8f9fc] p-3.5">
+              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#5149b9]" aria-hidden="true" />
+              <p className="text-xs leading-5 text-[#62697b]">
+                {welcomeState?.emailStatus === 'sent'
+                  ? `A welcome email has been sent to ${welcomeState.email}.`
+                  : welcomeState?.emailStatus === 'not_configured' || welcomeState?.emailStatus === 'failed'
+                    ? 'Your account is set up, but the welcome email could not be delivered just now. Contact support if you need help.'
+                    : 'A welcome email will be sent to your account address.'}
+              </p>
+            </div>
+            <Button
+              type="button"
+              className="min-h-11 w-full rounded-xl bg-[#3530a8] font-semibold text-white shadow-sm hover:bg-[#292580]"
+              onClick={continueFromWelcome}
+            >
+              {welcomeState?.nextStep === 'verification' ? 'Continue to email verification' : 'Continue to dashboard'}
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

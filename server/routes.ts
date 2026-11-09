@@ -53,6 +53,7 @@ import {
   revokeUserSessions,
 } from "./login-attempts";
 import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
+import { sendWelcomeEmail } from "./welcome-email";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -198,6 +199,16 @@ export async function registerRoutes(
           marketingConsent: req.body.marketingConsent === true,
           role: "user",
         });
+        const welcomeEmail = await sendWelcomeEmail({
+          userId: user.id,
+          email: user.email,
+          firstName: user.firstName,
+        });
+        if (welcomeEmail.status === "failed") {
+          console.error("[Welcome Email Delivery] failed", welcomeEmail.reason);
+        } else if (welcomeEmail.status === "not_configured") {
+          console.warn("[Welcome Email Delivery] Resend is not configured for this service.");
+        }
         if (!emailVerified) {
           if (req.session.userId) {
             clearAuthSessionCookie(req, res);
@@ -209,11 +220,17 @@ export async function registerRoutes(
             success: true,
             requiresEmailVerification: true,
             isNewUser: true,
+            welcomeEmailStatus: welcomeEmail.status,
           });
         }
         await createLoginSession(req, user);
         SecurityLogger.logAuthEvent("firebase_signup_success", user.id, true, req.ip, req.get("User-Agent"));
-        return res.json({ success: true, user: createSafeUser(user), isNewUser: true });
+        return res.json({
+          success: true,
+          user: createSafeUser(user),
+          isNewUser: true,
+          welcomeEmailStatus: welcomeEmail.status,
+        });
       }
 
       if (user.isActive === false) {

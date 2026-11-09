@@ -257,11 +257,19 @@ describe("Login", () => {
     );
     mocks.getRedirectResult.mockResolvedValue({ user: firebaseUser });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 } }) as Response,
+      syncResponse(200, {
+        success: true,
+        user: { id: 1 },
+        isNewUser: true,
+        welcomeEmailStatus: "sent",
+      }) as Response,
     );
 
     renderLogin();
 
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Welcome to Cush");
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to dashboard" }));
     await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
     expect(mocks.getRedirectResult).toHaveBeenCalled();
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual({
@@ -523,13 +531,8 @@ describe("Login", () => {
     expect(mocks.createUserWithEmailAndPassword).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.setLocation).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Consent required",
-        description: expect.stringContaining("accept the Terms of Service and Privacy Policy"),
-        variant: "destructive",
-      }),
-    );
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Review your agreements");
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 
   it("requires both agreements before Google account creation", async () => {
@@ -539,12 +542,8 @@ describe("Login", () => {
 
     expect(mocks.signInWithPopup).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(mocks.toast).toHaveBeenCalledWith(
-      expect.objectContaining({
-        title: "Consent required",
-        variant: "destructive",
-      }),
-    );
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Review your agreements");
+    expect(mocks.toast).not.toHaveBeenCalled();
   });
 
   it("allows email signup with required policies accepted but marketing left unchecked", async () => {
@@ -552,7 +551,12 @@ describe("Login", () => {
       user: { ...firebaseUser, emailVerified: false },
     });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, requiresEmailVerification: true }) as Response,
+      syncResponse(200, {
+        success: true,
+        requiresEmailVerification: true,
+        isNewUser: true,
+        welcomeEmailStatus: "sent",
+      }) as Response,
     );
 
     renderLogin();
@@ -566,6 +570,9 @@ describe("Login", () => {
     expect(marketingCheckbox).not.toBeRequired();
 
     submitSignUpForm();
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Welcome to Cush");
+    expect(screen.getByRole("dialog")).toHaveTextContent("A welcome email has been sent");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to email verification" }));
     expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
 
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
@@ -580,7 +587,12 @@ describe("Login", () => {
       user: { ...firebaseUser, emailVerified: false },
     });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, requiresEmailVerification: true }) as Response,
+      syncResponse(200, {
+        success: true,
+        requiresEmailVerification: true,
+        isNewUser: true,
+        welcomeEmailStatus: "sent",
+      }) as Response,
     );
 
     renderLogin();
@@ -589,6 +601,8 @@ describe("Login", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Email me product updates and offers/ }));
     submitSignUpForm();
 
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Welcome to Cush");
+    fireEvent.click(screen.getByRole("button", { name: "Continue to email verification" }));
     expect(await screen.findByText("Verify your email to activate your account")).toBeInTheDocument();
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toMatchObject({
       acceptTerms: true,
@@ -600,7 +614,12 @@ describe("Login", () => {
   it("sends consent for new Google accounts when using the create-account tab", async () => {
     mocks.signInWithPopup.mockResolvedValue({ user: firebaseUser });
     vi.mocked(fetch).mockResolvedValue(
-      syncResponse(200, { success: true, user: { id: 1 }, isNewUser: true }) as Response,
+      syncResponse(200, {
+        success: true,
+        user: { id: 1 },
+        isNewUser: true,
+        welcomeEmailStatus: "sent",
+      }) as Response,
     );
 
     renderLogin();
@@ -609,6 +628,10 @@ describe("Login", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Privacy Policy/ }));
     fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Welcome to Cush");
+    expect(screen.getByRole("dialog")).toHaveTextContent("A welcome email has been sent");
+    expect(mocks.setLocation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Continue to dashboard" }));
     await waitFor(() => expect(mocks.setLocation).toHaveBeenCalledWith("/dashboard"));
     expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1].body)).toEqual({
       idToken: "verified-id-token",

@@ -32,6 +32,7 @@ export interface AccountDropdownUser {
   firstName?: string | null;
   lastName?: string | null;
   email: string;
+  phoneNumber?: string | null;
   profilePicture?: string | null;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
@@ -67,12 +68,17 @@ export function AccountDropdown({ user, onSignOut }: AccountDropdownProps) {
   const displayName = fullName && fullName.toLowerCase() !== "user"
     ? fullName
     : user.email.split("@")[0] || "Name not provided";
-  const verifiedCount = Number(user.isEmailVerified === true) + Number(user.isPhoneVerified === true);
-  const verificationLabel = verifiedCount === 2
-    ? "Contact details verified"
-    : verifiedCount === 1
-      ? "Partially verified"
-      : "Verification pending";
+  const emailVerified = user.isEmailVerified === true;
+  const phoneVerified = user.isPhoneVerified === true;
+  const verificationLabel = emailVerified && phoneVerified
+    ? "Email and phone verified"
+    : emailVerified
+      ? user.phoneNumber
+        ? "Email verified · phone pending"
+        : "Email verified"
+      : phoneVerified
+        ? "Phone verified · email pending"
+        : "Email verification pending";
 
   const initials = useMemo(() => {
     const nameInitials = [user.firstName?.trim(), user.lastName?.trim()]
@@ -150,15 +156,13 @@ export function AccountDropdown({ user, onSignOut }: AccountDropdownProps) {
           </div>
           <div
             className={`mt-3 flex items-center gap-2 rounded-lg border px-2.5 py-2 ${
-              verifiedCount === 2
+              emailVerified
                 ? "border-[#cfe4da] bg-[#f1f8f4] text-[#2e6b4d]"
-                : verifiedCount === 1
-                  ? "border-[#d7e4f2] bg-[#f2f7fc] text-[#395c7d]"
-                  : "border-[#e6dfc8] bg-[#faf7ef] text-[#79633b]"
+                : "border-[#e6dfc8] bg-[#faf7ef] text-[#79633b]"
             }`}
             role="status"
           >
-            {verifiedCount > 0 ? (
+            {emailVerified ? (
               <ShieldCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
             ) : (
               <BadgeCheck className="h-4 w-4 shrink-0" aria-hidden="true" />
