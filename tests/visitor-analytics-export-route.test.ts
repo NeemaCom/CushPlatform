@@ -249,7 +249,7 @@ describe("visitor analytics export route", () => {
     const overviewResponse = createResponse();
     await overview.handlers.at(-1)!({ query: { startDate, endDate } } as any, overviewResponse);
     expect(overviewResponse.statusCode).toBe(200);
-    expect(poolQuery).toHaveBeenCalledTimes(4);
+    expect(poolQuery).toHaveBeenCalledTimes(5);
     for (const [, params] of poolQuery.mock.calls) {
       expect(params).toEqual(expectedWindow);
     }

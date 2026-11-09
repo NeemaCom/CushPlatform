@@ -14,6 +14,11 @@ import {
   VISITOR_EVENT_TYPES,
   VISITOR_ROUTE_ALLOWLIST,
 } from "@shared/visitor-analytics-policy";
+import {
+  getVisitorCountryDatabaseStatus,
+  lookupVisitorCountryCode,
+  prepareVisitorCountryLookup,
+} from "./visitor-country";
 
 const visitorIdSchema = z.string().uuid();
 const consentSchema = z.object({
@@ -82,6 +87,16 @@ function parseVisitorExportAuditResource(resourceId: string | null) {
 
 function isMissingTable(error: unknown) {
   return !!error && typeof error === "object" && "code" in error && error.code === "42P01";
+}
+
+function isMissingCountryColumn(error: unknown) {
+  return !!error
+    && typeof error === "object"
+    && "code" in error
+    && error.code === "42703"
+    && "message" in error
+    && typeof error.message === "string"
+    && error.message.includes("country_code");
 }
 
 function getRequestDevice(userAgent: string) {
@@ -312,6 +327,17 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
       const userId = await getVerifiedSessionUserId(req);
       const { deviceType, browser, operatingSystem } = getRequestDevice(req.get("user-agent") ?? "");
       const safeReferrerHost = normalizeReferrerHost(referrerHost);
+      const consentPreflight = await pgPool.query(
+        `SELECT 1 FROM public.cush_analytics_consents
+         WHERE visitor_id = $1::uuid
+           AND status = 'accepted'
+           AND policy_version = $2`,
+        [visitorId, VISITOR_ANALYTICS_POLICY_VERSION],
+      );
+      if (consentPreflight.rowCount !== 1) {
+        return res.status(403).json({ error: "Analytics consent is not active.", code: "CONSENT_REQUIRED" });
+      }
+      await prepareVisitorCountryLookup();
       const recorded = await inTransaction(async (client) => {
         const consent = await client.query(
           `SELECT 1 FROM public.cush_analytics_consents
@@ -322,11 +348,12 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
           [visitorId, VISITOR_ANALYTICS_POLICY_VERSION],
         );
         if (consent.rowCount !== 1) return false;
+        const countryCode = lookupVisitorCountryCode(req.ip);
         await client.query(
           `INSERT INTO public.cush_visitor_sessions
              (visitor_id, session_id, user_id, entry_route, current_route,
-              device_type, browser, operating_system, referrer_host, started_at, last_seen_at)
-           VALUES ($1::uuid, $2::uuid, $3::int, $4, $4, $5, $6, $7, $8, now(), now())
+              device_type, browser, operating_system, referrer_host, country_code, started_at, last_seen_at)
+           VALUES ($1::uuid, $2::uuid, $3::int, $4, $4, $5, $6, $7, $8, $9, now(), now())
            ON CONFLICT (visitor_id, session_id) DO UPDATE SET
              user_id = COALESCE(EXCLUDED.user_id, public.cush_visitor_sessions.user_id),
              current_route = EXCLUDED.current_route,
@@ -334,8 +361,9 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
              device_type = EXCLUDED.device_type,
              browser = EXCLUDED.browser,
              operating_system = EXCLUDED.operating_system,
+             country_code = COALESCE(public.cush_visitor_sessions.country_code, EXCLUDED.country_code),
              referrer_host = COALESCE(EXCLUDED.referrer_host, public.cush_visitor_sessions.referrer_host)`,
-          [visitorId, sessionId, userId, route, deviceType, browser, operatingSystem, safeReferrerHost],
+          [visitorId, sessionId, userId, route, deviceType, browser, operatingSystem, safeReferrerHost, countryCode],
         );
         if (eventType !== "session_ping") {
           await client.query(
@@ -359,6 +387,12 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
           code: "VISITOR_SCHEMA_MISSING",
         });
       }
+      if (isMissingCountryColumn(error)) {
+        return res.status(503).json({
+          error: "Visitor country storage is not ready. Apply migrations/manual/add-cush-visitor-country-mapping.sql first.",
+          code: "VISITOR_COUNTRY_SCHEMA_MISSING",
+        });
+      }
       return res.status(503).json({ error: "Could not record the analytics event." });
     }
   });
@@ -375,7 +409,7 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
         });
       }
       try {
-        const [metrics, topRoutes, recent] = await Promise.all([
+        const [metrics, topRoutes, recent, topCountries] = await Promise.all([
           pgPool.query(
             `SELECT
                COUNT(DISTINCT visitor_id)::int AS unique_visitors,
@@ -421,6 +455,18 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
              LIMIT 30`,
             [window.start.toISOString(), window.endExclusive.toISOString()],
           ),
+          pgPool.query(
+            `SELECT country_code, COUNT(*)::int AS sessions
+             FROM public.cush_visitor_sessions
+             WHERE country_code IS NOT NULL
+               AND last_seen_at >= $1::timestamptz
+               AND last_seen_at < $2::timestamptz
+             GROUP BY country_code
+             HAVING COUNT(*) >= 3
+             ORDER BY sessions DESC, country_code
+             LIMIT 8`,
+            [window.start.toISOString(), window.endExclusive.toISOString()],
+          ),
         ]);
         const events = await pgPool.query(
           `SELECT
@@ -432,6 +478,7 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
              AND occurred_at < $2::timestamptz`,
           [window.start.toISOString(), window.endExclusive.toISOString()],
         );
+        const countryStatus = getVisitorCountryDatabaseStatus();
         return res.json({
           rangeDays: window.rangeDays,
           startDate: window.startDate,
@@ -443,11 +490,15 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
             ...events.rows[0],
           },
           topRoutes: topRoutes.rows,
+          topCountries: topCountries.rows,
           recent: recent.rows,
           privacy: {
             consentRequired: true,
             rawIpStored: false,
             retentionDays: VISITOR_ANALYTICS_RETENTION_DAYS,
+            countryMappingReady: countryStatus.ready,
+            countryMappingUnavailable: countryStatus.unavailable,
+            countryDatabaseAsOf: countryStatus.dataAsOf,
           },
         });
       } catch (error) {
@@ -455,6 +506,12 @@ export function registerVisitorIntelligenceRoutes(app: Express) {
           return res.status(503).json({
             error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
             code: "VISITOR_SCHEMA_MISSING",
+          });
+        }
+        if (isMissingCountryColumn(error)) {
+          return res.status(503).json({
+            error: "Visitor country storage is not ready. Apply migrations/manual/add-cush-visitor-country-mapping.sql first.",
+            code: "VISITOR_COUNTRY_SCHEMA_MISSING",
           });
         }
         console.error("[visitor-intelligence] Overview failed:", error);

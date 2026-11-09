@@ -254,7 +254,7 @@ export default function VisitorAnalytics() {
             )}
           </div>
           <p className="mt-1 text-sm leading-5 text-slate-600">
-            Optional analytics record approved page views, sign-up/sign-in completions, active-session signals, and basic device categories after you agree. We do not store raw IP addresses or financial form contents in analytics. Events are removed after {VISITOR_ANALYTICS_RETENTION_DAYS} days.
+            After you opt in, analytics record approved activity and basic device categories. Cush briefly checks your IP locally to estimate your country and stores only that approximate country code. We do not store raw IPs or financial form contents; sessions and events are removed after {VISITOR_ANALYTICS_RETENTION_DAYS} days.
           </p>
           <Link href="/privacy-policy" className="mt-1 inline-flex text-xs font-semibold text-[#37338d] underline underline-offset-2">
             Read the Privacy Policy

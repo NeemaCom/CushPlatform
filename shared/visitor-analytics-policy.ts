@@ -1,4 +1,4 @@
-export const VISITOR_ANALYTICS_POLICY_VERSION = "visitor-analytics-v1";
+export const VISITOR_ANALYTICS_POLICY_VERSION = "visitor-analytics-v2";
 export const VISITOR_ANALYTICS_RETENTION_DAYS = 90;
 
 export const VISITOR_EVENT_TYPES = [

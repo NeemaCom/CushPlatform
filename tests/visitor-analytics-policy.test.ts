@@ -8,7 +8,7 @@ import {
 
 describe("visitor analytics privacy policy", () => {
   it("uses a versioned opt-in policy and bounded event retention", () => {
-    expect(VISITOR_ANALYTICS_POLICY_VERSION).toBe("visitor-analytics-v1");
+    expect(VISITOR_ANALYTICS_POLICY_VERSION).toBe("visitor-analytics-v2");
     expect(VISITOR_ANALYTICS_RETENTION_DAYS).toBe(90);
   });
 

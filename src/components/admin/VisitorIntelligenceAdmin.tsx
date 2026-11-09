@@ -21,8 +21,16 @@ type Overview = {
     logins: number;
   };
   topRoutes: { route: string; page_views: number }[];
+  topCountries: { country_code: string; sessions: number }[];
   recent: ActivityRow[];
-  privacy: { consentRequired: boolean; rawIpStored: boolean; retentionDays: number };
+  privacy: {
+    consentRequired: boolean;
+    rawIpStored: boolean;
+    retentionDays: number;
+    countryMappingReady: boolean;
+    countryMappingUnavailable: boolean;
+    countryDatabaseAsOf: string | null;
+  };
 };
 
 type VisitorRow = {
@@ -104,6 +112,14 @@ function formatTime(value: string) {
   return Number.isNaN(date.getTime())
     ? "—"
     : new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function formatCountryName(countryCode: string) {
+  try {
+    return new Intl.DisplayNames(["en"], { type: "region" }).of(countryCode) ?? countryCode;
+  } catch {
+    return countryCode;
+  }
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -282,7 +298,12 @@ export default function VisitorIntelligenceAdmin() {
 
   const overviewError = overviewQuery.error;
   const schemaMissing = apiError(overviewError).includes("migration");
+  const missingCountryMigration = apiError(overviewError).includes("add-cush-visitor-country-mapping.sql");
   const metrics = overviewQuery.data?.metrics;
+  const topCountrySessions = Math.max(
+    1,
+    ...(overviewQuery.data?.topCountries.map((country) => Number(country.sessions)) ?? []),
+  );
 
   return (
     <section aria-labelledby="visitor-intelligence-heading" className="space-y-6">
@@ -291,7 +312,7 @@ export default function VisitorIntelligenceAdmin() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#c7c5ee]">Operations · Consented analytics</p>
           <h1 id="visitor-intelligence-heading" className="mt-2 text-2xl font-semibold tracking-tight">Visitor intelligence</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d2d1eb]">
-            Live and recent activity from visitors who opted in. This view contains no raw IP addresses.
+            Live and recent activity from visitors who opted in. Country estimates are approximate; raw IP addresses are not stored in analytics.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
@@ -369,7 +390,7 @@ export default function VisitorIntelligenceAdmin() {
         <div className="flex items-start gap-2.5">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Only opted-in activity is shown. Analytics events are retained for up to 90 days; withdrawing consent removes the related visitor sessions and events. Country mapping is not active yet.
+            Only opted-in activity is shown. Analytics sessions and events are retained for up to 90 days; withdrawing consent removes the related data. Country is estimated locally from the request IP, stored only as a country code, and never shown on individual visitor records.
           </p>
         </div>
       </div>
@@ -386,7 +407,7 @@ export default function VisitorIntelligenceAdmin() {
         <div className="rounded-xl border border-[#e5c9b9] bg-[#fbf2ec] p-5 text-sm leading-6 text-[#81412e]" role="alert">
           <p className="font-semibold">{schemaMissing ? "Visitor data storage is not connected yet" : "Visitor data could not be loaded"}</p>
           <p className="mt-1">{apiError(overviewError)}</p>
-          {schemaMissing && <p className="mt-2">Run `migrations/manual/create-cush-visitor-intelligence.sql` in the connected Supabase SQL editor, then refresh this view.</p>}
+          {schemaMissing && <p className="mt-2">Run `{missingCountryMigration ? "migrations/manual/add-cush-visitor-country-mapping.sql" : "migrations/manual/create-cush-visitor-intelligence.sql"}` in the connected Supabase SQL editor, then refresh this view.</p>}
         </div>
       ) : (
         <>
@@ -399,6 +420,61 @@ export default function VisitorIntelligenceAdmin() {
             <MetricCard label="Page views" value={Number(metrics?.page_views ?? 0)} detail="Approved routes only" icon={MonitorSmartphone} tone="bg-[#eeedff] text-[#37338d]" />
             <MetricCard label="Sign-ups" value={Number(metrics?.signups ?? 0)} detail="Only sign-ups completed after opt-in" icon={Clock3} tone="bg-[#e4f4f0] text-[#28685c]" />
           </div>
+
+          <section className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-4 sm:p-5" aria-labelledby="visitor-countries-heading">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Globe2 className="h-4 w-4 text-[#57539c]" />
+                  <h2 id="visitor-countries-heading" className="font-semibold text-[#24252a]">Visitor countries</h2>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[#777973]">
+                  Approximate session counts from the local country-only database. Countries with fewer than three sessions are hidden.
+                </p>
+              </div>
+              <span className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                overviewQuery.data?.privacy.countryMappingReady
+                  ? "bg-[#e4f4f0] text-[#28685c]"
+                  : "bg-[#fbf0dc] text-[#8b6324]"
+              }`}>
+                {overviewQuery.data?.privacy.countryMappingReady
+                  ? `Local lookup ready${overviewQuery.data.privacy.countryMappingUnavailable ? " · refresh delayed" : ""}${overviewQuery.data.privacy.countryDatabaseAsOf ? ` · data ${new Date(overviewQuery.data.privacy.countryDatabaseAsOf).toLocaleDateString("en-GB")}` : ""}`
+                  : overviewQuery.data?.privacy.countryMappingUnavailable
+                    ? "Local database unavailable"
+                    : "Waiting for first opted-in visit"}
+              </span>
+            </div>
+            {overviewQuery.data?.privacy.countryMappingReady && overviewQuery.data.topCountries.length > 0 ? (
+              <ul className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {overviewQuery.data.topCountries.map((country) => {
+                  const count = Number(country.sessions);
+                  const barWidth = `${Math.max(8, Math.round((count / topCountrySessions) * 100))}%`;
+                  return (
+                    <li key={country.country_code} className="rounded-lg border border-[#eeece5] bg-white px-3 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-xs font-semibold text-[#45464a]">
+                          {formatCountryName(country.country_code)}
+                        </span>
+                        <span className="shrink-0 text-[10px] font-medium text-[#777973]">{country.country_code}</span>
+                      </div>
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#eeedff]">
+                        <div className="h-full rounded-full bg-[#5148d8]" style={{ width: barWidth }} />
+                      </div>
+                      <p className="mt-1.5 text-[10px] text-[#777973]">{count.toLocaleString("en-GB")} sessions</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className="mt-4 rounded-lg bg-white px-3 py-3 text-xs text-[#777973]">
+                {overviewQuery.data?.privacy.countryMappingReady
+                  ? "No reportable country totals for this date range yet."
+                  : overviewQuery.data?.privacy.countryMappingUnavailable
+                    ? "Country estimates are being skipped while the local database is unavailable. Visitor analytics will continue without them."
+                    : "The local database will load when an opted-in visitor event is received."}
+              </p>
+            )}
+          </section>
 
           <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
             <section className="overflow-hidden rounded-xl border border-[#e4e1d8] bg-[#fbfaf6]">

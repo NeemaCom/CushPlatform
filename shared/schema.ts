@@ -124,6 +124,7 @@ export const cushVisitorSessions = pgTable("cush_visitor_sessions", {
   browser: text("browser").notNull(),
   operatingSystem: text("operating_system").notNull(),
   referrerHost: text("referrer_host"),
+  countryCode: text("country_code"),
 }, (table) => ({
   primaryKey: primaryKey({
     name: "cush_visitor_sessions_pkey",
@@ -133,10 +134,17 @@ export const cushVisitorSessions = pgTable("cush_visitor_sessions", {
     "cush_visitor_sessions_device_type_check",
     sql`${table.deviceType} in ('mobile', 'tablet', 'desktop', 'unknown')`,
   ),
+  countryCodeCheck: check(
+    "cush_visitor_sessions_country_code_check",
+    sql`${table.countryCode} is null or ${table.countryCode} ~ '^[A-Z]{2}$'`,
+  ),
   visitorLastSeenIndex: index("cush_visitor_sessions_visitor_last_seen_idx").on(table.visitorId, table.lastSeenAt),
   userLastSeenIndex: index("cush_visitor_sessions_user_last_seen_idx").on(table.userId, table.lastSeenAt),
   lastSeenIndex: index("cush_visitor_sessions_last_seen_idx").on(table.lastSeenAt),
   currentRouteIndex: index("cush_visitor_sessions_current_route_idx").on(table.currentRoute),
+  countryLastSeenIndex: index("cush_visitor_sessions_country_last_seen_idx")
+    .on(table.countryCode, table.lastSeenAt)
+    .where(sql`${table.countryCode} is not null`),
 })).enableRLS();
 
 export const cushVisitorEvents = pgTable("cush_visitor_events", {

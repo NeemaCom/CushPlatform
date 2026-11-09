@@ -22,14 +22,15 @@ export default function PrivacyPolicy() {
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
             Privacy Policy
           </h1>
-          <p className="mt-3 text-sm text-slate-500">Version 3 · Effective 9 November 2026</p>
+          <p className="mt-3 text-sm text-slate-500">Version 4 · Effective 9 November 2026</p>
         </div>
 
         <div className="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm leading-6 text-indigo-950">
           <p className="font-semibold">Optional analytics require your choice.</p>
           <p className="mt-1">
-            Cush records limited visitor events only after you opt in. You can decline or withdraw
-            that choice using the Privacy choices control; the core service continues to work.
+            After you opt in, Cush records limited visitor events and an approximate country code
+            derived locally from your request IP. Raw IP addresses are not stored in analytics. You
+            can decline or withdraw that choice; the core service continues to work.
           </p>
         </div>
 
@@ -69,11 +70,13 @@ export default function PrivacyPolicy() {
               connection identifiers, consent records, sign-in and lockout events, support or
               institution-interest submissions, and security audit information such as request IP
               addresses. If you opt in, analytics records a pseudonymous visitor and browser-session
-              identifier, approved page routes, event and active-session times, broad device/browser categories, and
-              referrer hostname. On the same browser, the identifier may span anonymous and signed-in
-              use; activity can be associated with your Cush account when you sign in. It does not
-              create a cross-device identity. Cush Verify submissions may include an institution,
-              contact person, work email, role, and message.
+               identifier, approved page routes, event and active-session times, broad device/browser
+               categories, referrer hostname, and an approximate country code. The server briefly
+               checks the request IP against a local country-only database and does not retain that
+               raw IP in analytics. On the same browser, the identifier may span anonymous and
+               signed-in use; activity can be associated with your Cush account when you sign in. It
+               does not create a cross-device identity. Cush Verify submissions may include an
+               institution, contact person, work email, role, and message.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               <strong>Uploaded evidence:</strong> some evidence-upload flows currently hold files in
@@ -165,9 +168,12 @@ export default function PrivacyPolicy() {
               Optional analytics sessions and events are retained for up to 90 days. Withdrawing
               analytics consent deletes the visitor’s stored sessions and events. The record of an
               accepted or withdrawn analytics choice may be retained for up to one year after
-              withdrawal or account closure to document that choice. Cush does not store raw IP
-              addresses in visitor analytics; security and admin-audit IP records follow the
-              separate rules below.
+              withdrawal or account closure to document that choice. After you opt in, Cush briefly
+              processes your IP address on its own server against a local, country-only database and
+              stores only the approximate two-letter country code with that analytics session. Cush
+              does not store raw IP addresses in visitor analytics. Country estimates may be wrong,
+              are not used to identify a person or household, and do not affect financial decisions.
+              Security and admin-audit IP records follow the separate rules below.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               For admin audit records created after this policy takes effect on 9 November 2026, raw
@@ -207,8 +213,10 @@ export default function PrivacyPolicy() {
               actively opt in. It records page views, limited sign-up/sign-in completion events, and
               periodic active-session signals against approved routes; active status reflects
               activity within the last five minutes. It does not collect passwords, financial amounts,
-              uploaded documents, or form contents. We do not store raw IP addresses in analytics and
-              do not use advertising trackers. You can change this choice at any time.
+              uploaded documents, or form contents. After you opt in, the server uses the request IP
+              briefly for a local, approximate country lookup, saves only the country code with the
+              session, and does not retain the raw IP in analytics. We do not use advertising
+              trackers. You can change this choice at any time.
             </p>
           </section>
 
