@@ -9,3 +9,4 @@
 - [Post-Arrival data policy](post-arrival-data-policy.md) — arrival confirmation activates optional UK financial records; user-entered information is not verification and does not itself change scores.
 - [Shared IP rate limits](shared-ip-rate-limits.md) — authentication limits must use shared, keyed storage so restarts or extra Render instances do not reset counters.
 - [Render provider credentials](render-provider-credentials.md) — Render-hosted services need their own provider secrets; Replit-connected integrations are not production runtime credentials.
+- [Visitor analytics privacy](visitor-analytics-privacy.md) — optional visitor analytics requires explicit opt-in; do not reuse or persist raw IP for behavioral analytics.

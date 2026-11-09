@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { useToast } from '@/hooks/use-toast'
+import { trackVisitorEvent } from '@/components/visitor-intelligence/VisitorAnalytics'
 import { useQueryClient } from '@tanstack/react-query'
 import { API_BASE_URL } from '@/lib/api-base'
 import { getFirebaseEmailActionSettings } from '@/lib/firebase-email-action-settings'
@@ -221,6 +222,7 @@ export default function Login() {
                 acceptPrivacy: true,
                 marketingConsent: redirectIntent.marketingConsent,
               })
+              if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
               showWelcome(syncResult, 'verification', fbUser.email || '')
               if (!syncResult.requiresEmailVerification) {
                 throw new Error('Email verification is required before signing in.')
@@ -257,6 +259,8 @@ export default function Login() {
               marketingConsent: redirectIntent.marketingConsent,
             }
           : undefined)
+        if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
+        else void trackVisitorEvent("login_completed", "/login")
         stage = 'Finishing sign-in'
         if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
         await afterLogin()
@@ -312,6 +316,7 @@ export default function Login() {
 
   async function handleGoogle() {
     if (mode === 'signup' && !hasRequiredConsent()) return
+    if (mode === 'signup') void trackVisitorEvent("signup_started", "/login")
 
     let stage = isMobileAuthBrowser() ? 'Starting mobile Google redirect' : 'Opening Google sign-in'
     setGoogleSignInDiagnostic(null)
@@ -340,6 +345,7 @@ export default function Login() {
               acceptPrivacy: true,
               marketingConsent: consent.marketing,
             })
+            if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
             showWelcome(syncResult, 'verification', fbUser.email || '')
             if (!syncResult.requiresEmailVerification) {
               throw new Error('Email verification is required before signing in.')
@@ -374,6 +380,8 @@ export default function Login() {
             marketingConsent: consent.marketing,
           }
         : undefined)
+      if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
+      else void trackVisitorEvent("login_completed", "/login")
       stage = 'Finishing sign-in'
       if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
       await afterLogin()
@@ -428,6 +436,7 @@ export default function Login() {
 
     setSignInMessage(null)
     setPasswordLoginPending(false)
+    void trackVisitorEvent("login_completed", "/login")
     await afterLogin()
   }
 
@@ -451,6 +460,7 @@ export default function Login() {
   async function handleEmailSignUp(e: React.FormEvent) {
     e.preventDefault()
     if (!hasRequiredConsent()) return
+    void trackVisitorEvent("signup_started", "/login")
 
     setLoading(true)
     try {
@@ -462,6 +472,7 @@ export default function Login() {
         acceptPrivacy: true,
         marketingConsent: consent.marketing,
       })
+      if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
       if (!result.user.emailVerified || syncResult.requiresEmailVerification) {
         showVerificationPending(result.user)
         showWelcome(syncResult, 'verification', result.user.email || form.email)

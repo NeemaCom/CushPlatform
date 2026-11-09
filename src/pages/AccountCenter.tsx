@@ -674,6 +674,21 @@ function Preferences({ user }: { user: User }) {
         </label>
       </Surface>
       <Surface>
+        <SectionHeading title="Optional analytics" detail="This setting is separate from essential sign-in, security, and account messages." />
+        <div className="flex flex-col gap-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="max-w-xl text-sm leading-6 text-slate-600">
+            Review or withdraw your optional visitor analytics choice. Withdrawing also removes the related stored visitor events.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event("cush:open-privacy-choices"))}
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-[#29266f] px-4 py-2 text-sm font-semibold text-white hover:bg-[#37338d]"
+          >
+            Manage analytics choice
+          </button>
+        </div>
+      </Surface>
+      <Surface>
         <SectionHeading title="Notification channels" detail="Channel-by-channel notification settings are not configured in the current backend." />
         <div className="grid gap-3 sm:grid-cols-2">
           {["Email notifications", "SMS notifications", "WhatsApp notifications", "In-app notifications"].map((channel) => (

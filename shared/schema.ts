@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, date, check, index, primaryKey, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, decimal, timestamp, boolean, json, jsonb, bigint, date, check, index, primaryKey, unique, uniqueIndex, uuid, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -89,6 +89,79 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
   ),
   adminCreatedAtIndex: index("admin_audit_logs_admin_created_at_idx").on(table.adminUserId, table.createdAt),
   createdAtIndex: index("admin_audit_logs_created_at_idx").on(table.createdAt),
+})).enableRLS();
+
+export const cushAnalyticsConsents = pgTable("cush_analytics_consents", {
+  visitorId: uuid("visitor_id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  policyVersion: text("policy_version").notNull(),
+  status: text("status").$type<"accepted" | "withdrawn">().notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
+  withdrawnAt: timestamp("withdrawn_at", { withTimezone: true, mode: "date" }),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_analytics_consents_status_check",
+    sql`${table.status} in ('accepted', 'withdrawn')`,
+  ),
+  choiceTimestampsCheck: check(
+    "cush_analytics_consents_timestamps_check",
+    sql`(${table.status} = 'accepted' and ${table.acceptedAt} is not null and ${table.withdrawnAt} is null)
+      or (${table.status} = 'withdrawn' and ${table.withdrawnAt} is not null)`,
+  ),
+  consentUserUpdatedIndex: index("cush_analytics_consents_user_updated_idx").on(table.userId, table.updatedAt),
+})).enableRLS();
+
+export const cushVisitorSessions = pgTable("cush_visitor_sessions", {
+  visitorId: uuid("visitor_id").notNull(),
+  sessionId: uuid("session_id").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  entryRoute: text("entry_route").notNull(),
+  currentRoute: text("current_route").notNull(),
+  deviceType: text("device_type").notNull(),
+  browser: text("browser").notNull(),
+  operatingSystem: text("operating_system").notNull(),
+  referrerHost: text("referrer_host"),
+}, (table) => ({
+  primaryKey: primaryKey({
+    name: "cush_visitor_sessions_pkey",
+    columns: [table.visitorId, table.sessionId],
+  }),
+  deviceTypeCheck: check(
+    "cush_visitor_sessions_device_type_check",
+    sql`${table.deviceType} in ('mobile', 'tablet', 'desktop', 'unknown')`,
+  ),
+  visitorLastSeenIndex: index("cush_visitor_sessions_visitor_last_seen_idx").on(table.visitorId, table.lastSeenAt),
+  userLastSeenIndex: index("cush_visitor_sessions_user_last_seen_idx").on(table.userId, table.lastSeenAt),
+  lastSeenIndex: index("cush_visitor_sessions_last_seen_idx").on(table.lastSeenAt),
+  currentRouteIndex: index("cush_visitor_sessions_current_route_idx").on(table.currentRoute),
+})).enableRLS();
+
+export const cushVisitorEvents = pgTable("cush_visitor_events", {
+  id: serial("id").primaryKey(),
+  visitorId: uuid("visitor_id").notNull(),
+  sessionId: uuid("session_id").notNull(),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(),
+  route: text("route").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check(
+    "cush_visitor_events_type_check",
+    sql`${table.eventType} in ('page_view', 'signup_started', 'signup_completed', 'login_completed', 'session_ping')`,
+  ),
+  eventSessionForeignKey: foreignKey({
+    name: "cush_visitor_events_session_fk",
+    columns: [table.visitorId, table.sessionId],
+    foreignColumns: [cushVisitorSessions.visitorId, cushVisitorSessions.sessionId],
+  }).onDelete("cascade"),
+  visitorOccurredIndex: index("cush_visitor_events_visitor_occurred_idx").on(table.visitorId, table.occurredAt),
+  userOccurredIndex: index("cush_visitor_events_user_occurred_idx").on(table.userId, table.occurredAt),
+  sessionOccurredIndex: index("cush_visitor_events_session_occurred_idx").on(table.sessionId, table.occurredAt),
+  routeOccurredIndex: index("cush_visitor_events_route_occurred_idx").on(table.route, table.occurredAt),
+  occurredIndex: index("cush_visitor_events_occurred_idx").on(table.occurredAt),
 })).enableRLS();
 
 export type ConsentPolicyType = "terms" | "privacy";

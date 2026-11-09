@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { createApiOriginGuard, createSecurityHeaders } from "./http-security";
 import { clearExpiredAdminAuditIps, isAdminAuditTableMissing } from "./admin-audit";
 import { getAllowedFrontendOrigins } from "./origin-policy";
+import { purgeExpiredVisitorAnalytics } from "./visitor-intelligence-routes";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -33,9 +34,19 @@ function startAuditIpRetentionCleanup() {
     } catch (error) {
       if (isAdminAuditTableMissing(error)) {
         log("Admin audit table is unavailable; IP cleanup will retry later", "retention");
-        return;
+      } else {
+        console.error("[retention] Admin audit IP cleanup failed", error);
       }
-      console.error("[retention] Admin audit IP cleanup failed", error);
+    }
+
+    try {
+      await purgeExpiredVisitorAnalytics();
+    } catch (error) {
+      if (error && typeof error === "object" && "code" in error && error.code === "42P01") {
+        log("Visitor analytics tables are unavailable; event cleanup will retry later", "retention");
+      } else {
+        console.error("[retention] Visitor analytics cleanup failed", error);
+      }
     }
   };
 

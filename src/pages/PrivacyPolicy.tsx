@@ -22,15 +22,14 @@ export default function PrivacyPolicy() {
           <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">
             Privacy Policy
           </h1>
-          <p className="mt-3 text-sm text-slate-500">Version 2 · Effective 7 November 2026</p>
+          <p className="mt-3 text-sm text-slate-500">Version 3 · Effective 9 November 2026</p>
         </div>
 
         <div className="mb-5 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 text-sm leading-6 text-indigo-950">
-          <p className="font-semibold">Analytics are not enabled.</p>
+          <p className="font-semibold">Optional analytics require your choice.</p>
           <p className="mt-1">
-            Cush currently has no in-app analytics event collector, behavioral tracking service, or
-            advertising tracker. Hosting and security providers may create operational logs under
-            their own settings.
+            Cush records limited visitor events only after you opt in. You can decline or withdraw
+            that choice using the Privacy choices control; the core service continues to work.
           </p>
         </div>
 
@@ -66,10 +65,15 @@ export default function PrivacyPolicy() {
               you enter or import into Post-Arrival records.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              <strong>Provider and security information:</strong> provider connection identifiers,
-              consent records, sign-in and lockout events, support or institution-interest
-              submissions, and security audit information such as request IP addresses. Cush Verify
-              submissions may include an institution, contact person, work email, role, and message.
+              <strong>Provider, security, and optional analytics information:</strong> provider
+              connection identifiers, consent records, sign-in and lockout events, support or
+              institution-interest submissions, and security audit information such as request IP
+              addresses. If you opt in, analytics records a pseudonymous visitor and browser-session
+              identifier, approved page routes, event and active-session times, broad device/browser categories, and
+              referrer hostname. On the same browser, the identifier may span anonymous and signed-in
+              use; activity can be associated with your Cush account when you sign in. It does not
+              create a cross-device identity. Cush Verify submissions may include an institution,
+              contact person, work email, role, and message.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               <strong>Uploaded evidence:</strong> some evidence-upload flows currently hold files in
@@ -108,6 +112,7 @@ export default function PrivacyPolicy() {
               <li>To retrieve authorized financial or credit-history information and calculate assessments.</li>
               <li>To record required consent, support requests, institution enquiries, and administrative actions.</li>
               <li>To detect abuse, protect the service, troubleshoot failures, and meet legal obligations.</li>
+              <li>To understand high-level product use, only if you opt in to optional analytics.</li>
               <li>To send marketing only where you separately opt in; marketing consent is optional.</li>
             </ul>
           </section>
@@ -118,9 +123,10 @@ export default function PrivacyPolicy() {
               We use information when needed to provide features you request, to perform our
               agreement with you, or to take steps you request before using Cush. We rely on your
               consent for financial-provider connections and credit-history checks, and for
-              optional marketing. We may also use limited information for legitimate interests such
-              as account security, abuse prevention, service reliability, and administration, while
-              respecting your rights. We use or disclose information when required by law.
+              optional marketing and optional analytics. We may also use limited information for
+              legitimate interests such as account security, abuse prevention, service reliability,
+              and administration, while respecting your rights. We use or disclose information when
+              required by law.
             </p>
           </section>
 
@@ -156,7 +162,15 @@ export default function PrivacyPolicy() {
               retention rules.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-700">
-              For admin audit records created after this policy takes effect on 7 November 2026, raw
+              Optional analytics sessions and events are retained for up to 90 days. Withdrawing
+              analytics consent deletes the visitor’s stored sessions and events. The record of an
+              accepted or withdrawn analytics choice may be retained for up to one year after
+              withdrawal or account closure to document that choice. Cush does not store raw IP
+              addresses in visitor analytics; security and admin-audit IP records follow the
+              separate rules below.
+            </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              For admin audit records created after this policy takes effect on 9 November 2026, raw
               IP addresses are kept for up to one year from the audit event and then removed while
               the admin action record remains. Existing audit rows are not changed by this update;
               older raw IP addresses may remain longer. HMAC-based rate-limit identifiers are
@@ -177,15 +191,24 @@ export default function PrivacyPolicy() {
               . We may ask you to verify your identity before acting. You can delete some saved
               records or disconnect supported providers using the available account controls.
             </p>
+            <p className="mt-3 text-sm leading-6 text-slate-700">
+              You can decline optional analytics or withdraw at any time using the Privacy choices
+              control. Withdrawal stops future collection and deletes stored visitor sessions and
+              events associated with your visitor identifier; if you are signed in, it also removes
+              analytics sessions and events associated with your account.
+            </p>
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
             <h2 className="text-lg font-bold text-slate-950">9. Cookies and analytics</h2>
             <p className="mt-3 text-sm leading-6 text-slate-700">
               Cush uses necessary browser storage and session cookies for sign-in, security, and
-              core service functions. Cush does not currently use an in-app analytics SDK, behavioral
-              event collection, or advertising trackers. We will update this policy and provide
-              appropriate choices before introducing optional analytics.
+              core service functions. Optional first-party analytics storage is used only after you
+              actively opt in. It records page views, limited sign-up/sign-in completion events, and
+              periodic active-session signals against approved routes; active status reflects
+              activity within the last five minutes. It does not collect passwords, financial amounts,
+              uploaded documents, or form contents. We do not store raw IP addresses in analytics and
+              do not use advertising trackers. You can change this choice at any time.
             </p>
           </section>
 

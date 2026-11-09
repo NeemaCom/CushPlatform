@@ -15,6 +15,7 @@ export const ADMIN_PERMISSION = {
   integrationsRead: "admin.integrations.read",
   integrationsManage: "admin.integrations.manage",
   activityRead: "admin.activity.read",
+  visitorAnalyticsRead: "admin.visitor_analytics.read",
   reportsRead: "admin.reports.read",
   settingsRead: "admin.settings.read",
   settingsManage: "admin.settings.manage",
@@ -49,6 +50,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[
     ADMIN_PERMISSION.verificationsRead,
     ADMIN_PERMISSION.verificationsManage,
     ADMIN_PERMISSION.activityRead,
+    ADMIN_PERMISSION.visitorAnalyticsRead,
   ],
   financial_identity_admin: [
     ADMIN_PERMISSION.dashboardRead,
@@ -79,6 +81,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[
     ADMIN_PERMISSION.verificationsRead,
     ADMIN_PERMISSION.integrationsRead,
     ADMIN_PERMISSION.activityRead,
+    ADMIN_PERMISSION.visitorAnalyticsRead,
     ADMIN_PERMISSION.reportsRead,
     ADMIN_PERMISSION.settingsRead,
   ],

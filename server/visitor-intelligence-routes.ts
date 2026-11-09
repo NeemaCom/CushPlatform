@@ -1,0 +1,460 @@
+import type { Express, Request } from "express";
+import type { PoolClient } from "pg";
+import { z } from "zod";
+import { ADMIN_PERMISSION } from "@shared/admin-permissions";
+import { isAuthenticated, requireAdminPermission, requireTrustedAdminOrigin } from "./auth";
+import { pgPool } from "./db";
+import { storage } from "./storage";
+import {
+  VISITOR_ANALYTICS_POLICY_VERSION,
+  VISITOR_ANALYTICS_RETENTION_DAYS,
+  VISITOR_EVENT_TYPES,
+  VISITOR_ROUTE_ALLOWLIST,
+} from "@shared/visitor-analytics-policy";
+
+const visitorIdSchema = z.string().uuid();
+const consentSchema = z.object({
+  visitorId: visitorIdSchema.optional(),
+  accepted: z.boolean(),
+  policyVersion: z.literal(VISITOR_ANALYTICS_POLICY_VERSION),
+}).refine((value) => !value.accepted || Boolean(value.visitorId), {
+  message: "A visitor identifier is required to opt in.",
+});
+const eventSchema = z.object({
+  visitorId: visitorIdSchema,
+  sessionId: z.string().uuid(),
+  eventType: z.enum(VISITOR_EVENT_TYPES),
+  route: z.string().max(80),
+  referrerHost: z.string().max(253).optional().nullable(),
+});
+const SAFE_ROUTES = new Set<string>(VISITOR_ROUTE_ALLOWLIST);
+
+const analyticsRangeSchema = z.coerce.number().int().refine((value) => [7, 30, 90].includes(value));
+
+function isMissingTable(error: unknown) {
+  return !!error && typeof error === "object" && "code" in error && error.code === "42P01";
+}
+
+function getRequestDevice(userAgent: string) {
+  const ua = userAgent.toLowerCase();
+  const deviceType = /ipad|tablet|playbook|silk/.test(ua)
+    ? "tablet"
+    : /mobile|iphone|ipod|android/.test(ua)
+      ? "mobile"
+      : userAgent
+        ? "desktop"
+        : "unknown";
+  const browser = /edg\//.test(ua)
+    ? "Edge"
+    : /opr\//.test(ua)
+      ? "Opera"
+      : /firefox\//.test(ua)
+        ? "Firefox"
+        : /chrome\//.test(ua) && !/edg\//.test(ua)
+          ? "Chrome"
+          : /safari\//.test(ua) && !/chrome\//.test(ua)
+            ? "Safari"
+            : "Other";
+  const operatingSystem = /windows/.test(ua)
+    ? "Windows"
+    : /android/.test(ua)
+      ? "Android"
+      : /iphone|ipad|ipod/.test(ua)
+        ? "iOS"
+        : /mac os|macintosh/.test(ua)
+          ? "macOS"
+          : /linux/.test(ua)
+            ? "Linux"
+            : "Other";
+  return { deviceType, browser, operatingSystem };
+}
+
+function normalizeReferrerHost(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.hostname.toLowerCase().slice(0, 253);
+  } catch {
+    return null;
+  }
+}
+
+async function getVerifiedSessionUserId(req: Request): Promise<number | null> {
+  const userId = req.session?.userId;
+  if (!Number.isSafeInteger(userId) || !userId) return null;
+  const user = await storage.getUser(userId);
+  if (!user?.isActive || !user.isEmailVerified) return null;
+  return user.id;
+}
+
+async function inTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pgPool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await work(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function purgeExpiredVisitorAnalytics(now = new Date()) {
+  await pgPool.query(
+    `DELETE FROM public.cush_visitor_events
+     WHERE occurred_at < $1::timestamptz - ($2::int * interval '1 day')`,
+    [now.toISOString(), VISITOR_ANALYTICS_RETENTION_DAYS],
+  );
+  await pgPool.query(
+    `DELETE FROM public.cush_visitor_sessions
+     WHERE last_seen_at < $1::timestamptz - ($2::int * interval '1 day')`,
+    [now.toISOString(), VISITOR_ANALYTICS_RETENTION_DAYS],
+  );
+  await pgPool.query(
+    `DELETE FROM public.cush_analytics_consents
+     WHERE status = 'withdrawn'
+       AND updated_at < $1::timestamptz - interval '1 year'`,
+    [now.toISOString()],
+  );
+}
+
+function validateRange(value: unknown) {
+  const parsed = analyticsRangeSchema.safeParse(value ?? "7");
+  return parsed.success ? parsed.data : null;
+}
+
+export function registerVisitorIntelligenceRoutes(app: Express) {
+  app.post("/api/visitor-intelligence/consent", requireTrustedAdminOrigin, async (req, res) => {
+    const parsed = consentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid analytics choice." });
+    }
+
+    try {
+      const { visitorId, accepted, policyVersion } = parsed.data;
+      const userId = await getVerifiedSessionUserId(req);
+      if (accepted) {
+        await pgPool.query(
+          `INSERT INTO public.cush_analytics_consents
+             (visitor_id, user_id, policy_version, status, accepted_at, withdrawn_at, updated_at)
+           VALUES ($1::uuid, $2::int, $3, 'accepted', now(), NULL, now())
+           ON CONFLICT (visitor_id) DO UPDATE SET
+             user_id = COALESCE(EXCLUDED.user_id, public.cush_analytics_consents.user_id),
+             policy_version = EXCLUDED.policy_version,
+             status = 'accepted',
+             accepted_at = CASE
+               WHEN public.cush_analytics_consents.status = 'accepted'
+                 THEN public.cush_analytics_consents.accepted_at
+               ELSE now()
+             END,
+             withdrawn_at = NULL,
+             updated_at = now()`,
+          [visitorId!, userId, policyVersion],
+        );
+        return res.json({ success: true, status: "accepted", policyVersion });
+      }
+
+      if (!visitorId && !userId) {
+        return res.json({ success: true, status: "withdrawn", deletedVisitorData: false });
+      }
+      await inTransaction(async (client) => {
+        if (visitorId) {
+          await client.query(
+            `UPDATE public.cush_analytics_consents
+             SET status = 'withdrawn', withdrawn_at = now(), updated_at = now(),
+                 user_id = COALESCE($2::int, user_id)
+             WHERE visitor_id = $1::uuid`,
+            [visitorId, userId],
+          );
+          await client.query(
+            `DELETE FROM public.cush_visitor_sessions
+             WHERE visitor_id = $1::uuid OR ($2::int IS NOT NULL AND user_id = $2::int)`,
+            [visitorId, userId],
+          );
+        }
+        if (userId) {
+          await client.query(
+            `UPDATE public.cush_analytics_consents
+             SET status = 'withdrawn', withdrawn_at = now(), updated_at = now()
+             WHERE user_id = $1::int`,
+            [userId],
+          );
+          await client.query(
+            `DELETE FROM public.cush_visitor_sessions WHERE user_id = $1::int`,
+            [userId],
+          );
+        }
+      });
+      return res.json({ success: true, status: "withdrawn", deletedVisitorData: true });
+    } catch (error) {
+      console.error("[visitor-intelligence] Could not save consent:", error);
+      if (isMissingTable(error)) {
+        return res.status(503).json({
+          error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+          code: "VISITOR_SCHEMA_MISSING",
+        });
+      }
+      return res.status(503).json({ error: "Could not save the analytics choice." });
+    }
+  });
+
+  app.post("/api/visitor-intelligence/events", requireTrustedAdminOrigin, async (req, res) => {
+    const parsed = eventSchema.safeParse(req.body);
+    if (!parsed.success || !SAFE_ROUTES.has(parsed.data.route)) {
+      return res.status(400).json({ error: "Invalid analytics event." });
+    }
+
+    try {
+      const { visitorId, sessionId, eventType, route, referrerHost } = parsed.data;
+      const userId = await getVerifiedSessionUserId(req);
+      const { deviceType, browser, operatingSystem } = getRequestDevice(req.get("user-agent") ?? "");
+      const safeReferrerHost = normalizeReferrerHost(referrerHost);
+      const recorded = await inTransaction(async (client) => {
+        const consent = await client.query(
+          `SELECT 1 FROM public.cush_analytics_consents
+           WHERE visitor_id = $1::uuid
+             AND status = 'accepted'
+             AND policy_version = $2
+           FOR SHARE`,
+          [visitorId, VISITOR_ANALYTICS_POLICY_VERSION],
+        );
+        if (consent.rowCount !== 1) return false;
+        await client.query(
+          `INSERT INTO public.cush_visitor_sessions
+             (visitor_id, session_id, user_id, entry_route, current_route,
+              device_type, browser, operating_system, referrer_host, started_at, last_seen_at)
+           VALUES ($1::uuid, $2::uuid, $3::int, $4, $4, $5, $6, $7, $8, now(), now())
+           ON CONFLICT (visitor_id, session_id) DO UPDATE SET
+             user_id = COALESCE(EXCLUDED.user_id, public.cush_visitor_sessions.user_id),
+             current_route = EXCLUDED.current_route,
+             last_seen_at = now(),
+             device_type = EXCLUDED.device_type,
+             browser = EXCLUDED.browser,
+             operating_system = EXCLUDED.operating_system,
+             referrer_host = COALESCE(EXCLUDED.referrer_host, public.cush_visitor_sessions.referrer_host)`,
+          [visitorId, sessionId, userId, route, deviceType, browser, operatingSystem, safeReferrerHost],
+        );
+        if (eventType !== "session_ping") {
+          await client.query(
+            `INSERT INTO public.cush_visitor_events
+               (visitor_id, session_id, user_id, event_type, route, occurred_at)
+             VALUES ($1::uuid, $2::uuid, $3::int, $4, $5, now())`,
+            [visitorId, sessionId, userId, eventType, route],
+          );
+        }
+        return true;
+      });
+      if (!recorded) {
+        return res.status(403).json({ error: "Analytics consent is not active.", code: "CONSENT_REQUIRED" });
+      }
+      return res.status(202).json({ accepted: true });
+    } catch (error) {
+      console.error("[visitor-intelligence] Event write failed:", error);
+      if (isMissingTable(error)) {
+        return res.status(503).json({
+          error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+          code: "VISITOR_SCHEMA_MISSING",
+        });
+      }
+      return res.status(503).json({ error: "Could not record the analytics event." });
+    }
+  });
+
+  app.get(
+    "/api/admin/visitor-intelligence/overview",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
+    async (req, res) => {
+      const rangeDays = validateRange(req.query.range);
+      if (!rangeDays) return res.status(400).json({ error: "Range must be 7, 30, or 90 days." });
+      try {
+        const [metrics, topRoutes, recent] = await Promise.all([
+          pgPool.query(
+            `SELECT
+               COUNT(DISTINCT visitor_id)::int AS unique_visitors,
+               COUNT(*)::int AS sessions,
+               COUNT(DISTINCT visitor_id) FILTER (WHERE last_seen_at >= now() - interval '5 minutes')::int AS active_visitors,
+               COUNT(DISTINCT user_id) FILTER (WHERE user_id IS NOT NULL)::int AS identified_users,
+               COUNT(DISTINCT s.visitor_id) FILTER (
+                 WHERE s.user_id IS NULL
+                   AND NOT EXISTS (
+                     SELECT 1 FROM public.cush_visitor_sessions identified
+                     WHERE identified.visitor_id = s.visitor_id
+                       AND identified.user_id IS NOT NULL
+                       AND identified.last_seen_at >= now() - ($1::int * interval '1 day')
+                   )
+               )::int AS anonymous_visitors
+             FROM public.cush_visitor_sessions s
+             WHERE s.last_seen_at >= now() - ($1::int * interval '1 day')`,
+            [rangeDays],
+          ),
+          pgPool.query(
+            `SELECT route, COUNT(*)::int AS page_views
+             FROM public.cush_visitor_events
+             WHERE event_type = 'page_view'
+               AND occurred_at >= now() - ($1::int * interval '1 day')
+             GROUP BY route
+             ORDER BY page_views DESC, route
+             LIMIT 8`,
+            [rangeDays],
+          ),
+          pgPool.query(
+            `SELECT e.id, e.event_type, e.route, e.occurred_at, e.visitor_id,
+                    e.user_id, u.first_name, u.last_name, u.email
+             FROM public.cush_visitor_events e
+             LEFT JOIN public.users u ON u.id = e.user_id
+             WHERE e.occurred_at >= now() - ($1::int * interval '1 day')
+             ORDER BY e.occurred_at DESC
+             LIMIT 30`,
+            [rangeDays],
+          ),
+        ]);
+        const events = await pgPool.query(
+          `SELECT
+             COUNT(*) FILTER (WHERE event_type = 'page_view')::int AS page_views,
+             COUNT(*) FILTER (WHERE event_type = 'signup_completed')::int AS signups,
+             COUNT(*) FILTER (WHERE event_type = 'login_completed')::int AS logins
+           FROM public.cush_visitor_events
+           WHERE occurred_at >= now() - ($1::int * interval '1 day')`,
+          [rangeDays],
+        );
+        return res.json({
+          rangeDays,
+          generatedAt: new Date().toISOString(),
+          metrics: {
+            ...metrics.rows[0],
+            ...events.rows[0],
+          },
+          topRoutes: topRoutes.rows,
+          recent: recent.rows,
+          privacy: {
+            consentRequired: true,
+            rawIpStored: false,
+            retentionDays: VISITOR_ANALYTICS_RETENTION_DAYS,
+          },
+        });
+      } catch (error) {
+        if (isMissingTable(error)) {
+          return res.status(503).json({
+            error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+            code: "VISITOR_SCHEMA_MISSING",
+          });
+        }
+        console.error("[visitor-intelligence] Overview failed:", error);
+        return res.status(500).json({ error: "Could not load visitor analytics." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/visitor-intelligence/visitors",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
+    async (req, res) => {
+      const rangeDays = validateRange(req.query.range);
+      const page = z.coerce.number().int().min(1).max(10_000).safeParse(req.query.page ?? "1");
+      const kind = z.enum(["all", "registered", "anonymous"]).safeParse(req.query.kind ?? "all");
+      const search = typeof req.query.search === "string" ? req.query.search.trim().slice(0, 100) : "";
+      if (!rangeDays || !page.success || !kind.success) {
+        return res.status(400).json({ error: "Invalid visitor filter." });
+      }
+      try {
+        const result = await pgPool.query(
+          `WITH summaries AS (
+             SELECT visitor_id,
+                    COUNT(*)::int AS session_count,
+                    MIN(started_at) AS first_seen,
+                    MAX(last_seen_at) AS last_seen,
+                    (ARRAY_AGG(current_route ORDER BY last_seen_at DESC))[1] AS current_route,
+                    (ARRAY_AGG(device_type ORDER BY last_seen_at DESC))[1] AS device_type,
+                    (ARRAY_AGG(browser ORDER BY last_seen_at DESC))[1] AS browser,
+                    (ARRAY_AGG(user_id ORDER BY last_seen_at DESC) FILTER (WHERE user_id IS NOT NULL))[1] AS user_id
+             FROM public.cush_visitor_sessions
+             WHERE last_seen_at >= now() - ($1::int * interval '1 day')
+             GROUP BY visitor_id
+           )
+           SELECT s.visitor_id, s.session_count, s.first_seen, s.last_seen,
+                  s.current_route, s.device_type, s.browser, s.user_id,
+                  u.first_name, u.last_name, u.email,
+                  COUNT(e.id)::int AS event_count
+           FROM summaries s
+           LEFT JOIN public.users u ON u.id = s.user_id
+           LEFT JOIN public.cush_visitor_events e ON e.visitor_id = s.visitor_id
+             AND e.occurred_at >= now() - ($1::int * interval '1 day')
+           WHERE ($2 = 'all'
+             OR ($2 = 'registered' AND s.user_id IS NOT NULL)
+             OR ($2 = 'anonymous' AND s.user_id IS NULL))
+             AND ($3 = '' OR s.visitor_id::text ILIKE '%' || $3 || '%'
+               OR COALESCE(u.email, '') ILIKE '%' || $3 || '%'
+               OR COALESCE(u.first_name, '') ILIKE '%' || $3 || '%'
+               OR COALESCE(u.last_name, '') ILIKE '%' || $3 || '%')
+           GROUP BY s.visitor_id, s.session_count, s.first_seen, s.last_seen,
+                    s.current_route, s.device_type, s.browser, s.user_id,
+                    u.first_name, u.last_name, u.email
+           ORDER BY s.last_seen DESC
+           LIMIT 50 OFFSET $4`,
+          [rangeDays, kind.data, search, (page.data - 1) * 50],
+        );
+        return res.json({ rangeDays, page: page.data, pageSize: 50, visitors: result.rows });
+      } catch (error) {
+        if (isMissingTable(error)) {
+          return res.status(503).json({
+            error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+            code: "VISITOR_SCHEMA_MISSING",
+          });
+        }
+        console.error("[visitor-intelligence] Visitor list failed:", error);
+        return res.status(500).json({ error: "Could not load the visitor list." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/visitor-intelligence/visitors/:visitorId",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.visitorAnalyticsRead),
+    async (req, res) => {
+      const visitorId = visitorIdSchema.safeParse(req.params.visitorId);
+      if (!visitorId.success) return res.status(400).json({ error: "Invalid visitor identifier." });
+      try {
+        const [sessions, events] = await Promise.all([
+          pgPool.query(
+            `SELECT s.session_id, s.started_at, s.last_seen_at, s.entry_route,
+                    s.current_route, s.device_type, s.browser, s.operating_system,
+                    s.referrer_host, u.first_name, u.last_name, u.email
+             FROM public.cush_visitor_sessions s
+             LEFT JOIN public.users u ON u.id = s.user_id
+             WHERE s.visitor_id = $1::uuid
+               AND s.last_seen_at >= now() - ($2::int * interval '1 day')
+             ORDER BY s.last_seen_at DESC`,
+            [visitorId.data, VISITOR_ANALYTICS_RETENTION_DAYS],
+          ),
+          pgPool.query(
+            `SELECT event_type, route, occurred_at, u.first_name, u.last_name, u.email
+             FROM public.cush_visitor_events e
+             LEFT JOIN public.users u ON u.id = e.user_id
+             WHERE visitor_id = $1::uuid
+               AND occurred_at >= now() - ($2::int * interval '1 day')
+             ORDER BY occurred_at DESC
+             LIMIT 200`,
+            [visitorId.data, VISITOR_ANALYTICS_RETENTION_DAYS],
+          ),
+        ]);
+        if (sessions.rowCount === 0) return res.status(404).json({ error: "Visitor not found." });
+        return res.json({ visitorId: visitorId.data, sessions: sessions.rows, events: events.rows });
+      } catch (error) {
+        if (isMissingTable(error)) {
+          return res.status(503).json({
+            error: "Visitor analytics storage is not ready. Apply the Cush visitor-intelligence migration first.",
+            code: "VISITOR_SCHEMA_MISSING",
+          });
+        }
+        console.error("[visitor-intelligence] Visitor detail failed:", error);
+        return res.status(500).json({ error: "Could not load visitor details." });
+      }
+    },
+  );
+}

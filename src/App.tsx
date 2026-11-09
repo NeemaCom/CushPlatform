@@ -14,6 +14,7 @@ import TermsOfService from '@/pages/TermsOfService'
 const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 const CushVerify = lazy(() => import('@/pages/CushVerify'))
 import { useAuth } from '@/hooks/useAuth'
+import VisitorAnalytics from '@/components/visitor-intelligence/VisitorAnalytics'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -60,6 +61,7 @@ function App() {
     <ThemeProvider defaultTheme="light" enableSystem={false}>
       <QueryProvider>
         <Router>
+          <VisitorAnalytics />
           <div className="min-h-screen bg-white">
             <Switch>
               {/* Public landing page — redirects authenticated users to /dashboard */}

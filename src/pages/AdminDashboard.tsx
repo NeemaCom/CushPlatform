@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Activity, ArrowUpRight, CalendarDays, CircleAlert, Clock3, Database, Loader2, MailCheck, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,8 @@ import { ADMIN_PERMISSION, canManageUserRoles, hasAdminPermission } from "@share
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
 import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
 import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
+
+const VisitorIntelligenceAdmin = lazy(() => import("@/components/admin/VisitorIntelligenceAdmin"));
 
 type OverviewMetrics = {
   totalUsers: number;
@@ -105,7 +107,7 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "visitor-intelligence">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
@@ -118,6 +120,7 @@ export default function AdminDashboard() {
   const hasEvidenceFreshnessManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessManage);
   const hasVerifyInterestRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsRead);
   const hasVerifyInterestManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsManage);
+  const hasVisitorAnalyticsRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.visitorAnalyticsRead);
   const overviewQuery = useQuery<AdminOverview>({
     queryKey: ["/api/admin/overview", range],
     queryFn: async () => {
@@ -261,6 +264,20 @@ export default function AdminDashboard() {
               Cush Verify interest
             </button>
           )}
+          {hasVisitorAnalyticsRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("visitor-intelligence")}
+              aria-current={activeSection === "visitor-intelligence" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "visitor-intelligence"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Visitor intelligence
+            </button>
+          )}
         </nav>
         {activeSection === "users" ? (
           <UserDirectoryAdmin
@@ -270,6 +287,10 @@ export default function AdminDashboard() {
           />
         ) : activeSection === "cush-verify" ? (
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
+        ) : activeSection === "visitor-intelligence" ? (
+          <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading visitor intelligence…</div>}>
+            <VisitorIntelligenceAdmin />
+          </Suspense>
         ) : activeSection === "scoring-policy" ? (
           <section aria-labelledby="scoring-policy-heading">
             <div className="mb-5">

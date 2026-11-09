@@ -54,6 +54,7 @@ import {
 } from "./login-attempts";
 import { LOGIN_SUPPORT_EMAIL } from "@shared/auth-constants";
 import { sendWelcomeEmail } from "./welcome-email";
+import { registerVisitorIntelligenceRoutes } from "./visitor-intelligence-routes";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -144,6 +145,7 @@ export async function registerRoutes(
 
   // ── Passport V1 routes ────────────────────────────────────────────────────
   registerAdminRoutes(app);
+  registerVisitorIntelligenceRoutes(app);
   registerPassportRoutes(app);
   registerPostArrivalRoutes(app);
   registerPlaidRoutes(app);
