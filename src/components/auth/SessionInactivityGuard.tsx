@@ -10,9 +10,10 @@ import { broadcastAuthLogout, logoutFromCush } from "@/lib/logout";
 const SERVER_SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export default function SessionInactivityGuard() {
-  const { user, isLoading } = useAuth();
+  const [location, setLocation] = useLocation();
+  const isInstitutionalRoute = location === "/verify" || location.startsWith("/verify/");
+  const { user, isLoading } = useAuth({ enabled: !isInstitutionalRoute });
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const logoutStarted = useRef(false);
   const lastServerRefresh = useRef(Date.now());
@@ -36,7 +37,7 @@ export default function SessionInactivityGuard() {
   }, [queryClient, setLocation, toast]);
 
   const refreshServerSession = useCallback(() => {
-    if (isLoading || !user) return;
+    if (isInstitutionalRoute || isLoading || !user) return;
     const now = Date.now();
     if (now - lastServerRefresh.current < SERVER_SESSION_REFRESH_INTERVAL_MS) return;
     lastServerRefresh.current = now;
@@ -44,10 +45,10 @@ export default function SessionInactivityGuard() {
       queryKey: ["/api/auth/me"],
       type: "active",
     });
-  }, [isLoading, queryClient, user]);
+  }, [isInstitutionalRoute, isLoading, queryClient, user]);
 
   useSessionInactivity({
-    enabled: !isLoading && Boolean(user),
+    enabled: !isInstitutionalRoute && !isLoading && Boolean(user),
     sessionKey: user?.id,
     onTimeout: handleTimeout,
     onActivity: refreshServerSession,

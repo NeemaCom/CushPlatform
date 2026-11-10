@@ -116,7 +116,7 @@ async function saveChoice(visitorId: string | undefined, accepted: boolean) {
 
 export default function VisitorAnalytics() {
   const [location] = useLocation();
-  const { user } = useAuth();
+  const { user } = useAuth({ enabled: !location.startsWith("/verify") });
   const [choice, setChoice] = useState<ConsentChoice>("unset");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);

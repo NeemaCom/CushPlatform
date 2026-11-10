@@ -11,6 +11,7 @@ import { SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 declare module "express-session" {
   interface SessionData {
     userId?: number;
+    cushVerifyInstitutionalUserId?: number;
     role?: string;
     lastActivity?: number;
     plaidConsent?: {
@@ -49,7 +50,9 @@ export async function isAuthenticated(
     const userId = req.session.userId;
     
     if (!userId) {
-      clearAuthSessionCookie(req, res);
+      // A separate Cush Verify principal may share this browser's session cookie.
+      // A Passport identity check must not destroy that institutional session.
+      if (!req.session.cushVerifyInstitutionalUserId) clearAuthSessionCookie(req, res);
       SecurityLogger.logAuthEvent(
         'unauthorized_access_attempt',
         null,

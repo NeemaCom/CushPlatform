@@ -109,3 +109,67 @@ export async function verifyFirebaseIdentity(idToken: string) {
     photoURL: typeof claims.picture === "string" ? claims.picture : null,
   };
 }
+
+export interface CushVerifyFirebaseIdentity {
+  uid: string;
+  email: string;
+  emailVerified: boolean;
+  signInProvider: string;
+}
+
+function getCushVerifyFirebaseApp() {
+  const projectId = process.env.CUSH_VERIFY_FIREBASE_PROJECT_ID?.trim();
+  const clientEmail = process.env.CUSH_VERIFY_FIREBASE_CLIENT_EMAIL?.trim();
+  const privateKey = process.env.CUSH_VERIFY_FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+
+  if (!projectId || !clientEmail || !privateKey) {
+    throw new FirebaseAuthError(
+      "CUSH_VERIFY_AUTH_NOT_CONFIGURED",
+      "Cush Verify institutional authentication is not configured.",
+    );
+  }
+
+  const appName = "cush-verify-institutional-auth";
+  const existingApp = getApps().find((app) => app.name === appName);
+  if (existingApp) {
+    if (existingApp.options.projectId !== projectId) {
+      throw new FirebaseAuthError(
+        "CUSH_VERIFY_AUTH_CONFIGURATION_MISMATCH",
+        "Cush Verify institutional Firebase project configuration changed after startup.",
+      );
+    }
+    return existingApp;
+  }
+
+  return initializeApp({
+    projectId,
+    credential: cert({ projectId, clientEmail, privateKey }),
+  }, appName);
+}
+
+export async function verifyCushVerifyFirebaseIdentity(
+  idToken: string,
+): Promise<CushVerifyFirebaseIdentity> {
+  if (!idToken || idToken.length > 12_000) {
+    throw new FirebaseAuthError("INVALID_ID_TOKEN", "A valid institutional sign-in token is required.");
+  }
+  const decoded = await getAuth(getCushVerifyFirebaseApp()).verifyIdToken(idToken);
+  const firebaseClaims = decoded.firebase as { sign_in_provider?: unknown } | undefined;
+  if (
+    typeof decoded.uid !== "string" ||
+    typeof decoded.email !== "string" ||
+    firebaseClaims?.sign_in_provider !== "password"
+  ) {
+    throw new FirebaseAuthError(
+      "CUSH_VERIFY_EMAIL_SIGN_IN_ONLY",
+      "Cush Verify accepts institutional email and password sign-in only.",
+    );
+  }
+
+  return {
+    uid: decoded.uid,
+    email: decoded.email.toLowerCase(),
+    emailVerified: decoded.email_verified === true,
+    signInProvider: "password",
+  };
+}
