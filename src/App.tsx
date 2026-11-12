@@ -13,9 +13,15 @@ import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
 const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 const CushVerify = lazy(() => import('@/pages/CushVerify'))
+const CushVerifyApplication = lazy(() => import('@/pages/CushVerifyApplication'))
+const CushVerifyWorkspace = lazy(() => import('@/pages/CushVerifyWorkspace'))
+const CushVerifyLogin = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyLogin })))
+const CushVerifyInvitationRegistration = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyInvitationRegistration })))
+const CushVerifyCompleteRegistration = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyCompleteRegistration })))
 import { useAuth } from '@/hooks/useAuth'
 import VisitorAnalytics from '@/components/visitor-intelligence/VisitorAnalytics'
 import SessionInactivityGuard from '@/components/auth/SessionInactivityGuard'
+import CushVerifyInactivityGuard from '@/components/auth/CushVerifyInactivityGuard'
 import { auth, onAuthStateChanged, signOut } from '@/firebase'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
@@ -72,6 +78,7 @@ function App() {
       <QueryProvider>
         <Router>
           <SessionInactivityGuard />
+          <CushVerifyInactivityGuard />
           <VisitorAnalytics />
           <div className="min-h-screen bg-white">
             <Switch>
@@ -83,6 +90,31 @@ function App() {
               <Route path="/verify">
                 <Suspense fallback={<PageLoading />}>
                   <CushVerify />
+                </Suspense>
+              </Route>
+              <Route path="/verify/apply">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyApplication />
+                </Suspense>
+              </Route>
+              <Route path="/verify/login">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyLogin />
+                </Suspense>
+              </Route>
+              <Route path="/verify/register">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyInvitationRegistration />
+                </Suspense>
+              </Route>
+              <Route path="/verify/complete">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyCompleteRegistration />
+                </Suspense>
+              </Route>
+              <Route path="/verify/workspace">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyWorkspace />
                 </Suspense>
               </Route>
 

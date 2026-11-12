@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  cushVerifyApplicationSchema,
+  cushVerifyApplicantInstitutionTypes,
   cushVerifyInstitutionInterestSchema,
   cushVerifyReviewStatusSchema,
 } from "../shared/cush-verify";
@@ -76,6 +78,68 @@ describe("Cush Verify institution interest", () => {
     expect(cushVerifyInstitutionInterestSchema.safeParse({
       ...validInterest,
       verificationRequirements: "x".repeat(1201),
+    }).success).toBe(false);
+  });
+});
+
+describe("Cush Verify institutional applications", () => {
+  const validApplication = {
+    legalName: "Example Housing Group Ltd",
+    tradingName: "Example Homes",
+    institutionType: "housing_organisation",
+    countryOfRegistration: "United Kingdom",
+    website: "https://example.org",
+    businessEmail: " PARTNERSHIPS@EXAMPLE.ORG ",
+    contactFullName: "Jordan Example",
+    contactJobTitle: "Head of Partnerships",
+    businessTelephone: "+44 20 5555 0100",
+    intendedUse: "Discuss a consent-led verification pilot for new tenants.",
+    estimatedMonthlyVerifications: 150,
+    contactConsent: true,
+  };
+
+  it("normalizes business email and accepts optional volume", () => {
+    const result = cushVerifyApplicationSchema.parse(validApplication);
+    expect(result.businessEmail).toBe("partnerships@example.org");
+    expect(result.estimatedMonthlyVerifications).toBe(150);
+  });
+
+  it("allows only the institution types selected by Cush", () => {
+    expect(cushVerifyApplicantInstitutionTypes).toEqual([
+      "university",
+      "housing_organisation",
+      "bank",
+      "landlord",
+    ]);
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      institutionType: "employer",
+    }).success).toBe(false);
+  });
+
+  it("requires contact consent and a valid official website", () => {
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      contactConsent: false,
+    }).success).toBe(false);
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      website: "not a website",
+    }).success).toBe(false);
+  });
+
+  it("rejects an invalid telephone, huge volume, and unexpected access fields", () => {
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      businessTelephone: "1",
+    }).success).toBe(false);
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      estimatedMonthlyVerifications: 10_000_001,
+    }).success).toBe(false);
+    expect(cushVerifyApplicationSchema.safeParse({
+      ...validApplication,
+      accessGranted: true,
     }).success).toBe(false);
   });
 });

@@ -80,6 +80,18 @@ describe("server authentication middleware", () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it("does not clear a separate Cush Verify session during a Passport identity check", async () => {
+    const req = requestWithSession({ cushVerifyInstitutionalUserId: 42 });
+    const res = response();
+    const next = vi.fn();
+
+    await isAuthenticated(req, res as any, next);
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.clearCookie).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
   it("loads a valid session user and refreshes activity", async () => {
     const req = requestWithSession({
       userId: storedUser.id,

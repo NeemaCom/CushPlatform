@@ -55,6 +55,7 @@ import {
 import { LOGIN_SUPPORT_EMAIL, SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 import { sendWelcomeEmail } from "./welcome-email";
 import { registerVisitorIntelligenceRoutes } from "./visitor-intelligence-routes";
+import { registerCushVerifyInstitutionalRoutes } from "./cush-verify-institutional-routes";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -153,6 +154,7 @@ export async function registerRoutes(
   registerMonoRoutes(app);
   registerInterswitchCreditHistoryRoutes(app);
   registerCushVerifyRoutes(app);
+  registerCushVerifyInstitutionalRoutes(app);
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
   app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {
@@ -453,6 +455,9 @@ export async function registerRoutes(
   // ── Logout ────────────────────────────────────────────────────────────────
   app.post("/api/auth/logout", async (req: AuthenticatedRequest, res) => {
     const userId = req.session.userId;
+    if (!userId && req.session.cushVerifyInstitutionalUserId) {
+      return res.json({ message: "No Cush Passport session was active." });
+    }
     clearAuthSessionCookie(req, res);
     req.session.destroy((error) => {
       if (error) {

@@ -229,6 +229,165 @@ export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_i
   emailIndex: index("cush_verify_institution_interests_email_idx").on(table.email),
 })).enableRLS();
 
+// Institutional identities are deliberately separate from Cush Passport users.
+// Authentication is provided by a dedicated Firebase project; no password is
+// stored in this application database.
+export const cushVerifyApplications = pgTable("cush_verify_applications", {
+  id: serial("id").primaryKey(),
+  legalName: text("legal_name").notNull(),
+  tradingName: text("trading_name"),
+  institutionType: text("institution_type").notNull(),
+  countryOfRegistration: text("country_of_registration").notNull(),
+  website: text("website").notNull(),
+  businessEmail: text("business_email").notNull(),
+  normalizedBusinessEmail: text("normalized_business_email").notNull(),
+  duplicateKey: text("duplicate_key").notNull(),
+  contactFullName: text("contact_full_name").notNull(),
+  contactJobTitle: text("contact_job_title").notNull(),
+  businessTelephone: text("business_telephone").notNull(),
+  intendedUse: text("intended_use").notNull(),
+  estimatedMonthlyVerifications: integer("estimated_monthly_verifications"),
+  contactConsentAcceptedAt: timestamp("contact_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
+  status: text("status").notNull().default("submitted"),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  typeCheck: check(
+    "cush_verify_applications_type_check",
+    sql`${table.institutionType} in ('university', 'housing_organisation', 'bank', 'landlord')`,
+  ),
+  statusCheck: check(
+    "cush_verify_applications_status_check",
+    sql`${table.status} in ('submitted', 'under_review', 'additional_information_required', 'approved', 'rejected')`,
+  ),
+  monthlyVerificationsCheck: check(
+    "cush_verify_applications_monthly_verifications_check",
+    sql`${table.estimatedMonthlyVerifications} is null or ${table.estimatedMonthlyVerifications} between 0 and 10000000`,
+  ),
+  emailActiveUnique: uniqueIndex("cush_verify_applications_business_email_active_uq")
+    .on(table.normalizedBusinessEmail)
+    .where(sql`${table.status} <> 'rejected'`),
+  duplicateActiveUnique: uniqueIndex("cush_verify_applications_duplicate_active_uq")
+    .on(table.duplicateKey)
+    .where(sql`${table.status} <> 'rejected'`),
+  statusCreatedIndex: index("cush_verify_applications_status_created_idx").on(table.status, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyInstitutions = pgTable("cush_verify_institutions", {
+  id: serial("id").primaryKey(),
+  sourceApplicationId: integer("source_application_id").notNull()
+    .references(() => cushVerifyApplications.id, { onDelete: "restrict" }).unique(),
+  legalName: text("legal_name").notNull(),
+  tradingName: text("trading_name"),
+  institutionType: text("institution_type").notNull(),
+  countryOfRegistration: text("country_of_registration").notNull(),
+  website: text("website").notNull(),
+  businessEmail: text("business_email").notNull(),
+  normalizedBusinessEmail: text("normalized_business_email").notNull(),
+  duplicateKey: text("duplicate_key").notNull(),
+  status: text("status").notNull().default("pending_approval"),
+  approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_institutions_status_check",
+    sql`${table.status} in ('pending_approval', 'approved', 'rejected', 'suspended')`,
+  ),
+  typeCheck: check(
+    "cush_verify_institutions_type_check",
+    sql`${table.institutionType} in ('university', 'housing_organisation', 'bank', 'landlord')`,
+  ),
+  legalCountryUnique: uniqueIndex("cush_verify_institutions_legal_country_uq")
+    .on(table.duplicateKey)
+    .where(sql`${table.status} <> 'rejected'`),
+  businessEmailUnique: uniqueIndex("cush_verify_institutions_business_email_uq")
+    .on(table.normalizedBusinessEmail)
+    .where(sql`${table.status} <> 'rejected'`),
+})).enableRLS();
+
+export const cushVerifyInstitutionalUsers = pgTable("cush_verify_institutional_users", {
+  id: serial("id").primaryKey(),
+  firebaseUid: text("firebase_uid").notNull().unique(),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name").notNull(),
+  jobTitle: text("job_title").notNull(),
+  businessTelephone: text("business_telephone").notNull(),
+  isEmailVerified: boolean("is_email_verified").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}).enableRLS();
+
+export const cushVerifyInvitations = pgTable("cush_verify_invitations", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "cascade" }),
+  applicationId: integer("application_id").notNull()
+    .references(() => cushVerifyApplications.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  fullName: text("full_name").notNull(),
+  jobTitle: text("job_title").notNull(),
+  businessTelephone: text("business_telephone").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  createdBy: integer("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  institutionCreatedIndex: index("cush_verify_invitations_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+  inviteEmailIndex: index("cush_verify_invitations_email_idx").on(table.email),
+})).enableRLS();
+
+export const cushVerifyInstitutionalMemberships = pgTable("cush_verify_institutional_memberships", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "cascade" }),
+  institutionalUserId: integer("institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("organisation_admin"),
+  status: text("status").notNull().default("pending_approval"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  roleCheck: check(
+    "cush_verify_memberships_role_check",
+    sql`${table.role} in ('organisation_admin', 'analyst', 'viewer')`,
+  ),
+  statusCheck: check(
+    "cush_verify_memberships_status_check",
+    sql`${table.status} in ('pending_approval', 'active', 'suspended', 'revoked')`,
+  ),
+  institutionUserUnique: unique("cush_verify_memberships_institution_user_uq")
+    .on(table.institutionId, table.institutionalUserId),
+  userStatusIndex: index("cush_verify_memberships_user_status_idx")
+    .on(table.institutionalUserId, table.status),
+})).enableRLS();
+
+export const cushVerifyApplicationEvents = pgTable("cush_verify_application_events", {
+  id: serial("id").primaryKey(),
+  applicationId: integer("application_id").notNull()
+    .references(() => cushVerifyApplications.id, { onDelete: "cascade" }),
+  institutionId: integer("institution_id")
+    .references(() => cushVerifyInstitutions.id, { onDelete: "set null" }),
+  actorAdminId: integer("actor_admin_id").references(() => users.id, { onDelete: "set null" }),
+  eventType: text("event_type").notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check(
+    "cush_verify_application_events_type_check",
+    sql`${table.eventType} in ('submitted', 'status_changed', 'organisation_onboarded', 'invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_accepted', 'approved', 'rejected')`,
+  ),
+  applicationCreatedIndex: index("cush_verify_application_events_application_created_idx")
+    .on(table.applicationId, table.createdAt),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });

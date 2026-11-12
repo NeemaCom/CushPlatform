@@ -20,10 +20,11 @@ export interface User {
   mfaEnabled?: boolean;
 }
 
-export function useAuth() {
+export function useAuth({ enabled = true }: { enabled?: boolean } = {}) {
   const { data: user, isLoading } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
+    enabled,
     queryFn: async () => {
       const response = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: "include" });
       if (!response.ok) {

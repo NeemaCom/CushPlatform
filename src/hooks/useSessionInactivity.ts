@@ -10,22 +10,24 @@ export type SessionEndReason = "idle" | "remote-logout";
 interface UseSessionInactivityOptions {
   enabled: boolean;
   sessionKey?: string | number;
+  activityStorageKey?: string;
+  logoutStorageKey?: string;
   onTimeout: (reason: SessionEndReason) => void;
   onActivity?: () => void;
 }
 
-function readSharedActivity(): number {
+function readActivity(key: string): number {
   try {
-    const timestamp = Number(localStorage.getItem(AUTH_ACTIVITY_STORAGE_KEY));
+    const timestamp = Number(localStorage.getItem(key));
     return Number.isFinite(timestamp) && timestamp > 0 ? timestamp : 0;
   } catch {
     return 0;
   }
 }
 
-function writeSharedActivity(timestamp: number): void {
+function writeActivity(key: string, timestamp: number): void {
   try {
-    localStorage.setItem(AUTH_ACTIVITY_STORAGE_KEY, String(timestamp));
+    localStorage.setItem(key, String(timestamp));
   } catch {
     // Use the in-memory timer if browser storage is unavailable.
   }
@@ -34,6 +36,8 @@ function writeSharedActivity(timestamp: number): void {
 export function useSessionInactivity({
   enabled,
   sessionKey,
+  activityStorageKey = AUTH_ACTIVITY_STORAGE_KEY,
+  logoutStorageKey = AUTH_LOGOUT_STORAGE_KEY,
   onTimeout,
   onActivity,
 }: UseSessionInactivityOptions): void {
@@ -54,7 +58,7 @@ export function useSessionInactivity({
     let stopped = false;
     let lastPointerMoveAt = 0;
 
-    writeSharedActivity(lastActivityAt);
+    writeActivity(activityStorageKey, lastActivityAt);
 
     const stopTimer = () => {
       stopped = true;
@@ -68,7 +72,7 @@ export function useSessionInactivity({
       onTimeoutRef.current(reason);
     };
 
-    const latestActivity = () => Math.max(lastActivityAt, readSharedActivity());
+    const latestActivity = () => Math.max(lastActivityAt, readActivity(activityStorageKey));
 
     const checkIdle = () => {
       if (stopped) return;
@@ -92,7 +96,7 @@ export function useSessionInactivity({
 
       lastActivityAt = now;
       if (now - lastSharedWriteAt >= 1_000) {
-        writeSharedActivity(now);
+        writeActivity(activityStorageKey, now);
         lastSharedWriteAt = now;
       }
       onActivityRef.current?.();
@@ -107,12 +111,12 @@ export function useSessionInactivity({
     };
 
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === AUTH_LOGOUT_STORAGE_KEY && event.newValue) {
+      if (event.key === logoutStorageKey && event.newValue) {
         expire("remote-logout");
         return;
       }
 
-      if (event.key !== AUTH_ACTIVITY_STORAGE_KEY || !event.newValue) return;
+      if (event.key !== activityStorageKey || !event.newValue) return;
       const timestamp = Number(event.newValue);
       if (!Number.isFinite(timestamp) || timestamp <= lastActivityAt) return;
 
@@ -151,5 +155,5 @@ export function useSessionInactivity({
       window.removeEventListener("storage", handleStorage);
       document.removeEventListener("visibilitychange", handleWake);
     };
-  }, [enabled, sessionKey]);
+  }, [activityStorageKey, enabled, logoutStorageKey, sessionKey]);
 }

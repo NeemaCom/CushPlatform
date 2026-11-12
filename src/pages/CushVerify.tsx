@@ -164,7 +164,7 @@ export default function CushVerify() {
           </nav>
           <div className="flex items-center gap-3">
             <BetaBadge />
-            <Link href="/login" className="hidden rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-blue-50 transition hover:border-blue-200 hover:bg-white/5 sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">Sign in</Link>
+            <Link href="/verify/login" className="hidden rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-blue-50 transition hover:border-blue-200 hover:bg-white/5 sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">Institutional sign in</Link>
           </div>
         </div>
       </header>
@@ -190,9 +190,9 @@ export default function CushVerify() {
               A new way to think about financial identity: portable, permission-led, and shaped around the realities of life across countries.
             </p>
             <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-              <a href="#register" className="group inline-flex min-h-[54px] items-center justify-center gap-3 rounded-full bg-[#3475e7] px-6 text-sm font-semibold text-white shadow-[0_12px_35px_rgba(35,102,222,.28)] transition hover:-translate-y-0.5 hover:bg-[#4b89f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
+              <Link href="/verify/apply" className="group inline-flex min-h-[54px] items-center justify-center gap-3 rounded-full bg-[#3475e7] px-6 text-sm font-semibold text-white shadow-[0_12px_35px_rgba(35,102,222,.28)] transition hover:-translate-y-0.5 hover:bg-[#4b89f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
                 Register Your Institution <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
-              </a>
+              </Link>
               <a href="#approach" className="inline-flex min-h-[50px] items-center gap-2 px-4 text-sm font-semibold text-blue-100 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">
                 Explore Cush Verify <ArrowDown className="h-4 w-4" aria-hidden="true" />
               </a>
@@ -365,9 +365,10 @@ export default function CushVerify() {
       <section id="register" className="scroll-mt-4 bg-[#0c1830] px-4 py-14 text-[#f4f7ff] sm:px-8 sm:py-20 lg:px-12 lg:py-24">
         <div className="mx-auto grid max-w-[1320px] gap-10 lg:grid-cols-[.72fr_1.28fr] lg:gap-20">
           <div className="pt-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Institutional registration</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Institutional enquiry</p>
             <h2 className="mt-5 max-w-md font-serif text-4xl leading-[1.02] tracking-[-0.05em] sm:text-5xl">Let’s start with what matters to you.</h2>
-            <p className="mt-5 max-w-sm text-sm leading-6 text-blue-100/75">Share a little about your institution and the questions you’re exploring. The Cush team reviews institutional interest and will be in touch.</p>
+            <p className="mt-5 max-w-sm text-sm leading-6 text-blue-100/75">For a formal institutional application, use the registration flow. This enquiry form remains available for general partnership questions.</p>
+            <Link href="/verify/apply" className="mt-5 inline-flex min-h-11 items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#4b89f3]">Start an institutional application</Link>
             <div className="mt-9 flex max-w-sm gap-3 border-t border-white/15 pt-5 text-xs leading-5 text-blue-100/75">
               <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" aria-hidden="true" />
               <p>Please do not include customer records, account credentials, or sensitive personal or financial information in this form.</p>
