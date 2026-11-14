@@ -11,13 +11,12 @@ Updated November 14, 2026 after the Zod 4 migration.
 
 ## High findings
 
-- **Zod** — upgraded from `3.25.76` to `4.6.7`, resolving the oversized-array advisory reported by npm. Zod 4 removes `ZodError.errors`; server responses now use `ZodError.issues`. The full test suite and production build pass.
-- **Firebase client SDK** — `firebase@11.10.0` brings in Firestore and `@grpc/grpc-js@1.9.16`, which npm flags. Source imports use Firebase App and Auth; no Firestore imports were found. npm's suggested `firebase@9.14.0` is a major downgrade, so it is not a safe automatic fix.
-- **`zod-validation-error`** — removed because application source did not import it and its installed v3 release only peers with Zod 3.
+- **Zod** — upgraded from `3.25.76` to `4.6.7`, resolving the oversized-array advisory reported by npm. Zod 4 removes `ZodError.errors`; server responses now use `ZodError.issues`. The unused Zod 3-only `zod-validation-error` package was removed. The full test suite and production build pass.
+- **Firebase client SDK** — `firebase@11.10.0` installs `@firebase/firestore@4.8.0`, which pins vulnerable `@grpc/grpc-js@~1.9.0` (resolved as `1.9.16`). npm's suggested `firebase@9.14.0` is a major downgrade and is not a safe automatic fix.
 
 ## Moderate and low findings
 
-- **Firebase Admin** — `firebase-admin@13.10.0` and related Google Cloud packages are flagged; npm suggests `firebase-admin@14.5.1`, a major upgrade.
+- **Firebase Admin** — `firebase-admin@13.10.0` and related Google Cloud packages are flagged; npm recommends `firebase-admin@14.5.1`. The [v14 release notes](https://github.com/firebase/firebase-admin-node/releases/tag/v14.0.0) require Node.js 22 or newer and remove deprecated namespace APIs. The server currently imports only modular Admin App/Auth APIs, but the Render runtime still needs confirmation before upgrading.
 - **Tailwind Typography** — `@tailwindcss/typography@0.5.20` is flagged through `postcss-selector-parser`. npm suggests `0.5.4`, a downgrade that should not be applied blindly.
 - **Drizzle Kit / esbuild** — `drizzle-kit@0.31.11` pulls in the deprecated `@esbuild-kit` loader and vulnerable `esbuild@0.18.20`. npm suggests downgrading Drizzle Kit to `0.18.1`, which would break the current CLI interface. The app's schema scripts use Drizzle Kit, but the server bundle does not.
 - **fast-xml-parser** — one low-severity advisory has an available fix; no update was made.
@@ -25,9 +24,10 @@ Updated November 14, 2026 after the Zod 4 migration.
 ## Reachability and remediation notes
 
 - The Zod array schemas found in `server/` and `shared/` have explicit `.max()` limits. `server/index.ts` uses `express.json()` without a custom limit; Zod 4 now resolves the package advisory independently of those additional bounds.
-- Firebase Firestore appears in the installed dependency tree, but the application source does not import it. The npm result is based on installed packages, not proof that the flagged Firestore code is reachable in the built app.
+- Firebase Firestore appears in the installed dependency tree, but the application imports only `firebase/app` and `firebase/auth`. The built browser bundle contains Firebase package/version metadata but no gRPC implementation. The upstream report says web apps use WebChannel rather than Node gRPC for Firestore.
+- Current registry metadata for `firebase@13.3.0` still resolves to `@firebase/firestore@4.20.0`, which retains the `@grpc/grpc-js@~1.9.0` pin. The upstream [issue #10400](https://github.com/firebase/firebase-js-sdk/issues/10400) and [fix PR #10412](https://github.com/firebase/firebase-js-sdk/pull/10412) remain open. Upgrading the Firebase client SDK alone does not clear this finding. The official `@firebase/app` and `@firebase/auth` package READMEs say they are not intended for direct use, so replacing the supported `firebase` package with them is not recommended.
 - Moving Drizzle Kit out of production dependencies may reduce the production-only audit results, but the lockfile contains many related development/optional dependency classifications. Do not hand-edit that graph; regenerate it through the approved package workflow.
-- No forced downgrades or dependency overrides were used. The Zod major upgrade is complete; the remaining high npm findings come from the Firebase/Firestore/gRPC dependency chain and remain open for a separate compatibility review.
+- No forced downgrades or dependency overrides were used. The Zod major upgrade is complete. Keep the Firebase client finding open until the upstream Firestore dependency pin is fixed; consider the Firebase Admin upgrade separately after confirming the Render Node.js version is 22 or newer.
 
 ## Historical note
 
