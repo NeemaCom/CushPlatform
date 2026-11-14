@@ -388,6 +388,157 @@ export const cushVerifyApplicationEvents = pgTable("cush_verify_application_even
     .on(table.applicationId, table.createdAt),
 })).enableRLS();
 
+export type CushVerifyPricingFeatureFlags = {
+  fullPassportReports: boolean;
+  incomeEmploymentHistory: boolean;
+  rentHousingHistory: boolean;
+  savingsHistory: boolean;
+  financialCommitments: boolean;
+  cushScore: boolean;
+  confidenceInformation: boolean;
+  evidenceClassifications: boolean;
+  apiAccess: boolean;
+  webhooks: boolean;
+  usageAnalytics: boolean;
+  auditLogs: boolean;
+  teamAccounts: boolean;
+};
+
+export type CushVerifyPricingApiLimits = {
+  requestsPerMinute: number | null;
+  requestsPerHour: number | null;
+  maxConcurrentRequests: number | null;
+  monthlyReportLimit: number | null;
+};
+
+export const cushVerifyPricingVersions = pgTable("cush_verify_pricing_versions", {
+  id: serial("id").primaryKey(),
+  version: integer("version").notNull().unique(),
+  status: text("status").$type<"draft" | "published" | "superseded" | "abandoned">().notNull().default("draft"),
+  defaultCurrency: text("default_currency").notNull().default("USD"),
+  annualDiscountBps: integer("annual_discount_bps").notNull().default(1500),
+  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
+  publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_pricing_versions_status_check",
+    sql`${table.status} in ('draft', 'published', 'superseded', 'abandoned')`,
+  ),
+  versionCheck: check("cush_verify_pricing_versions_version_check", sql`${table.version} > 0`),
+  currencyCheck: check(
+    "cush_verify_pricing_versions_currency_check",
+    sql`${table.defaultCurrency} ~ '^[A-Z]{3}$'`,
+  ),
+  annualDiscountCheck: check(
+    "cush_verify_pricing_versions_annual_discount_check",
+    sql`${table.annualDiscountBps} between 0 and 9999`,
+  ),
+  publicationTimestampCheck: check(
+    "cush_verify_pricing_versions_publication_timestamp_check",
+    sql`(${table.status} in ('draft', 'abandoned') and ${table.publishedAt} is null)
+      or (${table.status} in ('published', 'superseded') and ${table.publishedAt} is not null)`,
+  ),
+  onePublishedVersion: uniqueIndex("cush_verify_pricing_versions_one_published_idx")
+    .on(table.status).where(sql`${table.status} = 'published'`),
+  oneDraftVersion: uniqueIndex("cush_verify_pricing_versions_one_draft_idx")
+    .on(table.status).where(sql`${table.status} = 'draft'`),
+  statusVersionIndex: index("cush_verify_pricing_versions_status_version_idx")
+    .on(table.status, table.version),
+})).enableRLS();
+
+export const cushVerifyPricingPlans = pgTable("cush_verify_pricing_plans", {
+  id: serial("id").primaryKey(),
+  versionId: integer("version_id").notNull()
+    .references(() => cushVerifyPricingVersions.id, { onDelete: "cascade" }),
+  planKey: text("plan_key").notNull(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  monthlyPriceMinor: integer("monthly_price_minor"),
+  includedReports: integer("included_reports").notNull().default(0),
+  allocationMode: text("allocation_mode").$type<"sandbox" | "exact" | "minimum">().notNull().default("exact"),
+  additionalReportPriceMinor: integer("additional_report_price_minor"),
+  salesMode: text("sales_mode").$type<"sandbox_only" | "self_service" | "contact_sales">().notNull().default("self_service"),
+  isActive: boolean("is_active").notNull().default(true),
+  isArchived: boolean("is_archived").notNull().default(false),
+  featureFlags: jsonb("feature_flags").$type<CushVerifyPricingFeatureFlags>().notNull(),
+  apiLimits: jsonb("api_limits").$type<CushVerifyPricingApiLimits>().notNull(),
+  supportLevel: text("support_level").$type<"not_configured" | "community" | "standard" | "priority" | "dedicated">().notNull().default("not_configured"),
+}, (table) => ({
+  planKeyCheck: check(
+    "cush_verify_pricing_plans_key_check",
+    sql`${table.planKey} ~ '^[a-z0-9][a-z0-9_-]{0,59}$'`,
+  ),
+  nameCheck: check(
+    "cush_verify_pricing_plans_name_check",
+    sql`char_length(btrim(${table.name})) between 1 and 100`,
+  ),
+  descriptionCheck: check(
+    "cush_verify_pricing_plans_description_check",
+    sql`char_length(${table.description}) <= 500`,
+  ),
+  currencyCheck: check(
+    "cush_verify_pricing_plans_currency_check",
+    sql`${table.currency} ~ '^[A-Z]{3}$'`,
+  ),
+  priceCheck: check(
+    "cush_verify_pricing_plans_price_check",
+    sql`(${table.monthlyPriceMinor} is null or ${table.monthlyPriceMinor} >= 0)
+      and (${table.additionalReportPriceMinor} is null or ${table.additionalReportPriceMinor} >= 0)`,
+  ),
+  reportAllocationCheck: check(
+    "cush_verify_pricing_plans_reports_check",
+    sql`${table.includedReports} >= 0`,
+  ),
+  allocationModeCheck: check(
+    "cush_verify_pricing_plans_allocation_mode_check",
+    sql`${table.allocationMode} in ('sandbox', 'exact', 'minimum')`,
+  ),
+  salesModeCheck: check(
+    "cush_verify_pricing_plans_sales_mode_check",
+    sql`${table.salesMode} in ('sandbox_only', 'self_service', 'contact_sales')`,
+  ),
+  supportLevelCheck: check(
+    "cush_verify_pricing_plans_support_level_check",
+    sql`${table.supportLevel} in ('not_configured', 'community', 'standard', 'priority', 'dedicated')`,
+  ),
+  availabilityCheck: check(
+    "cush_verify_pricing_plans_availability_check",
+    sql`not (${table.isActive} and ${table.isArchived})`,
+  ),
+  salesPriceCheck: check(
+    "cush_verify_pricing_plans_sales_price_check",
+    sql`(${table.salesMode} <> 'contact_sales' or
+        (${table.monthlyPriceMinor} is null and ${table.additionalReportPriceMinor} is null))
+      and (${table.monthlyPriceMinor} is not null or ${table.salesMode} = 'contact_sales')`,
+  ),
+  sandboxModeCheck: check(
+    "cush_verify_pricing_plans_sandbox_mode_check",
+    sql`(${table.allocationMode} <> 'sandbox' or ${table.salesMode} = 'sandbox_only')
+      and (${table.salesMode} <> 'sandbox_only' or ${table.allocationMode} = 'sandbox')`,
+  ),
+  minimumAllocationCheck: check(
+    "cush_verify_pricing_plans_minimum_allocation_check",
+    sql`${table.allocationMode} <> 'minimum' or ${table.includedReports} > 0`,
+  ),
+  featuresObjectCheck: check(
+    "cush_verify_pricing_plans_features_object_check",
+    sql`jsonb_typeof(${table.featureFlags}) = 'object'`,
+  ),
+  apiLimitsObjectCheck: check(
+    "cush_verify_pricing_plans_api_limits_object_check",
+    sql`jsonb_typeof(${table.apiLimits}) = 'object'`,
+  ),
+  versionPlanUnique: uniqueIndex("cush_verify_pricing_plans_version_key_uq")
+    .on(table.versionId, table.planKey),
+  versionIdIndex: index("cush_verify_pricing_plans_version_id_idx").on(table.versionId),
+  activePlanIndex: index("cush_verify_pricing_plans_version_active_idx")
+    .on(table.versionId, table.isActive, table.isArchived),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });

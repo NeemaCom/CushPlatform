@@ -234,9 +234,13 @@ describe("server authentication middleware", () => {
   });
 
   it("accepts a session with activity just before the 20-minute idle limit", async () => {
+    const destroy = vi.fn((callback: (error?: Error) => void) => callback());
     const req = requestWithSession({
       userId: storedUser.id,
-      lastActivity: Date.now() - SESSION_IDLE_TIMEOUT_MS + 1,
+      // Leave enough margin for test execution so the boundary does not expire
+      // between constructing the request and reading the clock in middleware.
+      lastActivity: Date.now() - SESSION_IDLE_TIMEOUT_MS + 60_000,
+      destroy,
     });
     const res = response();
     const next = vi.fn();
@@ -244,6 +248,7 @@ describe("server authentication middleware", () => {
     await isAuthenticated(req, res as any, next);
 
     expect(next).toHaveBeenCalledOnce();
+    expect(destroy).not.toHaveBeenCalled();
     expect(req.session.lastActivity).toBeGreaterThan(Date.now() - SESSION_IDLE_TIMEOUT_MS);
     expect(res.status).not.toHaveBeenCalled();
   });

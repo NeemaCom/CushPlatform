@@ -13,3 +13,4 @@
 - [Render provider credentials](render-provider-credentials.md) — Render-hosted services need their own provider secrets; Replit-connected integrations are not production runtime credentials.
 - [Visitor analytics privacy](visitor-analytics-privacy.md) — optional visitor analytics requires explicit opt-in; do not reuse or persist raw IP for behavioral analytics.
 - [Package installs and workspace settings](package-install-workspace-config.md) — Replit package updates may touch `.replit`; validate launcher changes before keeping them.
+- [Cush Verify pricing snapshots](cush-verify-pricing-snapshots.md) — future subscriptions must retain the published catalog version and agreed terms so later prices do not change existing agreements.

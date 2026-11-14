@@ -13,6 +13,7 @@ import CushVerifyApplicationsAdmin from "@/components/admin/CushVerifyApplicatio
 import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
 
 const VisitorIntelligenceAdmin = lazy(() => import("@/components/admin/VisitorIntelligenceAdmin"));
+const CushVerifyPricingAdmin = lazy(() => import("@/components/admin/CushVerifyPricingAdmin"));
 
 type OverviewMetrics = {
   totalUsers: number;
@@ -108,7 +109,7 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "visitor-intelligence">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-pricing" | "visitor-intelligence">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
@@ -121,6 +122,8 @@ export default function AdminDashboard() {
   const hasEvidenceFreshnessManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessManage);
   const hasVerifyInterestRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsRead);
   const hasVerifyInterestManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsManage);
+  const hasVerifyPricingRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyPricingRead);
+  const hasVerifyPricingManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyPricingManage);
   const hasVisitorAnalyticsRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.visitorAnalyticsRead);
   const overviewQuery = useQuery<AdminOverview>({
     queryKey: ["/api/admin/overview", range],
@@ -279,6 +282,20 @@ export default function AdminDashboard() {
               Institution applications
             </button>
           )}
+          {hasVerifyPricingRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("cush-verify-pricing")}
+              aria-current={activeSection === "cush-verify-pricing" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "cush-verify-pricing"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Verify pricing
+            </button>
+          )}
           {hasVisitorAnalyticsRead && (
             <button
               type="button"
@@ -304,6 +321,10 @@ export default function AdminDashboard() {
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
         ) : activeSection === "cush-verify-applications" ? (
           <CushVerifyApplicationsAdmin canManage={hasVerifyInterestManage} />
+        ) : activeSection === "cush-verify-pricing" ? (
+          <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading pricing controls…</div>}>
+            <CushVerifyPricingAdmin canManage={hasVerifyPricingManage} />
+          </Suspense>
         ) : activeSection === "visitor-intelligence" ? (
           <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading visitor intelligence…</div>}>
             <VisitorIntelligenceAdmin />

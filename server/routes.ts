@@ -56,6 +56,7 @@ import { LOGIN_SUPPORT_EMAIL, SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-const
 import { sendWelcomeEmail } from "./welcome-email";
 import { registerVisitorIntelligenceRoutes } from "./visitor-intelligence-routes";
 import { registerCushVerifyInstitutionalRoutes } from "./cush-verify-institutional-routes";
+import { registerCushVerifyPricingRoutes } from "./cush-verify-pricing-routes";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -155,6 +156,7 @@ export async function registerRoutes(
   registerInterswitchCreditHistoryRoutes(app);
   registerCushVerifyRoutes(app);
   registerCushVerifyInstitutionalRoutes(app);
+  registerCushVerifyPricingRoutes(app);
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
   app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {
