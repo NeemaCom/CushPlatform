@@ -1,8 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { useQuery } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuth } from "@/hooks/useAuth";
-import { QueryProvider } from "@/lib/query-provider";
+import { AUTH_USER_QUERY_KEY } from "@/lib/authUtils";
+import { createQueryClient } from "@/lib/query-provider";
 import { getQueryFn } from "@/lib/queryClient";
 
 function ProtectedRequest() {
@@ -55,14 +56,41 @@ describe("session expiry in the frontend", () => {
   });
 
   it("clears stale auth state after a protected request gets a session-expired response", async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(["/api/passport/profile"], { email: "previous-user@example.com" });
+
     render(
-      <QueryProvider>
+      <QueryClientProvider client={queryClient}>
         <SessionAwarePage />
-      </QueryProvider>,
+      </QueryClientProvider>,
     );
 
     await waitFor(() => expect(screen.getByTestId("sign-in")).toBeInTheDocument());
     expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(queryClient.getQueryData(["/api/passport/profile"])).toBeUndefined());
+    expect(queryClient.getQueryData(AUTH_USER_QUERY_KEY)).toBeNull();
+  });
+
+  it("clears cached user data when the session check itself expires", async () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(["/api/passport/profile"], { email: "previous-user@example.com" });
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: false,
+      status: 401,
+      statusText: "Unauthorized",
+      json: async () => ({ error: "Session expired" }),
+    } as Response)));
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <SessionAwarePage />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("sign-in")).toBeInTheDocument());
+    expect(screen.queryByTestId("protected-content")).not.toBeInTheDocument();
+    await waitFor(() => expect(queryClient.getQueryData(["/api/passport/profile"])).toBeUndefined());
+    expect(queryClient.getQueryData(AUTH_USER_QUERY_KEY)).toBeNull();
   });
 });

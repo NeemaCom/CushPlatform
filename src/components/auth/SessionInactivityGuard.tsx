@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useSessionInactivity, type SessionEndReason } from "@/hooks/useSessionInactivity";
 import { useToast } from "@/hooks/use-toast";
 import { broadcastAuthLogout, logoutFromCush } from "@/lib/logout";
+import { clearSessionQueryCache } from "@/lib/authUtils";
 
 const SERVER_SESSION_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -15,13 +16,10 @@ export default function SessionInactivityGuard() {
   const { user, isLoading } = useAuth({ enabled: !isInstitutionalRoute });
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const logoutStarted = useRef(false);
   const lastServerRefresh = useRef(Date.now());
 
   const handleTimeout = useCallback((reason: SessionEndReason) => {
-    if (logoutStarted.current) return;
-    logoutStarted.current = true;
-    queryClient.setQueryData(["/api/auth/me"], null);
+    clearSessionQueryCache(queryClient);
     setLocation("/login");
 
     if (reason === "idle") {

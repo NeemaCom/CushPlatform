@@ -2,13 +2,13 @@
 
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { useState } from "react"
-import { isSessionAuthFailure } from "./authUtils"
+import { clearSessionQueryCache, isSessionAuthFailure } from "./authUtils"
 
-function createQueryClient() {
+export function createQueryClient() {
   let queryClient: QueryClient
   const clearExpiredAuth = (error: unknown) => {
     if (isSessionAuthFailure(error)) {
-      queryClient.setQueryData(["/api/auth/me"], null)
+      clearSessionQueryCache(queryClient)
     }
   }
 

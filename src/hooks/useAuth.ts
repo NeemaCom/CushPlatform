@@ -1,6 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { API_BASE_URL } from "@/lib/api-base";
+import { AUTH_USER_QUERY_KEY, clearSessionQueryCache } from "@/lib/authUtils";
 
 export interface User {
   id: number;
@@ -21,14 +22,16 @@ export interface User {
 }
 
 export function useAuth({ enabled = true }: { enabled?: boolean } = {}) {
+  const queryClient = useQueryClient();
   const { data: user, isLoading } = useQuery({
-    queryKey: ["/api/auth/me"],
+    queryKey: AUTH_USER_QUERY_KEY,
     retry: false,
     enabled,
     queryFn: async () => {
       const response = await fetch(`${API_BASE_URL}/api/auth/me`, { credentials: "include" });
       if (!response.ok) {
         if (response.status === 401) {
+          clearSessionQueryCache(queryClient);
           return null;
         }
         throw new Error("Failed to fetch user");
