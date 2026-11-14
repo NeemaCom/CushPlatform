@@ -1,11 +1,12 @@
 # Dependency audit
 
-Updated November 14, 2026 after the Zod 4 migration.
+Updated November 14, 2026 after the Zod 4 and Firebase Admin upgrades.
 
 ## Current scanner results
 
-- `npm audit`: 4 high, 13 moderate, 1 low, 0 critical (18 total).
-- `npm audit --omit=dev`: the same counts. Several build/schema tools are still declared as production dependencies, so npm includes them in this report.
+- `npm audit`: 4 high, 6 moderate, 0 low, 0 critical (10 total).
+- `npm audit --omit=dev`: the same counts; several build/schema tools are still declared as production dependencies.
+- The 4 high findings are the remaining Firebase browser SDK / Firestore / gRPC dependency chain; the Firebase Admin findings cleared after the Admin SDK update.
 - The last Replit OSV dependency scan, run before this migration, reported one high Zod advisory and recommended `zod@4.6.6`. Zod is now `4.6.7`; rerun that scan to refresh its result.
 - The earlier report of 0 high and 4 moderate is historical and no longer current.
 
@@ -16,7 +17,7 @@ Updated November 14, 2026 after the Zod 4 migration.
 
 ## Moderate and low findings
 
-- **Firebase Admin** — `firebase-admin@13.10.0` and related Google Cloud packages are flagged; npm recommends `firebase-admin@14.5.1`. The [v14 release notes](https://github.com/firebase/firebase-admin-node/releases/tag/v14.0.0) require Node.js 22 or newer and remove deprecated namespace APIs. The server currently imports only modular Admin App/Auth APIs, but the Render runtime still needs confirmation before upgrading.
+- **Firebase Admin** — upgraded to `firebase-admin@14.5.1`. Render reports Node.js `24.21.0`, which meets the v14 requirement of Node.js 22 or newer. Server imports use modular Admin App/Auth APIs; type-check, all tests, and production build pass.
 - **Tailwind Typography** — `@tailwindcss/typography@0.5.20` is flagged through `postcss-selector-parser`. npm suggests `0.5.4`, a downgrade that should not be applied blindly.
 - **Drizzle Kit / esbuild** — `drizzle-kit@0.31.11` pulls in the deprecated `@esbuild-kit` loader and vulnerable `esbuild@0.18.20`. npm suggests downgrading Drizzle Kit to `0.18.1`, which would break the current CLI interface. The app's schema scripts use Drizzle Kit, but the server bundle does not.
 - **fast-xml-parser** — one low-severity advisory has an available fix; no update was made.
@@ -27,7 +28,7 @@ Updated November 14, 2026 after the Zod 4 migration.
 - Firebase Firestore appears in the installed dependency tree, but the application imports only `firebase/app` and `firebase/auth`. The built browser bundle contains Firebase package/version metadata but no gRPC implementation. The upstream report says web apps use WebChannel rather than Node gRPC for Firestore.
 - Current registry metadata for `firebase@13.3.0` still resolves to `@firebase/firestore@4.20.0`, which retains the `@grpc/grpc-js@~1.9.0` pin. The upstream [issue #10400](https://github.com/firebase/firebase-js-sdk/issues/10400) and [fix PR #10412](https://github.com/firebase/firebase-js-sdk/pull/10412) remain open. Upgrading the Firebase client SDK alone does not clear this finding. The official `@firebase/app` and `@firebase/auth` package READMEs say they are not intended for direct use, so replacing the supported `firebase` package with them is not recommended.
 - Moving Drizzle Kit out of production dependencies may reduce the production-only audit results, but the lockfile contains many related development/optional dependency classifications. Do not hand-edit that graph; regenerate it through the approved package workflow.
-- No forced downgrades or dependency overrides were used. The Zod major upgrade is complete. Keep the Firebase client finding open until the upstream Firestore dependency pin is fixed; consider the Firebase Admin upgrade separately after confirming the Render Node.js version is 22 or newer.
+- No forced downgrades or dependency overrides were used. The Zod and Firebase Admin upgrades are complete. Keep the Firebase client finding open until the upstream Firestore dependency pin is fixed.
 
 ## Historical note
 
