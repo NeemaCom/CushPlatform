@@ -11,3 +11,4 @@
 - [Cush session timeout](session-timeout-policy.md) — enforce the 20-minute inactivity limit consistently in the browser and on the server.
 - [Render provider credentials](render-provider-credentials.md) — Render-hosted services need their own provider secrets; Replit-connected integrations are not production runtime credentials.
 - [Visitor analytics privacy](visitor-analytics-privacy.md) — optional visitor analytics requires explicit opt-in; do not reuse or persist raw IP for behavioral analytics.
+- [Package installs and workspace settings](package-install-workspace-config.md) — Replit package updates may touch `.replit`; validate launcher changes before keeping them.

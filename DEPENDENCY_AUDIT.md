@@ -1,19 +1,19 @@
 # Dependency audit
 
-Updated November 14, 2026. No package versions or application code were changed during this review.
+Updated November 14, 2026 after the Zod 4 migration.
 
 ## Current scanner results
 
-- `npm audit`: 6 high, 13 moderate, 1 low, 0 critical (20 total).
+- `npm audit`: 4 high, 13 moderate, 1 low, 0 critical (18 total).
 - `npm audit --omit=dev`: the same counts. Several build/schema tools are still declared as production dependencies, so npm includes them in this report.
-- Replit's OSV dependency scan: 1 high, 0 moderate/low/critical. It identifies the Zod advisory in `package-lock.json` and recommends a fix at `zod@4.6.6`.
-- The scanners agree on the Zod issue but report different totals. The earlier report of 0 high and 4 moderate is historical and no longer current.
+- The last Replit OSV dependency scan, run before this migration, reported one high Zod advisory and recommended `zod@4.6.6`. Zod is now `4.6.7`; rerun that scan to refresh its result.
+- The earlier report of 0 high and 4 moderate is historical and no longer current.
 
 ## High findings
 
-- **Zod** — installed `zod@3.25.76` is flagged for memory exhaustion when validating oversized arrays. npm suggests `4.6.7`; Replit's OSV scan lists `4.6.6`. Both require a major-version upgrade. The app uses Zod across server and shared schemas, so this needs a compatibility migration rather than a forced update.
+- **Zod** — upgraded from `3.25.76` to `4.6.7`, resolving the oversized-array advisory reported by npm. Zod 4 removes `ZodError.errors`; server responses now use `ZodError.issues`. The full test suite and production build pass.
 - **Firebase client SDK** — `firebase@11.10.0` brings in Firestore and `@grpc/grpc-js@1.9.16`, which npm flags. Source imports use Firebase App and Auth; no Firestore imports were found. npm's suggested `firebase@9.14.0` is a major downgrade, so it is not a safe automatic fix.
-- **`zod-validation-error`** — npm reports the Zod advisory through installed `zod-validation-error@3.5.4` and suggests version 5.0.0, a major change. No source imports of this package were found; review whether it can be removed during a proper lockfile update.
+- **`zod-validation-error`** — removed because application source did not import it and its installed v3 release only peers with Zod 3.
 
 ## Moderate and low findings
 
@@ -24,10 +24,10 @@ Updated November 14, 2026. No package versions or application code were changed 
 
 ## Reachability and remediation notes
 
-- The current Zod array schemas found in `server/` and `shared/` have explicit `.max()` limits. `server/index.ts` uses `express.json()` without a custom limit. These constraints reduce exposure to the specific oversized-array scenario but do not remove the package advisory.
+- The Zod array schemas found in `server/` and `shared/` have explicit `.max()` limits. `server/index.ts` uses `express.json()` without a custom limit; Zod 4 now resolves the package advisory independently of those additional bounds.
 - Firebase Firestore appears in the installed dependency tree, but the application source does not import it. The npm result is based on installed packages, not proof that the flagged Firestore code is reachable in the built app.
 - Moving Drizzle Kit out of production dependencies may reduce the production-only audit results, but the lockfile contains many related development/optional dependency classifications. Do not hand-edit that graph; regenerate it through the approved package workflow.
-- No major dependency upgrades, forced downgrades, overrides, or lockfile edits were made. The high findings remain open pending a safe migration plan.
+- No forced downgrades or dependency overrides were used. The Zod major upgrade is complete; the remaining high npm findings come from the Firebase/Firestore/gRPC dependency chain and remain open for a separate compatibility review.
 
 ## Historical note
 

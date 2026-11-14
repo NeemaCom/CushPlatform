@@ -230,7 +230,7 @@ export function registerMonoRoutes(app: Express) {
     const localId = Number(req.params.id);
     const parsed = monoV2ImportSchema.safeParse(req.body);
     if (!Number.isSafeInteger(localId) || localId < 1 || !parsed.success) {
-      return res.status(400).json({ error: parsed.success ? "Invalid linked account." : parsed.error.errors[0]?.message ?? "Invalid Mono assessment review." });
+      return res.status(400).json({ error: parsed.success ? "Invalid linked account." : parsed.error.issues[0]?.message ?? "Invalid Mono assessment review." });
     }
 
     try {

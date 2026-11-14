@@ -94,7 +94,7 @@ export function registerPostArrivalRoutes(app: Express) {
   app.post("/api/passport/post-arrival/confirm", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
     const parsed = confirmUkArrivalSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Enter a valid UK arrival date." });
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Enter a valid UK arrival date." });
     }
     if (parsed.data.arrivalDate > new Date().toISOString().slice(0, 10)) {
       return res.status(400).json({ error: "Arrival date cannot be in the future." });
@@ -130,7 +130,7 @@ export function registerPostArrivalRoutes(app: Express) {
   app.put("/api/passport/post-arrival/profile", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
     const parsed = profileUpdateSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Post-Arrival profile." });
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid Post-Arrival profile." });
     }
     try {
       const userId = req.userId!;
@@ -160,7 +160,7 @@ export function registerPostArrivalRoutes(app: Express) {
       return res.json({ success: true, profile });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid Post-Arrival profile." });
+        return res.status(400).json({ error: error.issues[0]?.message ?? "Invalid Post-Arrival profile." });
       }
       return sendStorageError(res, error);
     }
@@ -169,7 +169,7 @@ export function registerPostArrivalRoutes(app: Express) {
   app.post("/api/passport/post-arrival/records", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
     const parsed = postArrivalRecordSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid financial record." });
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid financial record." });
     }
     try {
       const userId = req.userId!;
@@ -212,7 +212,7 @@ export function registerPostArrivalRoutes(app: Express) {
     const id = Number(req.params.id);
     const parsed = postArrivalRecordSchema.safeParse(req.body);
     if (!Number.isSafeInteger(id) || id < 1 || !parsed.success) {
-      return res.status(400).json({ error: parsed.success ? "Invalid record ID." : parsed.error.errors[0]?.message ?? "Invalid financial record." });
+      return res.status(400).json({ error: parsed.success ? "Invalid record ID." : parsed.error.issues[0]?.message ?? "Invalid financial record." });
     }
     try {
       const userId = req.userId!;

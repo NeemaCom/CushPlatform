@@ -504,7 +504,7 @@ export async function registerRoutes(
       SecurityLogger.logAuthEvent("profile_updated", userId, true, req.ip, req.get("User-Agent"));
       return res.json(createSafeUser(updated));
     } catch (error) {
-      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid input", details: error.errors });
+      if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid input", details: error.issues });
       res.status(500).json({ error: "Profile update failed" });
     }
   });
@@ -517,7 +517,7 @@ export async function registerRoutes(
       res.json(createSafeUser(updated));
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid profile image." });
+        return res.status(400).json({ error: error.issues[0]?.message ?? "Invalid profile image." });
       }
       res.status(500).json({ error: "Failed to update profile picture" });
     }

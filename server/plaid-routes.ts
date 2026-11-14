@@ -146,7 +146,7 @@ export function registerPlaidRoutes(app: Express) {
     noStore(res);
     const parsed = exchangeSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: parsed.error.errors[0]?.message ?? "Invalid Plaid connection." });
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid Plaid connection." });
     }
     const userId = req.userId!;
     const consent = req.session.plaidConsent;

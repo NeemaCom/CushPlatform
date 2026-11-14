@@ -127,7 +127,7 @@ export function registerPassportRoutes(app: Express) {
       return res.json(await saveV2Assessment(req.userId!, req.body));
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid V2 assessment input." });
+        return res.status(400).json({ error: error.issues[0]?.message ?? "Invalid V2 assessment input." });
       }
       if (isV2SchemaMissing(error)) {
         return res.status(503).json({
@@ -171,7 +171,7 @@ export function registerPassportRoutes(app: Express) {
         return res.json(await saveScoringPolicyDraft(req.userId!, req.body));
       } catch (error) {
         if (error instanceof z.ZodError) {
-          return res.status(400).json({ error: error.errors[0]?.message ?? "Invalid scoring policy." });
+          return res.status(400).json({ error: error.issues[0]?.message ?? "Invalid scoring policy." });
         }
         if (isV2SchemaMissing(error)) {
           return res.status(503).json({
@@ -235,7 +235,7 @@ export function registerPassportRoutes(app: Express) {
       return res.status(201).json({ signal, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: err.errors[0].message });
+        return res.status(400).json({ error: err.issues[0].message });
       }
       console.error("POST /api/passport/signals error:", err);
       return res.status(500).json({ error: "Failed to add signal" });
@@ -282,7 +282,7 @@ export function registerPassportRoutes(app: Express) {
       return res.status(201).json({ item, passport: sanitizePassportForCustomer(updatedPassport) });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: err.errors[0].message });
+        return res.status(400).json({ error: err.issues[0].message });
       }
       console.error("POST /api/passport/evidence error:", err);
       return res.status(500).json({ error: "Failed to add evidence" });
@@ -319,7 +319,7 @@ export function registerPassportRoutes(app: Express) {
       return res.json({ passport: sanitizePassportForCustomer(updated) });
     } catch (err) {
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ error: err.errors[0].message });
+        return res.status(400).json({ error: err.issues[0].message });
       }
       return res.status(500).json({ error: "Failed to update mode" });
     }
