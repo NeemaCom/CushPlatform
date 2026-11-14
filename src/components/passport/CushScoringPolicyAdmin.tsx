@@ -9,6 +9,12 @@ const FLAT_BASELINE_ID = "00000000-0000-4000-8000-000000000003";
 const FLAT_BASELINE_EFFECTIVE_DATE = "2026-11-01";
 const FLAT_BASELINE_PENCE = 100_000;
 const FLAT_BASELINE_PROVENANCE = "Initial UK baseline; update rationale when reviewing.";
+const APPROVED_CREDIT_MAPPINGS = {
+  strong: "80",
+  average: "50",
+  poor: "30",
+  no_history: "",
+};
 
 type PolicyVersions = {
   active: null | {
@@ -58,7 +64,7 @@ function emptyForm(): PolicyFormState {
     baselineAmountPounds: (FLAT_BASELINE_PENCE / 100).toFixed(2),
     baselineEffectiveDate: FLAT_BASELINE_EFFECTIVE_DATE,
     baselineProvenance: FLAT_BASELINE_PROVENANCE,
-    creditMappings: { strong: "", average: "", poor: "", no_history: "" },
+    creditMappings: { ...APPROVED_CREDIT_MAPPINGS },
   };
 }
 
@@ -313,15 +319,32 @@ export default function CushScoringPolicyAdmin() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
-        <div>
-          <h3 className="font-bold text-slate-900">Credit mappings</h3>
-          <p className="mt-1 text-xs text-slate-500">Enter approved component scores from 0–100. Thin-file is fixed at 50 by the scoring prompt.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-slate-900">Credit mappings</h3>
+            <p className="mt-1 text-xs text-slate-500">Approved values: strong 80, average 50, poor 30. No-history stays unscored.</p>
+            <p className="mt-1 text-xs text-slate-500">Thin-file is fixed at 50 only when Interswitch explicitly confirms it.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setForm((current) => ({
+              ...current,
+              creditMappings: { ...APPROVED_CREDIT_MAPPINGS },
+            }))}
+            className="rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-900 hover:bg-violet-100"
+          >
+            Apply approved mapping
+          </button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           {(["strong", "average", "poor", "no_history"] as const).map((key) => (
             <NumberField key={key} label={`${key.replace("_", " ")} mapping (0–100)`} max={100} value={form.creditMappings[key]} onChange={(value) => setForm((current) => ({ ...current, creditMappings: { ...current.creditMappings, [key]: value } }))} />
           ))}
         </div>
+        <p className="text-xs text-slate-500">
+          Leave no-history blank to keep that component unscored; it is not treated as thin-file.
+          Saving creates a draft. The active scoring policy changes only after an administrator reviews and activates it.
+        </p>
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">

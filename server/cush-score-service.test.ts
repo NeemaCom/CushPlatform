@@ -7,13 +7,12 @@ import {
   type MonthlyIncomeObservation,
 } from "./cush-score-service";
 
-// These are explicit test fixtures, not production credit or confidence policies.
+// This fixture uses the credit mapping values explicitly approved for the policy.
 const policy: CushScorePolicy = {
   creditMappings: {
-    strong: 90,
-    average: 60,
-    poor: 20,
-    no_history: 30,
+    strong: 80,
+    average: 50,
+    poor: 30,
   },
   confidence: {
     historyMonthsForMaximum: 6,
@@ -293,13 +292,28 @@ describe("Cush Score V2 engine", () => {
     expect(result.assessmentStatus).toBe("complete");
   });
 
-  it("keeps a confirmed no-history result distinct from thin-file neutral scoring", () => {
+  it("keeps confirmed no-history unscored and distinct from thin-file neutral scoring", () => {
     const result = calculateCushScore(completeInput({
       credit: { classification: "no_history", evidenceQuality: "verified", checkStatus: "no_match" },
     }), policy);
 
-    expect(result.componentScores.creditHistory).toBe(30);
-    expect(result.cushScore).toBe(895);
+    expect(result.componentScores.creditHistory).toBeNull();
+    expect(result.cushScore).toBeNull();
+    expect(result.provisionalScore).not.toBeNull();
+    expect(result.scoreCoveragePercent).toBe(85);
+    expect(result.missingRequirements).toContain("Completed, supported credit assessment");
+  });
+
+  it.each([
+    ["strong", 80],
+    ["average", 50],
+    ["poor", 30],
+  ] as const)("uses the approved %s credit mapping only for verified evidence", (classification, expectedScore) => {
+    const result = calculateCushScore(completeInput({
+      credit: { classification, evidenceQuality: "verified", checkStatus: "matched" },
+    }), policy);
+
+    expect(result.componentScores.creditHistory).toBe(expectedScore);
   });
 
   it("does not treat unavailable credit information as thin-file credit", () => {
@@ -372,7 +386,7 @@ describe("Cush Score V2 engine", () => {
 
     expect(result.componentScores.availableFunds).toBe(20);
     expect(result.componentScores.incomeStrength).toBe(100);
-    expect(result.componentScores.creditHistory).toBe(90);
+    expect(result.componentScores.creditHistory).toBe(80);
   });
 
   it("does not invent a credit score when no approved mapping exists", () => {
@@ -474,7 +488,7 @@ describe("Cush Score V2 engine", () => {
     expect(steadySalary.confidenceScore).toBe(98);
     expect(freelancer.confidenceScore).toBe(90);
     expect(familySupport.confidenceScore).toBe(88);
-    expect(steadySalary.cushScore).toBe(940);
+    expect(steadySalary.cushScore).toBe(925);
     expect(freelancer.cushScore).toBe(925);
     expect(familySupport.cushScore).toBe(925);
   });
