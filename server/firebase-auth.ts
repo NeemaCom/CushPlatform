@@ -14,7 +14,7 @@ export class FirebaseAuthError extends Error {
 
 export async function signInWithFirebasePassword(email: string, password: string): Promise<string> {
   const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`,
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${getFirebaseApiKey()}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,7 +46,7 @@ export async function sendFirebaseVerificationEmail(
   continueUrl?: string,
 ): Promise<void> {
   const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`,
+    `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${getFirebaseApiKey()}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -63,9 +63,33 @@ export async function sendFirebaseVerificationEmail(
 }
 
 export function ensureFirebaseConfigured(): void {
-  if (!configuredProjectId()) {
+  const projectId = configuredProjectId();
+  if (!projectId) {
     throw new Error("FIREBASE_PROJECT_ID is required for Firebase ID token verification");
   }
+
+  getFirebaseApiKey();
+
+  if (
+    projectId !== firebaseConfig.projectId &&
+    process.env.VITE_FIREBASE_PROJECT_ID?.trim() !== projectId
+  ) {
+    throw new Error(
+      "VITE_FIREBASE_PROJECT_ID must match FIREBASE_PROJECT_ID for the configured Passport Firebase project",
+    );
+  }
+}
+
+function getFirebaseApiKey(): string {
+  const configuredApiKey = process.env.FIREBASE_API_KEY?.trim();
+  const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
+
+  if (configuredApiKey) return configuredApiKey;
+  if (projectId && projectId !== firebaseConfig.projectId) {
+    throw new Error("FIREBASE_API_KEY is required when using a non-default Firebase project");
+  }
+
+  return firebaseConfig.apiKey;
 }
 
 function configuredProjectId(): string | undefined {

@@ -1,9 +1,34 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { FirebaseAuthError, sendFirebaseVerificationEmail } from "./firebase-auth";
+import {
+  ensureFirebaseConfigured,
+  FirebaseAuthError,
+  sendFirebaseVerificationEmail,
+} from "./firebase-auth";
 
 describe("Firebase verification email delivery", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("uses the configured API key for the selected Passport Firebase project", async () => {
+    vi.stubEnv("FIREBASE_API_KEY", "staging-api-key");
+    const fetcher = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetcher);
+
+    await sendFirebaseVerificationEmail("firebase-id-token");
+
+    expect(fetcher.mock.calls[0]?.[0]).toContain("?key=staging-api-key");
+  });
+
+  it("requires matching server and browser Firebase projects for staging", () => {
+    vi.stubEnv("FIREBASE_PROJECT_ID", "passport-staging");
+    vi.stubEnv("FIREBASE_API_KEY", "staging-api-key");
+    vi.stubEnv("VITE_FIREBASE_PROJECT_ID", "another-project");
+
+    expect(() => ensureFirebaseConfigured()).toThrow(
+      "VITE_FIREBASE_PROJECT_ID must match FIREBASE_PROJECT_ID",
+    );
   });
 
   it("requests a Firebase verification email with the trusted app continuation URL", async () => {
