@@ -30,6 +30,12 @@ import {
   getCushVerifyReportDigest,
   maskCushVerifyRecipientEmail,
 } from "./cush-verify-report-service";
+import {
+  allocateDueAnnualCredits,
+  CushVerifyBillingEntitlementError,
+  processPendingCushVerifyBillingOutbox,
+  recordReportCreditUse,
+} from "./cush-verify-billing-service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TTL_MS = 14 * DAY_MS;
@@ -95,6 +101,25 @@ function missingReportSchema(res: Response) {
     code: "CUSH_VERIFY_REPORT_SCHEMA_REQUIRED",
     error: "Cush Verify report requests are not set up yet. Apply the authorized reports migration first.",
   });
+}
+
+function billingSchemaUnavailable(error: unknown, res: Response): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 6 && typeof current === "object" && current !== null; depth += 1) {
+    const record = current as { code?: string; message?: string; cause?: unknown };
+    if (
+      (record.code === "42P01" || record.code === "42703") &&
+      /cush_verify_(billing|subscriptions|credit_ledger)/i.test(record.message ?? "")
+    ) {
+      res.status(503).json({
+        code: "CUSH_VERIFY_BILLING_SCHEMA_REQUIRED",
+        error: "Cush Verify billing storage is not ready. Apply the billing migration first.",
+      });
+      return true;
+    }
+    current = record.cause ?? null;
+  }
+  return false;
 }
 
 export function registerCushVerifyReportRoutes(app: Express): void {
@@ -508,6 +533,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           return res.status(403).json({ error: "There is no active authorization for this report." });
         }
         const reportCategories = authorization.categories;
+        await allocateDueAnnualCredits(actor.institutionId);
         const assessment = await getV2Assessment(request.targetUserId);
         const report = buildCushVerifyReport(assessment.calculation, reportCategories, now, assessment);
         const reportDigest = getCushVerifyReportDigest(report);
@@ -570,6 +596,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             ))
             .limit(1))[0];
           if (!existing) throw new Error("Idempotent report delivery event was not available.");
+          const billing = inserted
+            ? await recordReportCreditUse(tx, {
+                institutionId: actor.institutionId,
+                reportDeliveryId: inserted.id,
+                now,
+              })
+            : { charged: false as const, overageLedgerId: null };
           await tx.insert(cushVerifyReportEvents).values({
             requestId,
             eventType: inserted ? "report_delivered" : "report_accessed",
@@ -577,19 +610,44 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             actorInstitutionalUserId: actor.institutionalUserId,
             details: { reportDigest, categories: reportCategories },
           });
-          return { ...existing, newDeliveryEvent: Boolean(inserted) };
+          return { ...existing, newDeliveryEvent: Boolean(inserted), billing };
         });
 
         if (!delivery) return res.status(403).json({ error: "There is no active authorization for this report." });
+        if (delivery.billing.overageLedgerId !== null) {
+          res.once("finish", () => {
+            void processPendingCushVerifyBillingOutbox(1).catch((error) => {
+              console.error("Cush Verify report overage posting failed", {
+                errorType: error instanceof Error ? error.name : "UnknownError",
+              });
+            });
+          });
+        }
         return res.json({
           report,
           delivery: {
             id: delivery.id,
             deliveredAt: delivery.deliveredAt.toISOString(),
             newDeliveryEvent: delivery.newDeliveryEvent,
+            billing: {
+              charged: delivery.billing.charged,
+              type: delivery.billing.overageLedgerId !== null
+                ? "overage"
+                : delivery.billing.charged
+                  ? "report_credit"
+                  : "none",
+            },
           },
         });
       } catch (error) {
+        if (billingSchemaUnavailable(error, res)) return;
+        if (error instanceof CushVerifyBillingEntitlementError) {
+          const status = error.code === "BILLING_NOT_CONFIGURED" ? 503 : 402;
+          return res.status(status).json({
+            code: `CUSH_VERIFY_${error.code}`,
+            error: error.message,
+          });
+        }
         if (reportSchemaUnavailable(error, res)) return;
         if (isV2SchemaMissing(error)) {
           return res.status(503).json({

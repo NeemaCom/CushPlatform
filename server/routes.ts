@@ -58,6 +58,8 @@ import { registerVisitorIntelligenceRoutes } from "./visitor-intelligence-routes
 import { registerCushVerifyInstitutionalRoutes } from "./cush-verify-institutional-routes";
 import { registerCushVerifyPricingRoutes } from "./cush-verify-pricing-routes";
 import { registerCushVerifyReportRoutes } from "./cush-verify-report-routes";
+import { registerCushVerifyBillingRoutes } from "./cush-verify-billing-routes";
+import { startCushVerifyBillingWorkers } from "./cush-verify-billing-service";
 
 const profilePictureSchema = z.object({
   image: z.string()
@@ -159,6 +161,8 @@ export async function registerRoutes(
   registerCushVerifyInstitutionalRoutes(app);
   registerCushVerifyPricingRoutes(app);
   registerCushVerifyReportRoutes(app);
+  registerCushVerifyBillingRoutes(app);
+  startCushVerifyBillingWorkers();
 
   // ── Firebase sync ─────────────────────────────────────────────────────────
   app.post("/api/auth/firebase-sync", authRateLimit, async (req, res) => {

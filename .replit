@@ -19,3 +19,4 @@ name = "Start application"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+

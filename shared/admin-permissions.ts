@@ -19,6 +19,8 @@ export const ADMIN_PERMISSION = {
   reportsRead: "admin.reports.read",
   verifyPricingRead: "admin.verify_pricing.read",
   verifyPricingManage: "admin.verify_pricing.manage",
+  verifyBillingRead: "admin.verify_billing.read",
+  verifyBillingManage: "admin.verify_billing.manage",
   settingsRead: "admin.settings.read",
   settingsManage: "admin.settings.manage",
 } as const;
@@ -54,6 +56,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[
     ADMIN_PERMISSION.activityRead,
     ADMIN_PERMISSION.visitorAnalyticsRead,
     ADMIN_PERMISSION.verifyPricingRead,
+    ADMIN_PERMISSION.verifyBillingRead,
   ],
   financial_identity_admin: [
     ADMIN_PERMISSION.dashboardRead,
@@ -87,6 +90,7 @@ export const ADMIN_ROLE_PERMISSIONS: Record<AdminRole, readonly AdminPermission[
     ADMIN_PERMISSION.visitorAnalyticsRead,
     ADMIN_PERMISSION.reportsRead,
     ADMIN_PERMISSION.verifyPricingRead,
+    ADMIN_PERMISSION.verifyBillingRead,
     ADMIN_PERMISSION.settingsRead,
   ],
 };

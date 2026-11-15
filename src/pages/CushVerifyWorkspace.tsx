@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, FileCheck2, FileClock, LogOut, Plus, Settings2, ShieldCheck } from "lucide-react";
+import { Building2, CreditCard, FileCheck2, FileClock, LogOut, Plus, Settings2, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-verify-firebase";
 import { signOut } from "firebase/auth";
 import { broadcastCushVerifyLogout } from "@/lib/cush-verify-session";
 import { useQueryClient } from "@tanstack/react-query";
 import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorkspace";
+import CushVerifyBillingWorkspace from "@/components/verify/CushVerifyBillingWorkspace";
 import type { CushVerifyReportRequestView } from "@shared/cush-verify-reports";
 
 type WorkspaceIdentity = {
@@ -32,6 +33,7 @@ const sections = [
   { id: "history", label: "Request history and status", icon: FileClock },
   { id: "consent", label: "Consent and evidence status", icon: ShieldCheck },
   { id: "reports", label: "Reports and results", icon: FileCheck2 },
+  { id: "billing", label: "Billing and usage", icon: CreditCard },
   { id: "settings", label: "Organisation settings", icon: Settings2 },
 ] as const;
 
@@ -184,6 +186,11 @@ export default function CushVerifyWorkspace() {
               <div><p className="text-xs text-[#71819b]">Your account</p><p className="mt-1 text-sm font-semibold">{data.user.fullName} · Organisation Administrator</p></div>
               <p className="text-xs leading-5 text-[#71819b] sm:col-span-2">Organisation settings are read-only in this initial account release. Contact Cush support for changes.</p>
             </div>
+          ) : section === "billing" ? (
+            <CushVerifyBillingWorkspace
+              role={data.membership.role}
+              onRefresh={() => void queryClient.invalidateQueries({ queryKey: ["/api/verify/billing"] })}
+            />
           ) : (
             <CushVerifyReportWorkspace
               section={section}

@@ -7,6 +7,7 @@ import { createApiOriginGuard, createSecurityHeaders } from "./http-security";
 import { clearExpiredAdminAuditIps, isAdminAuditTableMissing } from "./admin-audit";
 import { getAllowedFrontendOrigins } from "./origin-policy";
 import { purgeExpiredVisitorAnalytics } from "./visitor-intelligence-routes";
+import { registerCushVerifyStripeWebhook } from "./cush-verify-stripe-webhooks";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
@@ -58,6 +59,7 @@ function startAuditIpRetentionCleanup() {
 // Express configuration
 app.set('trust proxy', 1);
 app.use(createSecurityHeaders(isProduction));
+registerCushVerifyStripeWebhook(app);
 
 const allowedOrigins = getAllowedFrontendOrigins();
 

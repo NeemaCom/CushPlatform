@@ -699,6 +699,204 @@ export const cushVerifyPricingPlans = pgTable("cush_verify_pricing_plans", {
     .on(table.versionId, table.isActive, table.isArchived),
 })).enableRLS();
 
+export const cushVerifyBillingAccounts = pgTable("cush_verify_billing_accounts", {
+  institutionId: integer("institution_id").primaryKey()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  stripeCustomerId: text("stripe_customer_id").unique(),
+  availableCredits: integer("available_credits").notNull().default(0),
+  currentPeriodUsed: integer("current_period_used").notNull().default(0),
+  currentPeriodStartAt: timestamp("current_period_start_at", { withTimezone: true, mode: "date" }),
+  currentPeriodEndAt: timestamp("current_period_end_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  balanceCheck: check("cush_verify_billing_accounts_balance_check", sql`${table.availableCredits} >= 0`),
+  usageCheck: check("cush_verify_billing_accounts_usage_check", sql`${table.currentPeriodUsed} >= 0`),
+  periodCheck: check(
+    "cush_verify_billing_accounts_period_check",
+    sql`(${table.currentPeriodStartAt} is null and ${table.currentPeriodEndAt} is null)
+      or (${table.currentPeriodStartAt} is not null and ${table.currentPeriodEndAt} is not null
+        and ${table.currentPeriodEndAt} > ${table.currentPeriodStartAt})`,
+  ),
+})).enableRLS();
+
+export const cushVerifyStripePriceMappings = pgTable("cush_verify_stripe_price_mappings", {
+  id: serial("id").primaryKey(),
+  pricingVersionId: integer("pricing_version_id").notNull()
+    .references(() => cushVerifyPricingVersions.id, { onDelete: "restrict" }),
+  planKey: text("plan_key").notNull(),
+  billingInterval: text("billing_interval").$type<"monthly" | "annual">().notNull(),
+  stripeProductId: text("stripe_product_id").notNull(),
+  stripePriceId: text("stripe_price_id").notNull().unique(),
+  currency: text("currency").notNull(),
+  unitAmountMinor: integer("unit_amount_minor").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  planReference: foreignKey({
+    name: "cush_verify_stripe_price_mappings_plan_fk",
+    columns: [table.pricingVersionId, table.planKey],
+    foreignColumns: [cushVerifyPricingPlans.versionId, cushVerifyPricingPlans.planKey],
+  }).onDelete("restrict"),
+  intervalCheck: check(
+    "cush_verify_stripe_price_mappings_interval_check",
+    sql`${table.billingInterval} in ('monthly', 'annual')`,
+  ),
+  currencyCheck: check(
+    "cush_verify_stripe_price_mappings_currency_check",
+    sql`${table.currency} ~ '^[A-Z]{3}$'`,
+  ),
+  amountCheck: check(
+    "cush_verify_stripe_price_mappings_amount_check",
+    sql`${table.unitAmountMinor} >= 0`,
+  ),
+  versionPlanIntervalUnique: unique("cush_verify_stripe_price_mappings_version_plan_interval_uq")
+    .on(table.pricingVersionId, table.planKey, table.billingInterval),
+})).enableRLS();
+
+export const cushVerifySubscriptions = pgTable("cush_verify_subscriptions", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  pricingVersionId: integer("pricing_version_id").notNull()
+    .references(() => cushVerifyPricingVersions.id, { onDelete: "restrict" }),
+  planKey: text("plan_key").notNull(),
+  stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
+  stripePriceId: text("stripe_price_id").notNull(),
+  billingInterval: text("billing_interval").$type<"monthly" | "annual">().notNull(),
+  status: text("status").$type<
+    "incomplete" | "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "paused" | "suspended"
+  >().notNull(),
+  currency: text("currency").notNull(),
+  unitAmountMinor: integer("unit_amount_minor").notNull(),
+  includedReports: integer("included_reports").notNull(),
+  additionalReportPriceMinor: integer("additional_report_price_minor"),
+  currentPeriodStartAt: timestamp("current_period_start_at", { withTimezone: true, mode: "date" }).notNull(),
+  currentPeriodEndAt: timestamp("current_period_end_at", { withTimezone: true, mode: "date" }).notNull(),
+  nextCreditAllocationAt: timestamp("next_credit_allocation_at", { withTimezone: true, mode: "date" }),
+  rolloverPolicy: text("rollover_policy").notNull().default("carry_all"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
+  graceEndsAt: timestamp("grace_ends_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  endedAt: timestamp("ended_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_subscriptions_status_check",
+    sql`${table.status} in ('incomplete', 'trialing', 'active', 'past_due', 'canceled', 'unpaid', 'paused', 'suspended')`,
+  ),
+  intervalCheck: check(
+    "cush_verify_subscriptions_interval_check",
+    sql`${table.billingInterval} in ('monthly', 'annual')`,
+  ),
+  currencyCheck: check("cush_verify_subscriptions_currency_check", sql`${table.currency} ~ '^[A-Z]{3}$'`),
+  priceCheck: check(
+    "cush_verify_subscriptions_price_check",
+    sql`${table.unitAmountMinor} >= 0 and ${table.includedReports} >= 0
+      and (${table.additionalReportPriceMinor} is null or ${table.additionalReportPriceMinor} >= 0)`,
+  ),
+  periodCheck: check(
+    "cush_verify_subscriptions_period_check",
+    sql`${table.currentPeriodEndAt} > ${table.currentPeriodStartAt}`,
+  ),
+  rolloverPolicyCheck: check(
+    "cush_verify_subscriptions_rollover_policy_check",
+    sql`${table.rolloverPolicy} = 'carry_all'`,
+  ),
+  oneCurrentSubscription: uniqueIndex("cush_verify_subscriptions_one_current_per_institution_idx")
+    .on(table.institutionId)
+    .where(sql`${table.status} in ('incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused')`),
+  institutionStatusIndex: index("cush_verify_subscriptions_institution_status_idx")
+    .on(table.institutionId, table.status),
+  creditAllocationIndex: index("cush_verify_subscriptions_credit_allocation_idx")
+    .on(table.status, table.nextCreditAllocationAt),
+})).enableRLS();
+
+export const cushVerifyCreditLedger = pgTable("cush_verify_credit_ledger", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  subscriptionId: integer("subscription_id")
+    .references(() => cushVerifySubscriptions.id, { onDelete: "restrict" }),
+  reportDeliveryId: integer("report_delivery_id")
+    .references(() => cushVerifyReportDeliveries.id, { onDelete: "restrict" }),
+  entryType: text("entry_type").$type<
+    "allocation" | "report_debit" | "overage" | "rollover" | "promotional_credit" | "reversal" | "admin_adjustment" | "expiration"
+  >().notNull(),
+  creditDelta: integer("credit_delta").notNull().default(0),
+  amountMinor: integer("amount_minor"),
+  currency: text("currency"),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  createdByAdminUserId: integer("created_by_admin_user_id")
+    .references(() => users.id, { onDelete: "set null" }),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  entryTypeCheck: check(
+    "cush_verify_credit_ledger_entry_type_check",
+    sql`${table.entryType} in ('allocation', 'report_debit', 'overage', 'rollover', 'promotional_credit', 'reversal', 'admin_adjustment', 'expiration')`,
+  ),
+  amountCheck: check(
+    "cush_verify_credit_ledger_amount_check",
+    sql`abs(${table.creditDelta}::bigint) <= 2000000000
+      and (${table.amountMinor} is null or abs(${table.amountMinor}::bigint) <= 2000000000)`,
+  ),
+  currencyCheck: check(
+    "cush_verify_credit_ledger_currency_check",
+    sql`${table.currency} is null or ${table.currency} ~ '^[A-Z]{3}$'`,
+  ),
+  detailsObjectCheck: check(
+    "cush_verify_credit_ledger_details_check",
+    sql`jsonb_typeof(${table.details}) = 'object'`,
+  ),
+  idempotencyKeyCheck: check(
+    "cush_verify_credit_ledger_idempotency_check",
+    sql`char_length(${table.idempotencyKey}) between 1 and 200`,
+  ),
+  deliveryUnique: unique("cush_verify_credit_ledger_delivery_uq").on(table.reportDeliveryId),
+  institutionCreatedIndex: index("cush_verify_credit_ledger_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyStripeWebhookEvents = pgTable("cush_verify_stripe_webhook_events", {
+  eventId: text("event_id").primaryKey(),
+  eventType: text("event_type").notNull(),
+  stripeObjectId: text("stripe_object_id"),
+  receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  processedAt: timestamp("processed_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check(
+    "cush_verify_stripe_webhook_events_type_check",
+    sql`char_length(${table.eventType}) between 1 and 100`,
+  ),
+  processedIndex: index("cush_verify_stripe_webhook_events_processed_idx").on(table.processedAt),
+})).enableRLS();
+
+export const cushVerifyBillingOutbox = pgTable("cush_verify_billing_outbox", {
+  id: serial("id").primaryKey(),
+  ledgerId: integer("ledger_id").notNull().unique()
+    .references(() => cushVerifyCreditLedger.id, { onDelete: "restrict" }),
+  stripeCustomerId: text("stripe_customer_id").notNull(),
+  status: text("status").$type<"pending" | "processing" | "sent">().notNull().default("pending"),
+  stripeInvoiceItemId: text("stripe_invoice_item_id").unique(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+  lastErrorCode: text("last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_billing_outbox_status_check",
+    sql`${table.status} in ('pending', 'processing', 'sent')`,
+  ),
+  attemptCountCheck: check(
+    "cush_verify_billing_outbox_attempt_count_check",
+    sql`${table.attemptCount} >= 0`,
+  ),
+  retryIndex: index("cush_verify_billing_outbox_retry_idx")
+    .on(table.status, table.nextAttemptAt),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });
