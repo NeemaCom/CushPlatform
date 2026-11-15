@@ -7,6 +7,16 @@ import {
   cushVerifySubscriptions,
 } from "@shared/schema";
 import { getCushVerifyStripeClient, getCushVerifyStripeReadiness } from "./cush-verify-stripe";
+import {
+  addUtcMonth,
+  billingCanUseSubscription,
+  getReportChargeDecision,
+} from "@shared/cush-verify-billing-rules";
+export {
+  addUtcMonth,
+  billingCanUseSubscription,
+  getReportChargeDecision,
+} from "@shared/cush-verify-billing-rules";
 
 type BillingTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type SubscriptionRow = typeof cushVerifySubscriptions.$inferSelect;
@@ -25,36 +35,44 @@ export class CushVerifyBillingEntitlementError extends Error {
   }
 }
 
-export function addUtcMonth(date: Date): Date {
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth() + 1;
-  const day = date.getUTCDate();
-  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  return new Date(Date.UTC(
-    year,
-    month,
-    Math.min(day, lastDay),
-    date.getUTCHours(),
-    date.getUTCMinutes(),
-    date.getUTCSeconds(),
-    date.getUTCMilliseconds(),
+export async function refreshBillingSubscriptionStatus(institutionId: number, now = new Date()): Promise<void> {
+  await db.update(cushVerifySubscriptions).set({
+    status: "suspended",
+    updatedAt: now,
+  }).where(and(
+    eq(cushVerifySubscriptions.institutionId, institutionId),
+    eq(cushVerifySubscriptions.status, "past_due"),
+    lte(cushVerifySubscriptions.graceEndsAt, now),
+  ));
+  await db.update(cushVerifySubscriptions).set({
+    status: "canceled",
+    endedAt: now,
+    updatedAt: now,
+  }).where(and(
+    eq(cushVerifySubscriptions.institutionId, institutionId),
+    eq(cushVerifySubscriptions.status, "active"),
+    eq(cushVerifySubscriptions.cancelAtPeriodEnd, true),
+    lte(cushVerifySubscriptions.currentPeriodEndAt, now),
   ));
 }
 
-export function billingCanUseSubscription(subscription: SubscriptionRow | null, now: Date): boolean {
-  if (!subscription) return false;
-  if (
-    (subscription.status === "active" || subscription.status === "trialing") &&
-    subscription.currentPeriodEndAt > now
-  ) return true;
-  if (
-    subscription.status === "past_due" &&
-    subscription.graceEndsAt !== null &&
-    subscription.graceEndsAt > now
-  ) return true;
-  return subscription.status === "canceled" &&
-    subscription.cancelAtPeriodEnd &&
-    subscription.currentPeriodEndAt > now;
+export async function refreshAllBillingSubscriptionStatuses(now = new Date()): Promise<void> {
+  await db.update(cushVerifySubscriptions).set({
+    status: "suspended",
+    updatedAt: now,
+  }).where(and(
+    eq(cushVerifySubscriptions.status, "past_due"),
+    lte(cushVerifySubscriptions.graceEndsAt, now),
+  ));
+  await db.update(cushVerifySubscriptions).set({
+    status: "canceled",
+    endedAt: now,
+    updatedAt: now,
+  }).where(and(
+    eq(cushVerifySubscriptions.status, "active"),
+    eq(cushVerifySubscriptions.cancelAtPeriodEnd, true),
+    lte(cushVerifySubscriptions.currentPeriodEndAt, now),
+  ));
 }
 
 async function addPeriodAllocation(
@@ -64,6 +82,7 @@ async function addPeriodAllocation(
   periodStart: Date,
   periodEnd: Date,
   idempotencyKey: string,
+  invoiceId: string,
 ) {
   await tx.insert(cushVerifyCreditLedger).values({
     institutionId: subscription.institutionId,
@@ -92,7 +111,7 @@ async function addPeriodAllocation(
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
       includedReports: subscription.includedReports,
-      invoiceId: idempotencyKey.replace(/^invoice:/, ""),
+      invoiceId,
     },
   }).onConflictDoNothing().returning({ id: cushVerifyCreditLedger.id });
 
@@ -208,7 +227,8 @@ export async function allocatePaidInvoiceCredits(
     account,
     periodStart,
     periodEnd,
-    `invoice:${invoiceId}`,
+    `billing-cycle:${subscription.stripeSubscriptionId}:${periodStart.toISOString()}`,
+    invoiceId,
   );
 }
 
@@ -217,26 +237,32 @@ export async function recordReportCreditUse(
   input: { institutionId: number; reportDeliveryId: number; now?: Date },
 ) {
   const now = input.now ?? new Date();
-  const [account] = await tx.select().from(cushVerifyBillingAccounts)
-    .where(eq(cushVerifyBillingAccounts.institutionId, input.institutionId))
-    .for("update")
-    .limit(1);
   const [subscription] = await tx.select().from(cushVerifySubscriptions)
     .where(and(
       eq(cushVerifySubscriptions.institutionId, input.institutionId),
-      inArray(cushVerifySubscriptions.status, ["incomplete", "trialing", "active", "past_due", "unpaid", "paused", "canceled"]),
+      inArray(cushVerifySubscriptions.status, ["incomplete", "trialing", "active", "past_due", "unpaid", "paused", "canceled", "suspended"]),
     ))
     .orderBy(desc(cushVerifySubscriptions.updatedAt))
     .for("update")
     .limit(1);
+  const [account] = await tx.select().from(cushVerifyBillingAccounts)
+    .where(eq(cushVerifyBillingAccounts.institutionId, input.institutionId))
+    .for("update")
+    .limit(1);
 
-  const subscriptionIsUsable = billingCanUseSubscription(subscription ?? null, now);
-  if (subscription && !subscriptionIsUsable) {
-    throw new CushVerifyBillingEntitlementError("SUBSCRIPTION_INACTIVE");
-  }
   if (!account) throw new CushVerifyBillingEntitlementError("CREDITS_REQUIRED");
+  const decision = getReportChargeDecision({
+    availableCredits: account.availableCredits,
+    subscription: subscription ?? null,
+    stripeBillingEnabled: getCushVerifyStripeReadiness().enabled,
+    stripeCustomerAvailable: Boolean(account.stripeCustomerId),
+    now,
+  });
+  if (decision.kind === "denied") {
+    throw new CushVerifyBillingEntitlementError(decision.code);
+  }
 
-  if (account.availableCredits > 0) {
+  if (decision.kind === "credit") {
     const [entry] = await tx.insert(cushVerifyCreditLedger).values({
       institutionId: input.institutionId,
       subscriptionId: subscription?.id ?? null,
@@ -256,17 +282,7 @@ export async function recordReportCreditUse(
     return { charged: true as const, overageLedgerId: null };
   }
 
-  const overagePrice = subscription?.additionalReportPriceMinor;
-  const readiness = getCushVerifyStripeReadiness();
-  if (!subscriptionIsUsable || !subscription || overagePrice === null || overagePrice === undefined) {
-    throw new CushVerifyBillingEntitlementError("CREDITS_REQUIRED");
-  }
-  if (overagePrice > 0 && !readiness.enabled) {
-    throw new CushVerifyBillingEntitlementError("BILLING_NOT_CONFIGURED");
-  }
-  if (overagePrice > 0 && !account.stripeCustomerId) {
-    throw new CushVerifyBillingEntitlementError("BILLING_NOT_CONFIGURED");
-  }
+  const overagePrice = subscription!.additionalReportPriceMinor!;
 
   const [overage] = await tx.insert(cushVerifyCreditLedger).values({
     institutionId: input.institutionId,
@@ -301,7 +317,7 @@ export async function recordReportCreditUse(
 let billingWorkersStarted = false;
 
 export function startCushVerifyBillingWorkers(): void {
-  if (process.env.CUSH_VERIFY_BILLING_ENABLED !== "true" || billingWorkersStarted) return;
+  if (!getCushVerifyStripeReadiness().enabled || billingWorkersStarted) return;
   billingWorkersStarted = true;
   const outboxTimer = setInterval(() => {
     void processPendingCushVerifyBillingOutbox().catch((error) => {
@@ -313,14 +329,20 @@ export function startCushVerifyBillingWorkers(): void {
   outboxTimer.unref();
 
   const annualCreditsTimer = setInterval(() => {
-    void processDueAnnualCredits().catch((error) => {
+    void Promise.all([
+      processDueAnnualCredits(),
+      refreshAllBillingSubscriptionStatuses(),
+    ]).catch((error) => {
       console.error("Cush Verify annual credit allocation failed", {
         errorType: error instanceof Error ? error.name : "UnknownError",
       });
     });
   }, 60 * 60_000);
   annualCreditsTimer.unref();
-  void processDueAnnualCredits().catch((error) => {
+  void Promise.all([
+    processDueAnnualCredits(),
+    refreshAllBillingSubscriptionStatuses(),
+  ]).catch((error) => {
     console.error("Cush Verify annual credit allocation failed", {
       errorType: error instanceof Error ? error.name : "UnknownError",
     });

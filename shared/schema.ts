@@ -804,7 +804,7 @@ export const cushVerifySubscriptions = pgTable("cush_verify_subscriptions", {
   ),
   oneCurrentSubscription: uniqueIndex("cush_verify_subscriptions_one_current_per_institution_idx")
     .on(table.institutionId)
-    .where(sql`${table.status} in ('incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused')`),
+    .where(sql`${table.status} in ('incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused', 'suspended')`),
   institutionStatusIndex: index("cush_verify_subscriptions_institution_status_idx")
     .on(table.institutionId, table.status),
   creditAllocationIndex: index("cush_verify_subscriptions_credit_allocation_idx")

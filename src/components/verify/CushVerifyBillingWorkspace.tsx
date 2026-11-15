@@ -164,6 +164,10 @@ export default function CushVerifyBillingWorkspace({
   const data = billingQuery.data!;
   const isAdmin = role === "organisation_admin";
   const status = data.subscription?.status ?? "no subscription";
+  const currentSubscriptionBlocksCheckout = Boolean(
+    data.subscription &&
+    ["incomplete", "trialing", "active", "past_due", "unpaid", "paused", "suspended"].includes(data.subscription.status),
+  );
   const statusStyle = status === "active" || status === "trialing"
     ? "bg-emerald-50 text-emerald-800"
     : status === "past_due"
@@ -250,6 +254,8 @@ export default function CushVerifyBillingWorkspace({
                 )}
                 {plan.salesMode === "contact_sales" ? (
                   <p className="mt-3 text-xs text-slate-500">Contact Cush to agree institutional terms.</p>
+                ) : isAdmin && currentSubscriptionBlocksCheckout ? (
+                  <p className="mt-3 text-xs text-slate-500">Use Manage billing above to change the current subscription.</p>
                 ) : isAdmin ? (
                   <div className="mt-4 flex flex-wrap gap-2">
                     <BillingAction

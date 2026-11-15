@@ -31,6 +31,7 @@ function fromUnixSeconds(value: number | null | undefined, fallback: Date): Date
 }
 
 function subscriptionStatus(status: string): typeof cushVerifySubscriptions.$inferInsert.status {
+  if (status === "incomplete_expired") return "canceled";
   if (
     status === "incomplete" || status === "trialing" || status === "active" ||
     status === "past_due" || status === "canceled" || status === "unpaid" ||
@@ -50,7 +51,6 @@ async function syncStripeSubscription(tx: Parameters<Parameters<typeof db.transa
   if (!customerId) return;
   const [account] = await tx.select().from(cushVerifyBillingAccounts)
     .where(eq(cushVerifyBillingAccounts.stripeCustomerId, customerId))
-    .for("update")
     .limit(1);
   if (!account) return;
 
@@ -162,8 +162,11 @@ async function markInvoicePaid(
 
   const now = new Date();
   const rawInvoice = invoice as Stripe.Invoice & { period_start?: number; period_end?: number };
-  const periodStart = fromUnixSeconds(rawInvoice.period_start, subscription.currentPeriodStartAt);
-  const periodEnd = fromUnixSeconds(rawInvoice.period_end, subscription.currentPeriodEndAt);
+  const subscriptionLine = invoice.lines.data.find((line) =>
+    (line as unknown as { type?: string }).type === "subscription",
+  );
+  const periodStart = fromUnixSeconds(rawInvoice.period_start ?? subscriptionLine?.period.start, subscription.currentPeriodStartAt);
+  const periodEnd = fromUnixSeconds(rawInvoice.period_end ?? subscriptionLine?.period.end, subscription.currentPeriodEndAt);
   if (periodEnd <= periodStart) throw new Error("Stripe invoice period is invalid.");
 
   const firstCreditPeriodEnd = subscription.billingInterval === "annual"
@@ -204,9 +207,16 @@ async function markInvoicePaymentFailed(
   const subscriptionId = invoiceSubscriptionId(invoice);
   if (!subscriptionId) return;
   const now = new Date();
+  const [subscription] = await tx.select().from(cushVerifySubscriptions)
+    .where(eq(cushVerifySubscriptions.stripeSubscriptionId, subscriptionId))
+    .for("update")
+    .limit(1);
+  if (!subscription) return;
+  const graceEndsAt = subscription.graceEndsAt ??
+    new Date(now.getTime() + paymentGraceDays() * 24 * 60 * 60_000);
   await tx.update(cushVerifySubscriptions).set({
     status: "past_due",
-    graceEndsAt: new Date(now.getTime() + paymentGraceDays() * 24 * 60 * 60_000),
+    graceEndsAt,
     updatedAt: now,
   }).where(eq(cushVerifySubscriptions.stripeSubscriptionId, subscriptionId));
 }

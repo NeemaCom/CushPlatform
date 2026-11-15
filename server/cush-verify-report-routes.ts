@@ -34,6 +34,7 @@ import {
   allocateDueAnnualCredits,
   CushVerifyBillingEntitlementError,
   processPendingCushVerifyBillingOutbox,
+  refreshBillingSubscriptionStatus,
   recordReportCreditUse,
 } from "./cush-verify-billing-service";
 
@@ -533,6 +534,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           return res.status(403).json({ error: "There is no active authorization for this report." });
         }
         const reportCategories = authorization.categories;
+        await refreshBillingSubscriptionStatus(actor.institutionId);
         await allocateDueAnnualCredits(actor.institutionId);
         const assessment = await getV2Assessment(request.targetUserId);
         const report = buildCushVerifyReport(assessment.calculation, reportCategories, now, assessment);

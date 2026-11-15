@@ -7,6 +7,8 @@ Count a Cush Verify report only after the server has confirmed the institution's
 
 Do not put report contents in audit or billing records. Keep only a stable content fingerprint and minimal delivery metadata.
 
-**Why:** The product rule is to charge only for successfully returned authorized reports, while limiting exposure of private financial data and preventing retries from creating duplicate charges.
+Unused report credits carry forward in full. Annual plans are charged annually while included credits are released monthly. Credits already paid for remain usable after cancellation, but a canceled account receives no new allocation or overage access.
 
-**How to apply:** When implementing institutional subscriptions or credit deduction, consume the backend's verified, idempotent delivery events. Never infer charges from client requests, consent records, or endpoint counts.
+**Why:** The user selected full credit rollover. Billing should still count only successfully returned authorized reports, limit exposure of private financial data, and prevent retries from creating duplicate charges.
+
+**How to apply:** Consume backend-verified, idempotent report-delivery events. Carry the full balance across renewals, release annual-plan credits monthly, and do not revoke prepaid remaining credits on cancellation. Never infer charges from client requests, consent records, or endpoint counts.

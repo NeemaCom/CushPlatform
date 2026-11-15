@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_subscriptions (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS cush_verify_subscriptions_one_current_per_institution_idx
   ON public.cush_verify_subscriptions (institution_id)
-  WHERE status IN ('incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused');
+  WHERE status IN ('incomplete', 'trialing', 'active', 'past_due', 'unpaid', 'paused', 'suspended');
 CREATE INDEX IF NOT EXISTS cush_verify_subscriptions_institution_status_idx
   ON public.cush_verify_subscriptions (institution_id, status);
 CREATE INDEX IF NOT EXISTS cush_verify_subscriptions_credit_allocation_idx

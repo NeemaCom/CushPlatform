@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Activity, ArrowUpRight, CalendarDays, CircleAlert, Clock3, Database, Loader2, MailCheck, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
+import { Activity, ArrowUpRight, CalendarDays, CircleAlert, Clock3, CreditCard, Database, Loader2, MailCheck, RefreshCw, ShieldCheck, UsersRound } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
@@ -14,6 +14,7 @@ import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
 
 const VisitorIntelligenceAdmin = lazy(() => import("@/components/admin/VisitorIntelligenceAdmin"));
 const CushVerifyPricingAdmin = lazy(() => import("@/components/admin/CushVerifyPricingAdmin"));
+const CushVerifyBillingAdmin = lazy(() => import("@/components/admin/CushVerifyBillingAdmin"));
 
 type OverviewMetrics = {
   totalUsers: number;
@@ -109,7 +110,7 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-pricing" | "visitor-intelligence">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-pricing" | "cush-verify-billing" | "visitor-intelligence">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
@@ -124,6 +125,8 @@ export default function AdminDashboard() {
   const hasVerifyInterestManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsManage);
   const hasVerifyPricingRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyPricingRead);
   const hasVerifyPricingManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyPricingManage);
+  const hasVerifyBillingRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyBillingRead);
+  const hasVerifyBillingManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyBillingManage);
   const hasVisitorAnalyticsRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.visitorAnalyticsRead);
   const overviewQuery = useQuery<AdminOverview>({
     queryKey: ["/api/admin/overview", range],
@@ -296,6 +299,21 @@ export default function AdminDashboard() {
               Verify pricing
             </button>
           )}
+          {hasVerifyBillingRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("cush-verify-billing")}
+              aria-current={activeSection === "cush-verify-billing" ? "page" : undefined}
+              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "cush-verify-billing"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              <CreditCard className="h-4 w-4" />
+              Verify billing
+            </button>
+          )}
           {hasVisitorAnalyticsRead && (
             <button
               type="button"
@@ -324,6 +342,10 @@ export default function AdminDashboard() {
         ) : activeSection === "cush-verify-pricing" ? (
           <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading pricing controls…</div>}>
             <CushVerifyPricingAdmin canManage={hasVerifyPricingManage} />
+          </Suspense>
+        ) : activeSection === "cush-verify-billing" ? (
+          <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading billing controls…</div>}>
+            <CushVerifyBillingAdmin canManage={hasVerifyBillingManage} />
           </Suspense>
         ) : activeSection === "visitor-intelligence" ? (
           <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading visitor intelligence…</div>}>

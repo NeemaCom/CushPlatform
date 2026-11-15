@@ -29,7 +29,10 @@ import {
   requireApprovedInstitution,
   type InstitutionalRequest,
 } from "./cush-verify-institutional-routes";
-import { allocateDueAnnualCredits } from "./cush-verify-billing-service";
+import {
+  allocateDueAnnualCredits,
+  refreshBillingSubscriptionStatus,
+} from "./cush-verify-billing-service";
 import {
   CushVerifyStripeUnavailableError,
   getCushVerifyStripeClient,
@@ -114,6 +117,7 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
       try {
         const actor = await getInstitutionActor(req);
         if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
+        await refreshBillingSubscriptionStatus(actor.institutionId);
         await allocateDueAnnualCredits(actor.institutionId);
         const [account] = await db.select().from(cushVerifyBillingAccounts)
           .where(eq(cushVerifyBillingAccounts.institutionId, actor.institutionId))
@@ -238,12 +242,13 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
         if (!getCushVerifyStripeReadiness().enabled) {
           return res.status(503).json({ error: "Online billing is not enabled for this environment." });
         }
+        await refreshBillingSubscriptionStatus(actor.institutionId);
 
         const [activeSubscription] = await db.select({ id: cushVerifySubscriptions.id })
           .from(cushVerifySubscriptions)
           .where(and(
             eq(cushVerifySubscriptions.institutionId, actor.institutionId),
-            inArray(cushVerifySubscriptions.status, ["incomplete", "trialing", "active", "past_due", "unpaid", "paused"]),
+            inArray(cushVerifySubscriptions.status, ["incomplete", "trialing", "active", "past_due", "unpaid", "paused", "suspended"]),
           ))
           .limit(1);
         if (activeSubscription) {
@@ -399,26 +404,36 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
           status: cushVerifyInstitutions.status,
           availableCredits: cushVerifyBillingAccounts.availableCredits,
           stripeCustomerId: cushVerifyBillingAccounts.stripeCustomerId,
-          planKey: cushVerifySubscriptions.planKey,
-          subscriptionStatus: cushVerifySubscriptions.status,
-          updatedAt: cushVerifySubscriptions.updatedAt,
         })
           .from(cushVerifyInstitutions)
           .leftJoin(cushVerifyBillingAccounts, eq(cushVerifyBillingAccounts.institutionId, cushVerifyInstitutions.id))
-          .leftJoin(cushVerifySubscriptions, eq(cushVerifySubscriptions.institutionId, cushVerifyInstitutions.id))
           .orderBy(desc(cushVerifyInstitutions.createdAt))
           .limit(250);
+        const institutionIds = institutions.map((institution) => institution.id);
+        const subscriptions = institutionIds.length
+          ? await db.select().from(cushVerifySubscriptions)
+              .where(inArray(cushVerifySubscriptions.institutionId, institutionIds))
+              .orderBy(desc(cushVerifySubscriptions.updatedAt))
+          : [];
+        const latestSubscription = new Map<number, typeof subscriptions[number]>();
+        for (const subscription of subscriptions) {
+          if (!latestSubscription.has(subscription.institutionId)) {
+            latestSubscription.set(subscription.institutionId, subscription);
+          }
+        }
         return res.json({
-          institutions: institutions.map((row) => ({
+          institutions: institutions.map((row) => {
+            const subscription = latestSubscription.get(row.id);
+            return ({
             id: row.id,
             name: row.tradingName || row.legalName,
             institutionStatus: row.status,
             availableCredits: row.availableCredits ?? 0,
             hasStripeCustomer: Boolean(row.stripeCustomerId),
-            planKey: row.planKey,
-            subscriptionStatus: row.subscriptionStatus,
-            subscriptionUpdatedAt: row.updatedAt?.toISOString() ?? null,
-          })),
+            planKey: subscription?.planKey ?? null,
+            subscriptionStatus: subscription?.status ?? null,
+            subscriptionUpdatedAt: subscription?.updatedAt.toISOString() ?? null,
+          });}),
         });
       } catch (error) {
         if (schemaUnavailable(error, res)) return;
@@ -426,6 +441,48 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(500).json({ error: "Billing directory could not be loaded." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/verify/billing/institutions/:institutionId/ledger",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verifyBillingRead),
+    async (req, res) => {
+      const institutionId = toAdminInstitutionId(req.params.institutionId);
+      if (!institutionId) return res.status(400).json({ error: "The organisation ID is invalid." });
+      try {
+        const [account] = await db.select({
+          availableCredits: cushVerifyBillingAccounts.availableCredits,
+        }).from(cushVerifyBillingAccounts)
+          .where(eq(cushVerifyBillingAccounts.institutionId, institutionId))
+          .limit(1);
+        const ledger = await db.select({
+          id: cushVerifyCreditLedger.id,
+          type: cushVerifyCreditLedger.entryType,
+          creditDelta: cushVerifyCreditLedger.creditDelta,
+          amountMinor: cushVerifyCreditLedger.amountMinor,
+          currency: cushVerifyCreditLedger.currency,
+          createdAt: cushVerifyCreditLedger.createdAt,
+          details: cushVerifyCreditLedger.details,
+        }).from(cushVerifyCreditLedger)
+          .where(eq(cushVerifyCreditLedger.institutionId, institutionId))
+          .orderBy(desc(cushVerifyCreditLedger.createdAt))
+          .limit(100);
+        return res.json({
+          availableCredits: account?.availableCredits ?? 0,
+          ledger: ledger.map((entry) => ({
+            ...entry,
+            createdAt: entry.createdAt.toISOString(),
+          })),
+        });
+      } catch (error) {
+        if (schemaUnavailable(error, res)) return;
+        console.error("Admin Cush Verify billing ledger failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "The billing ledger could not be loaded." });
       }
     },
   );
@@ -521,6 +578,7 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
             .for("update")
             .limit(1);
           if (!original || original.entryType === "reversal") return { status: 404 as const };
+          if (original.amountMinor !== null) return { status: 422 as const };
           const idempotencyKey = `admin-reversal:${original.id}`;
           const [existing] = await tx.select({ id: cushVerifyCreditLedger.id })
             .from(cushVerifyCreditLedger)
@@ -562,6 +620,7 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
         });
         if (result.status === 404) return res.status(404).json({ error: "Ledger entry or account not found." });
         if (result.status === 409) return res.status(409).json({ error: "This entry is already reversed or the reversal would make the balance negative." });
+        if (result.status === 422) return res.status(422).json({ error: "Monetary charges require a Stripe refund; this action reverses credit entries only." });
         return res.status(result.status).json({
           success: true,
           ledgerId: result.ledgerId,

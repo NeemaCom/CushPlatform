@@ -11,9 +11,11 @@ export function getCushVerifyStripeReadiness() {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim() ?? "";
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET?.trim() ?? "";
   const production = process.env.NODE_ENV === "production";
+  const allowTestModeInProduction = process.env.CUSH_VERIFY_ALLOW_TEST_MODE_IN_PRODUCTION === "true";
   const keyHasExpectedMode = production
-    ? secretKey.startsWith("sk_live_")
-    : secretKey.startsWith("sk_test_") || secretKey.startsWith("sk_live_");
+    ? secretKey.startsWith("sk_live_") ||
+      (allowTestModeInProduction && secretKey.startsWith("sk_test_"))
+    : secretKey.startsWith("sk_test_");
   const enabled = process.env.CUSH_VERIFY_BILLING_ENABLED === "true";
   const configured = enabled && keyHasExpectedMode && Boolean(webhookSecret);
   return {
