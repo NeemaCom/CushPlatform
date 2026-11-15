@@ -388,6 +388,156 @@ export const cushVerifyApplicationEvents = pgTable("cush_verify_application_even
     .on(table.applicationId, table.createdAt),
 })).enableRLS();
 
+export type CushVerifyReportCategory = "score_summary" | "assessment_status" | "evidence_summary";
+
+export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
+  id: uuid("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  requestedByInstitutionalUserId: integer("requested_by_institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  targetUserId: integer("target_user_id").references(() => users.id, { onDelete: "set null" }),
+  recipientLabel: text("recipient_label").notNull(),
+  purpose: text("purpose").notNull(),
+  requestedCategories: text("requested_categories").array().$type<CushVerifyReportCategory[]>().notNull(),
+  requestedAuthorizationDays: integer("requested_authorization_days").notNull(),
+  status: text("status").$type<"awaiting_consent" | "authorized" | "declined" | "revoked" | "expired">()
+    .notNull().default("awaiting_consent"),
+  requestExpiresAt: timestamp("request_expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  authorizationExpiresAt: timestamp("authorization_expires_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_report_requests_status_check",
+    sql`${table.status} in ('awaiting_consent', 'authorized', 'declined', 'revoked', 'expired')`,
+  ),
+  purposeLengthCheck: check(
+    "cush_verify_report_requests_purpose_length_check",
+    sql`char_length(btrim(${table.purpose})) between 10 and 500`,
+  ),
+  categoryCheck: check(
+    "cush_verify_report_requests_categories_check",
+    sql`cardinality(${table.requestedCategories}) between 1 and 3
+      and ${table.requestedCategories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+  ),
+  authorizationDaysCheck: check(
+    "cush_verify_report_requests_authorization_days_check",
+    sql`${table.requestedAuthorizationDays} between 1 and 90`,
+  ),
+  recipientLabelLengthCheck: check(
+    "cush_verify_report_requests_recipient_label_length_check",
+    sql`char_length(${table.recipientLabel}) between 3 and 254`,
+  ),
+  expiryCheck: check(
+    "cush_verify_report_requests_expiry_check",
+    sql`${table.requestExpiresAt} > ${table.createdAt}`,
+  ),
+  authorizationExpiryCheck: check(
+    "cush_verify_report_requests_authorization_expiry_check",
+    sql`(${table.status} = 'authorized' and ${table.authorizationExpiresAt} is not null)
+      or (${table.status} <> 'authorized' and ${table.authorizationExpiresAt} is null)`,
+  ),
+  institutionStatusIndex: index("cush_verify_report_requests_institution_status_created_idx")
+    .on(table.institutionId, table.status, table.createdAt),
+  targetStatusIndex: index("cush_verify_report_requests_target_status_created_idx")
+    .on(table.targetUserId, table.status, table.createdAt),
+  requestedByIndex: index("cush_verify_report_requests_requested_by_created_idx")
+    .on(table.requestedByInstitutionalUserId, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyReportConsents = pgTable("cush_verify_report_consents", {
+  id: serial("id").primaryKey(),
+  requestId: uuid("request_id").notNull()
+    .references(() => cushVerifyReportRequests.id, { onDelete: "cascade" }).unique(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: text("status").$type<"approved" | "declined" | "revoked">().notNull(),
+  approvedCategories: text("approved_categories").array().$type<CushVerifyReportCategory[]>().notNull().default([]),
+  approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
+  declinedAt: timestamp("declined_at", { withTimezone: true, mode: "date" }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_report_consents_status_check",
+    sql`${table.status} in ('approved', 'declined', 'revoked')`,
+  ),
+  categoriesCheck: check(
+    "cush_verify_report_consents_categories_check",
+    sql`cardinality(${table.approvedCategories}) between 0 and 3
+      and ${table.approvedCategories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+  ),
+  decisionTimestampsCheck: check(
+    "cush_verify_report_consents_timestamps_check",
+    sql`(${table.status} = 'approved' and ${table.approvedAt} is not null and ${table.declinedAt} is null
+        and ${table.revokedAt} is null and ${table.expiresAt} is not null and cardinality(${table.approvedCategories}) > 0)
+      or (${table.status} = 'declined' and ${table.approvedAt} is null and ${table.declinedAt} is not null
+        and ${table.revokedAt} is null and ${table.expiresAt} is null and cardinality(${table.approvedCategories}) = 0)
+      or (${table.status} = 'revoked' and ${table.approvedAt} is not null and ${table.declinedAt} is null
+        and ${table.revokedAt} is not null and ${table.expiresAt} is not null and cardinality(${table.approvedCategories}) > 0)`,
+  ),
+  userStatusIndex: index("cush_verify_report_consents_user_status_idx").on(table.userId, table.status),
+  expiresAtIndex: index("cush_verify_report_consents_expires_at_idx").on(table.expiresAt),
+})).enableRLS();
+
+export const cushVerifyReportEvents = pgTable("cush_verify_report_events", {
+  id: serial("id").primaryKey(),
+  requestId: uuid("request_id").notNull()
+    .references(() => cushVerifyReportRequests.id, { onDelete: "cascade" }),
+  eventType: text("event_type").$type<
+    "request_created" | "consent_approved" | "consent_declined" | "consent_revoked" | "report_delivered" | "report_accessed"
+  >().notNull(),
+  actorType: text("actor_type").$type<"institutional_user" | "passport_user" | "system">().notNull(),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorInstitutionalUserId: integer("actor_institutional_user_id")
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "set null" }),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check(
+    "cush_verify_report_events_type_check",
+    sql`${table.eventType} in ('request_created', 'consent_approved', 'consent_declined', 'consent_revoked', 'report_delivered', 'report_accessed')`,
+  ),
+  actorTypeCheck: check(
+    "cush_verify_report_events_actor_check",
+    sql`(${table.actorType} = 'passport_user' and ${table.actorInstitutionalUserId} is null)
+      or (${table.actorType} = 'institutional_user' and ${table.actorUserId} is null)
+      or (${table.actorType} = 'system' and ${table.actorUserId} is null and ${table.actorInstitutionalUserId} is null)`,
+  ),
+  detailsObjectCheck: check(
+    "cush_verify_report_events_details_object_check",
+    sql`jsonb_typeof(${table.details}) = 'object'`,
+  ),
+  requestCreatedIndex: index("cush_verify_report_events_request_created_idx").on(table.requestId, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyReportDeliveries = pgTable("cush_verify_report_deliveries", {
+  id: serial("id").primaryKey(),
+  requestId: uuid("request_id").notNull()
+    .references(() => cushVerifyReportRequests.id, { onDelete: "cascade" }),
+  reportDigest: text("report_digest").notNull(),
+  categories: text("categories").array().$type<CushVerifyReportCategory[]>().notNull(),
+  deliveredByInstitutionalUserId: integer("delivered_by_institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  reportDigestCheck: check(
+    "cush_verify_report_deliveries_digest_check",
+    sql`${table.reportDigest} ~ '^[a-f0-9]{64}$'`,
+  ),
+  categoriesCheck: check(
+    "cush_verify_report_deliveries_categories_check",
+    sql`cardinality(${table.categories}) between 1 and 3
+      and ${table.categories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+  ),
+  requestDigestUnique: unique("cush_verify_report_deliveries_request_digest_uq")
+    .on(table.requestId, table.reportDigest),
+  institutionUserDateIndex: index("cush_verify_report_deliveries_actor_date_idx")
+    .on(table.deliveredByInstitutionalUserId, table.deliveredAt),
+})).enableRLS();
+
 export type CushVerifyPricingFeatureFlags = {
   fullPassportReports: boolean;
   incomeEmploymentHistory: boolean;

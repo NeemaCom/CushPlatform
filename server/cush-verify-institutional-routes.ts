@@ -35,7 +35,7 @@ const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const APPLICATION_CONFIRMATION =
   "Thank you for your interest in Cush Verify. Your institutional interest has been received. The Cush team will be in touch.";
 
-type InstitutionalRequest = Request & {
+export type InstitutionalRequest = Request & {
   cushVerifyInstitutionalUserId?: number;
 };
 
@@ -144,7 +144,7 @@ function destroyInstitutionalSession(req: Request, res: Response, status: number
   return res.status(status).json(body);
 }
 
-async function getInstitutionalWorkspaceState(institutionalUserId: number) {
+export async function getInstitutionalWorkspaceState(institutionalUserId: number) {
   const [membership] = await db.select({
     membershipId: cushVerifyInstitutionalMemberships.id,
     role: cushVerifyInstitutionalMemberships.role,
@@ -171,7 +171,7 @@ async function getInstitutionalWorkspaceState(institutionalUserId: number) {
   return membership;
 }
 
-async function isInstitutionalAuthenticated(
+export async function isInstitutionalAuthenticated(
   req: InstitutionalRequest,
   res: Response,
   next: NextFunction,
@@ -225,7 +225,7 @@ async function isInstitutionalAuthenticated(
   }
 }
 
-function requireApprovedInstitution(
+export function requireApprovedInstitution(
   req: InstitutionalRequest,
   res: Response,
   next: NextFunction,

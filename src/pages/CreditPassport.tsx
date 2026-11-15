@@ -9,6 +9,7 @@ import { logoutFromCush } from "@/lib/logout";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
 import PostArrivalPanel from "@/components/passport/PostArrivalPanel";
+import CushVerifyConsentInbox from "@/components/passport/CushVerifyConsentInbox";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
 import {
   ChevronRight, Link2,
@@ -475,6 +476,7 @@ export default function CreditPassport() {
 
           {/* ── Left Column ──────────────────────────────────────────────── */}
           <div className="space-y-5">
+            <CushVerifyConsentInbox />
 
             {/* Score Center Card */}
             <motion.div

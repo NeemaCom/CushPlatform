@@ -7,6 +7,8 @@ import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-ve
 import { signOut } from "firebase/auth";
 import { broadcastCushVerifyLogout } from "@/lib/cush-verify-session";
 import { useQueryClient } from "@tanstack/react-query";
+import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorkspace";
+import type { CushVerifyReportRequestView } from "@shared/cush-verify-reports";
 
 type WorkspaceIdentity = {
   user: { id: number; email: string; fullName: string; jobTitle: string };
@@ -56,6 +58,15 @@ export default function CushVerifyWorkspace() {
       const response = await apiRequest("GET", "/api/verify/auth/me");
       return response.json() as Promise<WorkspaceIdentity>;
     },
+    retry: false,
+  });
+  const requestsQuery = useQuery<{ requests: CushVerifyReportRequestView[] }>({
+    queryKey: ["/api/verify/report-requests"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/verify/report-requests");
+      return response.json() as Promise<{ requests: CushVerifyReportRequestView[] }>;
+    },
+    enabled: identityQuery.data?.accessGranted === true,
     retry: false,
   });
 
@@ -125,6 +136,8 @@ export default function CushVerifyWorkspace() {
   }
 
   const currentSection = sections.find((item) => item.id === section)!;
+  const requests = requestsQuery.data?.requests ?? [];
+  const openRequests = requests.filter((request) => request.status === "awaiting_consent" || request.status === "authorized");
   return (
     <main className="min-h-screen bg-[#f3f7fc] text-[#14213a]">
       <header className="border-b border-[#d8e3f1] bg-white">
@@ -158,9 +171,9 @@ export default function CushVerifyWorkspace() {
               <p className="mt-3 max-w-2xl text-sm leading-6 text-[#52627b]">Your organisation is approved. This workspace will keep verification requests, consent, evidence status, and results together.</p>
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 {[
-                  { label: "Open requests", value: "0" },
-                  { label: "Awaiting consent", value: "0" },
-                  { label: "Reports available", value: "0" },
+                  { label: "Open requests", value: requestsQuery.isError || requestsQuery.isLoading ? "—" : String(openRequests.length) },
+                  { label: "Awaiting consent", value: requestsQuery.isError || requestsQuery.isLoading ? "—" : String(requests.filter((request) => request.status === "awaiting_consent").length) },
+                  { label: "Reports available", value: requestsQuery.isError || requestsQuery.isLoading ? "—" : String(requests.filter((request) => request.deliveredReportCount > 0).length) },
                 ].map((metric) => <div key={metric.label} className="rounded-xl border border-[#dce5f1] bg-[#f8fbff] p-4"><p className="text-xs text-[#61728a]">{metric.label}</p><p className="mt-2 text-2xl font-semibold text-[#12213d]">{metric.value}</p></div>)}
               </div>
             </>
@@ -172,15 +185,14 @@ export default function CushVerifyWorkspace() {
               <p className="text-xs leading-5 text-[#71819b] sm:col-span-2">Organisation settings are read-only in this initial account release. Contact Cush support for changes.</p>
             </div>
           ) : (
-            <div className="mt-6 max-w-2xl rounded-xl border border-dashed border-[#d4dfed] bg-[#f8fbff] p-5">
-              <p className="text-sm font-semibold text-[#12213d]">
-                {section === "new" ? "Verification request creation is not enabled yet." :
-                  section === "history" ? "No verification requests are available yet." :
-                    section === "consent" ? "Consent and evidence status will appear here when a verification request is available." :
-                      "Reports and results will appear here after a verification request is completed."}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[#61728a]">Your organisation account is active. Cush will enable request processing after the verification workflow and consent requirements are finalized.</p>
-            </div>
+            <CushVerifyReportWorkspace
+              section={section}
+              requests={requests}
+              isLoading={requestsQuery.isLoading}
+              errorMessage={requestsQuery.isError ? apiError(requestsQuery.error) : undefined}
+              canManageRequests={data.membership.role === "organisation_admin" || data.membership.role === "analyst"}
+              onRefresh={() => void queryClient.invalidateQueries({ queryKey: ["/api/verify/report-requests"] })}
+            />
           )}
         </section>
       </div>
