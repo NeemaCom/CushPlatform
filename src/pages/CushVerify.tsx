@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { cushVerifyInstitutionInterestSchema } from "@shared/cush-verify";
 import { apiRequest } from "@/lib/queryClient";
+import CushVerifyPublicNav from "@/components/verify/CushVerifyPublicNav";
 
 type InstitutionType = "bank" | "lender" | "housing" | "employer" | "university" | "other";
 type EngagementModel = "institutional_portal" | "api_integration" | "partnership_discussion";
@@ -151,23 +152,7 @@ export default function CushVerify() {
 
   return (
     <main className="min-h-[100dvh] overflow-hidden bg-[#f3f7fc] font-sans text-[#14213a] antialiased">
-      <header className="relative z-10 border-b border-white/10 bg-[#0c1830] text-white">
-        <div className="mx-auto flex min-h-[72px] max-w-[1320px] items-center justify-between gap-5 px-5 sm:px-8 lg:px-12">
-          <Link href="/" className="group flex items-center gap-3" aria-label="Cush Passport home">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#3475e7] font-serif text-[22px] leading-none text-white transition-transform group-hover:-rotate-6">c</span>
-            <span className="text-[15px] font-semibold tracking-[-0.03em] text-white">Cush Passport</span>
-          </Link>
-          <nav aria-label="Main navigation" className="hidden items-center gap-8 md:flex">
-            <a href="#approach" className="text-[13px] font-medium text-blue-100/75 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">The approach</a>
-            <a href="#use-cases" className="text-[13px] font-medium text-blue-100/75 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">For institutions</a>
-            <a href="#how-it-works" className="text-[13px] font-medium text-blue-100/75 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">How it works</a>
-          </nav>
-          <div className="flex items-center gap-3">
-            <BetaBadge />
-            <Link href="/verify/login" className="hidden rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-blue-50 transition hover:border-blue-200 hover:bg-white/5 sm:inline-flex focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-300">Institutional sign in</Link>
-          </div>
-        </div>
-      </header>
+      <CushVerifyPublicNav currentPage="home" />
 
       <section className="relative isolate overflow-hidden bg-[#0c1830] text-white">
         <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">

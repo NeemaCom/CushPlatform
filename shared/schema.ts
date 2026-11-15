@@ -411,12 +411,18 @@ export type CushVerifyPricingApiLimits = {
   monthlyReportLimit: number | null;
 };
 
+export type CushVerifyPricingFaq = {
+  question: string;
+  answer: string;
+};
+
 export const cushVerifyPricingVersions = pgTable("cush_verify_pricing_versions", {
   id: serial("id").primaryKey(),
   version: integer("version").notNull().unique(),
   status: text("status").$type<"draft" | "published" | "superseded" | "abandoned">().notNull().default("draft"),
   defaultCurrency: text("default_currency").notNull().default("USD"),
   annualDiscountBps: integer("annual_discount_bps").notNull().default(1500),
+  faqItems: jsonb("faq_items").$type<CushVerifyPricingFaq[]>().notNull().default([]),
   createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
   publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -435,6 +441,10 @@ export const cushVerifyPricingVersions = pgTable("cush_verify_pricing_versions",
   annualDiscountCheck: check(
     "cush_verify_pricing_versions_annual_discount_check",
     sql`${table.annualDiscountBps} between 0 and 9999`,
+  ),
+  faqItemsArrayCheck: check(
+    "cush_verify_pricing_versions_faq_items_array_check",
+    sql`jsonb_typeof(${table.faqItems}) = 'array'`,
   ),
   publicationTimestampCheck: check(
     "cush_verify_pricing_versions_publication_timestamp_check",

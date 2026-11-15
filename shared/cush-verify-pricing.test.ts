@@ -84,6 +84,10 @@ describe("Cush Verify public pricing catalog", () => {
       version: 3,
       defaultCurrency: "USD",
       annualDiscountBps: 1500,
+      faqItems: [{
+        question: "What is a report credit?",
+        answer: "One credit is intended for an authorized full report returned successfully.",
+      }],
       publishedAt: new Date("2026-11-15T10:00:00.000Z"),
     }, [
       { ...plan(), id: 1, versionId: 3 },
@@ -111,11 +115,19 @@ describe("Cush Verify public pricing catalog", () => {
     expect(cushVerifyPricingCatalogSchema.safeParse({
       defaultCurrency: "USD",
       annualDiscountBps: 1500,
+      faqs: [{
+        question: "What is a report credit?",
+        answer: "One credit is intended for an authorized full report returned successfully.",
+      }],
       plans: [plan(), plan()],
     }).success).toBe(false);
     expect(cushVerifyPricingCatalogSchema.safeParse({
       defaultCurrency: "USD",
       annualDiscountBps: 1500,
+      faqs: [{
+        question: "What is a report credit?",
+        answer: "One credit is intended for an authorized full report returned successfully.",
+      }],
       plans: [plan({
         planKey: "enterprise",
         salesMode: "contact_sales",
@@ -126,6 +138,10 @@ describe("Cush Verify public pricing catalog", () => {
     expect(cushVerifyPricingCatalogSchema.safeParse({
       defaultCurrency: "USD",
       annualDiscountBps: 1500,
+      faqs: [{
+        question: "What is a report credit?",
+        answer: "One credit is intended for an authorized full report returned successfully.",
+      }],
       plans: [plan({ salesMode: "sandbox_only", allocationMode: "exact" })],
     }).success).toBe(false);
   });

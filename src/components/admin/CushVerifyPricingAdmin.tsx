@@ -30,6 +30,7 @@ type AdminPricingVersion = {
   createdBy: number | null;
   publishedBy: number | null;
   plans: CushVerifyPricingPlanInput[];
+  faqs: CushVerifyPricingCatalogInput["faqs"];
 };
 type PricingAdminResponse = {
   published: AdminPricingVersion | null;
@@ -45,6 +46,7 @@ type PricingAdminResponse = {
     annualDiscountBps: number;
     planCount: number;
     plans: CushVerifyPricingPlanInput[];
+    faqs: CushVerifyPricingCatalogInput["faqs"];
   }>;
 };
 
@@ -83,6 +85,7 @@ function toForm(catalog: CushVerifyPricingCatalogInput): PricingForm {
   return {
     defaultCurrency: catalog.defaultCurrency,
     annualDiscountBps: String(catalog.annualDiscountBps),
+    faqs: catalog.faqs.map((faq) => ({ ...faq })),
     plans: catalog.plans.map((plan) => ({
       ...plan,
       monthlyPrice: toMoneyInput(plan.monthlyPriceMinor),
@@ -98,6 +101,7 @@ function toCatalog(form: PricingForm): CushVerifyPricingCatalogInput {
   return cushVerifyPricingCatalogSchema.parse({
     defaultCurrency: form.defaultCurrency,
     annualDiscountBps,
+    faqs: form.faqs,
     plans: form.plans.map(({ monthlyPrice, additionalReportPrice, ...plan }) => ({
       ...plan,
       monthlyPriceMinor: parseMoneyInput(monthlyPrice),
@@ -128,6 +132,7 @@ function versionToCatalog(version: AdminPricingVersion): CushVerifyPricingCatalo
   return {
     defaultCurrency: version.defaultCurrency,
     annualDiscountBps: version.annualDiscountBps,
+    faqs: version.faqs,
     plans: version.plans,
   };
 }
@@ -415,7 +420,7 @@ export default function CushVerifyPricingAdmin({ canManage }: { canManage: boole
               <Clock3 className="h-3.5 w-3.5" />
               {version?.status === "published" ? `Published ${formatDate(version.publishedAt)}` : version ? `Updated ${formatDate(version.updatedAt)}` : "Create a draft from the published version."}
             </p>
-            {version && <p className="mt-3 text-xs text-[#6f706f]">{version.plans.length} configured plans · {version.defaultCurrency} default · {version.annualDiscountBps / 100}% annual discount</p>}
+            {version && <p className="mt-3 text-xs text-[#6f706f]">{version.plans.length} configured plans · {version.faqs.length} FAQs · {version.defaultCurrency} default · {version.annualDiscountBps / 100}% annual discount</p>}
           </article>
         ))}
       </section>
@@ -495,6 +500,75 @@ export default function CushVerifyPricingAdmin({ canManage }: { canManage: boole
                 </div>
               </FormField>
             </div>
+
+            <section className="rounded-xl border border-[#e5e3db] bg-white p-4 sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h3 className="font-semibold text-[#34353a]">Published FAQs</h3>
+                  <p className="mt-1 text-xs leading-5 text-[#777973]">Questions and answers are part of this pricing version and are shown on the public pricing page.</p>
+                </div>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setForm((current) => current && current.faqs.length < 20
+                      ? { ...current, faqs: [...current.faqs, { question: "", answer: "" }] }
+                      : current)}
+                    disabled={(form?.faqs.length ?? 20) >= 20}
+                    className="inline-flex w-fit items-center gap-2 rounded-lg border border-dashed border-[#bdbbcf] px-3 py-2 text-xs font-semibold text-[#57539c] hover:bg-[#f0efff] disabled:opacity-50"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add FAQ
+                  </button>
+                )}
+              </div>
+              <div className="mt-4 space-y-3">
+                {form?.faqs.map((faq, index) => (
+                  <article key={index} className="grid gap-3 rounded-lg border border-[#efeee8] bg-[#faf9f5] p-3 sm:grid-cols-[.8fr_1.2fr_auto] sm:items-start">
+                    <FormField label={`Question ${index + 1}`}>
+                      <input
+                        value={faq.question}
+                        disabled={!canManage}
+                        maxLength={160}
+                        onChange={(event) => setForm((current) => current ? {
+                          ...current,
+                          faqs: current.faqs.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, question: event.target.value } : item,
+                          ),
+                        } : current)}
+                        className={inputClass}
+                      />
+                    </FormField>
+                    <FormField label="Answer">
+                      <textarea
+                        value={faq.answer}
+                        disabled={!canManage}
+                        maxLength={1000}
+                        rows={2}
+                        onChange={(event) => setForm((current) => current ? {
+                          ...current,
+                          faqs: current.faqs.map((item, itemIndex) =>
+                            itemIndex === index ? { ...item, answer: event.target.value } : item,
+                          ),
+                        } : current)}
+                        className={`${inputClass} resize-y`}
+                      />
+                    </FormField>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => setForm((current) => current ? {
+                          ...current,
+                          faqs: current.faqs.filter((_, itemIndex) => itemIndex !== index),
+                        } : current)}
+                        className="mt-5 w-fit rounded-md px-2 py-1 text-xs font-semibold text-[#8b4639] hover:bg-[#fff1eb]"
+                        aria-label={`Remove question ${index + 1}`}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </section>
 
             <div className="grid gap-4 xl:grid-cols-2">
               {form?.plans.map((plan, index) => {
@@ -785,7 +859,7 @@ export default function CushVerifyPricingAdmin({ canManage }: { canManage: boole
                 <div>
                   <p className="text-sm font-semibold text-[#34353a]">Version {version.version}</p>
                   <p className="mt-1 text-xs text-[#777973]">
-                    {version.status} · {version.planCount} plans · {version.defaultCurrency} · {version.annualDiscountBps / 100}% annual discount · {formatDate(version.publishedAt)}
+                    {version.status} · {version.planCount} plans · {version.faqs.length} FAQs · {version.defaultCurrency} · {version.annualDiscountBps / 100}% annual discount · {formatDate(version.publishedAt)}
                   </p>
                   <details className="mt-2 text-xs text-[#57539c]">
                     <summary className="cursor-pointer font-semibold">Review version snapshot</summary>
@@ -800,6 +874,17 @@ export default function CushVerifyPricingAdmin({ canManage }: { canManage: boole
                           </div>
                         );
                       })}
+                    </div>
+                    <div className="mt-3 rounded-lg border border-[#e8e6de] bg-white p-3 text-[#555750]">
+                      <p className="text-xs font-semibold text-[#34353a]">FAQs in this version</p>
+                      <ul className="mt-2 space-y-2">
+                        {version.faqs.map((faq, index) => (
+                          <li key={index} className="text-xs leading-5">
+                            <span className="font-semibold">{faq.question}</span>
+                            <span className="block text-[#777973]">{faq.answer}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </details>
                 </div>

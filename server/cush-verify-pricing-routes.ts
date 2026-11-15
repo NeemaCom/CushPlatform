@@ -117,6 +117,7 @@ function toAdminVersion(
     status: version.status,
     defaultCurrency: version.defaultCurrency,
     annualDiscountBps: version.annualDiscountBps,
+    faqs: version.faqItems,
     createdAt: version.createdAt,
     updatedAt: version.updatedAt,
     publishedAt: version.publishedAt,
@@ -159,6 +160,7 @@ async function createDraftFromVersion(
     status: "draft",
     defaultCurrency: source.defaultCurrency,
     annualDiscountBps: source.annualDiscountBps,
+    faqItems: source.faqItems,
     createdBy: userId,
     updatedAt: new Date(),
   }).returning();
@@ -258,6 +260,7 @@ export function registerCushVerifyPricingRoutes(app: Express) {
               publishedAt: version.publishedAt,
               defaultCurrency: version.defaultCurrency,
               annualDiscountBps: version.annualDiscountBps,
+              faqs: version.faqItems,
               planCount: plansByVersion.get(version.id)?.length ?? 0,
               plans: (plansByVersion.get(version.id) ?? []).map((plan) => ({
                 planKey: plan.planKey,
@@ -357,6 +360,7 @@ export function registerCushVerifyPricingRoutes(app: Express) {
             .set({
               defaultCurrency: parsed.data.catalog.defaultCurrency,
               annualDiscountBps: parsed.data.catalog.annualDiscountBps,
+              faqItems: parsed.data.catalog.faqs,
               updatedAt,
             })
             .where(and(
@@ -399,6 +403,7 @@ export function registerCushVerifyPricingRoutes(app: Express) {
           const validated = cushVerifyPricingCatalogSchema.safeParse({
             defaultCurrency: draft.defaultCurrency,
             annualDiscountBps: draft.annualDiscountBps,
+            faqs: draft.faqItems,
             plans: planRows.map((plan) => ({
               planKey: plan.planKey,
               name: plan.name,

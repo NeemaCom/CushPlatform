@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_pricing_versions (
     CHECK (default_currency ~ '^[A-Z]{3}$'),
   annual_discount_bps integer NOT NULL DEFAULT 1500
     CHECK (annual_discount_bps BETWEEN 0 AND 9999),
+  faq_items jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_by integer REFERENCES public.users(id) ON DELETE SET NULL,
   published_by integer REFERENCES public.users(id) ON DELETE SET NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -17,7 +18,9 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_pricing_versions (
   CONSTRAINT cush_verify_pricing_versions_publication_timestamp_check CHECK (
     (status IN ('draft', 'abandoned') AND published_at IS NULL)
     OR (status IN ('published', 'superseded') AND published_at IS NOT NULL)
-  )
+  ),
+  CONSTRAINT cush_verify_pricing_versions_faq_items_array_check
+    CHECK (jsonb_typeof(faq_items) = 'array')
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS cush_verify_pricing_versions_one_published_idx
@@ -84,9 +87,39 @@ REVOKE ALL ON SEQUENCE public.cush_verify_pricing_versions_id_seq FROM PUBLIC, a
 REVOKE ALL ON SEQUENCE public.cush_verify_pricing_plans_id_seq FROM PUBLIC, anon, authenticated;
 
 INSERT INTO public.cush_verify_pricing_versions (
-  version, status, default_currency, annual_discount_bps, created_at, updated_at, published_at
+  version, status, default_currency, annual_discount_bps, faq_items, created_at, updated_at, published_at
 )
-VALUES (1, 'published', 'USD', 1500, now(), now(), now())
+VALUES (
+  1,
+  'published',
+  'USD',
+  1500,
+  '[
+    {
+      "question": "When does a report use one credit?",
+      "answer": "Only a successfully returned, authorised full report consumes one report credit. Searching for a profile, a profile not being found, a declined consent request, and consent being obtained by itself are free."
+    },
+    {
+      "question": "Are failed requests or technical retries charged?",
+      "answer": "No. A failed API request is not charged, and repeated technical retries do not consume additional credits."
+    },
+    {
+      "question": "Are individual endpoint results charged separately?",
+      "answer": "Individual endpoint retrieval is included within the allocation for a full report; it does not add another report credit."
+    },
+    {
+      "question": "What if a profile changes materially?",
+      "answer": "A new report requested after a material profile update consumes one new report credit when Cush successfully returns the authorised report."
+    },
+    {
+      "question": "Can we subscribe or retrieve reports now?",
+      "answer": "Not yet. This is a pricing preview; subscriptions, checkout, report retrieval, and credit balances are not currently active."
+    }
+  ]'::jsonb,
+  now(),
+  now(),
+  now()
+)
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.cush_verify_pricing_plans (

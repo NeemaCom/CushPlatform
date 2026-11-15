@@ -68,6 +68,11 @@ export const cushVerifyPricingApiLimitsSchema = z.object({
   monthlyReportLimit: optionalPositiveLimit,
 }).strict();
 
+export const cushVerifyPricingFaqSchema = z.object({
+  question: z.string().trim().min(5).max(160),
+  answer: z.string().trim().min(10).max(1000),
+}).strict();
+
 export const cushVerifyPricingPlanSchema = z.object({
   planKey: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,59}$/),
   name: z.string().trim().min(1).max(100),
@@ -133,6 +138,7 @@ export const cushVerifyPricingCatalogSchema = z.object({
   defaultCurrency: z.string().regex(/^[A-Z]{3}$/),
   annualDiscountBps: z.number().int().min(0).max(9999),
   plans: z.array(cushVerifyPricingPlanSchema).min(1).max(25),
+  faqs: z.array(cushVerifyPricingFaqSchema).min(1).max(20),
 }).strict().superRefine((catalog, context) => {
   const keys = new Set<string>();
   for (const [index, plan] of catalog.plans.entries()) {
@@ -156,6 +162,7 @@ export const cushVerifyPricingCatalogSchema = z.object({
 
 export type CushVerifyPricingPlanInput = z.infer<typeof cushVerifyPricingPlanSchema>;
 export type CushVerifyPricingCatalogInput = z.infer<typeof cushVerifyPricingCatalogSchema>;
+export type CushVerifyPricingFaq = z.infer<typeof cushVerifyPricingFaqSchema>;
 
 export function calculateAnnualPricing(
   monthlyPriceMinor: number | null,
@@ -220,6 +227,7 @@ export function toPublicCushVerifyPricingCatalog(
     version: number;
     defaultCurrency: string;
     annualDiscountBps: number;
+    faqItems: CushVerifyPricingFaq[];
     publishedAt: Date | string | null;
   },
   plans: Array<CushVerifyPricingPlanInput & { id?: number; versionId?: number }>,
@@ -228,6 +236,7 @@ export function toPublicCushVerifyPricingCatalog(
     version: version.version,
     defaultCurrency: version.defaultCurrency,
     annualDiscountBps: version.annualDiscountBps,
+    faqs: version.faqItems,
     publishedAt: version.publishedAt,
     plans: plans
       .filter((plan) => plan.isActive && !plan.isArchived)
