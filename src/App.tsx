@@ -1,4 +1,4 @@
-import { Router, Route, Switch, useLocation } from 'wouter'
+import { Router, Redirect, Route, Switch, useLocation } from 'wouter'
 import { lazy, Suspense, useEffect } from 'react'
 import { QueryProvider } from '@/lib/query-provider'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -84,8 +84,12 @@ function App() {
           <VisitorAnalytics />
           <div className="min-h-screen bg-white">
             <Switch>
-              {/* Public landing page — redirects authenticated users to /dashboard */}
-              <Route path="/" component={HomeRoute} />
+              {/* Staging may use Cush Verify as its homepage; production keeps Passport. */}
+              <Route path="/">
+                {import.meta.env.VITE_DEFAULT_APP === 'verify'
+                  ? <Redirect to="/verify" />
+                  : <HomeRoute />}
+              </Route>
               <Route path="/login" component={Login} />
               <Route path="/privacy-policy" component={PrivacyPolicy} />
               <Route path="/terms-of-service" component={TermsOfService} />
