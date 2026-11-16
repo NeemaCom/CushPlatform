@@ -1,6 +1,6 @@
 import { Link } from "wouter";
 
-type CurrentPage = "home" | "pricing" | "how-it-works";
+type CurrentPage = "home" | "pricing" | "how-it-works" | "api";
 
 const desktopLinkClass = "text-[13px] font-medium text-blue-100/75 transition hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300";
 
@@ -25,6 +25,7 @@ export default function CushVerifyPublicNav({ currentPage }: { currentPage: Curr
           {currentPage === "home" && <a href="/verify#approach" className={desktopLinkClass}>The approach</a>}
           <Link href="/verify/how-it-works" aria-current={currentPage === "how-it-works" ? "page" : undefined} className={desktopLinkClass}>How it works</Link>
           <Link href="/verify/pricing" aria-current={currentPage === "pricing" ? "page" : undefined} className={desktopLinkClass}>Pricing</Link>
+          <Link href="/verify/api" aria-current={currentPage === "api" ? "page" : undefined} className={desktopLinkClass}>API</Link>
           <a href="/verify#use-cases" className={desktopLinkClass}>For institutions</a>
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
@@ -34,10 +35,11 @@ export default function CushVerifyPublicNav({ currentPage }: { currentPage: Curr
           </Link>
         </div>
       </div>
-      <nav aria-label="Cush Verify mobile navigation" className={`grid border-t border-white/10 px-2 py-1.5 md:hidden ${currentPage === "home" ? "grid-cols-4" : "grid-cols-3"}`}>
+      <nav aria-label="Cush Verify mobile navigation" className={`grid border-t border-white/10 px-2 py-1.5 md:hidden ${currentPage === "home" ? "grid-cols-5" : "grid-cols-4"}`}>
         {currentPage === "home" && <a href="/verify#approach" className="rounded-md px-1 py-2 text-center text-xs font-semibold text-blue-100/80 hover:bg-white/5 hover:text-white">Approach</a>}
         <Link href="/verify/how-it-works" aria-current={currentPage === "how-it-works" ? "page" : undefined} className="rounded-md px-1 py-2 text-center text-xs font-semibold text-blue-100/80 hover:bg-white/5 hover:text-white">How it works</Link>
         <Link href="/verify/pricing" aria-current={currentPage === "pricing" ? "page" : undefined} className="rounded-md px-1 py-2 text-center text-xs font-semibold text-blue-100/80 hover:bg-white/5 hover:text-white">Pricing</Link>
+        <Link href="/verify/api" aria-current={currentPage === "api" ? "page" : undefined} className="rounded-md px-1 py-2 text-center text-xs font-semibold text-blue-100/80 hover:bg-white/5 hover:text-white">API</Link>
         <a href="/verify#use-cases" className="rounded-md px-1 py-2 text-center text-xs font-semibold text-blue-100/80 hover:bg-white/5 hover:text-white">Institutions</a>
       </nav>
     </header>

@@ -243,6 +243,9 @@ export default function CushVerifyPricing() {
             <Link href="/verify/how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
               See how it works
             </Link>
+            <Link href="/verify/api" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
+              API access details
+            </Link>
           </div>
         </div>
       </section>

@@ -14,6 +14,7 @@ import TermsOfService from '@/pages/TermsOfService'
 const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 const CushVerify = lazy(() => import('@/pages/CushVerify'))
 const CushVerifyPricing = lazy(() => import('@/pages/CushVerifyPricing'))
+const CushVerifyApi = lazy(() => import('@/pages/CushVerifyApi'))
 const CushVerifyHowItWorks = lazy(() => import('@/pages/CushVerifyHowItWorks'))
 const CushVerifyApplication = lazy(() => import('@/pages/CushVerifyApplication'))
 const CushVerifyWorkspace = lazy(() => import('@/pages/CushVerifyWorkspace'))
@@ -96,6 +97,11 @@ function App() {
               <Route path="/verify/pricing">
                 <Suspense fallback={<PageLoading />}>
                   <CushVerifyPricing />
+                </Suspense>
+              </Route>
+              <Route path="/verify/api">
+                <Suspense fallback={<PageLoading />}>
+                  <CushVerifyApi />
                 </Suspense>
               </Route>
               <Route path="/verify/how-it-works">
