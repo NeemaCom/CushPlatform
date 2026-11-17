@@ -26,6 +26,11 @@ import VisitorAnalytics from '@/components/visitor-intelligence/VisitorAnalytics
 import SessionInactivityGuard from '@/components/auth/SessionInactivityGuard'
 import CushVerifyInactivityGuard from '@/components/auth/CushVerifyInactivityGuard'
 import { auth, onAuthStateChanged, signOut } from '@/firebase'
+import {
+  buildCushVerifyUrl,
+  isCushVerifyHost,
+  isCushVerifyPath,
+} from '@/lib/cush-verify-domain'
 
 export function AuthRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
@@ -75,102 +80,143 @@ function HomeRoute() {
   return <Home />
 }
 
+function CushVerifyRoutes({ redirectRootToVerify = false }: { redirectRootToVerify?: boolean }) {
+  return (
+    <>
+      <CushVerifyInactivityGuard />
+      <div className="min-h-screen bg-white">
+        <Switch>
+          <Route path="/">
+            {redirectRootToVerify
+              ? <Redirect to="/verify" />
+              : <Suspense fallback={<PageLoading />}><CushVerify /></Suspense>}
+          </Route>
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/terms-of-service" component={TermsOfService} />
+          <Route path="/verify/pricing">
+            <Suspense fallback={<PageLoading />}><CushVerifyPricing /></Suspense>
+          </Route>
+          <Route path="/verify/api">
+            <Suspense fallback={<PageLoading />}><CushVerifyApi /></Suspense>
+          </Route>
+          <Route path="/verify/how-it-works">
+            <Suspense fallback={<PageLoading />}><CushVerifyHowItWorks /></Suspense>
+          </Route>
+          <Route path="/verify">
+            <Suspense fallback={<PageLoading />}><CushVerify /></Suspense>
+          </Route>
+          <Route path="/verify/apply">
+            <Suspense fallback={<PageLoading />}><CushVerifyApplication /></Suspense>
+          </Route>
+          <Route path="/verify/login">
+            <Suspense fallback={<PageLoading />}><CushVerifyLogin /></Suspense>
+          </Route>
+          <Route path="/verify/register">
+            <Suspense fallback={<PageLoading />}><CushVerifyInvitationRegistration /></Suspense>
+          </Route>
+          <Route path="/verify/complete">
+            <Suspense fallback={<PageLoading />}><CushVerifyCompleteRegistration /></Suspense>
+          </Route>
+          <Route path="/verify/workspace">
+            <Suspense fallback={<PageLoading />}><CushVerifyWorkspace /></Suspense>
+          </Route>
+        </Switch>
+      </div>
+    </>
+  )
+}
+
+function CushVerifyHostRedirect() {
+  useEffect(() => {
+    window.location.replace(buildCushVerifyUrl(
+      window.location.pathname,
+      window.location.search,
+      window.location.hash,
+    ))
+  }, [])
+
+  return <PageLoading />
+}
+
+function PassportRoutes() {
+  return (
+    <>
+      <SessionInactivityGuard />
+      <VisitorAnalytics />
+      <div className="min-h-screen bg-white">
+        <Switch>
+          <Route path="/">
+            <HomeRoute />
+          </Route>
+          <Route path="/login" component={Login} />
+          <Route path="/privacy-policy" component={PrivacyPolicy} />
+          <Route path="/terms-of-service" component={TermsOfService} />
+
+          {/* Sample passport — public demo */}
+          <Route path="/sample" component={SamplePassport} />
+
+          {/* Shareable passport — unauthenticated landlord view */}
+          <Route path="/passport/:token" component={PublicPassport} />
+
+          {/* Dashboard — authenticated */}
+          <Route path="/dashboard">
+            <AuthRoute><CreditPassport /></AuthRoute>
+          </Route>
+          <Route path="/passport">
+            <AuthRoute><CreditPassport /></AuthRoute>
+          </Route>
+
+          {/* Admin surface is authenticated; APIs enforce permissions server-side. */}
+          <Route path="/admin">
+            <AuthRoute><AdminDashboard /></AuthRoute>
+          </Route>
+
+          {/* Account management and support are authenticated and owner-scoped. */}
+          <Route path="/account/:section">
+            {(params) => <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section={params.section} /></AuthRoute></Suspense>}
+          </Route>
+          <Route path="/support">
+            <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="support" /></AuthRoute></Suspense>
+          </Route>
+          <Route path="/contact">
+            <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="contact" /></AuthRoute></Suspense>
+          </Route>
+        </Switch>
+      </div>
+    </>
+  )
+}
+
+function AppRoutes() {
+  const [location] = useLocation()
+  const dedicatedVerifyHost = isCushVerifyHost(window.location.hostname)
+  const stagingVerifyBuild = import.meta.env.VITE_DEFAULT_APP === 'verify'
+  const verifyExperience = dedicatedVerifyHost || stagingVerifyBuild
+
+  useEffect(() => {
+    document.title = verifyExperience
+      ? 'Cush Verify | Institutional Verification'
+      : 'Cush Passport — Global Credit Identity'
+    if (verifyExperience) {
+      document.querySelector('meta[name="description"]')?.setAttribute(
+        'content',
+        'Cush Verify helps approved institutions request consent-led identity and financial reports.',
+      )
+    }
+  }, [verifyExperience])
+
+  if (dedicatedVerifyHost) return <CushVerifyRoutes />
+  if (stagingVerifyBuild) return <CushVerifyRoutes redirectRootToVerify />
+  if (isCushVerifyPath(location)) return <CushVerifyHostRedirect />
+  return <PassportRoutes />
+}
+
 function App() {
   return (
     <ThemeProvider defaultTheme="light" enableSystem={false}>
       <QueryProvider>
         <Router>
-          <SessionInactivityGuard />
-          <CushVerifyInactivityGuard />
-          <VisitorAnalytics />
-          <div className="min-h-screen bg-white">
-            <Switch>
-              {/* Staging may use Cush Verify as its homepage; production keeps Passport. */}
-              <Route path="/">
-                {import.meta.env.VITE_DEFAULT_APP === 'verify'
-                  ? <Redirect to="/verify" />
-                  : <HomeRoute />}
-              </Route>
-              <Route path="/login" component={Login} />
-              <Route path="/privacy-policy" component={PrivacyPolicy} />
-              <Route path="/terms-of-service" component={TermsOfService} />
-              <Route path="/verify/pricing">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyPricing />
-                </Suspense>
-              </Route>
-              <Route path="/verify/api">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyApi />
-                </Suspense>
-              </Route>
-              <Route path="/verify/how-it-works">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyHowItWorks />
-                </Suspense>
-              </Route>
-              <Route path="/verify">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerify />
-                </Suspense>
-              </Route>
-              <Route path="/verify/apply">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyApplication />
-                </Suspense>
-              </Route>
-              <Route path="/verify/login">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyLogin />
-                </Suspense>
-              </Route>
-              <Route path="/verify/register">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyInvitationRegistration />
-                </Suspense>
-              </Route>
-              <Route path="/verify/complete">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyCompleteRegistration />
-                </Suspense>
-              </Route>
-              <Route path="/verify/workspace">
-                <Suspense fallback={<PageLoading />}>
-                  <CushVerifyWorkspace />
-                </Suspense>
-              </Route>
-
-              {/* Sample passport — public demo */}
-              <Route path="/sample" component={SamplePassport} />
-
-              {/* Shareable passport — unauthenticated landlord view */}
-              <Route path="/passport/:token" component={PublicPassport} />
-
-              {/* Dashboard — authenticated */}
-              <Route path="/dashboard">
-                <AuthRoute><CreditPassport /></AuthRoute>
-              </Route>
-              <Route path="/passport">
-                <AuthRoute><CreditPassport /></AuthRoute>
-              </Route>
-
-              {/* Admin surface is authenticated; APIs enforce permissions server-side. */}
-              <Route path="/admin">
-                <AuthRoute><AdminDashboard /></AuthRoute>
-              </Route>
-
-              {/* Account management and support are authenticated and owner-scoped. */}
-              <Route path="/account/:section">
-                {(params) => <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section={params.section} /></AuthRoute></Suspense>}
-              </Route>
-              <Route path="/support">
-                <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="support" /></AuthRoute></Suspense>
-              </Route>
-              <Route path="/contact">
-                <Suspense fallback={<AccountLoading />}><AuthRoute><AccountCenter section="contact" /></AuthRoute></Suspense>
-              </Route>
-            </Switch>
-          </div>
+          <AppRoutes />
         </Router>
         <Toaster />
       </QueryProvider>

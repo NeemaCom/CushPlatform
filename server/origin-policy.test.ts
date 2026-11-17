@@ -6,6 +6,7 @@ describe("frontend origin policy", () => {
     const allowedOrigins = getAllowedFrontendOrigins("production", "");
 
     expect(allowedOrigins.has("https://app.we-cush.com")).toBe(true);
+    expect(allowedOrigins.has("https://verify.we-cush.com")).toBe(true);
     expect(allowedOrigins.has("http://localhost:5000")).toBe(false);
   });
 

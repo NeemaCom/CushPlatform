@@ -106,6 +106,13 @@ function frontendOrigin(req: Request): string | null {
     }
   }
 
+  if (
+    process.env.NODE_ENV === "production" &&
+    allowedOrigins.has("https://verify.we-cush.com")
+  ) {
+    return "https://verify.we-cush.com";
+  }
+
   const requestOrigin = req.get("Origin");
   if (requestOrigin && allowedOrigins.has(requestOrigin)) return requestOrigin;
   return [...allowedOrigins][0] ?? null;

@@ -1,4 +1,7 @@
-const PRODUCTION_FRONTEND_ORIGINS = ["https://app.we-cush.com"];
+const PRODUCTION_FRONTEND_ORIGINS = [
+  "https://app.we-cush.com",
+  "https://verify.we-cush.com",
+];
 const DEVELOPMENT_FRONTEND_ORIGINS = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
