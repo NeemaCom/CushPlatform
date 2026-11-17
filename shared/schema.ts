@@ -411,7 +411,14 @@ export const cushVerifyApplicationEvents = pgTable("cush_verify_application_even
     .on(table.applicationId, table.createdAt),
 })).enableRLS();
 
-export type CushVerifyReportCategory = "score_summary" | "assessment_status" | "evidence_summary";
+export type CushVerifyReportCategory =
+  | "income_employment"
+  | "rent_housing"
+  | "savings"
+  | "financial_commitments"
+  | "score_summary"
+  | "assessment_status"
+  | "evidence_summary";
 
 export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
   id: uuid("id").primaryKey(),
@@ -420,6 +427,9 @@ export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
   requestedByInstitutionalUserId: integer("requested_by_institutional_user_id").notNull()
     .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
   targetUserId: integer("target_user_id").references(() => users.id, { onDelete: "set null" }),
+  recipientEmailHash: text("recipient_email_hash"),
+  invitationTokenHash: text("invitation_token_hash"),
+  invitationExpiresAt: timestamp("invitation_expires_at", { withTimezone: true, mode: "date" }),
   recipientLabel: text("recipient_label").notNull(),
   purpose: text("purpose").notNull(),
   requestedCategories: text("requested_categories").array().$type<CushVerifyReportCategory[]>().notNull(),
@@ -441,8 +451,8 @@ export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
   ),
   categoryCheck: check(
     "cush_verify_report_requests_categories_check",
-    sql`cardinality(${table.requestedCategories}) between 1 and 3
-      and ${table.requestedCategories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+    sql`cardinality(${table.requestedCategories}) between 1 and 7
+      and ${table.requestedCategories} <@ ARRAY['income_employment', 'rent_housing', 'savings', 'financial_commitments', 'score_summary', 'assessment_status', 'evidence_summary']::text[]`,
   ),
   authorizationDaysCheck: check(
     "cush_verify_report_requests_authorization_days_check",
@@ -451,6 +461,19 @@ export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
   recipientLabelLengthCheck: check(
     "cush_verify_report_requests_recipient_label_length_check",
     sql`char_length(${table.recipientLabel}) between 3 and 254`,
+  ),
+  recipientEmailHashCheck: check(
+    "cush_verify_report_requests_recipient_email_hash_check",
+    sql`${table.recipientEmailHash} is null or ${table.recipientEmailHash} ~ '^[a-f0-9]{64}$'`,
+  ),
+  invitationHashCheck: check(
+    "cush_verify_report_requests_invitation_hash_check",
+    sql`${table.invitationTokenHash} is null or (
+      ${table.invitationTokenHash} ~ '^[a-f0-9]{64}$'
+      and ${table.recipientEmailHash} is not null
+      and ${table.invitationExpiresAt} is not null
+      and ${table.invitationExpiresAt} > ${table.createdAt}
+    )`,
   ),
   expiryCheck: check(
     "cush_verify_report_requests_expiry_check",
@@ -463,6 +486,11 @@ export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
   ),
   institutionStatusIndex: index("cush_verify_report_requests_institution_status_created_idx")
     .on(table.institutionId, table.status, table.createdAt),
+  invitationTokenUnique: uniqueIndex("cush_verify_report_requests_invitation_token_uq")
+    .on(table.invitationTokenHash)
+    .where(sql`${table.invitationTokenHash} is not null`),
+  invitationEmailIndex: index("cush_verify_report_requests_invitation_email_hash_idx")
+    .on(table.recipientEmailHash, table.status),
   targetStatusIndex: index("cush_verify_report_requests_target_status_created_idx")
     .on(table.targetUserId, table.status, table.createdAt),
   requestedByIndex: index("cush_verify_report_requests_requested_by_created_idx")
@@ -489,8 +517,8 @@ export const cushVerifyReportConsents = pgTable("cush_verify_report_consents", {
   ),
   categoriesCheck: check(
     "cush_verify_report_consents_categories_check",
-    sql`cardinality(${table.approvedCategories}) between 0 and 3
-      and ${table.approvedCategories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+    sql`cardinality(${table.approvedCategories}) between 0 and 7
+      and ${table.approvedCategories} <@ ARRAY['income_employment', 'rent_housing', 'savings', 'financial_commitments', 'score_summary', 'assessment_status', 'evidence_summary']::text[]`,
   ),
   decisionTimestampsCheck: check(
     "cush_verify_report_consents_timestamps_check",
@@ -510,7 +538,7 @@ export const cushVerifyReportEvents = pgTable("cush_verify_report_events", {
   requestId: uuid("request_id").notNull()
     .references(() => cushVerifyReportRequests.id, { onDelete: "cascade" }),
   eventType: text("event_type").$type<
-    "request_created" | "consent_approved" | "consent_declined" | "consent_revoked" | "report_delivered" | "report_accessed"
+    "request_created" | "request_linked" | "consent_approved" | "consent_declined" | "consent_revoked" | "report_delivered" | "report_accessed"
   >().notNull(),
   actorType: text("actor_type").$type<"institutional_user" | "passport_user" | "system">().notNull(),
   actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -521,7 +549,7 @@ export const cushVerifyReportEvents = pgTable("cush_verify_report_events", {
 }, (table) => ({
   eventTypeCheck: check(
     "cush_verify_report_events_type_check",
-    sql`${table.eventType} in ('request_created', 'consent_approved', 'consent_declined', 'consent_revoked', 'report_delivered', 'report_accessed')`,
+    sql`${table.eventType} in ('request_created', 'request_linked', 'consent_approved', 'consent_declined', 'consent_revoked', 'report_delivered', 'report_accessed')`,
   ),
   actorTypeCheck: check(
     "cush_verify_report_events_actor_check",
@@ -552,13 +580,36 @@ export const cushVerifyReportDeliveries = pgTable("cush_verify_report_deliveries
   ),
   categoriesCheck: check(
     "cush_verify_report_deliveries_categories_check",
-    sql`cardinality(${table.categories}) between 1 and 3
-      and ${table.categories} <@ ARRAY['score_summary', 'assessment_status', 'evidence_summary']::text[]`,
+    sql`cardinality(${table.categories}) between 1 and 7
+      and ${table.categories} <@ ARRAY['income_employment', 'rent_housing', 'savings', 'financial_commitments', 'score_summary', 'assessment_status', 'evidence_summary']::text[]`,
   ),
   requestDigestUnique: unique("cush_verify_report_deliveries_request_digest_uq")
     .on(table.requestId, table.reportDigest),
   institutionUserDateIndex: index("cush_verify_report_deliveries_actor_date_idx")
     .on(table.deliveredByInstitutionalUserId, table.deliveredAt),
+})).enableRLS();
+
+export const cushVerifyDiscoverySearches = pgTable("cush_verify_discovery_searches", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  institutionalUserId: integer("institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  identifierType: text("identifier_type").$type<"email" | "reference_code">().notNull(),
+  identifierDigest: text("identifier_digest").notNull(),
+  matchFound: boolean("match_found").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  typeCheck: check(
+    "cush_verify_discovery_searches_identifier_type_check",
+    sql`${table.identifierType} in ('email', 'reference_code')`,
+  ),
+  digestCheck: check(
+    "cush_verify_discovery_searches_identifier_digest_check",
+    sql`${table.identifierDigest} ~ '^[a-f0-9]{64}$'`,
+  ),
+  institutionCreatedIndex: index("cush_verify_discovery_searches_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
 })).enableRLS();
 
 export type CushVerifyPricingFeatureFlags = {

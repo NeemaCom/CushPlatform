@@ -11,6 +11,7 @@ import PublicPassport from '@/pages/PublicPassport'
 import SamplePassport from '@/pages/SamplePassport'
 import PrivacyPolicy from '@/pages/PrivacyPolicy'
 import TermsOfService from '@/pages/TermsOfService'
+import PassportConsentInvite from '@/pages/PassportConsentInvite'
 const AccountCenter = lazy(() => import('@/pages/AccountCenter'))
 const CushVerify = lazy(() => import('@/pages/CushVerify'))
 const CushVerifyPricing = lazy(() => import('@/pages/CushVerifyPricing'))
@@ -39,7 +40,10 @@ export function AuthRoute({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoading && !user) {
-      setLocation('/login')
+      const next = window.location.pathname === '/passport/consent-invite'
+        ? `${window.location.pathname}${window.location.search}`
+        : ''
+      setLocation(next ? `/login?next=${encodeURIComponent(next)}` : '/login')
       if (user === null) {
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) void signOut(auth).catch(() => undefined)
@@ -160,6 +164,9 @@ function PassportRoutes() {
           <Route path="/sample" component={SamplePassport} />
 
           {/* Shareable passport — unauthenticated landlord view */}
+          <Route path="/passport/consent-invite">
+            <AuthRoute><PassportConsentInvite /></AuthRoute>
+          </Route>
           <Route path="/passport/:token" component={PublicPassport} />
 
           {/* Dashboard — authenticated */}

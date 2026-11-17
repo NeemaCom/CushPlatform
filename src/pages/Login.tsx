@@ -311,7 +311,11 @@ export default function Login() {
 
   async function afterLogin() {
     await qc.invalidateQueries({ queryKey: ['/api/auth/me'] })
-    setLocation('/dashboard')
+    const next = new URLSearchParams(window.location.search).get('next')
+    const safeNext = next?.startsWith('/passport/consent-invite?token=') && !next.startsWith('//')
+      ? next
+      : '/dashboard'
+    setLocation(safeNext)
   }
 
   async function handleGoogle() {
