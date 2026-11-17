@@ -14,7 +14,7 @@ import {
   cushVerifySubscriptions,
 } from "@shared/schema";
 import { calculateAnnualPricing } from "@shared/cush-verify-pricing";
-import { db } from "./db";
+import { cushVerifyDb as db } from "./db";
 import {
   isAuthenticated,
   requireAdminPermission,

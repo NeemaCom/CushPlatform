@@ -14,6 +14,7 @@
 - [Visitor analytics privacy](visitor-analytics-privacy.md) — optional visitor analytics requires explicit opt-in; do not reuse or persist raw IP for behavioral analytics.
 - [Package installs and workspace settings](package-install-workspace-config.md) — Replit package updates may touch `.replit`; validate launcher changes before keeping them.
 - [Cush Verify pricing snapshots](cush-verify-pricing-snapshots.md) — future subscriptions must retain the published catalog version and agreed terms so later prices do not change existing agreements.
+- [Cush Verify database boundary](cush-verify-database-boundary.md) — Verify production uses its own Supabase project; Passport records remain separate and are accessed only through consent-controlled server code.
 - [Cush Verify report billing](cush-verify-report-billing.md) — bill only distinct authorized report content successfully returned; retries and consent alone are not billable.
 - [Cush Verify Stripe runtime](cush-verify-stripe-runtime.md) — production Render needs its own Stripe keys and webhook secret; a Replit connection does not configure the deployed app.
 - [Cush Verify domain separation](cush-verify-domain-separation.md) — Cush Verify must have its own public subdomain instead of sharing the Cush Passport site address.

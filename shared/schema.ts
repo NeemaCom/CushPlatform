@@ -191,6 +191,8 @@ export const userConsentRecords = pgTable("user_consent_records", {
     .on(table.userId, table.acceptedAt),
 })).enableRLS();
 
+// Cush Verify production uses a separate database. Numeric IDs that identify
+// Passport users or admins are opaque references and must not be cross-database FKs.
 export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_interests", {
   id: serial("id").primaryKey(),
   institutionName: text("institution_name").notNull(),
@@ -204,7 +206,7 @@ export const cushVerifyInstitutionInterests = pgTable("cush_verify_institution_i
   preferredEngagementModel: text("preferred_engagement_model"),
   contactConsentAcceptedAt: timestamp("contact_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("pending_review"),
-  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedBy: integer("reviewed_by"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -249,7 +251,7 @@ export const cushVerifyApplications = pgTable("cush_verify_applications", {
   estimatedMonthlyVerifications: integer("estimated_monthly_verifications"),
   contactConsentAcceptedAt: timestamp("contact_consent_accepted_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("submitted"),
-  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedBy: integer("reviewed_by"),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -288,7 +290,7 @@ export const cushVerifyInstitutions = pgTable("cush_verify_institutions", {
   normalizedBusinessEmail: text("normalized_business_email").notNull(),
   duplicateKey: text("duplicate_key").notNull(),
   status: text("status").notNull().default("pending_approval"),
-  approvedBy: integer("approved_by").references(() => users.id, { onDelete: "set null" }),
+  approvedBy: integer("approved_by"),
   approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -336,7 +338,7 @@ export const cushVerifyInvitations = pgTable("cush_verify_invitations", {
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
   revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
-  createdBy: integer("created_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdBy: integer("created_by").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   institutionCreatedIndex: index("cush_verify_invitations_institution_created_idx")
@@ -398,7 +400,7 @@ export const cushVerifyApplicationEvents = pgTable("cush_verify_application_even
     .references(() => cushVerifyApplications.id, { onDelete: "cascade" }),
   institutionId: integer("institution_id")
     .references(() => cushVerifyInstitutions.id, { onDelete: "set null" }),
-  actorAdminId: integer("actor_admin_id").references(() => users.id, { onDelete: "set null" }),
+  actorAdminId: integer("actor_admin_id"),
   eventType: text("event_type").notNull(),
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -426,7 +428,7 @@ export const cushVerifyReportRequests = pgTable("cush_verify_report_requests", {
     .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
   requestedByInstitutionalUserId: integer("requested_by_institutional_user_id").notNull()
     .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
-  targetUserId: integer("target_user_id").references(() => users.id, { onDelete: "set null" }),
+  targetUserId: integer("target_user_id"),
   recipientEmailHash: text("recipient_email_hash"),
   invitationTokenHash: text("invitation_token_hash"),
   invitationExpiresAt: timestamp("invitation_expires_at", { withTimezone: true, mode: "date" }),
@@ -501,7 +503,7 @@ export const cushVerifyReportConsents = pgTable("cush_verify_report_consents", {
   id: serial("id").primaryKey(),
   requestId: uuid("request_id").notNull()
     .references(() => cushVerifyReportRequests.id, { onDelete: "cascade" }).unique(),
-  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull(),
   status: text("status").$type<"approved" | "declined" | "revoked">().notNull(),
   approvedCategories: text("approved_categories").array().$type<CushVerifyReportCategory[]>().notNull().default([]),
   approvedAt: timestamp("approved_at", { withTimezone: true, mode: "date" }),
@@ -541,7 +543,7 @@ export const cushVerifyReportEvents = pgTable("cush_verify_report_events", {
     "request_created" | "request_linked" | "consent_approved" | "consent_declined" | "consent_revoked" | "report_delivered" | "report_accessed"
   >().notNull(),
   actorType: text("actor_type").$type<"institutional_user" | "passport_user" | "system">().notNull(),
-  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorUserId: integer("actor_user_id"),
   actorInstitutionalUserId: integer("actor_institutional_user_id")
     .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "set null" }),
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
@@ -647,8 +649,8 @@ export const cushVerifyPricingVersions = pgTable("cush_verify_pricing_versions",
   defaultCurrency: text("default_currency").notNull().default("USD"),
   annualDiscountBps: integer("annual_discount_bps").notNull().default(1500),
   faqItems: jsonb("faq_items").$type<CushVerifyPricingFaq[]>().notNull().default([]),
-  createdBy: integer("created_by").references(() => users.id, { onDelete: "set null" }),
-  publishedBy: integer("published_by").references(() => users.id, { onDelete: "set null" }),
+  createdBy: integer("created_by"),
+  publishedBy: integer("published_by"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   publishedAt: timestamp("published_at", { withTimezone: true, mode: "date" }),
@@ -900,8 +902,7 @@ export const cushVerifyCreditLedger = pgTable("cush_verify_credit_ledger", {
   amountMinor: integer("amount_minor"),
   currency: text("currency"),
   idempotencyKey: text("idempotency_key").notNull().unique(),
-  createdByAdminUserId: integer("created_by_admin_user_id")
-    .references(() => users.id, { onDelete: "set null" }),
+  createdByAdminUserId: integer("created_by_admin_user_id"),
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({

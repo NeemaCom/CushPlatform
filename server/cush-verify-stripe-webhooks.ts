@@ -8,7 +8,7 @@ import {
   cushVerifyStripeWebhookEvents,
   cushVerifySubscriptions,
 } from "@shared/schema";
-import { db } from "./db";
+import { cushVerifyDb as db } from "./db";
 import {
   allocatePaidInvoiceCredits,
   addUtcMonth,

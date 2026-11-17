@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, Clock3, FileCheck2, LoaderCircle, Plus, ShieldCheck } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
+import { getProductSessionHeaders } from "@/lib/product-session";
 import { useToast } from "@/hooks/use-toast";
 import {
   CUSH_VERIFY_REPORT_CATEGORIES,
@@ -27,7 +28,7 @@ async function requestJson<T>(path: string, method = "GET", body?: unknown): Pro
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...getProductSessionHeaders(), "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const payload = await response.json().catch(() => ({}));

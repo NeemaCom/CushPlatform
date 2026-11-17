@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_pricing_versions (
   annual_discount_bps integer NOT NULL DEFAULT 1500
     CHECK (annual_discount_bps BETWEEN 0 AND 9999),
   faq_items jsonb NOT NULL DEFAULT '[]'::jsonb,
-  created_by integer REFERENCES public.users(id) ON DELETE SET NULL,
-  published_by integer REFERENCES public.users(id) ON DELETE SET NULL,
+  created_by integer,
+  published_by integer,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   published_at timestamptz,

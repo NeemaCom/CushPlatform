@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_institution_interests (
   contact_consent_accepted_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending_review'
     CHECK (status IN ('pending_review', 'in_review', 'approved_for_follow_up', 'not_approved')),
-  reviewed_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  reviewed_by INTEGER,
   reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

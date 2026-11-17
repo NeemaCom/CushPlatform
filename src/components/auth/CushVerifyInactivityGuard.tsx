@@ -5,6 +5,7 @@ import { signOut } from "firebase/auth";
 import { useSessionInactivity, type SessionEndReason } from "@/hooks/useSessionInactivity";
 import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-verify-firebase";
 import { API_BASE_URL } from "@/lib/api-base";
+import { getProductSessionHeaders } from "@/lib/product-session";
 import { CUSH_VERIFY_ACTIVITY_STORAGE_KEY, CUSH_VERIFY_LOGOUT_STORAGE_KEY } from "@/lib/cush-verify-session";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,7 +27,10 @@ export default function CushVerifyInactivityGuard() {
     enabled: activeRoute,
     retry: false,
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/api/verify/auth/me`, { credentials: "include" });
+      const response = await fetch(`${API_BASE_URL}/api/verify/auth/me`, {
+        credentials: "include",
+        headers: getProductSessionHeaders(),
+      });
       if (!response.ok) throw new Error(`${response.status}: Institutional session expired`);
       return response.json() as Promise<CushVerifyIdentity>;
     },
@@ -49,6 +53,7 @@ export default function CushVerifyInactivityGuard() {
     void fetch(`${API_BASE_URL}/api/verify/auth/logout`, {
       method: "POST",
       credentials: "include",
+      headers: getProductSessionHeaders(),
     }).catch(() => undefined);
     if (isCushVerifyFirebaseConfigured()) {
       void signOut(getCushVerifyAuth()).catch(() => undefined);

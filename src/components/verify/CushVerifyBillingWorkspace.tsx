@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertCircle, ArrowUpRight, CreditCard, LoaderCircle, ReceiptText, RefreshCw, WalletCards } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
+import { getProductSessionHeaders } from "@/lib/product-session";
 
 type BillingEntry = {
   id: number;
@@ -84,7 +85,7 @@ async function requestJson<T>(path: string, method = "GET", body?: unknown): Pro
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: { ...getProductSessionHeaders(), "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const payload = await response.json().catch(() => ({}));

@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, inArray, isNull, lt, lte, or } from "drizzle-orm";
-import { db } from "./db";
+import { cushVerifyDb as db } from "./db";
 import {
   cushVerifyBillingAccounts,
   cushVerifyBillingOutbox,
