@@ -41,6 +41,14 @@ export const cushVerifyApplicationSchema = z.object({
   contactConsent: z.literal(true),
 }).strict();
 
+export const cushVerifyInstitutionalRegistrationSchema = cushVerifyApplicationSchema.extend({
+  password: z.string().min(12).max(4096),
+  passwordConfirmation: z.string().min(12).max(4096),
+}).refine((value) => value.password === value.passwordConfirmation, {
+  path: ["passwordConfirmation"],
+  message: "Passwords do not match.",
+});
+
 export const cushVerifyInstitutionInterestSchema = z.object({
   institutionName: z.string().trim().min(2).max(160),
   institutionType: z.enum(cushVerifyInstitutionTypes),
@@ -61,4 +69,5 @@ export const cushVerifyApplicationStatusSchema = z.enum(cushVerifyApplicationSta
 export type CushVerifyInstitutionInterestInput = z.infer<typeof cushVerifyInstitutionInterestSchema>;
 export type CushVerifyReviewStatus = z.infer<typeof cushVerifyReviewStatusSchema>;
 export type CushVerifyApplicationInput = z.infer<typeof cushVerifyApplicationSchema>;
+export type CushVerifyInstitutionalRegistrationInput = z.infer<typeof cushVerifyInstitutionalRegistrationSchema>;
 export type CushVerifyApplicationStatus = z.infer<typeof cushVerifyApplicationStatusSchema>;

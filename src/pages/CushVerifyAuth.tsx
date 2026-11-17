@@ -1,12 +1,25 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { createUserWithEmailAndPassword, reload, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ArrowLeft, Building2, MailCheck, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-verify-firebase";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function getQueryToken() {
   return new URLSearchParams(window.location.search).get("token") ?? "";
+}
+
+function getActivationToken() {
+  const fragment = window.location.hash.replace(/^#/, "");
+  return new URLSearchParams(fragment).get("token") ?? getQueryToken();
 }
 
 function errorMessage(error: unknown) {
@@ -52,7 +65,7 @@ function AuthLayout({ children }: { children: React.ReactNode }) {
           {children}
         </section>
         <p className="mx-auto mt-5 max-w-md text-center text-xs leading-5 text-[#71819b]">
-          Institutional accounts are separate from Cush Passport profiles. Applications and invitations do not grant verification access; Cush Admin approval is required.
+          Institutional accounts are separate from Cush Passport profiles. New Cush Verify accounts are activated by confirming the official email address.
         </p>
       </div>
     </main>
@@ -222,6 +235,153 @@ export function CushVerifyInvitationRegistration() {
             <p role={error ? "alert" : "status"} className="mt-4 text-sm text-[#52627b]">{error || "Checking your invitation…"}</p>
           )}
           <p className="mt-5 text-sm text-[#61728a]">Already registered? <button type="button" onClick={() => setLocation(`/verify/login?token=${encodeURIComponent(token)}`)} className="font-semibold text-[#275fb7] hover:underline">Sign in to accept it</button></p>
+        </>
+      )}
+    </AuthLayout>
+  );
+}
+
+export function CushVerifyActivation() {
+  const [, setLocation] = useLocation();
+  const token = getActivationToken();
+  const [activation, setActivation] = useState<{
+    email: string;
+    contactName: string;
+    institutionName: string;
+  } | null>(null);
+  const [lookupError, setLookupError] = useState("");
+  const [activationError, setActivationError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [activated, setActivated] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!token) {
+      setLookupError("This activation link is missing or invalid.");
+      return;
+    }
+    apiRequest("POST", "/api/verify/activations/lookup", { token })
+      .then((response) => response.json())
+      .then((value: { email: string; contactName: string; institutionName: string }) => {
+        if (!cancelled) {
+          setActivation(value);
+          setResendEmail(value.email);
+        }
+      })
+      .catch((lookupFailure) => {
+        if (!cancelled) setLookupError(errorMessage(lookupFailure));
+      });
+    return () => { cancelled = true; };
+  }, [token]);
+
+  async function completeActivation() {
+    setActivationError("");
+    setBusy(true);
+    try {
+      await apiRequest("POST", "/api/verify/activations/complete", { token });
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+      setActivated(true);
+    } catch (activationFailure) {
+      setActivationError(errorMessage(activationFailure));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestFreshLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setResendMessage("");
+    setResendBusy(true);
+    try {
+      const response = await apiRequest("POST", "/api/verify/applications/resend-activation", {
+        businessEmail: resendEmail.trim(),
+      });
+      const result = await response.json() as { message?: string };
+      setResendMessage(result.message ?? "If an application is waiting for activation, a fresh link has been sent.");
+    } catch (resendFailure) {
+      setResendMessage(errorMessage(resendFailure));
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
+  return (
+    <AuthLayout>
+      {activated ? (
+        <>
+          <div className="py-2">
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-[#e3f4ef] text-[#16816f]">
+              <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+            </span>
+            <h1 className="mt-5 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Your account is active.</h1>
+            <p className="mt-3 text-sm leading-6 text-[#52627b]">Your official email is confirmed. Sign in to open the Cush Verify workspace.</p>
+            <Link href="/verify/login" className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">
+              Sign in to Cush Verify
+            </Link>
+          </div>
+          <Dialog open={activated} onOpenChange={setActivated}>
+            <DialogContent className="border-[#d8e3f1] bg-white text-[#14213a] sm:max-w-md">
+              <DialogHeader>
+                <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-[#e3f4ef] text-[#16816f] sm:mx-0">
+                  <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <DialogTitle className="pt-2 font-serif text-2xl tracking-[-0.03em] text-[#12213d]">Welcome to Cush Verify</DialogTitle>
+                <DialogDescription className="text-sm leading-6 text-[#52627b]">
+                  Your official email is verified and your institutional account is active. Sign in with your business email and password to open the full workspace.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <button type="button" onClick={() => setLocation("/verify/login")} className="min-h-11 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">
+                  Continue to sign in
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Email activation</p>
+          <h1 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Activate your institutional account</h1>
+          {activation ? (
+            <>
+              <p className="mt-3 text-sm leading-6 text-[#52627b]">
+                Confirm the official email for <strong>{activation.institutionName}</strong>. The account will be active immediately after confirmation.
+              </p>
+              <p className="mt-4 rounded-xl bg-[#f8fbff] p-3 text-sm text-[#40516d]">
+                Official email: <strong>{activation.email}</strong>
+              </p>
+              {activationError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{activationError}</p>}
+              <button type="button" disabled={busy} onClick={() => void completeActivation()} className="mt-5 min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">
+                {busy ? "Activating account…" : "Confirm email and activate"}
+              </button>
+              <p className="mt-4 text-xs leading-5 text-[#61728a]">
+                This one-time link is valid for 24 hours. After activation, sign in with the password you created during application.
+              </p>
+            </>
+          ) : (
+            <>
+              <p role={lookupError ? "alert" : "status"} className="mt-4 text-sm leading-6 text-[#52627b]">
+                {lookupError || "Checking your secure activation link…"}
+              </p>
+              {lookupError && (
+                <form onSubmit={(event) => void requestFreshLink(event)} className="mt-5 space-y-3">
+                  <label className="block text-sm font-medium">Institutional email
+                    <input required type="email" maxLength={254} autoComplete="email" value={resendEmail} onChange={(event) => setResendEmail(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-[#cad7e8] bg-[#f8fbff] px-4 text-sm outline-none focus:border-[#3977e6] focus:ring-4 focus:ring-[#3977e6]/15" />
+                  </label>
+                  <button disabled={resendBusy} className="min-h-11 w-full rounded-full border border-[#cad7e8] px-5 text-sm font-semibold text-[#275fb7] hover:bg-[#f8fbff] disabled:opacity-60">
+                    {resendBusy ? "Requesting a fresh link…" : "Resend activation link"}
+                  </button>
+                  {resendMessage && <p role="status" className="text-xs leading-5 text-[#61728a]">{resendMessage}</p>}
+                </form>
+              )}
+            </>
+          )}
+          <p className="mt-5 text-sm text-[#61728a]">
+            Already activated? <Link href="/verify/login" className="font-semibold text-[#275fb7] hover:underline">Sign in</Link>
+          </p>
         </>
       )}
     </AuthLayout>

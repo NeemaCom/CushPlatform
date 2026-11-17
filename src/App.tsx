@@ -19,6 +19,7 @@ const CushVerifyHowItWorks = lazy(() => import('@/pages/CushVerifyHowItWorks'))
 const CushVerifyApplication = lazy(() => import('@/pages/CushVerifyApplication'))
 const CushVerifyWorkspace = lazy(() => import('@/pages/CushVerifyWorkspace'))
 const CushVerifyLogin = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyLogin })))
+const CushVerifyActivation = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyActivation })))
 const CushVerifyInvitationRegistration = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyInvitationRegistration })))
 const CushVerifyCompleteRegistration = lazy(() => import('@/pages/CushVerifyAuth').then((module) => ({ default: module.CushVerifyCompleteRegistration })))
 import { useAuth } from '@/hooks/useAuth'
@@ -107,6 +108,9 @@ function CushVerifyRoutes({ redirectRootToVerify = false }: { redirectRootToVeri
           </Route>
           <Route path="/verify/apply">
             <Suspense fallback={<PageLoading />}><CushVerifyApplication /></Suspense>
+          </Route>
+          <Route path="/verify/activate">
+            <Suspense fallback={<PageLoading />}><CushVerifyActivation /></Suspense>
           </Route>
           <Route path="/verify/login">
             <Suspense fallback={<PageLoading />}><CushVerifyLogin /></Suspense>

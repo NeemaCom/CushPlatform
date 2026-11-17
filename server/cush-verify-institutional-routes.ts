@@ -4,6 +4,7 @@ import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import {
   cushVerifyApplications,
   cushVerifyApplicationEvents,
+  cushVerifyEmailActivations,
   cushVerifyInstitutionalMemberships,
   cushVerifyInstitutionalUsers,
   cushVerifyInstitutions,
@@ -11,6 +12,7 @@ import {
 } from "@shared/schema";
 import {
   cushVerifyApplicationSchema,
+  cushVerifyInstitutionalRegistrationSchema,
   cushVerifyApplicationStatusSchema,
 } from "@shared/cush-verify";
 import {
@@ -24,16 +26,25 @@ import {
   requireAdminPermission,
   requireTrustedAdminOrigin,
 } from "./auth";
-import { verifyCushVerifyFirebaseIdentity } from "./firebase-auth";
+import {
+  createCushVerifyPendingFirebaseUser,
+  deleteCushVerifyFirebaseUser,
+  setCushVerifyFirebaseUserActivated,
+  verifyCushVerifyFirebaseIdentity,
+} from "./firebase-auth";
 import { recordAdminAuditEvent } from "./admin-audit";
 import { getAllowedFrontendOrigins } from "./origin-policy";
-import { sendCushVerifyInvitationEmail } from "./cush-verify-invitation-email";
+import {
+  sendCushVerifyActivationEmail,
+  sendCushVerifyInvitationEmail,
+} from "./cush-verify-invitation-email";
 import { authRateLimit } from "./security";
 import { SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const APPLICATION_CONFIRMATION =
-  "Thank you for your interest in Cush Verify. Your institutional interest has been received. The Cush team will be in touch.";
+const ACTIVATION_TTL_MS = 24 * 60 * 60 * 1000;
+const GENERIC_ACTIVATION_RESEND_MESSAGE =
+  "If an application is waiting for email activation, a fresh link has been sent.";
 
 export type InstitutionalRequest = Request & {
   cushVerifyInstitutionalUserId?: number;
@@ -53,6 +64,10 @@ function hashInvitationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function hashActivationToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
 function isUniqueViolation(error: unknown): boolean {
   return !!error && typeof error === "object" && "code" in error &&
     (error as { code?: unknown }).code === "23505";
@@ -65,6 +80,7 @@ function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boo
     "cush_verify_institutions",
     "cush_verify_institutional_users",
     "cush_verify_invitations",
+    "cush_verify_email_activations",
     "cush_verify_institutional_memberships",
     "cush_verify_application_events",
   ];
@@ -90,7 +106,7 @@ function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boo
 function publicApplicationError(res: Response) {
   return res.status(409).json({
     code: "CUSH_VERIFY_DUPLICATE_APPLICATION",
-    error: "An application for this institution or business email already exists. Contact Cush support if you need help.",
+    error: "We could not start a new application with those details. If you have already applied, request a fresh activation link or contact Cush support.",
   });
 }
 
@@ -123,6 +139,14 @@ function invitationUrl(req: Request, token: string): string | null {
   if (!origin) return null;
   const url = new URL("/verify/register", origin);
   url.searchParams.set("token", token);
+  return url.toString();
+}
+
+function emailActivationUrl(req: Request, token: string): string | null {
+  const origin = frontendOrigin(req);
+  if (!origin) return null;
+  const url = new URL("/verify/activate", origin);
+  url.hash = new URLSearchParams({ token }).toString();
   return url.toString();
 }
 
@@ -250,7 +274,7 @@ export function requireApprovedInstitution(
       })) {
         return res.status(403).json({
           code: "CUSH_VERIFY_APPROVAL_REQUIRED",
-          error: "Cush Admin must approve your organisation before verification workspace access is enabled.",
+          error: "Institutional access is not active. Complete the official email activation or contact Cush support.",
         });
       }
       next();
@@ -262,17 +286,27 @@ export function requireApprovedInstitution(
 
 export function registerCushVerifyInstitutionalRoutes(app: Express): void {
   app.post("/api/verify/applications", authRateLimit, async (req, res) => {
-    const parsed = cushVerifyApplicationSchema.safeParse(req.body);
+    const parsed = cushVerifyInstitutionalRegistrationSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Check the required institution and contact details." });
+      return res.status(400).json({ error: "Check the required institution, contact, and password details." });
     }
 
-    const input = parsed.data;
+    const { password, passwordConfirmation: _passwordConfirmation, ...applicationFields } = parsed.data;
+    const input = cushVerifyApplicationSchema.parse(applicationFields);
     const businessEmail = normalizeEmail(input.businessEmail);
     const duplicateKey = normalizeDuplicateKey(input.legalName, input.countryOfRegistration);
-    const submittedAt = new Date();
+    const token = randomBytes(32).toString("hex");
+    const now = new Date();
+    let firebaseUid: string | undefined;
+    let applicationId: number | undefined;
+    let activationId: number | undefined;
 
     try {
+      firebaseUid = await createCushVerifyPendingFirebaseUser({
+        email: businessEmail,
+        password,
+        displayName: input.contactFullName,
+      });
       const created = await db.transaction(async (tx) => {
         const [application] = await tx.insert(cushVerifyApplications).values({
           legalName: input.legalName,
@@ -288,22 +322,364 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           businessTelephone: input.businessTelephone,
           intendedUse: input.intendedUse,
           estimatedMonthlyVerifications: input.estimatedMonthlyVerifications ?? null,
-          contactConsentAcceptedAt: submittedAt,
+          contactConsentAcceptedAt: now,
         }).returning({ id: cushVerifyApplications.id });
+        const [activation] = await tx.insert(cushVerifyEmailActivations).values({
+          applicationId: application.id,
+          firebaseUid: firebaseUid!,
+          tokenHash: hashActivationToken(token),
+          expiresAt: new Date(now.getTime() + ACTIVATION_TTL_MS),
+        }).returning({ id: cushVerifyEmailActivations.id });
         await tx.insert(cushVerifyApplicationEvents).values({
           applicationId: application.id,
           eventType: "submitted",
         });
-        return application;
+        return { applicationId: application.id, activationId: activation.id };
       });
-      return res.status(201).json({ success: true, message: APPLICATION_CONFIRMATION, applicationId: created.id });
+      applicationId = created.applicationId;
+      activationId = created.activationId;
     } catch (error) {
       if (respondIfInstitutionalSchemaMissing(error, res)) return;
-      if (isUniqueViolation(error)) return publicApplicationError(res);
+      if (firebaseUid) {
+        await deleteCushVerifyFirebaseUser(firebaseUid).catch((cleanupError) => {
+          console.error("Cush Verify pending identity cleanup failed", {
+            errorType: cleanupError instanceof Error ? cleanupError.name : "UnknownError",
+          });
+        });
+      }
+      const code = error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "";
+      if (code === "CUSH_VERIFY_EMAIL_ALREADY_EXISTS" || isUniqueViolation(error)) {
+        return publicApplicationError(res);
+      }
       console.error("Cush Verify institutional application submission failed", {
         errorType: error instanceof Error ? error.name : "UnknownError",
+        code: code.startsWith("CUSH_VERIFY_") ? code : undefined,
       });
-      return res.status(500).json({ error: "We could not save your application. Please try again later." });
+      return res.status(503).json({ error: "We could not start your Cush Verify account. Please try again later." });
+    }
+
+    const activationLink = emailActivationUrl(req, token);
+    const emailResult = activationLink
+      ? await sendCushVerifyActivationEmail({
+          email: businessEmail,
+          contactName: input.contactFullName,
+          institutionName: input.legalName,
+          activationUrl: activationLink,
+          activationId: activationId!,
+        })
+      : { status: "failed" as const, reason: "request_failed" as const };
+    try {
+      await db.insert(cushVerifyApplicationEvents).values({
+        applicationId: applicationId!,
+        eventType: emailResult.status === "sent"
+          ? "activation_email_sent"
+          : "activation_email_delivery_failed",
+        details: { status: emailResult.status },
+      });
+    } catch (eventError) {
+      console.error("Cush Verify activation email event could not be recorded", {
+        errorType: eventError instanceof Error ? eventError.name : "UnknownError",
+      });
+    }
+
+    if (emailResult.status !== "sent") {
+      return res.status(202).json({
+        success: true,
+        emailDeliveryStatus: emailResult.status,
+        message: "Your application is saved, but we could not send the activation email. Use the resend option or contact Cush support.",
+      });
+    }
+    return res.status(201).json({
+      success: true,
+      emailDeliveryStatus: "sent",
+      message: "Check your official email for a secure activation link. Activate your account there, then sign in to Cush Verify.",
+    });
+  });
+
+  app.post("/api/verify/applications/resend-activation", authRateLimit, async (req, res) => {
+    const email = typeof req.body?.businessEmail === "string"
+      ? normalizeEmail(req.body.businessEmail)
+      : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+      return res.status(400).json({ error: "Enter a valid institutional email address." });
+    }
+
+    try {
+      const [application] = await db.select({
+        id: cushVerifyApplications.id,
+        legalName: cushVerifyApplications.legalName,
+        contactFullName: cushVerifyApplications.contactFullName,
+      })
+        .from(cushVerifyApplications)
+        .where(and(
+          eq(cushVerifyApplications.normalizedBusinessEmail, email),
+          eq(cushVerifyApplications.status, "submitted"),
+        ))
+        .limit(1);
+      if (!application) return res.json({ success: true, message: GENERIC_ACTIVATION_RESEND_MESSAGE });
+
+      const [previousActivation] = await db.select({
+        firebaseUid: cushVerifyEmailActivations.firebaseUid,
+      })
+        .from(cushVerifyEmailActivations)
+        .where(eq(cushVerifyEmailActivations.applicationId, application.id))
+        .orderBy(desc(cushVerifyEmailActivations.createdAt))
+        .limit(1);
+      if (!previousActivation) return res.json({ success: true, message: GENERIC_ACTIVATION_RESEND_MESSAGE });
+
+      const token = randomBytes(32).toString("hex");
+      const now = new Date();
+      const activation = await db.transaction(async (tx) => {
+        await tx.update(cushVerifyEmailActivations)
+          .set({ revokedAt: now, claimedAt: null })
+          .where(and(
+            eq(cushVerifyEmailActivations.applicationId, application.id),
+            isNull(cushVerifyEmailActivations.consumedAt),
+            isNull(cushVerifyEmailActivations.revokedAt),
+          ));
+        const [created] = await tx.insert(cushVerifyEmailActivations).values({
+          applicationId: application.id,
+          firebaseUid: previousActivation.firebaseUid,
+          tokenHash: hashActivationToken(token),
+          expiresAt: new Date(now.getTime() + ACTIVATION_TTL_MS),
+        }).returning({ id: cushVerifyEmailActivations.id });
+        return created;
+      });
+      const activationLink = emailActivationUrl(req, token);
+      const emailResult = activationLink
+        ? await sendCushVerifyActivationEmail({
+            email,
+            contactName: application.contactFullName,
+            institutionName: application.legalName,
+            activationUrl: activationLink,
+            activationId: activation.id,
+          })
+        : { status: "failed" as const, reason: "request_failed" as const };
+      await db.insert(cushVerifyApplicationEvents).values({
+        applicationId: application.id,
+        eventType: emailResult.status === "sent"
+          ? "activation_email_resent"
+          : "activation_email_delivery_failed",
+        details: { status: emailResult.status },
+      });
+      return res.json({ success: true, message: GENERIC_ACTIVATION_RESEND_MESSAGE });
+    } catch (error) {
+      if (respondIfInstitutionalSchemaMissing(error, res)) return;
+      console.error("Cush Verify activation resend failed", {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+      return res.json({ success: true, message: GENERIC_ACTIVATION_RESEND_MESSAGE });
+    }
+  });
+
+  app.post("/api/verify/activations/lookup", authRateLimit, async (req, res) => {
+    const token = typeof req.body?.token === "string" ? req.body.token : "";
+    if (!/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(404).json({ error: "This activation link is invalid or has expired." });
+    }
+    try {
+      const [activation] = await db.select({
+        id: cushVerifyEmailActivations.id,
+        email: cushVerifyApplications.normalizedBusinessEmail,
+        contactName: cushVerifyApplications.contactFullName,
+        institutionName: cushVerifyApplications.legalName,
+        expiresAt: cushVerifyEmailActivations.expiresAt,
+      })
+        .from(cushVerifyEmailActivations)
+        .innerJoin(
+          cushVerifyApplications,
+          eq(cushVerifyApplications.id, cushVerifyEmailActivations.applicationId),
+        )
+        .where(and(
+          eq(cushVerifyEmailActivations.tokenHash, hashActivationToken(token)),
+          isNull(cushVerifyEmailActivations.consumedAt),
+          isNull(cushVerifyEmailActivations.claimedAt),
+          isNull(cushVerifyEmailActivations.revokedAt),
+          gt(cushVerifyEmailActivations.expiresAt, new Date()),
+          eq(cushVerifyApplications.status, "submitted"),
+        ))
+        .limit(1);
+      if (!activation) return res.status(404).json({ error: "This activation link is invalid or has expired." });
+      return res.json({
+        email: activation.email,
+        contactName: activation.contactName,
+        institutionName: activation.institutionName,
+        expiresAt: activation.expiresAt,
+      });
+    } catch (error) {
+      if (respondIfInstitutionalSchemaMissing(error, res)) return;
+      console.error("Cush Verify activation lookup failed", {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+      return res.status(503).json({ error: "Activation status is temporarily unavailable." });
+    }
+  });
+
+  app.post("/api/verify/activations/complete", authRateLimit, async (req, res) => {
+    const token = typeof req.body?.token === "string" ? req.body.token : "";
+    if (!/^[a-f0-9]{64}$/i.test(token)) {
+      return res.status(400).json({ error: "A valid activation link is required." });
+    }
+
+    const now = new Date();
+    try {
+      const [candidate] = await db.select({
+        id: cushVerifyEmailActivations.id,
+        applicationId: cushVerifyEmailActivations.applicationId,
+        firebaseUid: cushVerifyEmailActivations.firebaseUid,
+        email: cushVerifyApplications.normalizedBusinessEmail,
+      })
+        .from(cushVerifyEmailActivations)
+        .innerJoin(
+          cushVerifyApplications,
+          eq(cushVerifyApplications.id, cushVerifyEmailActivations.applicationId),
+        )
+        .where(and(
+          eq(cushVerifyEmailActivations.tokenHash, hashActivationToken(token)),
+          isNull(cushVerifyEmailActivations.consumedAt),
+          isNull(cushVerifyEmailActivations.claimedAt),
+          isNull(cushVerifyEmailActivations.revokedAt),
+          gt(cushVerifyEmailActivations.expiresAt, now),
+          eq(cushVerifyApplications.status, "submitted"),
+        ))
+        .limit(1);
+      if (!candidate) {
+        return res.status(409).json({ error: "This activation link is invalid, expired, or has already been used. Request a fresh link if needed." });
+      }
+
+      const [claim] = await db.update(cushVerifyEmailActivations)
+        .set({ claimedAt: now })
+        .where(and(
+          eq(cushVerifyEmailActivations.id, candidate.id),
+          isNull(cushVerifyEmailActivations.consumedAt),
+          isNull(cushVerifyEmailActivations.claimedAt),
+          isNull(cushVerifyEmailActivations.revokedAt),
+          gt(cushVerifyEmailActivations.expiresAt, now),
+        ))
+        .returning({ id: cushVerifyEmailActivations.id });
+      if (!claim) {
+        return res.status(409).json({ error: "This activation link is already being completed or has been used." });
+      }
+
+      let firebaseActivated = false;
+      try {
+        await setCushVerifyFirebaseUserActivated(candidate.firebaseUid, true);
+        firebaseActivated = true;
+        await db.transaction(async (tx) => {
+          const [claimedActivation] = await tx.select({ id: cushVerifyEmailActivations.id })
+            .from(cushVerifyEmailActivations)
+            .where(and(
+              eq(cushVerifyEmailActivations.id, claim.id),
+              eq(cushVerifyEmailActivations.claimedAt, now),
+              isNull(cushVerifyEmailActivations.consumedAt),
+              isNull(cushVerifyEmailActivations.revokedAt),
+            ))
+            .limit(1);
+          if (!claimedActivation) throw new Error("CUSH_VERIFY_ACTIVATION_CLAIM_LOST");
+
+          const [application] = await tx.select()
+            .from(cushVerifyApplications)
+            .where(eq(cushVerifyApplications.id, candidate.applicationId))
+            .limit(1);
+          if (!application || application.status !== "submitted") {
+            throw new Error("CUSH_VERIFY_APPLICATION_NOT_ACTIVATABLE");
+          }
+          const [existingInstitution] = await tx.select({ id: cushVerifyInstitutions.id })
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.sourceApplicationId, application.id))
+            .limit(1);
+          if (existingInstitution) throw new Error("CUSH_VERIFY_APPLICATION_ALREADY_ACTIVATED");
+
+          const [institution] = await tx.insert(cushVerifyInstitutions).values({
+            sourceApplicationId: application.id,
+            legalName: application.legalName,
+            tradingName: application.tradingName,
+            institutionType: application.institutionType,
+            countryOfRegistration: application.countryOfRegistration,
+            website: application.website,
+            businessEmail: application.businessEmail,
+            normalizedBusinessEmail: application.normalizedBusinessEmail,
+            duplicateKey: application.duplicateKey,
+            status: "approved",
+            approvedAt: now,
+          }).returning({ id: cushVerifyInstitutions.id });
+          const [institutionalUser] = await tx.insert(cushVerifyInstitutionalUsers).values({
+            firebaseUid: candidate.firebaseUid,
+            email: candidate.email,
+            fullName: application.contactFullName,
+            jobTitle: application.contactJobTitle,
+            businessTelephone: application.businessTelephone,
+            isEmailVerified: true,
+            isActive: true,
+          }).returning({ id: cushVerifyInstitutionalUsers.id });
+          await tx.insert(cushVerifyInstitutionalMemberships).values({
+            institutionId: institution.id,
+            institutionalUserId: institutionalUser.id,
+            role: "organisation_admin",
+            status: "active",
+          });
+          await tx.update(cushVerifyApplications)
+            .set({ status: "approved", updatedAt: now })
+            .where(eq(cushVerifyApplications.id, application.id));
+          await tx.update(cushVerifyEmailActivations)
+            .set({ consumedAt: now, claimedAt: null })
+            .where(and(
+              eq(cushVerifyEmailActivations.id, claim.id),
+              isNull(cushVerifyEmailActivations.consumedAt),
+            ));
+          await tx.insert(cushVerifyApplicationEvents).values({
+            applicationId: application.id,
+            institutionId: institution.id,
+            eventType: "account_activated",
+            details: { emailVerified: true, accessEnabled: true },
+          });
+        });
+      } catch (error) {
+        if (firebaseActivated) {
+          await setCushVerifyFirebaseUserActivated(candidate.firebaseUid, false).catch((rollbackError) => {
+            console.error("Cush Verify Firebase activation rollback failed", {
+              errorType: rollbackError instanceof Error ? rollbackError.name : "UnknownError",
+            });
+          });
+        }
+        await db.update(cushVerifyEmailActivations)
+          .set({ claimedAt: null })
+          .where(and(
+            eq(cushVerifyEmailActivations.id, claim.id),
+            isNull(cushVerifyEmailActivations.consumedAt),
+          ))
+          .catch((releaseError) => {
+            console.error("Cush Verify activation claim release failed", {
+              errorType: releaseError instanceof Error ? releaseError.name : "UnknownError",
+            });
+          });
+        throw error;
+      }
+
+      return res.json({
+        success: true,
+        accessGranted: true,
+        message: "Your Cush Verify account is active. Sign in to open your institutional workspace.",
+      });
+    } catch (error) {
+      if (respondIfInstitutionalSchemaMissing(error, res)) return;
+      const code = error && typeof error === "object" && "code" in error
+        ? String((error as { code: unknown }).code)
+        : error instanceof Error ? error.message : "";
+      if (
+        code === "CUSH_VERIFY_APPLICATION_ALREADY_ACTIVATED" ||
+        code === "CUSH_VERIFY_APPLICATION_NOT_ACTIVATABLE" ||
+        isUniqueViolation(error)
+      ) {
+        return res.status(409).json({ error: "This application could not be activated. Contact Cush support for help." });
+      }
+      console.error("Cush Verify account activation failed", {
+        errorType: error instanceof Error ? error.name : "UnknownError",
+        code: code.startsWith("CUSH_VERIFY_") ? code : undefined,
+      });
+      return res.status(503).json({ error: "We could not activate the account. Try again or request a fresh activation link." });
     }
   });
 
@@ -608,7 +984,7 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         const applicationIds = applications.map((application) => application.id);
         const institutionIds = applications.flatMap((application) =>
           application.institutionId ? [application.institutionId] : []);
-        const [allEvents, allInvites, allMembers] = applicationIds.length
+        const [allEvents, allInvites, allMembers, allActivations] = applicationIds.length
           ? await Promise.all([
               db.select({
                 applicationId: cushVerifyApplicationEvents.applicationId,
@@ -638,8 +1014,19 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
                     )
                     .where(inArray(cushVerifyInstitutionalMemberships.institutionId, institutionIds))
                 : Promise.resolve([]),
+              db.select({
+                applicationId: cushVerifyEmailActivations.applicationId,
+                expiresAt: cushVerifyEmailActivations.expiresAt,
+                claimedAt: cushVerifyEmailActivations.claimedAt,
+                consumedAt: cushVerifyEmailActivations.consumedAt,
+                revokedAt: cushVerifyEmailActivations.revokedAt,
+                createdAt: cushVerifyEmailActivations.createdAt,
+              })
+                .from(cushVerifyEmailActivations)
+                .where(inArray(cushVerifyEmailActivations.applicationId, applicationIds))
+                .orderBy(desc(cushVerifyEmailActivations.createdAt)),
             ])
-          : [[], [], []];
+          : [[], [], [], []];
         const eventsByApplication = new Map<number, typeof allEvents>();
         for (const event of allEvents) {
           const existing = eventsByApplication.get(event.applicationId) ?? [];
@@ -654,10 +1041,30 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         for (const member of allMembers) {
           verifiedByInstitution.set(member.institutionId, member.emailVerified);
         }
+        const activationByApplication = new Map<number, (typeof allActivations)[number]>();
+        for (const activation of allActivations) {
+          if (!activationByApplication.has(activation.applicationId)) {
+            activationByApplication.set(activation.applicationId, activation);
+          }
+        }
         const enriched = applications.map((application) => {
           const invite = inviteByApplication.get(application.id);
+          const activation = activationByApplication.get(application.id);
+          const activationStatus = !activation
+            ? "legacy"
+            : activation.consumedAt
+              ? "activated"
+              : activation.revokedAt
+                ? "replaced"
+                : activation.expiresAt <= new Date()
+                  ? "expired"
+                  : activation.claimedAt
+                    ? "completing"
+                    : "pending";
           return {
             ...application,
+            selfServiceActivation: Boolean(activation),
+            activationStatus,
             invitationAccepted: Boolean(invite?.acceptedAt),
             invitedAccountEmailVerified: application.institutionId
               ? verifiedByInstitution.get(application.institutionId) ?? false
@@ -695,6 +1102,11 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             .where(eq(cushVerifyApplications.id, id))
             .limit(1);
           if (!application) return { kind: "not_found" as const };
+          const [selfServiceActivation] = await tx.select({ id: cushVerifyEmailActivations.id })
+            .from(cushVerifyEmailActivations)
+            .where(eq(cushVerifyEmailActivations.applicationId, id))
+            .limit(1);
+          if (selfServiceActivation) return { kind: "self_service_activation" as const };
           const [institution] = await tx.select()
             .from(cushVerifyInstitutions)
             .where(eq(cushVerifyInstitutions.sourceApplicationId, id))
@@ -771,6 +1183,9 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         });
 
         if (result.kind === "not_found") return res.status(404).json({ error: "Application not found." });
+        if (result.kind === "self_service_activation") {
+          return res.status(409).json({ error: "This signup is activated through the applicant’s official email and is not part of the admin-review flow." });
+        }
         if (result.kind === "onboarding_required") {
           return res.status(409).json({ error: "Create the organisation and send its secure invitation before final approval." });
         }

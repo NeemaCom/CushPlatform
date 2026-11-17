@@ -344,6 +344,29 @@ export const cushVerifyInvitations = pgTable("cush_verify_invitations", {
   inviteEmailIndex: index("cush_verify_invitations_email_idx").on(table.email),
 })).enableRLS();
 
+export const cushVerifyEmailActivations = pgTable("cush_verify_email_activations", {
+  id: serial("id").primaryKey(),
+  applicationId: integer("application_id").notNull()
+    .references(() => cushVerifyApplications.id, { onDelete: "cascade" }),
+  firebaseUid: text("firebase_uid").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true, mode: "date" }),
+  consumedAt: timestamp("consumed_at", { withTimezone: true, mode: "date" }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  applicationCreatedIndex: index("cush_verify_email_activations_application_created_idx")
+    .on(table.applicationId, table.createdAt),
+  pendingApplicationUnique: uniqueIndex("cush_verify_email_activations_pending_application_uq")
+    .on(table.applicationId)
+    .where(sql`${table.consumedAt} is null and ${table.revokedAt} is null`),
+  expiryCheck: check(
+    "cush_verify_email_activations_expiry_check",
+    sql`${table.expiresAt} > ${table.createdAt}`,
+  ),
+})).enableRLS();
+
 export const cushVerifyInstitutionalMemberships = pgTable("cush_verify_institutional_memberships", {
   id: serial("id").primaryKey(),
   institutionId: integer("institution_id").notNull()
@@ -382,7 +405,7 @@ export const cushVerifyApplicationEvents = pgTable("cush_verify_application_even
 }, (table) => ({
   eventTypeCheck: check(
     "cush_verify_application_events_type_check",
-    sql`${table.eventType} in ('submitted', 'status_changed', 'organisation_onboarded', 'invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_accepted', 'approved', 'rejected')`,
+    sql`${table.eventType} in ('submitted', 'status_changed', 'organisation_onboarded', 'invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_accepted', 'activation_email_sent', 'activation_email_resent', 'activation_email_delivery_failed', 'account_activated', 'approved', 'rejected')`,
   ),
   applicationCreatedIndex: index("cush_verify_application_events_application_created_idx")
     .on(table.applicationId, table.createdAt),

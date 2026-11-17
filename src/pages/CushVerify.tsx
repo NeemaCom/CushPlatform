@@ -341,7 +341,7 @@ export default function CushVerify() {
           </div>
           <div className="max-w-[550px] lg:ml-auto">
             <p className="text-lg leading-8 text-[#40516d]">Cush Verify is a vision for financial identity that moves with people, across institutions and borders. We believe the best way to shape that future is to listen closely to the organizations and communities it should serve.</p>
-            <p className="mt-5 text-sm leading-6 text-[#61728a]">Registration is an invitation to share your institution’s perspective with Cush and start a conversation about what comes next.</p>
+            <p className="mt-5 text-sm leading-6 text-[#61728a]">Submit your institution details, confirm your official email, and sign in to the Cush Verify workspace.</p>
             <a href="#register" className="mt-7 inline-flex items-center gap-2 text-sm font-semibold text-[#275fb7] transition hover:text-[#16458f] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-600">Bring your perspective <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></a>
           </div>
         </div>
@@ -359,7 +359,7 @@ export default function CushVerify() {
               <p>Please do not include customer records, account credentials, or sensitive personal or financial information in this form.</p>
             </div>
             <div className="mt-10 hidden items-center gap-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-blue-200/65 lg:flex">
-              <BadgeCheck className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Reviewed by the Cush team
+              <BadgeCheck className="h-4 w-4 text-emerald-300" aria-hidden="true" /> Activated by official email
             </div>
           </div>
 

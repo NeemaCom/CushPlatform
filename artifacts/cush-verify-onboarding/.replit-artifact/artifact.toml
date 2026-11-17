@@ -1,0 +1,19 @@
+kind = "design"
+previewPath = "/__mockup/"
+title = "Cush Verify Onboarding"
+description = "A focused preview of the streamlined Cush Verify registration and activation journey."
+version = "1.0.0"
+id = "artifacts/cush-verify-onboarding"
+router = "path"
+
+[[services]]
+name = "Component Preview Server"
+paths = [ "/__mockup/" ]
+localPort = 21702
+
+[services.development]
+run = "npm run dev"
+
+[services.env]
+PORT = "21702"
+BASE_PATH = "/__mockup/"

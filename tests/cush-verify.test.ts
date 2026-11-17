@@ -3,6 +3,7 @@ import {
   cushVerifyApplicationSchema,
   cushVerifyApplicantInstitutionTypes,
   cushVerifyInstitutionInterestSchema,
+  cushVerifyInstitutionalRegistrationSchema,
   cushVerifyReviewStatusSchema,
 } from "../shared/cush-verify";
 
@@ -140,6 +141,29 @@ describe("Cush Verify institutional applications", () => {
     expect(cushVerifyApplicationSchema.safeParse({
       ...validApplication,
       accessGranted: true,
+    }).success).toBe(false);
+  });
+
+  it("accepts strong matching credentials for the self-service registration flow", () => {
+    const result = cushVerifyInstitutionalRegistrationSchema.parse({
+      ...validApplication,
+      password: "secure-institutional-password",
+      passwordConfirmation: "secure-institutional-password",
+    });
+    expect(result.businessEmail).toBe("partnerships@example.org");
+    expect(result.password).toBe("secure-institutional-password");
+  });
+
+  it("rejects mismatched or short institutional passwords", () => {
+    expect(cushVerifyInstitutionalRegistrationSchema.safeParse({
+      ...validApplication,
+      password: "secure-institutional-password",
+      passwordConfirmation: "different-institutional-password",
+    }).success).toBe(false);
+    expect(cushVerifyInstitutionalRegistrationSchema.safeParse({
+      ...validApplication,
+      password: "short",
+      passwordConfirmation: "short",
     }).success).toBe(false);
   });
 });

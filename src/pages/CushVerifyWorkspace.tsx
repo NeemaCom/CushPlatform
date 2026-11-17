@@ -122,8 +122,8 @@ export default function CushVerifyWorkspace() {
                 <h2 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">{applicationLabels[data.applicationStatus] ?? "Under review"}</h2>
                 <p className="mt-3 max-w-xl text-sm leading-6 text-[#52627b]">
                   {rejected
-                    ? "Cush Admin has rejected this organisation's application. Contact support if you need more information."
-                    : "Your institutional account is separate from Cush Passport. Verification workspace access will remain disabled until Cush Admin completes the organisation review."}
+                    ? "This organisation's application is not active. Contact support if you need more information."
+                    : "Your institutional account is separate from Cush Passport. Complete the activation link sent to your official email, or contact support if you have already activated."}
                 </p>
                 {!rejected && data.applicationStatus === "additional_information_required" && (
                   <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Cush needs additional information. The team will contact the official email on the application.</p>

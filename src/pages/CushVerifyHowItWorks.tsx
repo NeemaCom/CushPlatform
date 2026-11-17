@@ -7,26 +7,26 @@ import { CUSH_VERIFY_BILLING_EVENTS, CUSH_VERIFY_REPORT_CREDIT_RULE } from "@sha
 const onboardingSteps = [
   {
     number: "01",
-    title: "Submit your institution",
-    description: "Share your organisation’s official details and intended use through the existing application form.",
+    title: "Submit your details",
+    description: "Complete the guided institution form, choose an email-and-password sign-in, and submit once.",
     icon: FileCheck2,
   },
   {
     number: "02",
-    title: "Cush reviews the application",
-    description: "Enquiry approval does not grant access. Cush explicitly creates the organisation and invites a named contact.",
+    title: "Open your activation email",
+    description: "We send a one-time activation link to the official business email address. The link expires after 24 hours.",
     icon: ShieldCheck,
   },
   {
     number: "03",
-    title: "Verify your official email",
-    description: "The invited person creates an email-and-password account and confirms ownership of their official email address.",
+    title: "Confirm your official email",
+    description: "Confirm the address from the email link. Your institutional account and initial organisation administrator access activate immediately.",
     icon: Fingerprint,
   },
   {
     number: "04",
-    title: "Receive final approval",
-    description: "The institution remains pending until Cush Admin approves it. Only approved institutional accounts can access the workspace.",
+    title: "Sign in to your workspace",
+    description: "Use your institutional email and password to open the full Cush Verify workspace. No admin invitation or review is required.",
     icon: LockKeyhole,
   },
 ];
@@ -46,7 +46,7 @@ export default function CushVerifyHowItWorks() {
               Consent first. <span className="text-[#79aaff]">A credit only after a report is returned.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-blue-100/75 sm:text-lg">
-              Cush Verify is designed for authorised, consent-led financial identity requests. Institution applications and report access follow separate review steps.
+              Cush Verify is designed for authorised, consent-led financial identity requests. Institutional account setup is separate from report consent and verification.
             </p>
           </div>
           <aside className="rounded-[24px] border border-white/15 bg-[#142746]/85 p-5 sm:p-6">
@@ -77,9 +77,9 @@ export default function CushVerifyHowItWorks() {
       <section className="mx-auto max-w-[1320px] px-5 py-12 sm:px-8 sm:py-16 lg:px-12">
         <div className="max-w-3xl">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Institution onboarding</p>
-          <h2 className="mt-3 font-serif text-3xl tracking-[-0.04em] text-[#12213d] sm:text-4xl">A request for access is not access.</h2>
+          <h2 className="mt-3 font-serif text-3xl tracking-[-0.04em] text-[#12213d] sm:text-4xl">A simpler way to get started.</h2>
           <p className="mt-4 text-sm leading-6 text-[#52627b]">
-            Institutional accounts use a separate sign-in from Cush Passport. Every organisation and named member is reviewed before institutional access is granted.
+            Cush Verify accounts are separate from Cush Passport. Confirming the official business email activates the organisation administrator account; signing in opens the full workspace.
           </p>
         </div>
         <ol className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -154,8 +154,8 @@ export default function CushVerifyHowItWorks() {
         <div className="mx-auto flex max-w-[1100px] flex-col justify-between gap-5 rounded-[24px] border border-[#d4dfed] bg-white p-6 shadow-[0_12px_35px_rgba(28,59,107,.05)] sm:flex-row sm:items-center sm:p-8">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#3973c8]">Cush Verify</p>
-            <h2 className="mt-2 font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Ready to start an institutional conversation?</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Cush reviews every application. A request does not create immediate access.</p>
+            <h2 className="mt-2 font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Ready to set up your institution?</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Submit your details, activate from your official email, and sign in. No separate admin invitation is needed.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/verify/apply" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">

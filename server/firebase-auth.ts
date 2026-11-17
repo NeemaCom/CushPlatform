@@ -197,3 +197,70 @@ export async function verifyCushVerifyFirebaseIdentity(
     signInProvider: "password",
   };
 }
+
+function firebaseAdminErrorCode(error: unknown): string | null {
+  if (!error || typeof error !== "object" || !("code" in error)) return null;
+  return typeof (error as { code?: unknown }).code === "string"
+    ? (error as { code: string }).code
+    : null;
+}
+
+export async function createCushVerifyPendingFirebaseUser(input: {
+  email: string;
+  password: string;
+  displayName: string;
+}): Promise<string> {
+  try {
+    const user = await getAuth(getCushVerifyFirebaseApp()).createUser({
+      email: input.email,
+      password: input.password,
+      displayName: input.displayName,
+      emailVerified: false,
+      disabled: true,
+    });
+    return user.uid;
+  } catch (error) {
+    const code = firebaseAdminErrorCode(error);
+    if (code === "auth/email-already-exists") {
+      throw new FirebaseAuthError(
+        "CUSH_VERIFY_EMAIL_ALREADY_EXISTS",
+        "This email already has a Cush Verify sign-in.",
+      );
+    }
+    if (code === "auth/invalid-password") {
+      throw new FirebaseAuthError(
+        "CUSH_VERIFY_WEAK_PASSWORD",
+        "Choose a password with at least 12 characters.",
+      );
+    }
+    throw new FirebaseAuthError(
+      "CUSH_VERIFY_ACCOUNT_CREATE_FAILED",
+      "The institutional account could not be created.",
+    );
+  }
+}
+
+export async function setCushVerifyFirebaseUserActivated(
+  uid: string,
+  activated: boolean,
+): Promise<void> {
+  try {
+    await getAuth(getCushVerifyFirebaseApp()).updateUser(uid, {
+      emailVerified: activated,
+      disabled: !activated,
+    });
+  } catch {
+    throw new FirebaseAuthError(
+      "CUSH_VERIFY_ACCOUNT_UPDATE_FAILED",
+      "The institutional account activation could not be completed.",
+    );
+  }
+}
+
+export async function deleteCushVerifyFirebaseUser(uid: string): Promise<void> {
+  try {
+    await getAuth(getCushVerifyFirebaseApp()).deleteUser(uid);
+  } catch (error) {
+    if (firebaseAdminErrorCode(error) !== "auth/user-not-found") throw error;
+  }
+}

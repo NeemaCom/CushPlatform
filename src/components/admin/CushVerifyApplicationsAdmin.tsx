@@ -26,6 +26,8 @@ type Application = {
   createdAt: string;
   institutionId: number | null;
   institutionStatus: string | null;
+  selfServiceActivation: boolean;
+  activationStatus: "legacy" | "pending" | "completing" | "activated" | "expired" | "replaced";
   invitationAccepted: boolean;
   invitedAccountEmailVerified: boolean;
   events: { eventType: string; createdAt: string }[];
@@ -117,7 +119,7 @@ export default function CushVerifyApplicationsAdmin({ canManage }: { canManage: 
         <div>
           <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-[#82847d]">Cush Verify · Institutional accounts</p>
           <h2 className="mt-1 text-lg font-semibold tracking-tight text-[#24252a]">Institution applications</h2>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6f706f]">Applications do not grant access. Move an application under review, explicitly create the organisation and invite its named contact, then approve only after they register and verify their official email.</p>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-[#6f706f]">New applicants activate by confirming their official email and can sign in immediately. Cush Admin review and invitations are not part of the new signup flow; older applications remain available below.</p>
         </div>
         <span className="rounded-full border border-[#e5e3db] bg-[#f5f4ef] px-2.5 py-1 text-[11px] font-medium text-[#656760]">{applications.length} recent</span>
       </div>
@@ -157,7 +159,17 @@ export default function CushVerifyApplicationsAdmin({ canManage }: { canManage: 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-base font-semibold text-[#24252a]">{application.legalName}</h3>
-                      <span className="rounded-full border border-[#deddd4] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#656760]">{statusLabels[application.status]}</span>
+                      <span className="rounded-full border border-[#deddd4] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#656760]">
+                        {application.selfServiceActivation
+                          ? application.activationStatus === "activated"
+                            ? "Activated"
+                            : application.activationStatus === "expired"
+                              ? "Activation expired"
+                              : application.activationStatus === "completing"
+                                ? "Activation in progress"
+                                : "Awaiting email activation"
+                          : statusLabels[application.status]}
+                      </span>
                       {application.institutionStatus && <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-900">Organisation: {application.institutionStatus.replace(/_/g, " ")}</span>}
                     </div>
                     {application.tradingName && <p className="mt-1 text-xs text-[#777973]">Trading as {application.tradingName}</p>}
@@ -169,7 +181,16 @@ export default function CushVerifyApplicationsAdmin({ canManage }: { canManage: 
                     <p className="mt-2 text-xs text-[#777973]">
                       Estimated monthly requests: {application.estimatedMonthlyVerifications?.toLocaleString("en-GB") ?? "Not specified"} · Submitted {dateLabel(application.createdAt)}
                     </p>
-                    {application.institutionId && (
+                    {application.selfServiceActivation ? (
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#555750]">
+                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                        {application.activationStatus === "activated"
+                          ? "Official email confirmed · workspace access active"
+                          : application.activationStatus === "expired"
+                            ? "Activation link expired · applicant can request a new link"
+                            : "Official email activation link sent to applicant"}
+                      </p>
+                    ) : application.institutionId && (
                       <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#555750]">
                         <Mail className="h-3.5 w-3.5" aria-hidden="true" />
                         Invitation {application.invitationAccepted ? "accepted" : "pending"} · Email {application.invitedAccountEmailVerified ? "verified" : "not verified"}
@@ -190,7 +211,7 @@ export default function CushVerifyApplicationsAdmin({ canManage }: { canManage: 
                       </ol>
                     </details>
                   </div>
-                  {canManage && (
+                  {canManage && !application.selfServiceActivation && (
                     <div className="flex shrink-0 flex-col gap-2 sm:flex-row xl:w-64 xl:flex-col">
                       <label className="sr-only" htmlFor={`application-status-${application.id}`}>Application status for {application.legalName}</label>
                       <select

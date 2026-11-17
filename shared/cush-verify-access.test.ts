@@ -45,4 +45,15 @@ describe("Cush Verify institutional access gates", () => {
     expect(canFinalApproveCushVerifyApplication({ ...pending, invitationAccepted: false })).toBe(false);
     expect(canFinalApproveCushVerifyApplication({ ...pending, institutionStatus: "approved" })).toBe(false);
   });
+
+  it("opens the full workspace after verified email activation", () => {
+    const activatedAccount = {
+      applicationStatus: "approved",
+      institutionStatus: "approved",
+      membershipStatus: "active",
+      emailVerified: true,
+    };
+    expect(canAccessCushVerifyWorkspace(activatedAccount)).toBe(true);
+    expect(canAccessCushVerifyWorkspace({ ...activatedAccount, emailVerified: false })).toBe(false);
+  });
 });
