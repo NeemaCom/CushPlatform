@@ -26,7 +26,7 @@ function getErrorMessage(error: unknown) {
   try {
     const body = JSON.parse(response) as { code?: string };
     if (body.code === "CUSH_VERIFY_PRICING_SCHEMA_MISSING") {
-      return "Published pricing details are being prepared. You can still submit an institutional enquiry.";
+        return "Published pricing details are being prepared. You can still create an account and activate it by verifying your business email.";
     }
     return "We could not load the latest published pricing. Please retry shortly.";
   } catch {
@@ -58,7 +58,7 @@ function reportAllocation(plan: PublicCushVerifyPricingPlan) {
 function planAction(plan: PublicCushVerifyPricingPlan) {
   if (plan.salesMode === "contact_sales") return "Discuss enterprise terms";
   if (plan.salesMode === "sandbox_only") return "Ask about sandbox access";
-  return "Apply for institutional access";
+  return "Create institutional account";
 }
 
 function PricingCard({
@@ -238,7 +238,7 @@ export default function CushVerifyPricing() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/verify/apply" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#4b89f3]">
-              Apply as an institution <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Create an institutional account <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <Link href="/verify/how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
               See how it works
@@ -256,7 +256,7 @@ export default function CushVerifyPricing() {
           <div>
             <p className="font-semibold">Pricing preview — not available to purchase</p>
             <p className="mt-1 leading-6">
-              The configured prices and report allocations are not live. Checkout, subscriptions, report retrieval, and credit balances are not enabled yet; an application is an enquiry, not a purchase.
+              The configured prices and report allocations are not live. Checkout, subscriptions, report retrieval, and credit balances are not enabled yet. Account activation is separate from purchasing a plan.
             </p>
           </div>
         </aside>
@@ -278,7 +278,7 @@ export default function CushVerifyPricing() {
                   <RefreshCw className="h-4 w-4" /> Retry
                 </button>
                 <Link href="/verify/apply" className="ml-3 inline-flex min-h-10 items-center gap-1.5 px-2 text-sm font-semibold text-[#275fb7] hover:underline">
-                  Submit an enquiry <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  Create an account <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Link>
               </div>
             </div>
@@ -383,11 +383,11 @@ export default function CushVerifyPricing() {
       <section className="bg-[#eaf1fb] px-5 py-12 sm:px-8 sm:py-16">
         <div className="mx-auto flex max-w-[1100px] flex-col justify-between gap-5 rounded-[24px] border border-[#d4dfed] bg-white p-6 shadow-[0_12px_35px_rgba(28,59,107,.05)] sm:flex-row sm:items-center sm:p-8">
           <div>
-            <h2 className="font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Start with an institutional enquiry</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Cush reviews each application. Submission does not create report access or a subscription.</p>
+            <h2 className="font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Open your institutional account</h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Verify your business email to activate your account. No staff approval or invitation is required.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link href="/verify/apply" className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">Apply</Link>
+            <Link href="/verify/apply" className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">Create account</Link>
             <Link href="/verify/login" className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#cad7e8] px-5 text-sm font-semibold text-[#275fb7] hover:bg-[#f8fbff]">Institutional sign in</Link>
           </div>
         </div>

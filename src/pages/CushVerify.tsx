@@ -184,23 +184,23 @@ export default function CushVerify() {
             </div>
             <p className="mt-5 flex items-center gap-2 text-xs text-blue-100/65">
               <LockKeyhole className="h-3.5 w-3.5 text-emerald-300" aria-hidden="true" />
-              Institutional interest is reviewed by the Cush team.
+              Confirm your business email to activate your account; no staff approval or invitation is required.
             </p>
           </div>
 
-          <aside aria-label="Current institutional enquiry process" className="relative mx-auto w-full max-w-[590px] rounded-[26px] border border-blue-100/15 bg-[#142746]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,.28)] backdrop-blur sm:p-7">
+          <aside aria-label="Institutional account setup" className="relative mx-auto w-full max-w-[590px] rounded-[26px] border border-blue-100/15 bg-[#142746]/90 p-5 shadow-[0_30px_90px_rgba(0,0,0,.28)] backdrop-blur sm:p-7">
             <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Current process</p>
-                <h2 className="mt-2 font-serif text-2xl tracking-[-0.03em] text-white sm:text-[28px]">An institutional enquiry</h2>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">Get started</p>
+                <h2 className="mt-2 font-serif text-2xl tracking-[-0.03em] text-white sm:text-[28px]">Open your institution account</h2>
               </div>
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-blue-200/15 bg-blue-300/10 text-blue-200"><Network className="h-5 w-5" aria-hidden="true" /></span>
             </div>
             <ol className="relative mt-6 space-y-3 before:absolute before:bottom-8 before:left-[19px] before:top-8 before:w-px before:bg-gradient-to-b before:from-blue-400/70 before:to-emerald-300/40">
               {[
-                { number: "01", title: "Submit interest", description: "Tell us about your institution and what you would like to explore.", icon: Building2, tone: "bg-[#3475e7] text-white" },
-                { number: "02", title: "Cush reviews", description: "The Cush team reviews each institutional submission.", icon: ShieldCheck, tone: "bg-[#293d61] text-blue-100" },
-                { number: "03", title: "Cush follows up", description: "The team gets in touch using the contact details you provide.", icon: ArrowUpRight, tone: "bg-[#153d48] text-emerald-200" },
+                { number: "01", title: "Submit your application", description: "Provide your institution and contact details to create your account.", icon: Building2, tone: "bg-[#3475e7] text-white" },
+                { number: "02", title: "Verify your business email", description: "Open the secure activation link sent to your email address.", icon: ShieldCheck, tone: "bg-[#293d61] text-blue-100" },
+                { number: "03", title: "Sign in to your workspace", description: "Your institutional workspace is available after email activation.", icon: ArrowUpRight, tone: "bg-[#153d48] text-emerald-200" },
               ].map(({ number, title, description, icon: Icon, tone }) => (
                 <li key={number} className="relative flex gap-4 rounded-2xl border border-white/[0.07] bg-[#0d1c35]/75 p-4 sm:gap-5 sm:p-5">
                   <span className={`relative z-[1] grid h-10 w-10 shrink-0 place-items-center rounded-xl ${tone}`}><Icon className="h-[18px] w-[18px]" aria-hidden="true" /></span>
@@ -216,7 +216,7 @@ export default function CushVerify() {
             </ol>
             <div className="mt-5 flex items-center gap-2 border-t border-white/10 pt-4 text-[11px] leading-5 text-blue-100/60">
               <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-emerald-300" aria-hidden="true" />
-              An enquiry starts a conversation; it does not grant immediate access.
+              No staff approval or invitation is required to activate your account.
             </div>
           </aside>
         </div>
@@ -310,15 +310,15 @@ export default function CushVerify() {
         <div className="mx-auto max-w-[1320px] px-5 py-16 sm:px-8 sm:py-20 lg:px-12 lg:py-24">
           <div className="grid gap-10 lg:grid-cols-[.8fr_1.2fr] lg:gap-20">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#3973c8]">How it works today</p>
-              <h2 className="mt-4 max-w-md font-serif text-4xl leading-[1.04] tracking-[-0.05em] text-[#12213d] sm:text-5xl">A conversation, starting with your institution.</h2>
-              <p className="mt-5 max-w-sm text-sm leading-6 text-[#52627b]">The available step is simple: tell us what your institution wants to explore. The Cush team reviews each submission and follows up directly.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#3973c8]">Institutional access</p>
+              <h2 className="mt-4 max-w-md font-serif text-4xl leading-[1.04] tracking-[-0.05em] text-[#12213d] sm:text-5xl">Get started with your institution.</h2>
+              <p className="mt-5 max-w-sm text-sm leading-6 text-[#52627b]">Submit an application, verify your business email, then sign in. Email activation unlocks the workspace without a staff approval or invitation step.</p>
             </div>
             <ol className="grid gap-3 sm:grid-cols-3">
               {[
-                { n: "01", title: "Share your perspective", text: "Tell us about your organization, your role, and the questions you’re considering." },
-                { n: "02", title: "Cush reviews", text: "Your institutional interest is received for review by the Cush team." },
-                { n: "03", title: "Connect with Cush", text: "The team will be in touch using the contact details you provide." },
+                { n: "01", title: "Submit your application", text: "Add your institution details and create an account using your business email." },
+                { n: "02", title: "Activate by email", text: "Use the secure link sent to your business email to activate your account." },
+                { n: "03", title: "Open your workspace", text: "Sign in after activation to access the institutional workspace." },
               ].map((step) => (
                 <li key={step.n} className="flex min-h-[200px] flex-col rounded-[20px] border border-[#d4dfed] bg-white p-6 shadow-[0_12px_35px_rgba(28,59,107,.05)] sm:min-h-[224px]">
                   <span className="font-mono text-[11px] tracking-[0.14em] text-[#3973c8]">{step.n}</span>
