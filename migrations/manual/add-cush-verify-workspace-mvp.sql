@@ -8,6 +8,7 @@ ALTER TABLE public.cush_verify_report_requests
   ADD COLUMN IF NOT EXISTS invitation_expires_at TIMESTAMPTZ;
 
 ALTER TABLE public.cush_verify_report_requests
+  DROP CONSTRAINT IF EXISTS cush_verify_report_requests_requested_categories_check,
   DROP CONSTRAINT IF EXISTS cush_verify_report_requests_categories_check,
   ADD CONSTRAINT cush_verify_report_requests_categories_check CHECK (
     cardinality(requested_categories) BETWEEN 1 AND 7
@@ -36,6 +37,7 @@ CREATE INDEX IF NOT EXISTS cush_verify_report_requests_invitation_email_hash_idx
   WHERE recipient_email_hash IS NOT NULL;
 
 ALTER TABLE public.cush_verify_report_consents
+  DROP CONSTRAINT IF EXISTS cush_verify_report_consents_approved_categories_check,
   DROP CONSTRAINT IF EXISTS cush_verify_report_consents_categories_check,
   ADD CONSTRAINT cush_verify_report_consents_categories_check CHECK (
     cardinality(approved_categories) BETWEEN 0 AND 7
@@ -56,6 +58,7 @@ ALTER TABLE public.cush_verify_report_deliveries
   );
 
 ALTER TABLE public.cush_verify_report_events
+  DROP CONSTRAINT IF EXISTS cush_verify_report_events_event_type_check,
   DROP CONSTRAINT IF EXISTS cush_verify_report_events_type_check,
   ADD CONSTRAINT cush_verify_report_events_type_check CHECK (
     event_type IN (
