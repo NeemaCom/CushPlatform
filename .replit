@@ -10,7 +10,7 @@ localPort = 24678
 externalPort = 3000
 
 [workflows]
-runButton = "Project"
+runButton = "Start application"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -19,4 +19,3 @@ name = "Start application"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
-
