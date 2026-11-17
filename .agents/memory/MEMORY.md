@@ -17,3 +17,4 @@
 - [Cush Verify report billing](cush-verify-report-billing.md) — bill only distinct authorized report content successfully returned; retries and consent alone are not billable.
 - [Cush Verify Stripe runtime](cush-verify-stripe-runtime.md) — production Render needs its own Stripe keys and webhook secret; a Replit connection does not configure the deployed app.
 - [Cush Verify domain separation](cush-verify-domain-separation.md) — Cush Verify must have its own public subdomain instead of sharing the Cush Passport site address.
+- [Cush Verify same-origin API](cush-verify-same-origin-api.md) — proxy Verify API calls through its own domain so browsers retain institutional session cookies.
