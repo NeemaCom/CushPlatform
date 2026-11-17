@@ -209,9 +209,11 @@ function AppRoutes() {
     }
   }, [verifyExperience])
 
-  if (dedicatedVerifyHost) return <CushVerifyRoutes />
+  if (dedicatedVerifyHost || (import.meta.env.DEV && isCushVerifyPath(location))) {
+    return <CushVerifyRoutes />
+  }
   if (stagingVerifyBuild) return <CushVerifyRoutes redirectRootToVerify />
-  if (isCushVerifyPath(location)) return <CushVerifyHostRedirect />
+  if (isCushVerifyPath(location) && !import.meta.env.DEV) return <CushVerifyHostRedirect />
   return <PassportRoutes />
 }
 

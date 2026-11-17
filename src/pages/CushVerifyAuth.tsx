@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useLocation } from "wouter";
 import { createUserWithEmailAndPassword, reload, sendEmailVerification, sendPasswordResetEmail, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { ArrowLeft, Building2, CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
@@ -248,6 +248,8 @@ export function CushVerifyActivation() {
     email: string;
     contactName: string;
     institutionName: string;
+    alreadyActivated?: boolean;
+    activationInProgress?: boolean;
   } | null>(null);
   const [lookupError, setLookupError] = useState("");
   const [activationError, setActivationError] = useState("");
@@ -256,6 +258,7 @@ export function CushVerifyActivation() {
   const [resendEmail, setResendEmail] = useState("");
   const [resendBusy, setResendBusy] = useState(false);
   const [resendMessage, setResendMessage] = useState("");
+  const activationRequestRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,11 +268,26 @@ export function CushVerifyActivation() {
     }
     apiRequest("POST", "/api/verify/activations/lookup", { token })
       .then((response) => response.json())
-      .then((value: { email: string; contactName: string; institutionName: string }) => {
-        if (!cancelled) {
-          setActivation(value);
-          setResendEmail(value.email);
+      .then(async (value: {
+        email: string;
+        contactName: string;
+        institutionName: string;
+        alreadyActivated?: boolean;
+        activationInProgress?: boolean;
+      }) => {
+        if (cancelled) return;
+        setActivation(value);
+        setResendEmail(value.email);
+        if (value.alreadyActivated) {
+          window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+          setActivated(true);
+          return;
         }
+        if (value.activationInProgress) {
+          setActivationError("Activation is already being completed. Refresh this page in a moment to continue.");
+          return;
+        }
+        await completeActivation();
       })
       .catch((lookupFailure) => {
         if (!cancelled) setLookupError(errorMessage(lookupFailure));
@@ -281,10 +299,15 @@ export function CushVerifyActivation() {
     setActivationError("");
     setBusy(true);
     try {
-      await apiRequest("POST", "/api/verify/activations/complete", { token });
+      if (!activationRequestRef.current) {
+        activationRequestRef.current = apiRequest("POST", "/api/verify/activations/complete", { token })
+          .then(() => undefined);
+      }
+      await activationRequestRef.current;
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
       setActivated(true);
     } catch (activationFailure) {
+      activationRequestRef.current = null;
       setActivationError(errorMessage(activationFailure));
     } finally {
       setBusy(false);
@@ -348,17 +371,28 @@ export function CushVerifyActivation() {
           {activation ? (
             <>
               <p className="mt-3 text-sm leading-6 text-[#52627b]">
-                Confirm the official email for <strong>{activation.institutionName}</strong>. The account will be active immediately after confirmation.
+                We’re activating the official email for <strong>{activation.institutionName}</strong>. Your account will be ready as soon as this finishes.
               </p>
               <p className="mt-4 rounded-xl bg-[#f8fbff] p-3 text-sm text-[#40516d]">
                 Official email: <strong>{activation.email}</strong>
               </p>
               {activationError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{activationError}</p>}
-              <button type="button" disabled={busy} onClick={() => void completeActivation()} className="mt-5 min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">
-                {busy ? "Activating account…" : "Confirm email and activate"}
-              </button>
+              {busy && <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#52627b]"><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3977e6] border-t-transparent" />Confirming your email and activating your account…</p>}
+              {activationError && !activation.activationInProgress && (
+                <button type="button" disabled={busy} onClick={() => void completeActivation()} className="mt-5 min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">
+                  {busy ? "Activating account…" : "Try activation again"}
+                </button>
+              )}
+              {activation.activationInProgress && (
+                <form onSubmit={(event) => void requestFreshLink(event)} className="mt-4">
+                  <button type="submit" disabled={resendBusy} className="min-h-11 w-full rounded-full border border-[#cad7e8] px-5 text-sm font-semibold text-[#275fb7] hover:bg-[#f8fbff] disabled:opacity-60">
+                    {resendBusy ? "Requesting a fresh link…" : "Request a fresh activation link"}
+                  </button>
+                  {resendMessage && <p role="status" className="mt-2 text-xs leading-5 text-[#61728a]">{resendMessage}</p>}
+                </form>
+              )}
               <p className="mt-4 text-xs leading-5 text-[#61728a]">
-                This one-time link is valid for 24 hours. After activation, sign in with the password you created during application.
+                This one-time link is valid for 24 hours. When activation finishes, a welcome message will prompt you to sign in.
               </p>
             </>
           ) : (

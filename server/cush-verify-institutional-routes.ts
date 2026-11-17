@@ -339,7 +339,6 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       applicationId = created.applicationId;
       activationId = created.activationId;
     } catch (error) {
-      if (respondIfInstitutionalSchemaMissing(error, res)) return;
       if (firebaseUid) {
         await deleteCushVerifyFirebaseUser(firebaseUid).catch((cleanupError) => {
           console.error("Cush Verify pending identity cleanup failed", {
@@ -347,6 +346,7 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           });
         });
       }
+      if (respondIfInstitutionalSchemaMissing(error, res)) return;
       const code = error && typeof error === "object" && "code" in error
         ? String((error as { code: unknown }).code)
         : "";
@@ -486,6 +486,10 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         contactName: cushVerifyApplications.contactFullName,
         institutionName: cushVerifyApplications.legalName,
         expiresAt: cushVerifyEmailActivations.expiresAt,
+        claimedAt: cushVerifyEmailActivations.claimedAt,
+        consumedAt: cushVerifyEmailActivations.consumedAt,
+        revokedAt: cushVerifyEmailActivations.revokedAt,
+        applicationStatus: cushVerifyApplications.status,
       })
         .from(cushVerifyEmailActivations)
         .innerJoin(
@@ -494,19 +498,40 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         )
         .where(and(
           eq(cushVerifyEmailActivations.tokenHash, hashActivationToken(token)),
-          isNull(cushVerifyEmailActivations.consumedAt),
-          isNull(cushVerifyEmailActivations.claimedAt),
           isNull(cushVerifyEmailActivations.revokedAt),
-          gt(cushVerifyEmailActivations.expiresAt, new Date()),
-          eq(cushVerifyApplications.status, "submitted"),
         ))
         .limit(1);
       if (!activation) return res.status(404).json({ error: "This activation link is invalid or has expired." });
+      if (activation.consumedAt && activation.applicationStatus === "approved") {
+        return res.json({
+          email: activation.email,
+          contactName: activation.contactName,
+          institutionName: activation.institutionName,
+          alreadyActivated: true,
+        });
+      }
+      if (activation.claimedAt) {
+        return res.json({
+          email: activation.email,
+          contactName: activation.contactName,
+          institutionName: activation.institutionName,
+          activationInProgress: true,
+        });
+      }
+      if (
+        activation.consumedAt ||
+        activation.revokedAt ||
+        activation.expiresAt <= new Date() ||
+        activation.applicationStatus !== "submitted"
+      ) {
+        return res.status(404).json({ error: "This activation link is invalid or has expired." });
+      }
       return res.json({
         email: activation.email,
         contactName: activation.contactName,
         institutionName: activation.institutionName,
         expiresAt: activation.expiresAt,
+        alreadyActivated: false,
       });
     } catch (error) {
       if (respondIfInstitutionalSchemaMissing(error, res)) return;
