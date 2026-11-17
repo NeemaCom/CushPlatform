@@ -8,9 +8,11 @@ and session store.
 
 1. Create the Verify database in the dedicated Supabase project.
 2. Apply the Verify schema migrations below.
-3. Transfer the existing Verify institution, member, request, consent, billing,
-   and catalog records that must remain available. Do not copy Passport user or
-   financial tables into this project.
+3. Run the data-transfer script in dry-run mode, review its counts, then run it
+   with `--apply` to copy the Verify institution, member, request, consent, and
+   history rows. Do not copy Passport user or financial tables into this project.
+   The script checks that the seeded published version 1 catalog exactly matches
+   the source catalog; it does not duplicate or overwrite prices.
 4. Verify the transferred institution can sign in and its approved workspace
    still opens.
 5. Only then configure the application to use this database.
@@ -39,6 +41,36 @@ The schema stores Passport user and admin IDs as opaque references where needed.
 There are no foreign keys from the Verify database to Passport's database.
 Internal foreign keys between Verify-owned tables remain enforced.
 
+## Transfer existing Verify records
+
+Run the script from the repository root in a trusted environment where both
+database URLs are provided privately to the process:
+
+- `CUSH_VERIFY_SOURCE_DATABASE_URL`: the current database that contains the
+  Verify records.
+- `CUSH_VERIFY_DATABASE_URL`: the dedicated Verify target database.
+
+First run the read-only preflight:
+
+```sh
+node scripts/migrate-cush-verify-data.mjs
+```
+
+Only after reviewing the output, run the write operation:
+
+```sh
+node scripts/migrate-cush-verify-data.mjs --apply
+```
+
+The script verifies the Supabase project refs differ, checks target tables are
+empty, validates the target's published version 1 pricing seed against the
+source, and copies only Verify-owned institutional and report records in
+dependency order. It does not modify the source database, copy Passport data,
+copy sessions, or transfer Stripe/billing records. If any billing/Stripe rows
+exist in the source, or if the catalog differs, it stops without copying; review
+those records separately rather than risking credits or production Stripe IDs.
+Institutional users will sign in again after the cutover.
+
 ## Configure the server
 
 Add these server-side environment values to the Verify Render service:
@@ -61,7 +93,7 @@ continue using the existing Passport session.
 - Confirm all Verify tables exist and have row-level security enabled.
 - Confirm `anon` and `authenticated` have no direct table access.
 - Confirm the approved institutional account and its membership were transferred.
-- Confirm the published pricing version and plans were transferred.
+- Confirm the target's published pricing version and plans match the source.
 - Confirm a Verify sign-in and a Passport sign-in still use their separate sessions.
 - Confirm an authorised report can be generated, and that declined or revoked
   consent blocks retrieval.
