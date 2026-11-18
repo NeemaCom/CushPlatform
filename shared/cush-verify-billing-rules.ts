@@ -3,6 +3,25 @@ export type BillingEntitlementCode =
   | "SUBSCRIPTION_INACTIVE"
   | "BILLING_NOT_CONFIGURED";
 
+export const CUSH_VERIFY_ACTIVATION_PROMOTIONAL_CREDITS = 5;
+
+export function getCushVerifyActivationPromotionalGrant(applicationId: number) {
+  if (!Number.isSafeInteger(applicationId) || applicationId <= 0) {
+    throw new Error("A valid Cush Verify application ID is required.");
+  }
+
+  return {
+    entryType: "promotional_credit" as const,
+    creditDelta: CUSH_VERIFY_ACTIVATION_PROMOTIONAL_CREDITS,
+    idempotencyKey: `verify-email-activation:${applicationId}:promotional-credit`,
+    details: {
+      source: "official_email_activation",
+      grantType: "new_institution_onboarding",
+      credits: CUSH_VERIFY_ACTIVATION_PROMOTIONAL_CREDITS,
+    },
+  };
+}
+
 export type BillingSubscriptionEntitlement = {
   status: string;
   currentPeriodEndAt: Date;

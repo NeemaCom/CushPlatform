@@ -19,4 +19,4 @@
 - [Cush Verify Stripe runtime](cush-verify-stripe-runtime.md) — production Render needs its own Stripe keys and webhook secret; a Replit connection does not configure the deployed app.
 - [Cush Verify domain separation](cush-verify-domain-separation.md) — Cush Verify must have its own public subdomain instead of sharing the Cush Passport site address.
 - [Cush Verify same-origin API](cush-verify-same-origin-api.md) — proxy Verify API calls through its own domain so browsers retain institutional session cookies.
-- [Cush Verify activation policy](cush-verify-onboarding-policy.md) — official-email activation creates an active institutional account with workspace access, without pre-access admin review.
+- [Cush Verify activation policy](cush-verify-onboarding-policy.md) — official-email activation grants workspace access and five promotional report credits, without pre-access admin review.

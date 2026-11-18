@@ -384,7 +384,7 @@ export default function CushVerifyPricing() {
         <div className="mx-auto flex max-w-[1100px] flex-col justify-between gap-5 rounded-[24px] border border-[#d4dfed] bg-white p-6 shadow-[0_12px_35px_rgba(28,59,107,.05)] sm:flex-row sm:items-center sm:p-8">
           <div>
             <h2 className="font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Open your institutional account</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Verify your business email to activate your account. No staff approval or invitation is required.</p>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Verify your business email to activate your account. No staff approval or invitation is required. Five promotional report credits are added after activation.</p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Link href="/verify/apply" className="inline-flex min-h-11 items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">Create account</Link>

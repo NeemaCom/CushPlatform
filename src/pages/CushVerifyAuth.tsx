@@ -340,7 +340,7 @@ export function CushVerifyActivation() {
               <CheckCircle2 className="h-6 w-6" aria-hidden="true" />
             </span>
             <h1 className="mt-5 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Your account is active.</h1>
-            <p className="mt-3 text-sm leading-6 text-[#52627b]">Your official email is confirmed. Sign in to open the Cush Verify workspace.</p>
+            <p className="mt-3 text-sm leading-6 text-[#52627b]">Your official email is confirmed, your institutional account is active, and five promotional report credits have been added. Sign in to open the Cush Verify workspace.</p>
             <Link href="/verify/login" className="mt-6 inline-flex min-h-12 w-full items-center justify-center rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7]">
               Sign in to Cush Verify
             </Link>
@@ -353,7 +353,7 @@ export function CushVerifyActivation() {
                 </div>
                 <DialogTitle className="pt-2 font-serif text-2xl tracking-[-0.03em] text-[#12213d]">Welcome to Cush Verify</DialogTitle>
                 <DialogDescription className="text-sm leading-6 text-[#52627b]">
-                  Your official email is verified and your institutional account is active. Sign in with your business email and password to open the full workspace.
+                  Your official email is verified, your institutional account is active, and five promotional report credits have been added. Sign in with your business email and password to open the full workspace.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

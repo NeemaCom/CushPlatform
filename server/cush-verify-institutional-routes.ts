@@ -5,6 +5,8 @@ import {
   cushVerifyApplications,
   cushVerifyApplicationEvents,
   cushVerifyEmailActivations,
+  cushVerifyBillingAccounts,
+  cushVerifyCreditLedger,
   cushVerifyInstitutionalMemberships,
   cushVerifyInstitutionalUsers,
   cushVerifyInstitutions,
@@ -15,6 +17,7 @@ import {
   cushVerifyInstitutionalRegistrationSchema,
   cushVerifyApplicationStatusSchema,
 } from "@shared/cush-verify";
+import { getCushVerifyActivationPromotionalGrant } from "@shared/cush-verify-billing-rules";
 import {
   canAccessCushVerifyWorkspace,
   canFinalApproveCushVerifyApplication,
@@ -686,6 +689,27 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             role: "organisation_admin",
             status: "active",
           });
+          await tx.insert(cushVerifyBillingAccounts).values({
+            institutionId: institution.id,
+          }).onConflictDoNothing();
+          const [billingAccount] = await tx.select({
+            availableCredits: cushVerifyBillingAccounts.availableCredits,
+          }).from(cushVerifyBillingAccounts)
+            .where(eq(cushVerifyBillingAccounts.institutionId, institution.id))
+            .for("update")
+            .limit(1);
+          if (!billingAccount) throw new Error("CUSH_VERIFY_BILLING_ACCOUNT_CREATE_FAILED");
+          const initialCreditGrant = getCushVerifyActivationPromotionalGrant(application.id);
+          const [creditGrant] = await tx.insert(cushVerifyCreditLedger).values({
+            institutionId: institution.id,
+            ...initialCreditGrant,
+          }).onConflictDoNothing().returning({ id: cushVerifyCreditLedger.id });
+          if (creditGrant) {
+            await tx.update(cushVerifyBillingAccounts).set({
+              availableCredits: billingAccount.availableCredits + initialCreditGrant.creditDelta,
+              updatedAt: now,
+            }).where(eq(cushVerifyBillingAccounts.institutionId, institution.id));
+          }
           await tx.update(cushVerifyApplications)
             .set({ status: "approved", updatedAt: now })
             .where(eq(cushVerifyApplications.id, application.id));
@@ -699,7 +723,11 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             applicationId: application.id,
             institutionId: institution.id,
             eventType: "account_activated",
-            details: { emailVerified: true, accessEnabled: true },
+            details: {
+              emailVerified: true,
+              accessEnabled: true,
+              promotionalCreditsGranted: initialCreditGrant.creditDelta,
+            },
           });
         });
       } catch (error) {

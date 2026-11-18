@@ -53,6 +53,7 @@ Copy the endpoint's signing secret into Render's `STRIPE_WEBHOOK_SECRET`. The we
 ## 5. Confirm billing behavior before live mode
 
 - One new, authorized full report deducts one credit; a repeated retrieval of the same report does not deduct another.
+- Each new institutional account receives five promotional report credits after official email activation. The grant is recorded once in the credit ledger and does not create a Stripe charge.
 - Searches, missing profiles, declined consent, consent alone, failed requests, and individual report endpoints do not deduct credits.
 - When included credits run out, an eligible overage creates a Stripe invoice item with an idempotency key. Stripe collects it on the applicable invoice; transient failures are retried.
 - Unused credits carry forward in full. Annual plans are charged on their annual invoice while report credits are released monthly.
