@@ -121,7 +121,7 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
     <div className="space-y-6">
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Institutional workspace · Settings</p>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Institutional workspace · Team management</p>
           <h2 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Team & access</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Manage who can access your organisation’s Cush Verify workspace.</p>
         </div>
