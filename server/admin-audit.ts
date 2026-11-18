@@ -55,6 +55,35 @@ export async function recordAdminAuditEvent(
   });
 }
 
+/**
+ * Verify domain writes commit in a separate database from the main admin log.
+ * Call this only after the Verify transaction commits; the domain ledger/event
+ * remains the authoritative audit record if the cross-database mirror fails.
+ */
+export async function recordAdminAuditEventAfterCommit(
+  req: Request & { userId?: number },
+  event: AdminAuditEvent,
+): Promise<void> {
+  try {
+    await recordAdminAuditEvent(req, event);
+  } catch (error) {
+    let current: unknown = error;
+    let databaseCode: string | undefined;
+    for (let depth = 0; depth < 6 && current && typeof current === "object"; depth += 1) {
+      if ("code" in current && typeof (current as { code?: unknown }).code === "string") {
+        databaseCode = (current as { code: string }).code;
+        break;
+      }
+      current = "cause" in current ? (current as { cause?: unknown }).cause : null;
+    }
+    console.error("Cush Verify action committed but central admin audit mirror failed", {
+      action: event.action,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+      ...(databaseCode ? { databaseCode } : {}),
+    });
+  }
+}
+
 export function isAdminAuditTableMissing(error: unknown): boolean {
   let current: unknown = error;
   for (let depth = 0; current && depth < 5; depth += 1) {

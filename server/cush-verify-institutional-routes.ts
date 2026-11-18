@@ -35,7 +35,7 @@ import {
   setCushVerifyFirebaseUserActivated,
   verifyCushVerifyFirebaseIdentity,
 } from "./firebase-auth";
-import { recordAdminAuditEvent } from "./admin-audit";
+import { recordAdminAuditEventAfterCommit } from "./admin-audit";
 import { getAllowedFrontendOrigins } from "./origin-policy";
 import {
   sendCushVerifyActivationEmail,
@@ -1266,11 +1266,6 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             eventType: nextStatus === "approved" ? "approved" : nextStatus === "rejected" ? "rejected" : "status_changed",
             details: { status: nextStatus },
           });
-          await recordAdminAuditEvent(req, {
-            action: `admin.cush_verify_application.status_${nextStatus}`,
-            resourceType: "cush_verify_application",
-            resourceId: id,
-          }, tx);
           return { kind: "updated" as const };
         });
 
@@ -1284,6 +1279,11 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         if (result.kind === "invite_acceptance_required") {
           return res.status(409).json({ error: "The invited organisation administrator must accept the invitation and verify the official email before approval." });
         }
+        await recordAdminAuditEventAfterCommit(req, {
+          action: `admin.cush_verify_application.status_${nextStatus}`,
+          resourceType: "cush_verify_application",
+          resourceId: id,
+        });
         return res.json({ success: true, status: nextStatus });
       } catch (error) {
         if (respondIfInstitutionalSchemaMissing(error, res)) return;
@@ -1370,11 +1370,6 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
               details: { invitationId: invite.id },
             },
           ]);
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify_application.organisation_onboarded",
-            resourceType: "cush_verify_application",
-            resourceId: id,
-          }, tx);
           return {
             institutionId: institution.id,
             invitationId: invite.id,
@@ -1398,6 +1393,11 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         return res.status(500).json({ error: "Unable to start institutional onboarding." });
       }
 
+      await recordAdminAuditEventAfterCommit(req, {
+        action: "admin.cush_verify_application.organisation_onboarded",
+        resourceType: "cush_verify_application",
+        resourceId: id,
+      });
       const url = invitationUrl(req, token);
       if (!url) {
         await db.insert(cushVerifyApplicationEvents).values({
@@ -1512,11 +1512,6 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             eventType: "invitation_created",
             details: { invitationId: invite.id, resent: true },
           });
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify_application.invitation_resent",
-            resourceType: "cush_verify_application",
-            resourceId: id,
-          }, tx);
           return {
             institutionId: institution.id,
             invitationId: invite.id,
@@ -1542,6 +1537,11 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         return res.status(500).json({ error: "Unable to create a replacement invitation." });
       }
 
+      await recordAdminAuditEventAfterCommit(req, {
+        action: "admin.cush_verify_application.invitation_resent",
+        resourceType: "cush_verify_application",
+        resourceId: id,
+      });
       const url = invitationUrl(req, token);
       if (!url) {
         await db.insert(cushVerifyApplicationEvents).values({

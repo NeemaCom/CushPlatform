@@ -21,7 +21,7 @@ import {
   requireTrustedAdminOrigin,
   type AuthenticatedRequest,
 } from "./auth";
-import { recordAdminAuditEvent } from "./admin-audit";
+import { recordAdminAuditEventAfterCommit } from "./admin-audit";
 import { getAllowedFrontendOrigins } from "./origin-policy";
 import {
   getInstitutionalWorkspaceState,
@@ -534,17 +534,19 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
             availableCredits: newBalance,
             updatedAt: new Date(),
           }).where(eq(cushVerifyBillingAccounts.institutionId, institutionId));
-          await recordAdminAuditEvent(req, {
+          return { status: 201 as const, ledgerId: entry.id, balance: newBalance };
+        });
+        if (result.status === 404) return res.status(404).json({ error: "Organisation not found." });
+        if (result.status === 409) return res.status(409).json({ error: "This adjustment would make the credit balance negative." });
+        if (result.status === 201) {
+          await recordAdminAuditEventAfterCommit(req, {
             action: parsed.data.kind === "promotional_credit"
               ? "admin.cush_verify.billing.promotional_credit"
               : "admin.cush_verify.billing.credit_adjustment",
             resourceType: "cush_verify_billing_account",
             resourceId: String(institutionId),
-          }, tx);
-          return { status: 201 as const, ledgerId: entry.id, balance: newBalance };
-        });
-        if (result.status === 404) return res.status(404).json({ error: "Organisation not found." });
-        if (result.status === 409) return res.status(409).json({ error: "This adjustment would make the credit balance negative." });
+          });
+        }
         return res.status(result.status).json({
           success: true,
           ledgerId: result.ledgerId,
@@ -611,16 +613,18 @@ export function registerCushVerifyBillingRoutes(app: Express): void {
             availableCredits: newBalance,
             updatedAt: new Date(),
           }).where(eq(cushVerifyBillingAccounts.institutionId, original.institutionId));
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify.billing.ledger_reversal",
-            resourceType: "cush_verify_credit_ledger",
-            resourceId: String(original.id),
-          }, tx);
           return { status: 201 as const, ledgerId: entry.id, balance: newBalance };
         });
         if (result.status === 404) return res.status(404).json({ error: "Ledger entry or account not found." });
         if (result.status === 409) return res.status(409).json({ error: "This entry is already reversed or the reversal would make the balance negative." });
         if (result.status === 422) return res.status(422).json({ error: "Monetary charges require a Stripe refund; this action reverses credit entries only." });
+        if (result.status === 201) {
+          await recordAdminAuditEventAfterCommit(req, {
+            action: "admin.cush_verify.billing.ledger_reversal",
+            resourceType: "cush_verify_credit_ledger",
+            resourceId: String(ledgerId),
+          });
+        }
         return res.status(result.status).json({
           success: true,
           ledgerId: result.ledgerId,

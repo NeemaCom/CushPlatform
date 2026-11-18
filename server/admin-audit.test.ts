@@ -7,7 +7,11 @@ const { mockDb } = vi.hoisted(() => ({
 vi.mock("./db", () => ({ db: mockDb }));
 
 import { adminAuditLogs } from "@shared/schema";
-import { getAdminAuditIpRetentionCutoff, recordAdminAuditEvent } from "./admin-audit";
+import {
+  getAdminAuditIpRetentionCutoff,
+  recordAdminAuditEvent,
+  recordAdminAuditEventAfterCommit,
+} from "./admin-audit";
 
 describe("recordAdminAuditEvent", () => {
   beforeEach(() => {
@@ -45,6 +49,41 @@ describe("recordAdminAuditEvent", () => {
     })).rejects.toThrow("An authenticated admin user is required for audit records.");
 
     expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+
+  it("writes a committed Verify audit mirror through the main database", async () => {
+    const values = vi.fn().mockResolvedValue(undefined);
+    mockDb.insert.mockReturnValue({ values });
+    const req = { userId: 21, ip: "203.0.113.11" } as never;
+
+    await recordAdminAuditEventAfterCommit(req, {
+      action: "admin.cush_verify.billing.promotional_credit",
+      resourceType: "cush_verify_billing_account",
+      resourceId: 8,
+    });
+
+    expect(mockDb.insert).toHaveBeenCalledWith(adminAuditLogs);
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({
+      adminUserId: 21,
+      action: "admin.cush_verify.billing.promotional_credit",
+      resourceId: "8",
+    }));
+  });
+
+  it("keeps an already-committed Verify action successful if the central audit mirror fails", async () => {
+    const values = vi.fn().mockRejectedValue({ code: "42P01" });
+    mockDb.insert.mockReturnValue({ values });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(recordAdminAuditEventAfterCommit({ userId: 21 } as never, {
+      action: "admin.cush_verify.billing.promotional_credit",
+    })).resolves.toBeUndefined();
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Cush Verify action committed but central admin audit mirror failed",
+      expect.objectContaining({ databaseCode: "42P01" }),
+    );
+    errorSpy.mockRestore();
   });
 
   it("expires new audit IPs one calendar year after their event", () => {

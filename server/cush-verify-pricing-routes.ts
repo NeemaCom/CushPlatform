@@ -17,7 +17,7 @@ import {
   requireAdminPermission,
   requireTrustedAdminOrigin,
 } from "./auth";
-import { isAdminAuditTableMissing, recordAdminAuditEvent } from "./admin-audit";
+import { isAdminAuditTableMissing, recordAdminAuditEventAfterCommit } from "./admin-audit";
 
 const PRICING_VERSION_ADVISORY_LOCK = 1_724_913_087;
 const restoreRequestSchema = z.object({
@@ -313,12 +313,12 @@ export function registerCushVerifyPricingRoutes(app: Express) {
             publishedPlans,
             req.userId!,
           );
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify.pricing.draft_created",
-            resourceType: "cush_verify_pricing_version",
-            resourceId: draft.id,
-          }, transaction);
           return { id: draft.id, version: draft.version };
+        });
+        await recordAdminAuditEventAfterCommit(req, {
+          action: "admin.cush_verify.pricing.draft_created",
+          resourceType: "cush_verify_pricing_version",
+          resourceId: created.id,
         });
         return res.status(201).json(created);
       } catch (error) {
@@ -369,14 +369,14 @@ export function registerCushVerifyPricingRoutes(app: Express) {
             ))
             .returning();
           if (!updated) throw new PricingConflictError("The draft changed before it could be saved.");
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify.pricing.draft_updated",
-            resourceType: "cush_verify_pricing_version",
-            resourceId: draft.id,
-          }, transaction);
           const savedPlans = await transaction.select().from(cushVerifyPricingPlans)
             .where(eq(cushVerifyPricingPlans.versionId, draft.id));
           return toAdminVersion(updated, savedPlans);
+        });
+        await recordAdminAuditEventAfterCommit(req, {
+          action: "admin.cush_verify.pricing.draft_updated",
+          resourceType: "cush_verify_pricing_version",
+          resourceId: saved.id,
         });
         return res.json(saved);
       } catch (error) {
@@ -441,12 +441,12 @@ export function registerCushVerifyPricingRoutes(app: Express) {
             ))
             .returning();
           if (!activated) throw new PricingConflictError("The draft changed before it could be published.");
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify.pricing.published",
-            resourceType: "cush_verify_pricing_version",
-            resourceId: activated.id,
-          }, transaction);
           return { id: activated.id, version: activated.version, publishedAt: activated.publishedAt };
+        });
+        await recordAdminAuditEventAfterCommit(req, {
+          action: "admin.cush_verify.pricing.published",
+          resourceType: "cush_verify_pricing_version",
+          resourceId: published.id,
         });
         return res.json(published);
       } catch (error) {
@@ -500,12 +500,12 @@ export function registerCushVerifyPricingRoutes(app: Express) {
             sourcePlans,
             req.userId!,
           );
-          await recordAdminAuditEvent(req, {
-            action: "admin.cush_verify.pricing.restored_as_draft",
-            resourceType: "cush_verify_pricing_version",
-            resourceId: draft.id,
-          }, transaction);
           return { id: draft.id, version: draft.version, restoredFromVersion: source.version };
+        });
+        await recordAdminAuditEventAfterCommit(req, {
+          action: "admin.cush_verify.pricing.restored_as_draft",
+          resourceType: "cush_verify_pricing_version",
+          resourceId: restored.id,
         });
         return res.status(201).json(restored);
       } catch (error) {
