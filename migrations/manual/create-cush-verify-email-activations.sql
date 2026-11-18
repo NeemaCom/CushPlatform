@@ -26,9 +26,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS cush_verify_email_activations_pending_applicat
   WHERE consumed_at IS NULL AND revoked_at IS NULL;
 
 ALTER TABLE public.cush_verify_application_events
+  DROP CONSTRAINT IF EXISTS cush_verify_application_events_event_type_check,
   DROP CONSTRAINT IF EXISTS cush_verify_application_events_type_check;
 ALTER TABLE public.cush_verify_application_events
-  ADD CONSTRAINT cush_verify_application_events_type_check
+  ADD CONSTRAINT cush_verify_application_events_event_type_check
   CHECK (event_type IN (
     'submitted', 'status_changed', 'organisation_onboarded',
     'invitation_created', 'invitation_sent', 'invitation_delivery_failed',
