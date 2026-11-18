@@ -5,7 +5,10 @@ import session from "express-session";
 import type { Store } from "express-session";
 import { storage } from "./storage";
 import type { User } from "@shared/schema";
-import { createPostgresSessionStore } from "./session-store";
+import {
+  createCushVerifyPostgresSessionStore,
+  createPostgresSessionStore,
+} from "./session-store";
 import {
   ensureFirebaseConfigured,
   verifyFirebaseIdentity,
@@ -107,11 +110,13 @@ async function respondToFailedLogin(req: Request, res: Response, identifier: str
 export async function registerRoutes(
   app: Express,
   sessionStoreFactory?: () => Promise<Store>,
+  verifySessionStoreFactory?: () => Promise<Store>,
 ): Promise<Server> {
   const sessionSecret = process.env.SESSION_SECRET;
   if (!sessionSecret || sessionSecret.length < 32 || sessionSecret === "your-super-secret-session-key-here") {
     throw new Error("SESSION_SECRET must be set to a unique, random value of at least 32 characters");
   }
+  const verifySessionSecret = process.env.CUSH_VERIFY_SESSION_SECRET;
   ensureFirebaseConfigured();
   const crossSiteCookies = process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SAME_SITE === "none";
   const isProduction = process.env.NODE_ENV === "production";
@@ -120,8 +125,16 @@ export async function registerRoutes(
     : isProduction
       ? await createPostgresSessionStore()
       : new session.MemoryStore();
+  if (isProduction && (!verifySessionSecret || verifySessionSecret.length < 32 || verifySessionSecret === sessionSecret)) {
+    throw new Error("CUSH_VERIFY_SESSION_SECRET must be a unique random value of at least 32 characters.");
+  }
+  const cushVerifySessionStore = verifySessionStoreFactory
+    ? await verifySessionStoreFactory()
+    : isProduction
+      ? await createCushVerifyPostgresSessionStore()
+      : new session.MemoryStore();
   if (!isProduction && process.env.NODE_ENV === "development") {
-    console.warn("[session] Using volatile in-memory sessions for local development only.");
+    console.warn("[session] Using volatile in-memory Passport and Cush Verify sessions for local development only.");
   }
 
   // ── Health checks ─────────────────────────────────────────────────────────
@@ -135,9 +148,10 @@ export async function registerRoutes(
   app.use(generalRateLimit);
   app.use(sanitizeRequest);
 
-  app.use(session({
+  const passportSession = session({
     secret: sessionSecret,
     store: sessionStore,
+    name: "connect.sid",
     rolling: true,
     resave: false,
     saveUninitialized: false,
@@ -147,7 +161,27 @@ export async function registerRoutes(
       maxAge: SESSION_IDLE_TIMEOUT_MS,
       sameSite: crossSiteCookies ? "none" : "strict",
     },
-  }));
+  });
+  const institutionalSession = session({
+    secret: verifySessionSecret || `${sessionSecret}:cush-verify-local`,
+    store: cushVerifySessionStore,
+    name: "cush.verify.sid",
+    rolling: true,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: crossSiteCookies,
+      httpOnly: true,
+      maxAge: SESSION_IDLE_TIMEOUT_MS,
+      sameSite: crossSiteCookies ? "none" : "strict",
+    },
+  });
+  app.use((req, res, next) => {
+    if (req.get("X-Cush-Product")?.trim().toLowerCase() === "verify") {
+      return institutionalSession(req, res, next);
+    }
+    return passportSession(req, res, next);
+  });
 
   // ── Passport V1 routes ────────────────────────────────────────────────────
   registerAdminRoutes(app);

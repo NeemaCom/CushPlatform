@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_report_requests (
     REFERENCES public.cush_verify_institutions(id) ON DELETE RESTRICT,
   requested_by_institutional_user_id INTEGER NOT NULL
     REFERENCES public.cush_verify_institutional_users(id) ON DELETE RESTRICT,
-  target_user_id INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  target_user_id INTEGER,
   recipient_label TEXT NOT NULL
     CHECK (char_length(recipient_label) BETWEEN 3 AND 254),
   purpose TEXT NOT NULL
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_report_consents (
   id SERIAL PRIMARY KEY,
   request_id UUID NOT NULL UNIQUE
     REFERENCES public.cush_verify_report_requests(id) ON DELETE CASCADE,
-  user_id INTEGER NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL,
   status TEXT NOT NULL
     CHECK (status IN ('approved', 'declined', 'revoked')),
   approved_categories TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[]
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_report_events (
     )),
   actor_type TEXT NOT NULL
     CHECK (actor_type IN ('institutional_user', 'passport_user', 'system')),
-  actor_user_id INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  actor_user_id INTEGER,
   actor_institutional_user_id INTEGER
     REFERENCES public.cush_verify_institutional_users(id) ON DELETE SET NULL,
   details JSONB NOT NULL DEFAULT '{}'::jsonb

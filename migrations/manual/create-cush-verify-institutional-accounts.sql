@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_applications (
   contact_consent_accepted_at TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'submitted'
     CHECK (status IN ('submitted', 'under_review', 'additional_information_required', 'approved', 'rejected')),
-  reviewed_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  reviewed_by INTEGER,
   reviewed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_institutions (
   duplicate_key TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending_approval'
     CHECK (status IN ('pending_approval', 'approved', 'rejected', 'suspended')),
-  approved_by INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  approved_by INTEGER,
   approved_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_invitations (
   expires_at TIMESTAMPTZ NOT NULL,
   accepted_at TIMESTAMPTZ,
   revoked_at TIMESTAMPTZ,
-  created_by INTEGER NOT NULL REFERENCES public.users(id) ON DELETE RESTRICT,
+  created_by INTEGER NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS cush_verify_invitations_institution_created_idx
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_application_events (
     REFERENCES public.cush_verify_applications(id) ON DELETE CASCADE,
   institution_id INTEGER
     REFERENCES public.cush_verify_institutions(id) ON DELETE SET NULL,
-  actor_admin_id INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  actor_admin_id INTEGER,
   event_type TEXT NOT NULL
     CHECK (event_type IN (
       'submitted', 'status_changed', 'organisation_onboarded',

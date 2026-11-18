@@ -1,13 +1,14 @@
 import type { Express, Response } from "express";
-import { randomUUID } from "node:crypto";
-import { and, desc, eq, gt, inArray, sql } from "drizzle-orm";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
+import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { z } from "zod";
 import {
+  cushVerifyDiscoverySearches,
   cushVerifyInstitutions,
   cushVerifyReportConsents,
   cushVerifyReportDeliveries,
   cushVerifyReportEvents,
   cushVerifyReportRequests,
-  users,
 } from "@shared/schema";
 import {
   cushVerifyReportDecisionSchema,
@@ -15,7 +16,7 @@ import {
   type CushVerifyReportCategory,
 } from "@shared/cush-verify-reports";
 import { isAuthenticated, type AuthenticatedRequest } from "./auth";
-import { db } from "./db";
+import { cushVerifyDb } from "./db";
 import {
   getInstitutionalWorkspaceState,
   isInstitutionalAuthenticated,
@@ -23,13 +24,19 @@ import {
   type InstitutionalRequest,
 } from "./cush-verify-institutional-routes";
 import { authRateLimit } from "./security";
-import { getV2Assessment, isV2SchemaMissing } from "./cush-score-v2";
+import { isV2SchemaMissing } from "./cush-score-v2";
+import {
+  findEligiblePassportByEmail,
+  getConsentBoundPassportReportData,
+  getEligiblePassportUserById,
+} from "./cush-verify-passport-data";
 import {
   buildCushVerifyReport,
   checkCushVerifyReportAuthorization,
   getCushVerifyReportDigest,
   maskCushVerifyRecipientEmail,
 } from "./cush-verify-report-service";
+import { sendCushVerifyConsentRequestEmail } from "./cush-verify-consent-email";
 import {
   allocateDueAnnualCredits,
   CushVerifyBillingEntitlementError,
@@ -41,6 +48,37 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TTL_MS = 14 * DAY_MS;
 const MAX_OPEN_REQUESTS_PER_INSTITUTION = 100;
+const discoverySchema = z.object({
+  identifierType: z.enum(["email", "reference_code"]),
+  identifier: z.string().trim().min(3).max(254),
+}).strict();
+
+function digestValue(value: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || secret.length < 32) throw new Error("Cush Verify identifier hashing is not configured.");
+  return createHmac("sha256", secret).update(value).digest("hex");
+}
+
+function invitationDigest(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+function passportAppOrigin(): string {
+  const configured = process.env.CUSH_PASSPORT_APP_URL || "https://app.we-cush.com";
+  const url = new URL(configured);
+  const isLocalDevelopment = process.env.NODE_ENV !== "production" &&
+    url.protocol === "http:" && url.hostname === "localhost";
+  if (
+    (url.protocol !== "https:" && !isLocalDevelopment) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("Cush Passport invitation origin is not permitted.");
+  }
+  return url.origin;
+}
 
 function reportSchemaUnavailable(error: unknown, res: Response): boolean {
   let current: unknown = error;
@@ -48,7 +86,7 @@ function reportSchemaUnavailable(error: unknown, res: Response): boolean {
     if ("code" in current && (current as { code?: string }).code === "42P01") {
       res.status(503).json({
         code: "CUSH_VERIFY_REPORT_SCHEMA_REQUIRED",
-        error: "Cush Verify report requests are not set up yet. Apply the authorized reports migration first.",
+        error: "Cush Verify report storage is not ready. Apply the authorized reports and workspace MVP migrations first.",
       });
       return true;
     }
@@ -83,6 +121,7 @@ async function getWorkspaceActor(req: InstitutionalRequest) {
     institutionalUserId: req.cushVerifyInstitutionalUserId,
     institutionId: membership.institutionId,
     role: membership.role,
+    institutionName: membership.tradingName || membership.institutionName,
   };
 }
 
@@ -100,7 +139,7 @@ function isCategorySubset(
 function missingReportSchema(res: Response) {
   return res.status(503).json({
     code: "CUSH_VERIFY_REPORT_SCHEMA_REQUIRED",
-    error: "Cush Verify report requests are not set up yet. Apply the authorized reports migration first.",
+    error: "Cush Verify report storage is not ready. Apply the authorized reports and workspace MVP migrations first.",
   });
 }
 
@@ -125,6 +164,74 @@ function billingSchemaUnavailable(error: unknown, res: Response): boolean {
 
 export function registerCushVerifyReportRoutes(app: Express): void {
   app.post(
+    "/api/verify/passport-discovery",
+    authRateLimit,
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const parsed = discoverySchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Enter a valid email address or report reference." });
+
+      try {
+        const actor = await getWorkspaceActor(req);
+        if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
+        if (!canManageRequests(actor.role)) {
+          return res.status(403).json({ error: "Only organisation administrators and analysts can search for Passport holders." });
+        }
+        const identifier = parsed.data.identifierType === "email"
+          ? parsed.data.identifier.toLowerCase()
+          : parsed.data.identifier.toLowerCase();
+        let found = false;
+        let recipientLabel: string | null = null;
+
+        if (parsed.data.identifierType === "email") {
+          const normalizedEmail = z.string().email().safeParse(identifier);
+          if (!normalizedEmail.success) return res.status(400).json({ error: "Enter a valid email address." });
+          const target = await findEligiblePassportByEmail(identifier);
+          found = Boolean(target);
+          if (target) recipientLabel = maskCushVerifyRecipientEmail(target.email);
+        } else {
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier)) {
+            return res.status(400).json({ error: "Enter a valid report reference." });
+          }
+          const [request] = await cushVerifyDb.select({
+            recipientLabel: cushVerifyReportRequests.recipientLabel,
+          })
+            .from(cushVerifyReportRequests)
+            .where(and(
+              eq(cushVerifyReportRequests.id, identifier),
+              eq(cushVerifyReportRequests.institutionId, actor.institutionId),
+            ))
+            .limit(1);
+          found = Boolean(request);
+          recipientLabel = request?.recipientLabel ?? null;
+        }
+
+        await cushVerifyDb.insert(cushVerifyDiscoverySearches).values({
+          institutionId: actor.institutionId,
+          institutionalUserId: actor.institutionalUserId,
+          identifierType: parsed.data.identifierType,
+          identifierDigest: digestValue(`${parsed.data.identifierType}:${identifier}`),
+          matchFound: found,
+        });
+        return res.json({
+          matchFound: found,
+          recipientLabel,
+          message: found
+            ? "A minimal Passport match is available. No financial details are exposed."
+            : "No eligible match was found. You can still send a secure Passport invitation.",
+        });
+      } catch (error) {
+        if (reportSchemaUnavailable(error, res)) return;
+        console.error("Cush Verify Passport discovery failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Passport discovery could not be completed." });
+      }
+    },
+  );
+
+  app.post(
     "/api/verify/report-requests",
     authRateLimit,
     isInstitutionalAuthenticated,
@@ -143,17 +250,10 @@ export function registerCushVerifyReportRoutes(app: Express): void {
         }
 
         const normalizedEmail = parsed.data.recipientEmail.trim().toLowerCase();
-        const [targetUser] = await db.select({ id: users.id })
-          .from(users)
-          .where(and(
-            sql`lower(${users.email}) = ${normalizedEmail}`,
-            eq(users.isActive, true),
-            eq(users.isEmailVerified, true),
-          ))
-          .limit(1);
+        const targetUser = await findEligiblePassportByEmail(normalizedEmail);
 
         const now = new Date();
-        const pending = await db.select({ id: cushVerifyReportRequests.id })
+        const pending = await cushVerifyDb.select({ id: cushVerifyReportRequests.id })
           .from(cushVerifyReportRequests)
           .where(and(
             eq(cushVerifyReportRequests.institutionId, actor.institutionId),
@@ -166,19 +266,24 @@ export function registerCushVerifyReportRoutes(app: Express): void {
         }
 
         const requestId = randomUUID();
+        const invitationToken = randomBytes(32).toString("hex");
         const recipientLabel = maskCushVerifyRecipientEmail(normalizedEmail);
-        await db.transaction(async (tx) => {
+        const invitationExpiresAt = new Date(now.getTime() + REQUEST_TTL_MS);
+        await cushVerifyDb.transaction(async (tx) => {
           await tx.insert(cushVerifyReportRequests).values({
             id: requestId,
             institutionId: actor.institutionId,
             requestedByInstitutionalUserId: actor.institutionalUserId,
             targetUserId: targetUser?.id ?? null,
+            recipientEmailHash: digestValue(`email:${normalizedEmail}`),
+            invitationTokenHash: invitationDigest(invitationToken),
+            invitationExpiresAt,
             recipientLabel,
             purpose: parsed.data.purpose,
             requestedCategories: parsed.data.categories,
             requestedAuthorizationDays: parsed.data.authorizationDays,
             status: "awaiting_consent",
-            requestExpiresAt: new Date(now.getTime() + REQUEST_TTL_MS),
+            requestExpiresAt: invitationExpiresAt,
             createdAt: now,
             updatedAt: now,
           });
@@ -195,10 +300,22 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           });
         });
 
+        const consentUrl = new URL("/passport/consent-invite", passportAppOrigin());
+        consentUrl.searchParams.set("token", invitationToken);
+        const emailResult = await sendCushVerifyConsentRequestEmail({
+          email: normalizedEmail,
+          institutionName: actor.institutionName,
+          consentUrl: consentUrl.toString(),
+          requestId,
+        });
         return res.status(201).json({
           success: true,
           requestId,
-          message: "If a verified Cush Passport account matches that email, its owner can review the request. Cush does not confirm account matches.",
+          invitationEmailStatus: emailResult.status,
+          invitationUrl: consentUrl.toString(),
+          message: emailResult.status === "sent"
+            ? "The request was saved and a secure review link was emailed. No financial information is shared unless the individual approves."
+            : "The request was saved, but the review email could not be sent. Share the secure link below with the intended recipient; account matching is not disclosed.",
         });
       } catch (error) {
         if (reportSchemaUnavailable(error, res)) return;
@@ -219,14 +336,14 @@ export function registerCushVerifyReportRoutes(app: Express): void {
         const actor = await getWorkspaceActor(req);
         if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
 
-        const rows = await db.select()
+        const rows = await cushVerifyDb.select()
           .from(cushVerifyReportRequests)
           .where(eq(cushVerifyReportRequests.institutionId, actor.institutionId))
           .orderBy(desc(cushVerifyReportRequests.createdAt))
           .limit(100);
         const requestIds = rows.map((row) => row.id);
         const deliveries = requestIds.length
-          ? await db.select({
+          ? await cushVerifyDb.select({
               id: cushVerifyReportDeliveries.id,
               requestId: cushVerifyReportDeliveries.requestId,
               deliveredAt: cushVerifyReportDeliveries.deliveredAt,
@@ -274,7 +391,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
   app.get("/api/passport/verification-requests", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const now = new Date();
-      const rows = await db.select({
+      const rows = await cushVerifyDb.select({
         id: cushVerifyReportRequests.id,
         purpose: cushVerifyReportRequests.purpose,
         requestedCategories: cushVerifyReportRequests.requestedCategories,
@@ -315,6 +432,64 @@ export function registerCushVerifyReportRoutes(app: Express): void {
   });
 
   app.post(
+    "/api/passport/verification-invitations/claim",
+    authRateLimit,
+    isAuthenticated,
+    async (req: AuthenticatedRequest, res) => {
+      const token = typeof req.body?.token === "string" ? req.body.token : "";
+      if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(400).json({ error: "The invitation link is invalid." });
+      try {
+        const passportUser = await getEligiblePassportUserById(req.userId!);
+        if (!passportUser?.isActive || !passportUser.isEmailVerified) {
+          return res.status(403).json({ error: "Sign in with the verified email address that received the invitation." });
+        }
+        const emailDigest = digestValue(`email:${passportUser.email.trim().toLowerCase()}`);
+        const now = new Date();
+        const result = await cushVerifyDb.transaction(async (tx) => {
+          const [request] = await tx.select()
+            .from(cushVerifyReportRequests)
+            .where(and(
+              eq(cushVerifyReportRequests.invitationTokenHash, invitationDigest(token)),
+              eq(cushVerifyReportRequests.recipientEmailHash, emailDigest),
+              gt(cushVerifyReportRequests.invitationExpiresAt, now),
+            ))
+            .for("update")
+            .limit(1);
+          if (!request) return "not_found" as const;
+          if (request.targetUserId && request.targetUserId !== passportUser.id) return "not_found" as const;
+          if (request.status !== "awaiting_consent" || request.requestExpiresAt <= now) return "expired" as const;
+
+          await tx.update(cushVerifyReportRequests).set({
+            targetUserId: passportUser.id,
+            invitationTokenHash: null,
+            updatedAt: now,
+          }).where(eq(cushVerifyReportRequests.id, request.id));
+          await tx.insert(cushVerifyReportEvents).values({
+            requestId: request.id,
+            eventType: "request_linked",
+            actorType: "passport_user",
+            actorUserId: passportUser.id,
+            details: {},
+            createdAt: now,
+          });
+          return "linked" as const;
+        });
+        if (result === "not_found") {
+          return res.status(404).json({ error: "This invitation is unavailable for the signed-in account." });
+        }
+        if (result === "expired") return res.status(410).json({ error: "This invitation has expired." });
+        return res.json({ success: true });
+      } catch (error) {
+        if (reportSchemaUnavailable(error, res)) return;
+        console.error("Cush Verify Passport invitation claim failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "The invitation could not be linked to this Passport." });
+      }
+    },
+  );
+
+  app.post(
     "/api/passport/verification-requests/:requestId/decision",
     authRateLimit,
     isAuthenticated,
@@ -327,7 +502,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
 
       const now = new Date();
       try {
-        const result = await db.transaction(async (tx) => {
+        const result = await cushVerifyDb.transaction(async (tx) => {
           const [request] = await tx.select()
             .from(cushVerifyReportRequests)
             .where(and(
@@ -423,7 +598,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
       if (!requestId) return res.status(400).json({ error: "The request ID is invalid." });
       const now = new Date();
       try {
-        const result = await db.transaction(async (tx) => {
+        const result = await cushVerifyDb.transaction(async (tx) => {
           const [request] = await tx.select()
             .from(cushVerifyReportRequests)
             .where(and(
@@ -497,7 +672,10 @@ export function registerCushVerifyReportRoutes(app: Express): void {
       try {
         const actor = await getWorkspaceActor(req);
         if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
-        const [request] = await db.select()
+        if (!canManageRequests(actor.role)) {
+          return res.status(403).json({ error: "Only organisation administrators and analysts can retrieve reports." });
+        }
+        const [request] = await cushVerifyDb.select()
           .from(cushVerifyReportRequests)
           .where(eq(cushVerifyReportRequests.id, requestId))
           .limit(1);
@@ -508,7 +686,7 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           return res.status(404).json({ error: "Report request not found." });
         }
         const [consent] = request.targetUserId
-          ? await db.select()
+          ? await cushVerifyDb.select()
               .from(cushVerifyReportConsents)
               .where(and(
                 eq(cushVerifyReportConsents.requestId, requestId),
@@ -536,11 +714,27 @@ export function registerCushVerifyReportRoutes(app: Express): void {
         const reportCategories = authorization.categories;
         await refreshBillingSubscriptionStatus(actor.institutionId);
         await allocateDueAnnualCredits(actor.institutionId);
-        const assessment = await getV2Assessment(request.targetUserId);
-        const report = buildCushVerifyReport(assessment.calculation, reportCategories, now, assessment);
+        const passportData = await getConsentBoundPassportReportData(
+          request.targetUserId,
+          reportCategories,
+        );
+        const report = buildCushVerifyReport(
+          passportData.assessment.calculation,
+          reportCategories,
+          now,
+          passportData.assessment,
+          passportData.financialRecords.map((record) => ({
+            recordType: record.recordType,
+            activityDate: record.activityDate,
+            countryCode: record.countryCode,
+            currencyCode: record.currencyCode,
+            evidenceStatus: record.evidenceStatus,
+            details: record.details,
+          })),
+        );
         const reportDigest = getCushVerifyReportDigest(report);
 
-        const delivery = await db.transaction(async (tx) => {
+        const delivery = await cushVerifyDb.transaction(async (tx) => {
           const [lockedRequest] = await tx.select()
             .from(cushVerifyReportRequests)
             .where(eq(cushVerifyReportRequests.id, requestId))
@@ -630,6 +824,9 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           delivery: {
             id: delivery.id,
             deliveredAt: delivery.deliveredAt.toISOString(),
+            consentReference: requestId,
+            consentApprovedAt: consent.approvedAt?.toISOString() ?? null,
+            authorizationExpiresAt: request.authorizationExpiresAt?.toISOString() ?? null,
             newDeliveryEvent: delivery.newDeliveryEvent,
             billing: {
               charged: delivery.billing.charged,

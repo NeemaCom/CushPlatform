@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { API_BASE_URL } from "@/lib/api-base";
+import { getProductSessionHeaders } from "@/lib/product-session";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -17,7 +18,10 @@ export async function apiRequest(
   
   const res = await fetch(fullUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...getProductSessionHeaders(),
+      ...(data ? { "Content-Type": "application/json" } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -36,6 +40,7 @@ export const getQueryFn: <T>(options: {
     
     const res = await fetch(fullUrl, {
       credentials: "include",
+      headers: getProductSessionHeaders(),
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Building2, CreditCard, FileCheck2, FileClock, LogOut, Plus, Settings2, ShieldCheck } from "lucide-react";
+import { Building2, CreditCard, FileCheck2, FileClock, KeyRound, LogOut, Search, Settings2, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-verify-firebase";
 import { signOut } from "firebase/auth";
@@ -29,12 +29,13 @@ const applicationLabels: Record<string, string> = {
 
 const sections = [
   { id: "overview", label: "Overview", icon: Building2 },
-  { id: "new", label: "New verification request", icon: Plus },
-  { id: "history", label: "Request history and status", icon: FileClock },
-  { id: "consent", label: "Consent and evidence status", icon: ShieldCheck },
-  { id: "reports", label: "Reports and results", icon: FileCheck2 },
-  { id: "billing", label: "Billing and usage", icon: CreditCard },
-  { id: "settings", label: "Organisation settings", icon: Settings2 },
+  { id: "discovery", label: "Find a Passport", icon: Search },
+  { id: "requests", label: "Report Requests", icon: FileClock },
+  { id: "reports", label: "Reports", icon: FileCheck2 },
+  { id: "consent", label: "Consent & Access", icon: ShieldCheck },
+  { id: "api", label: "API & Integrations", icon: KeyRound },
+  { id: "billing", label: "Usage & Billing", icon: CreditCard },
+  { id: "settings", label: "Settings", icon: Settings2 },
 ] as const;
 
 function apiError(error: unknown) {
@@ -54,6 +55,8 @@ export default function CushVerifyWorkspace() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("overview");
+  const [selectedRecipientEmail, setSelectedRecipientEmail] = useState("");
+  const [showRequestForm, setShowRequestForm] = useState(false);
   const identityQuery = useQuery<WorkspaceIdentity>({
     queryKey: ["/api/verify/auth/me"],
     queryFn: async () => {
@@ -160,7 +163,10 @@ export default function CushVerifyWorkspace() {
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-8 lg:grid-cols-[250px_1fr] lg:py-9">
         <nav aria-label="Institutional workspace" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
           {sections.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setSection(id)} aria-current={section === id ? "page" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-4 text-left text-sm font-medium ${section === id ? "bg-[#0c1830] text-white" : "bg-white text-[#52627b] hover:bg-[#eaf1fb]"}`}>
+            <button key={id} onClick={() => {
+              setSection(id);
+              if (id === "requests") setShowRequestForm(false);
+            }} aria-current={section === id ? "page" : undefined} className={`flex min-h-11 shrink-0 items-center gap-3 rounded-xl px-4 text-left text-sm font-medium ${section === id ? "bg-[#0c1830] text-white" : "bg-white text-[#52627b] hover:bg-[#eaf1fb]"}`}>
               <Icon className="h-4 w-4" aria-hidden="true" /> {label}
             </button>
           ))}
@@ -186,6 +192,20 @@ export default function CushVerifyWorkspace() {
               <div><p className="text-xs text-[#71819b]">Your account</p><p className="mt-1 text-sm font-semibold">{data.user.fullName} · Organisation Administrator</p></div>
               <p className="text-xs leading-5 text-[#71819b] sm:col-span-2">Organisation settings are read-only in this initial account release. Contact Cush support for changes.</p>
             </div>
+          ) : section === "api" ? (
+            <div className="mt-5 max-w-2xl space-y-4">
+              <p className="text-sm leading-6 text-[#52627b]">Institutional report requests and delivery are enforced by the Cush Verify server. Each report retrieval checks tenant membership, active individual consent, approved categories, expiry, and the shared credit ledger.</p>
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-950">Machine-to-machine credentials are not enabled</p>
+                <p className="mt-1 text-sm leading-6 text-amber-900">Use the signed-in workspace for now. Do not put API secrets in browser code. API credential provisioning and external integrations are not active in this release.</p>
+              </div>
+              <div className="rounded-xl border border-[#dce5f1] bg-[#f8fbff] p-4 text-sm text-[#52627b]">
+                <p className="font-semibold text-[#12213d]">Current report endpoints</p>
+                <code className="mt-2 block text-xs">POST /api/verify/report-requests</code>
+                <code className="mt-1 block text-xs">POST /api/verify/report-requests/:requestId/deliver</code>
+                <p className="mt-2 text-xs leading-5">These endpoints require the institution’s secure web session; they are not public API-key endpoints.</p>
+              </div>
+            </div>
           ) : section === "billing" ? (
             <CushVerifyBillingWorkspace
               role={data.membership.role}
@@ -193,12 +213,22 @@ export default function CushVerifyWorkspace() {
             />
           ) : (
             <CushVerifyReportWorkspace
-              section={section}
+              section={section === "requests" ? (showRequestForm ? "new" : "history") : section}
               requests={requests}
               isLoading={requestsQuery.isLoading}
               errorMessage={requestsQuery.isError ? apiError(requestsQuery.error) : undefined}
               canManageRequests={data.membership.role === "organisation_admin" || data.membership.role === "analyst"}
               onRefresh={() => void queryClient.invalidateQueries({ queryKey: ["/api/verify/report-requests"] })}
+              onCreateRequest={(email) => {
+                setSelectedRecipientEmail(email);
+                setSection("requests");
+                setShowRequestForm(true);
+              }}
+              onStartRequest={() => {
+                setSelectedRecipientEmail("");
+                setShowRequestForm(section === "requests" && showRequestForm ? false : true);
+              }}
+              initialRecipientEmail={selectedRecipientEmail}
             />
           )}
         </section>

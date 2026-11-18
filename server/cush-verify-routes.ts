@@ -8,7 +8,7 @@ import {
   cushVerifyInstitutionInterestSchema,
   cushVerifyReviewStatusSchema,
 } from "@shared/cush-verify";
-import { db } from "./db";
+import { cushVerifyDb as db } from "./db";
 import {
   isAuthenticated,
   requireAdminPermission,

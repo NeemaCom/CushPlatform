@@ -111,7 +111,7 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_credit_ledger (
   currency TEXT CHECK (currency IS NULL OR currency ~ '^[A-Z]{3}$'),
   idempotency_key TEXT NOT NULL UNIQUE
     CHECK (char_length(idempotency_key) BETWEEN 1 AND 200),
-  created_by_admin_user_id INTEGER REFERENCES public.users(id) ON DELETE SET NULL,
+  created_by_admin_user_id INTEGER,
   details JSONB NOT NULL DEFAULT '{}'::JSONB CHECK (jsonb_typeof(details) = 'object'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT cush_verify_credit_ledger_amount_check CHECK (

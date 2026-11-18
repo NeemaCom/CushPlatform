@@ -20,7 +20,7 @@ import {
   canFinalApproveCushVerifyApplication,
 } from "@shared/cush-verify-access";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
-import { db } from "./db";
+import { cushVerifyDb as db } from "./db";
 import {
   isAuthenticated,
   requireAdminPermission,
@@ -165,7 +165,7 @@ async function createInstitutionalSession(req: Request, institutionalUserId: num
 }
 
 function destroyInstitutionalSession(req: Request, res: Response, status: number, body: object) {
-  res.clearCookie("connect.sid", {
+  res.clearCookie("cush.verify.sid", {
     path: req.session.cookie.path || "/",
     httpOnly: true,
     secure: req.session.cookie.secure === true || req.secure,
