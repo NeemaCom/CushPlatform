@@ -379,9 +379,20 @@ export function CushVerifyActivation() {
               {activationError && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{activationError}</p>}
               {busy && <p role="status" className="mt-5 flex items-center gap-2 text-sm text-[#52627b]"><span className="h-4 w-4 animate-spin rounded-full border-2 border-[#3977e6] border-t-transparent" />Confirming your email and activating your account…</p>}
               {activationError && !activation.activationInProgress && (
-                <button type="button" disabled={busy} onClick={() => void completeActivation()} className="mt-5 min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">
-                  {busy ? "Activating account…" : "Try activation again"}
-                </button>
+                <>
+                  <button type="button" disabled={busy} onClick={() => void completeActivation()} className="mt-5 min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">
+                    {busy ? "Activating account…" : "Try activation again"}
+                  </button>
+                  <form onSubmit={(event) => void requestFreshLink(event)} className="mt-3">
+                    <p className="text-xs leading-5 text-[#61728a]">
+                      If retrying does not work, request a fresh one-time link at {resendEmail}.
+                    </p>
+                    <button type="submit" disabled={resendBusy} className="mt-2 min-h-11 w-full rounded-full border border-[#cad7e8] px-5 text-sm font-semibold text-[#275fb7] hover:bg-[#f8fbff] disabled:opacity-60">
+                      {resendBusy ? "Requesting a fresh link…" : "Request a fresh activation link"}
+                    </button>
+                    {resendMessage && <p role="status" className="mt-2 text-xs leading-5 text-[#61728a]">{resendMessage}</p>}
+                  </form>
+                </>
               )}
               {activation.activationInProgress && (
                 <form onSubmit={(event) => void requestFreshLink(event)} className="mt-4">

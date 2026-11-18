@@ -549,6 +549,7 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
     }
 
     const now = new Date();
+    let failureStage = "find_activation";
     try {
       const [candidate] = await db.select({
         id: cushVerifyEmailActivations.id,
@@ -574,6 +575,7 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         return res.status(409).json({ error: "This activation link is invalid, expired, or has already been used. Request a fresh link if needed." });
       }
 
+      failureStage = "claim_activation";
       const [claim] = await db.update(cushVerifyEmailActivations)
         .set({ claimedAt: now })
         .where(and(
@@ -590,8 +592,10 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
 
       let firebaseActivated = false;
       try {
+        failureStage = "activate_firebase_identity";
         await setCushVerifyFirebaseUserActivated(candidate.firebaseUid, true);
         firebaseActivated = true;
+        failureStage = "create_organisation_and_membership";
         await db.transaction(async (tx) => {
           const [claimedActivation] = await tx.select({ id: cushVerifyEmailActivations.id })
             .from(cushVerifyEmailActivations)
@@ -693,6 +697,10 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       const code = error && typeof error === "object" && "code" in error
         ? String((error as { code: unknown }).code)
         : error instanceof Error ? error.message : "";
+      const databaseCode = /^[0-9A-Z]{5}$/i.test(code) ? code : undefined;
+      const constraint = error && typeof error === "object" && "constraint" in error
+        ? String((error as { constraint: unknown }).constraint)
+        : "";
       if (
         code === "CUSH_VERIFY_APPLICATION_ALREADY_ACTIVATED" ||
         code === "CUSH_VERIFY_APPLICATION_NOT_ACTIVATABLE" ||
@@ -702,7 +710,10 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       }
       console.error("Cush Verify account activation failed", {
         errorType: error instanceof Error ? error.name : "UnknownError",
+        stage: failureStage,
         code: code.startsWith("CUSH_VERIFY_") ? code : undefined,
+        databaseCode,
+        constraint: /^[a-zA-Z0-9_]{1,128}$/.test(constraint) ? constraint : undefined,
       });
       return res.status(503).json({ error: "We could not activate the account. Try again or request a fresh activation link." });
     }

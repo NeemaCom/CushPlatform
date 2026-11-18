@@ -7,6 +7,8 @@ import {
   Check,
   CheckCircle2,
   CircleCheck,
+  Eye,
+  EyeOff,
   KeyRound,
   LockKeyhole,
   Mail,
@@ -78,10 +80,80 @@ function fieldError(error: unknown) {
   return message || "We could not submit your application. Please try again.";
 }
 
+function getOrganisationDetailsToComplete(form: ApplicationForm) {
+  const missing: string[] = [];
+  if (form.legalName.trim().length < 2) missing.push("Institution legal name");
+  if (!form.institutionType) missing.push("Institution type");
+  if (form.countryOfRegistration.trim().length < 2) missing.push("Country of registration");
+  let validWebsite = false;
+  try {
+    const url = new URL(form.website.trim());
+    validWebsite = url.protocol === "https:" || url.protocol === "http:";
+  } catch {
+    // Keep the website in the checklist until it is a complete URL.
+  }
+  if (!validWebsite) missing.push("A valid website starting with https:// or http://");
+  return missing;
+}
+
+function getAccountDetailsToComplete(form: ApplicationForm) {
+  const missing: string[] = [];
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.businessEmail.trim())) {
+    missing.push("A valid official business email");
+  }
+  if (form.businessTelephone.trim().length < 5) missing.push("Business telephone number");
+  if (form.contactFullName.trim().length < 2) missing.push("Contact person's full name");
+  if (form.contactJobTitle.trim().length < 2) missing.push("Contact person's job title");
+  if (form.password.length < 12) missing.push("Password with at least 12 characters");
+  if (!form.passwordConfirmation || form.password !== form.passwordConfirmation) {
+    missing.push("Matching password confirmation");
+  }
+  if (form.intendedUse.trim().length < 10) missing.push("Intended use (at least 10 characters)");
+  if (
+    form.estimatedMonthlyVerifications !== "" &&
+    (!Number.isInteger(Number(form.estimatedMonthlyVerifications)) ||
+      Number(form.estimatedMonthlyVerifications) < 0 ||
+      Number(form.estimatedMonthlyVerifications) > 10_000_000)
+  ) {
+    missing.push("A whole-number monthly estimate, or leave it blank");
+  }
+  if (!form.contactConsent) missing.push("Your authorisation checkbox");
+  return missing;
+}
+
+function IncompleteChecklist({ items }: { items: string[] }) {
+  return (
+    <div className="mt-5 rounded-xl border border-[#dce5f1] bg-[#f8fbff] p-4" aria-label="Step completion checklist">
+      {items.length ? (
+        <>
+          <p className="text-sm font-semibold text-[#1a3154]">
+            {items.length === 1 ? "One item still needed" : `${items.length} items still needed`}
+          </p>
+          <ul className="mt-2 space-y-1.5 text-sm text-[#52627b]">
+            {items.map((item) => (
+              <li key={item} className="flex items-start gap-2">
+                <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#b56c35]" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="flex items-center gap-2 text-sm font-medium text-[#176b5d]">
+          <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+          Everything needed for this step is complete.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function CushVerifyApplication() {
   const [form, setForm] = useState(initialForm);
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showPasswordConfirmation, setShowPasswordConfirmation] = useState(false);
   const [error, setError] = useState("");
   const [confirmation, setConfirmation] = useState<{
     email: string;
@@ -98,6 +170,11 @@ export default function CushVerifyApplication() {
   function continueToAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    const missing = getOrganisationDetailsToComplete(form);
+    if (missing.length) {
+      setError(`Please complete: ${missing.join("; ")}.`);
+      return;
+    }
     setStep(2);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -113,7 +190,12 @@ export default function CushVerifyApplication() {
         : null,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Check the required fields and try again.");
+      const missing = getAccountDetailsToComplete(form);
+      setError(
+        missing.length
+          ? `Please complete the items listed below: ${missing.join("; ")}.`
+          : parsed.error.issues[0]?.message ?? "Check the details and try again.",
+      );
       return;
     }
 
@@ -229,7 +311,7 @@ export default function CushVerifyApplication() {
                   <p className="mt-5 text-xs leading-5 text-[#71819b]">The secure link is for your official business email and expires after 24 hours. Your account activates after the email is confirmed.</p>
                 </div>
               ) : step === 1 ? (
-                <form onSubmit={continueToAccount}>
+                  <form noValidate onSubmit={continueToAccount}>
                   <div className="flex items-center gap-3 border-b border-[#e1e8f1] pb-5">
                     <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf1fb] text-[#3471d2]"><Building2 className="h-5 w-5" aria-hidden="true" /></span>
                     <div>
@@ -258,13 +340,14 @@ export default function CushVerifyApplication() {
                       <input required type="url" maxLength={300} autoComplete="url" placeholder="https://institution.org" className={inputClass} value={form.website} onChange={(event) => update("website", event.target.value)} />
                     </label>
                   </div>
+                  <IncompleteChecklist items={getOrganisationDetailsToComplete(form)} />
                   <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#e1e8f1] pt-5 sm:flex-row sm:items-center sm:justify-between">
                     <p className="inline-flex items-center gap-2 text-xs leading-5 text-[#61728a]"><LockKeyhole className="h-4 w-4 shrink-0 text-[#16816f]" aria-hidden="true" />Your details create a separate institutional profile.</p>
                     <button type="submit" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-6 text-sm font-semibold text-white transition hover:bg-[#275fb7]">Continue <ArrowRight className="h-4 w-4" aria-hidden="true" /></button>
                   </div>
                 </form>
               ) : (
-                <form onSubmit={(event) => void submit(event)}>
+                  <form noValidate onSubmit={(event) => void submit(event)}>
                   <div className="flex items-center gap-3 border-b border-[#e1e8f1] pb-5">
                     <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#eaf1fb] text-[#3471d2]"><KeyRound className="h-5 w-5" aria-hidden="true" /></span>
                     <div>
@@ -287,11 +370,33 @@ export default function CushVerifyApplication() {
                       <input required maxLength={120} autoComplete="organization-title" className={inputClass} value={form.contactJobTitle} onChange={(event) => update("contactJobTitle", event.target.value)} />
                     </label>
                     <label className={labelClass}>Create password
-                      <input required type="password" minLength={12} maxLength={4096} autoComplete="new-password" className={inputClass} value={form.password} onChange={(event) => update("password", event.target.value)} />
+                      <span className="relative mt-2 block">
+                        <input required type={showPassword ? "text" : "password"} minLength={12} maxLength={4096} autoComplete="new-password" className={`${inputClass} mt-0 pr-12`} value={form.password} onChange={(event) => update("password", event.target.value)} />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((visible) => !visible)}
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-pressed={showPassword}
+                          className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[#52627b] hover:bg-[#eaf1fb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3977e6]"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                        </button>
+                      </span>
                       <span className="mt-1.5 block text-xs font-normal text-[#71819b]">Use at least 12 characters.</span>
                     </label>
                     <label className={labelClass}>Confirm password
-                      <input required type="password" minLength={12} maxLength={4096} autoComplete="new-password" className={inputClass} value={form.passwordConfirmation} onChange={(event) => update("passwordConfirmation", event.target.value)} />
+                      <span className="relative mt-2 block">
+                        <input required type={showPasswordConfirmation ? "text" : "password"} minLength={12} maxLength={4096} autoComplete="new-password" className={`${inputClass} mt-0 pr-12`} value={form.passwordConfirmation} onChange={(event) => update("passwordConfirmation", event.target.value)} />
+                        <button
+                          type="button"
+                          onClick={() => setShowPasswordConfirmation((visible) => !visible)}
+                          aria-label={showPasswordConfirmation ? "Hide password confirmation" : "Show password confirmation"}
+                          aria-pressed={showPasswordConfirmation}
+                          className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-[#52627b] hover:bg-[#eaf1fb] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#3977e6]"
+                        >
+                          {showPasswordConfirmation ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                        </button>
+                      </span>
                       {form.passwordConfirmation && form.password !== form.passwordConfirmation && <span className="mt-1.5 block text-xs font-medium text-[#a34b4b]">Passwords must match.</span>}
                     </label>
                     <label className={`${labelClass} sm:col-span-2`}>Intended use of Cush Verify
@@ -305,11 +410,12 @@ export default function CushVerifyApplication() {
                     <input required type="checkbox" checked={form.contactConsent} onChange={(event) => update("contactConsent", event.target.checked)} className="mt-1 h-4 w-4 accent-[#3475e7]" />
                     <span>I confirm I am authorised to submit these details and agree that Cush may use them to create my institutional account and contact me about Cush Verify. Please do not include customer records or sensitive personal financial information.</span>
                   </label>
+                  <IncompleteChecklist items={getAccountDetailsToComplete(form)} />
                   <div className="mt-6 flex flex-col-reverse gap-3 border-t border-[#e1e8f1] pt-5 sm:flex-row sm:items-center sm:justify-between">
                     <button type="button" onClick={() => { setError(""); setStep(1); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="inline-flex min-h-11 items-center justify-center gap-2 text-sm font-semibold text-[#275fb7] hover:text-[#16458f]">
                       <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back to organisation
                     </button>
-                    <button type="submit" disabled={submitting || form.password.length < 12 || form.password !== form.passwordConfirmation} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-6 text-sm font-semibold text-white transition hover:bg-[#275fb7] disabled:cursor-not-allowed disabled:opacity-50">
+                    <button type="submit" disabled={submitting} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-6 text-sm font-semibold text-white transition hover:bg-[#275fb7] disabled:cursor-not-allowed disabled:opacity-50">
                       {submitting ? "Creating account…" : "Create account"} <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
