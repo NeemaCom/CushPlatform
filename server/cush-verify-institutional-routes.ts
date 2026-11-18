@@ -68,13 +68,52 @@ function hashActivationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+function getErrorChain(error: unknown): Record<string, unknown>[] {
+  const chain: Record<string, unknown>[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current && depth < 6; depth += 1) {
+    if (typeof current !== "object") break;
+    const candidate = current as Record<string, unknown>;
+    chain.push(candidate);
+    current = candidate.cause;
+  }
+  return chain;
+}
+
 function isUniqueViolation(error: unknown): boolean {
-  return !!error && typeof error === "object" && "code" in error &&
-    (error as { code?: unknown }).code === "23505";
+  return getErrorChain(error).some((candidate) => candidate.code === "23505");
+}
+
+function activationFailureDetails(error: unknown) {
+  const chain = getErrorChain(error);
+  let code: string | undefined;
+  let databaseCode: string | undefined;
+  let constraint: string | undefined;
+
+  for (const candidate of chain) {
+    const candidateCode = typeof candidate.code === "string" ? candidate.code : "";
+    const candidateMessage = typeof candidate.message === "string" ? candidate.message : "";
+    if (!code && candidateCode.startsWith("CUSH_VERIFY_")) code = candidateCode;
+    if (!code && candidateMessage.startsWith("CUSH_VERIFY_")) code = candidateMessage;
+    if (!databaseCode && /^[0-9A-Z]{5}$/i.test(candidateCode)) databaseCode = candidateCode;
+    if (
+      !constraint &&
+      typeof candidate.constraint === "string" &&
+      /^[a-zA-Z0-9_]{1,128}$/.test(candidate.constraint)
+    ) {
+      constraint = candidate.constraint;
+    }
+  }
+
+  return {
+    errorType: error instanceof Error ? error.name : "UnknownError",
+    code,
+    databaseCode,
+    constraint,
+  };
 }
 
 function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boolean {
-  let current: unknown = error;
   const institutionalTables = [
     "cush_verify_applications",
     "cush_verify_institutions",
@@ -84,12 +123,11 @@ function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boo
     "cush_verify_institutional_memberships",
     "cush_verify_application_events",
   ];
-  for (let depth = 0; current && depth < 6; depth += 1) {
-    if (typeof current !== "object" || !("code" in current)) break;
-    const candidate = current as { code?: unknown; message?: unknown; cause?: unknown };
+  for (const candidate of getErrorChain(error)) {
+    const code = candidate.code;
     const message = String(candidate.message ?? "").toLowerCase();
     if (
-      (candidate.code === "42P01" || candidate.code === "42703") &&
+      (code === "42P01" || code === "42703") &&
       institutionalTables.some((table) => message.includes(table))
     ) {
       res.status(503).json({
@@ -98,7 +136,6 @@ function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boo
       });
       return true;
     }
-    current = candidate.cause;
   }
   return false;
 }
@@ -694,26 +731,17 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       });
     } catch (error) {
       if (respondIfInstitutionalSchemaMissing(error, res)) return;
-      const code = error && typeof error === "object" && "code" in error
-        ? String((error as { code: unknown }).code)
-        : error instanceof Error ? error.message : "";
-      const databaseCode = /^[0-9A-Z]{5}$/i.test(code) ? code : undefined;
-      const constraint = error && typeof error === "object" && "constraint" in error
-        ? String((error as { constraint: unknown }).constraint)
-        : "";
+      const details = activationFailureDetails(error);
       if (
-        code === "CUSH_VERIFY_APPLICATION_ALREADY_ACTIVATED" ||
-        code === "CUSH_VERIFY_APPLICATION_NOT_ACTIVATABLE" ||
+        details.code === "CUSH_VERIFY_APPLICATION_ALREADY_ACTIVATED" ||
+        details.code === "CUSH_VERIFY_APPLICATION_NOT_ACTIVATABLE" ||
         isUniqueViolation(error)
       ) {
         return res.status(409).json({ error: "This application could not be activated. Contact Cush support for help." });
       }
       console.error("Cush Verify account activation failed", {
-        errorType: error instanceof Error ? error.name : "UnknownError",
+        ...details,
         stage: failureStage,
-        code: code.startsWith("CUSH_VERIFY_") ? code : undefined,
-        databaseCode,
-        constraint: /^[a-zA-Z0-9_]{1,128}$/.test(constraint) ? constraint : undefined,
       });
       return res.status(503).json({ error: "We could not activate the account. Try again or request a fresh activation link." });
     }
