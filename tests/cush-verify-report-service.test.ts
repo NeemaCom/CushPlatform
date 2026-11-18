@@ -143,6 +143,21 @@ describe("Cush Verify authorized reports", () => {
     expect(getCushVerifyReportDigest(first)).not.toBe(getCushVerifyReportDigest(changed));
   });
 
+  it("includes reporting coverage in the digest but ignores the generated timestamp", () => {
+    const first = buildCushVerifyReport(calculation, ["score_summary"], now);
+    const retried = {
+      ...first,
+      generatedAt: new Date(now.getTime() + 60_000).toISOString(),
+    };
+    const changedCoverage = {
+      ...retried,
+      reportingPeriod: { start: "2026-01-01", end: "2026-10-31" },
+    };
+
+    expect(getCushVerifyReportDigest(first)).toBe(getCushVerifyReportDigest(retried));
+    expect(getCushVerifyReportDigest(first)).not.toBe(getCushVerifyReportDigest(changedCoverage));
+  });
+
   it("masks the recipient address before displaying request history", () => {
     const masked = maskCushVerifyRecipientEmail("alice.smith@example.com");
     expect(masked).toBe("a***h@example.com");

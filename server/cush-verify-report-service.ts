@@ -234,6 +234,12 @@ export function buildCushVerifyReport(
 
 export function getCushVerifyReportDigest(report: CushVerifyReportPayload): string {
   // A retry at a later time must not create another successful-delivery event
-  // when the authorized report content has not changed.
-  return createHash("sha256").update(JSON.stringify(report.categories)).digest("hex");
+  // when the authorized report content and coverage have not changed. The
+  // generated timestamp is intentionally excluded because it changes on retry.
+  return createHash("sha256")
+    .update(JSON.stringify({
+      reportingPeriod: report.reportingPeriod,
+      categories: report.categories,
+    }))
+    .digest("hex");
 }

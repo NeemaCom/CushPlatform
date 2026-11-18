@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 const {
   database,
@@ -82,7 +83,6 @@ type Handler = (...args: any[]) => unknown;
 type RegisteredRoute = { path: string; handlers: Handler[] };
 
 const requestId = "b70fa5c4-0f68-4cc8-b7b7-2f4db5af59a1";
-const reportDigest = "a".repeat(64);
 const deliveryDate = new Date("2026-11-18T12:00:00.000Z");
 
 const requestRow = {
@@ -104,9 +104,14 @@ const consentRow = {
   approvedAt: new Date(Date.now() - 1_000),
 };
 
-let deliveryRow: { id: number; deliveredAt: Date; requestId: string; reportDigest: string } | null;
+let deliveryRows: Array<{ id: number; deliveredAt: Date; requestId: string; reportDigest: string }>;
 let reportEvents: Array<Record<string, unknown>>;
+let reportDebits: number[];
+let creditBalance: number;
 let nextDeliveryId: number;
+let latestDeliveryInsert: { requestId: string; reportDigest: string } | null;
+let reportContent: Record<string, unknown>;
+let failReportEventInsert: boolean;
 
 function selectBuilder() {
   let selectedTable: unknown;
@@ -124,8 +129,12 @@ function selectBuilder() {
     async limit() {
       if (selectedTable === cushVerifyReportRequests) return [requestRow];
       if (selectedTable === cushVerifyReportConsents) return [consentRow];
-      if (selectedTable === cushVerifyReportDeliveries && deliveryRow) {
-        return [{ id: deliveryRow.id, deliveredAt: deliveryRow.deliveredAt }];
+      if (selectedTable === cushVerifyReportDeliveries && latestDeliveryInsert) {
+        const delivery = deliveryRows.find((row) =>
+          row.requestId === latestDeliveryInsert?.requestId &&
+          row.reportDigest === latestDeliveryInsert?.reportDigest,
+        );
+        if (delivery) return [{ id: delivery.id, deliveredAt: delivery.deliveredAt }];
       }
       return [];
     },
@@ -144,23 +153,25 @@ function createTransaction() {
         },
         async returning() {
           if (table !== cushVerifyReportDeliveries || !insertedValues) return [];
-          if (
-            deliveryRow?.requestId === insertedValues.requestId &&
-            deliveryRow.reportDigest === insertedValues.reportDigest
-          ) return [];
-          deliveryRow = {
+          const request = String(insertedValues.requestId);
+          const digest = String(insertedValues.reportDigest);
+          latestDeliveryInsert = { requestId: request, reportDigest: digest };
+          if (deliveryRows.some((row) => row.requestId === request && row.reportDigest === digest)) return [];
+          const delivery = {
             id: nextDeliveryId++,
             deliveredAt: deliveryDate,
-            requestId: String(insertedValues.requestId),
-            reportDigest: String(insertedValues.reportDigest),
+            requestId: request,
+            reportDigest: digest,
           };
-          return [{ id: deliveryRow.id, deliveredAt: deliveryRow.deliveredAt }];
+          deliveryRows.push(delivery);
+          return [{ id: delivery.id, deliveredAt: delivery.deliveredAt }];
         },
       };
       return {
         values(values: Record<string, unknown>) {
           insertedValues = values;
           if (table === cushVerifyReportEvents) {
+            if (failReportEventInsert) return Promise.reject(new Error("simulated report event write failure"));
             reportEvents.push(values);
             return Promise.resolve(undefined);
           }
@@ -219,19 +230,22 @@ async function invokeDeliveryRoute() {
 describe("Cush Verify report delivery route billing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    deliveryRow = null;
     reportEvents = [];
     nextDeliveryId = 100;
 
     database.select.mockImplementation(() => selectBuilder());
     database.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
-      const previousDelivery = deliveryRow;
+      const previousDeliveries = [...deliveryRows];
       const previousEvents = [...reportEvents];
+      const previousDebits = [...reportDebits];
+      const previousBalance = creditBalance;
       try {
         return await callback(createTransaction());
       } catch (error) {
-        deliveryRow = previousDelivery;
+        deliveryRows = previousDeliveries;
         reportEvents = previousEvents;
+        reportDebits = previousDebits;
+        creditBalance = previousBalance;
         throw error;
       }
     });
@@ -249,11 +263,32 @@ describe("Cush Verify report delivery route billing", () => {
       assessment: { calculation: {} },
       financialRecords: [],
     });
-    buildReport.mockReturnValue({ categories: { scoreSummary: { score: 700 } } });
-    getReportDigest.mockReturnValue(reportDigest);
+    reportContent = {
+      generatedAt: deliveryDate.toISOString(),
+      reportingPeriod: { start: null, end: null },
+      categories: { scoreSummary: { score: 700 } },
+    };
+    buildReport.mockImplementation(() => reportContent);
+    getReportDigest.mockImplementation((report: { categories: unknown; reportingPeriod: unknown }) =>
+      createHash("sha256")
+        .update(JSON.stringify({ reportingPeriod: report.reportingPeriod, categories: report.categories }))
+        .digest("hex"),
+    );
     refreshSubscription.mockResolvedValue(undefined);
     allocateAnnualCredits.mockResolvedValue(undefined);
-    recordReportCreditUse.mockResolvedValue({ charged: true, overageLedgerId: null });
+    deliveryRows = [];
+    reportDebits = [];
+    creditBalance = 5;
+    latestDeliveryInsert = null;
+    failReportEventInsert = false;
+    recordReportCreditUse.mockImplementation(async (_tx, input: { reportDeliveryId: number }) => {
+      if (reportDebits.includes(input.reportDeliveryId)) {
+        return { charged: false as const, overageLedgerId: null };
+      }
+      reportDebits.push(input.reportDeliveryId);
+      creditBalance -= 1;
+      return { charged: true as const, overageLedgerId: null };
+    });
   });
 
   it("charges once when the same authorized report is retrieved repeatedly", async () => {
@@ -271,8 +306,33 @@ describe("Cush Verify report delivery route billing", () => {
       billing: { charged: false, type: "none" },
     });
     expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
-    expect(deliveryRow).toMatchObject({ id: 100, requestId, reportDigest });
+    expect(deliveryRows).toHaveLength(1);
+    expect(deliveryRows[0]).toMatchObject({ id: 100, requestId });
+    expect(creditBalance).toBe(4);
     expect(reportEvents.map((event) => event.eventType)).toEqual(["report_delivered", "report_accessed"]);
+  });
+
+  it("charges a second time only when report content changes", async () => {
+    const firstResponse = await invokeDeliveryRoute();
+    reportContent = {
+      generatedAt: new Date(deliveryDate.getTime() + 60_000).toISOString(),
+      reportingPeriod: { start: null, end: null },
+      categories: { scoreSummary: { score: 701 } },
+    };
+    const changedResponse = await invokeDeliveryRoute();
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(changedResponse.statusCode).toBe(200);
+    expect(changedResponse.payload.delivery).toMatchObject({
+      newDeliveryEvent: true,
+      billing: { charged: true, type: "report_credit" },
+    });
+    expect(deliveryRows).toHaveLength(2);
+    expect(deliveryRows[0].reportDigest).not.toBe(deliveryRows[1].reportDigest);
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(2);
+    expect(reportDebits).toEqual([100, 101]);
+    expect(creditBalance).toBe(3);
+    expect(reportEvents.map((event) => event.eventType)).toEqual(["report_delivered", "report_delivered"]);
   });
 
   it("does not attempt a charge when report generation fails", async () => {
@@ -285,7 +345,9 @@ describe("Cush Verify report delivery route billing", () => {
     expect(response.payload).toEqual({ error: "The report could not be retrieved." });
     expect(database.transaction).not.toHaveBeenCalled();
     expect(recordReportCreditUse).not.toHaveBeenCalled();
-    expect(deliveryRow).toBeNull();
+    expect(deliveryRows).toEqual([]);
+    expect(creditBalance).toBe(5);
+    expect(reportDebits).toEqual([]);
     errorSpy.mockRestore();
   });
 
@@ -298,8 +360,38 @@ describe("Cush Verify report delivery route billing", () => {
     expect(response.statusCode).toBe(500);
     expect(response.payload).toEqual({ error: "The report could not be retrieved." });
     expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
-    expect(deliveryRow).toBeNull();
+    expect(deliveryRows).toEqual([]);
+    expect(creditBalance).toBe(5);
+    expect(reportDebits).toEqual([]);
     expect(reportEvents).toEqual([]);
+    errorSpy.mockRestore();
+  });
+
+  it("rolls back delivery and credit when a later transaction write fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    failReportEventInsert = true;
+
+    const response = await invokeDeliveryRoute();
+
+    expect(response.statusCode).toBe(500);
+    expect(response.payload).toEqual({ error: "The report could not be retrieved." });
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
+    expect(deliveryRows).toEqual([]);
+    expect(reportEvents).toEqual([]);
+    expect(reportDebits).toEqual([]);
+    expect(creditBalance).toBe(5);
+
+    failReportEventInsert = false;
+    const retry = await invokeDeliveryRoute();
+    expect(retry.statusCode).toBe(200);
+    expect(retry.payload.delivery).toMatchObject({
+      newDeliveryEvent: true,
+      billing: { charged: true, type: "report_credit" },
+    });
+    expect(deliveryRows).toHaveLength(1);
+    expect(reportDebits).toEqual([101]);
+    expect(creditBalance).toBe(4);
+    expect(reportEvents.map((event) => event.eventType)).toEqual(["report_delivered"]);
     errorSpy.mockRestore();
   });
 });
