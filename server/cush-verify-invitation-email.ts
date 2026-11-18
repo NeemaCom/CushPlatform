@@ -22,7 +22,15 @@ function escapeHtml(value: string) {
 }
 
 export async function sendCushVerifyInvitationEmail(
-  input: { email: string; contactName: string; institutionName: string; inviteUrl: string; invitationId: number },
+  input: {
+    email: string;
+    contactName: string;
+    institutionName: string;
+    inviteUrl: string;
+    invitationId: number;
+    role?: string;
+    institutionApproved?: boolean;
+  },
   options: InvitationEmailOptions = {},
 ): Promise<CushVerifyInvitationEmailResult> {
   const apiKey = options.apiKey ?? process.env.RESEND_API_KEY;
@@ -31,14 +39,32 @@ export async function sendCushVerifyInvitationEmail(
 
   const safeName = input.contactName.trim() || "there";
   const safeInstitution = input.institutionName.trim();
+  const roleLabel = input.role === "organisation_admin"
+    ? "Organisation Administrator"
+    : input.role === "analyst"
+      ? "Analyst"
+      : input.role === "viewer"
+        ? "Viewer"
+        : "Organisation Administrator";
+  const roleWithArticle = input.role === "viewer"
+    ? `a ${roleLabel}`
+    : `an ${roleLabel}`;
+  const accessMessage = input.institutionApproved
+    ? `You have been invited to join ${safeInstitution} as ${roleWithArticle}. After you verify the official email address used for this invitation, your membership will be active.`
+    : `You have been invited to create an institutional account for ${safeInstitution} as its initial Organisation Administrator. The organisation remains under review until Cush Admin completes the application review.`;
+  const accessMessageHtml = input.institutionApproved
+    ? `After you verify the official email address used for this invitation, your ${escapeHtml(roleLabel)} membership will be active.`
+    : "The organisation remains under review until Cush Admin completes the application review.";
   const text = [
     `Hello ${safeName},`,
     "",
-    `Cush has invited you to create an institutional account for ${safeInstitution}.`,
+    accessMessage,
     "Use the secure invitation link to register with your official email address and verify ownership.",
     input.inviteUrl,
     "",
-    "The organisation remains under review. Creating an account does not grant access to the Cush Verify workspace.",
+    input.institutionApproved
+      ? "Your membership is activated by email verification. No additional Cush Admin approval is required."
+      : "Creating an account does not grant access to the Cush Verify workspace until the organisation is approved.",
     "If you were not expecting this invitation, contact support@we-cush.com.",
   ].join("\n");
   const html = `
@@ -50,9 +76,9 @@ export async function sendCushVerifyInvitationEmail(
         </div>
         <div style="padding:28px 32px">
           <p style="margin:0 0 14px;font-size:16px;line-height:1.6">Hello ${escapeHtml(safeName)},</p>
-          <p style="margin:0 0 18px;font-size:15px;line-height:1.7">Cush has invited you to create an institutional account for <strong>${escapeHtml(safeInstitution)}</strong>. Register using your official email address.</p>
+          <p style="margin:0 0 18px;font-size:15px;line-height:1.7">${escapeHtml(accessMessage)} Register using your official email address.</p>
           <a href="${escapeHtml(input.inviteUrl)}" style="display:inline-block;border-radius:10px;background:#3475e7;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700">Accept invitation</a>
-          <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#526174">This link expires in 7 days. Your organisation remains under review; creating an account does not grant access to the verification workspace.</p>
+          <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#526174">This link expires in 7 days. ${accessMessageHtml}</p>
           <p style="margin:24px 0 0;font-size:13px;line-height:1.6;color:#64748b">If you were not expecting this invitation, contact <a href="mailto:support@we-cush.com" style="color:#275fb7">support@we-cush.com</a>.</p>
         </div>
       </div>

@@ -317,7 +317,7 @@ export const cushVerifyInstitutionalUsers = pgTable("cush_verify_institutional_u
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   jobTitle: text("job_title").notNull(),
-  businessTelephone: text("business_telephone").notNull(),
+  businessTelephone: text("business_telephone"),
   isEmailVerified: boolean("is_email_verified").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
@@ -333,17 +333,27 @@ export const cushVerifyInvitations = pgTable("cush_verify_invitations", {
   email: text("email").notNull(),
   fullName: text("full_name").notNull(),
   jobTitle: text("job_title").notNull(),
-  businessTelephone: text("business_telephone").notNull(),
+  businessTelephone: text("business_telephone"),
+  role: text("role").notNull().default("organisation_admin"),
   tokenHash: text("token_hash").notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
   acceptedAt: timestamp("accepted_at", { withTimezone: true, mode: "date" }),
   revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
   createdBy: integer("created_by").notNull(),
+  createdByType: text("created_by_type").notNull().default("cush_admin"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
   institutionCreatedIndex: index("cush_verify_invitations_institution_created_idx")
     .on(table.institutionId, table.createdAt),
   inviteEmailIndex: index("cush_verify_invitations_email_idx").on(table.email),
+  roleCheck: check(
+    "cush_verify_invitations_role_check",
+    sql`${table.role} in ('organisation_admin', 'analyst', 'viewer')`,
+  ),
+  createdByTypeCheck: check(
+    "cush_verify_invitations_created_by_type_check",
+    sql`${table.createdByType} in ('cush_admin', 'organisation_admin')`,
+  ),
 })).enableRLS();
 
 export const cushVerifyEmailActivations = pgTable("cush_verify_email_activations", {
@@ -392,6 +402,36 @@ export const cushVerifyInstitutionalMemberships = pgTable("cush_verify_instituti
     .on(table.institutionId, table.institutionalUserId),
   userStatusIndex: index("cush_verify_memberships_user_status_idx")
     .on(table.institutionalUserId, table.status),
+})).enableRLS();
+
+export const cushVerifyMembershipEvents = pgTable("cush_verify_membership_events", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "cascade" }),
+  invitationId: integer("invitation_id")
+    .references(() => cushVerifyInvitations.id, { onDelete: "set null" }),
+  membershipId: integer("membership_id")
+    .references(() => cushVerifyInstitutionalMemberships.id, { onDelete: "set null" }),
+  actorType: text("actor_type").notNull(),
+  actorInstitutionalUserId: integer("actor_institutional_user_id")
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "set null" }),
+  actorAdminUserId: integer("actor_admin_user_id"),
+  eventType: text("event_type").notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  actorTypeCheck: check(
+    "cush_verify_membership_events_actor_type_check",
+    sql`${table.actorType} in ('organisation_admin', 'institutional_user', 'cush_admin', 'system')`,
+  ),
+  eventTypeCheck: check(
+    "cush_verify_membership_events_type_check",
+    sql`${table.eventType} in ('invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_revoked', 'invitation_accepted', 'membership_revoked')`,
+  ),
+  institutionCreatedIndex: index("cush_verify_membership_events_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+  membershipCreatedIndex: index("cush_verify_membership_events_membership_created_idx")
+    .on(table.membershipId, table.createdAt),
 })).enableRLS();
 
 export const cushVerifyApplicationEvents = pgTable("cush_verify_application_events", {

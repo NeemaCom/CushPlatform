@@ -10,6 +10,7 @@ import { ADMIN_PERMISSION, canManageUserRoles, hasAdminPermission } from "@share
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
 import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
 import CushVerifyApplicationsAdmin from "@/components/admin/CushVerifyApplicationsAdmin";
+import CushVerifyMembershipQueue from "@/components/verify/team-management/CushVerifyMembershipQueue";
 import UserDirectoryAdmin from "@/components/admin/UserDirectoryAdmin";
 
 const VisitorIntelligenceAdmin = lazy(() => import("@/components/admin/VisitorIntelligenceAdmin"));
@@ -110,7 +111,7 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-pricing" | "cush-verify-billing" | "visitor-intelligence">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-memberships" | "cush-verify-pricing" | "cush-verify-billing" | "visitor-intelligence">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
@@ -285,6 +286,20 @@ export default function AdminDashboard() {
               Institution applications
             </button>
           )}
+          {hasVerifyInterestRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("cush-verify-memberships")}
+              aria-current={activeSection === "cush-verify-memberships" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "cush-verify-memberships"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Verify memberships
+            </button>
+          )}
           {hasVerifyPricingRead && (
             <button
               type="button"
@@ -339,6 +354,8 @@ export default function AdminDashboard() {
           <CushVerifyInterestAdmin canManage={hasVerifyInterestManage} />
         ) : activeSection === "cush-verify-applications" ? (
           <CushVerifyApplicationsAdmin canManage={hasVerifyInterestManage} />
+        ) : activeSection === "cush-verify-memberships" ? (
+          <CushVerifyMembershipQueue />
         ) : activeSection === "cush-verify-pricing" ? (
           <Suspense fallback={<div className="rounded-xl border border-[#e4e1d8] bg-[#fbfaf6] p-8 text-center text-sm text-[#777973]">Loading pricing controls…</div>}>
             <CushVerifyPricingAdmin canManage={hasVerifyPricingManage} />

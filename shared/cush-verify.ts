@@ -25,6 +25,7 @@ export const cushVerifyApplicantInstitutionTypes = [
   "bank",
   "landlord",
 ] as const;
+export const cushVerifyMembershipRoles = ["organisation_admin", "analyst", "viewer"] as const;
 
 export const cushVerifyApplicationSchema = z.object({
   legalName: z.string().trim().min(2).max(200),
@@ -65,6 +66,13 @@ export const cushVerifyInstitutionInterestSchema = z.object({
 
 export const cushVerifyReviewStatusSchema = z.enum(cushVerifyReviewStatuses);
 export const cushVerifyApplicationStatusSchema = z.enum(cushVerifyApplicationStatuses);
+export const cushVerifyTeamInvitationSchema = z.object({
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  fullName: z.string().trim().min(2).max(160),
+  jobTitle: z.string().trim().min(2).max(120),
+  role: z.enum(cushVerifyMembershipRoles),
+}).strict();
+export const cushVerifyMembershipRoleSchema = z.enum(cushVerifyMembershipRoles);
 
 export type CushVerifyInstitutionInterestInput = z.infer<typeof cushVerifyInstitutionInterestSchema>;
 export type CushVerifyReviewStatus = z.infer<typeof cushVerifyReviewStatusSchema>;

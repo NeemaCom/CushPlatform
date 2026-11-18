@@ -158,7 +158,15 @@ export function CushVerifyLogin() {
 export function CushVerifyInvitationRegistration() {
   const [, setLocation] = useLocation();
   const token = getQueryToken();
-  const [invitation, setInvitation] = useState<{ email: string; fullName: string; institutionName: string } | null>(null);
+  const [invitation, setInvitation] = useState<{
+    email: string;
+    fullName: string;
+    jobTitle: string;
+    role: string;
+    institutionName: string;
+    institutionStatus: string;
+    applicationStatus: string;
+  } | null>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -172,7 +180,15 @@ export function CushVerifyInvitationRegistration() {
     }
     apiRequest("GET", `/api/verify/invitations/lookup?token=${encodeURIComponent(token)}`)
       .then((response) => response.json())
-      .then((value: { email: string; fullName: string; institutionName: string }) => {
+      .then((value: {
+        email: string;
+        fullName: string;
+        jobTitle: string;
+        role: string;
+        institutionName: string;
+        institutionStatus: string;
+        applicationStatus: string;
+      }) => {
         if (!cancelled) setInvitation(value);
       })
       .catch((lookupError) => {
@@ -204,13 +220,26 @@ export function CushVerifyInvitationRegistration() {
     }
   }
 
+  const approvedTeamInvitation = invitation?.institutionStatus === "approved"
+    && invitation.applicationStatus === "approved";
+  const invitationRole = invitation?.role === "organisation_admin"
+    ? "Organisation Administrator"
+    : invitation?.role === "analyst"
+      ? "Analyst"
+      : "Viewer";
+
   return (
     <AuthLayout>
       {sent ? (
         <div role="status" aria-live="polite" className="py-5">
           <MailCheck className="h-8 w-8 text-[#16816f]" aria-hidden="true" />
           <h1 className="mt-4 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Verify your official email</h1>
-          <p className="mt-3 text-sm leading-6 text-[#52627b]">We sent an activation link to <strong>{invitation?.email}</strong>. Open it to verify the address and finish registering. Your organisation stays under review until Cush Admin approves it.</p>
+          <p className="mt-3 text-sm leading-6 text-[#52627b]">
+            We sent an activation link to <strong>{invitation?.email}</strong>. Open it to verify the address and finish registering.
+            {approvedTeamInvitation
+              ? " Your team membership will become active as soon as the email is verified."
+              : " Your organisation stays under review until Cush Admin approves its application."}
+          </p>
           <Link href="/verify/login" className="mt-6 inline-flex font-semibold text-[#275fb7]">Go to institutional sign in</Link>
         </div>
       ) : (
@@ -219,7 +248,11 @@ export function CushVerifyInvitationRegistration() {
           <h1 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Create your institutional account</h1>
           {invitation ? (
             <>
-              <p className="mt-3 text-sm leading-6 text-[#52627b]">You have been invited to join <strong>{invitation.institutionName}</strong> as its initial Organisation Administrator.</p>
+              <p className="mt-3 text-sm leading-6 text-[#52627b]">
+                {approvedTeamInvitation
+                  ? <>You have been invited to join <strong>{invitation.institutionName}</strong> as a <strong>{invitationRole}</strong>.</>
+                  : <>You have been invited to join <strong>{invitation.institutionName}</strong> as its initial Organisation Administrator.</>}
+              </p>
               <p className="mt-3 rounded-xl bg-[#f8fbff] p-3 text-sm text-[#40516d]">Official email: <strong>{invitation.email}</strong></p>
               {error && <p role="alert" className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</p>}
               <form onSubmit={submit} className="mt-5 space-y-4">
@@ -227,7 +260,12 @@ export function CushVerifyInvitationRegistration() {
                   <input required type="password" minLength={12} maxLength={4096} autoComplete="new-password" className="mt-2 min-h-12 w-full rounded-xl border border-[#cad7e8] bg-[#f8fbff] px-4 text-sm outline-none focus:border-[#3977e6] focus:ring-4 focus:ring-[#3977e6]/15" value={password} onChange={(event) => setPassword(event.target.value)} />
                 </label>
                 <p className="text-xs text-[#61728a]">Use at least 12 characters. You can reset it by email later.</p>
-                <p className="flex gap-2 text-xs leading-5 text-[#61728a]"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#16816f]" />Email is verified by Firebase. Your account will remain pending until final Cush Admin approval.</p>
+                <p className="flex gap-2 text-xs leading-5 text-[#61728a]">
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#16816f]" />
+                  {approvedTeamInvitation
+                    ? "Firebase verifies ownership of this email. No further Cush Admin approval is required for a team membership at this approved institution."
+                    : "Firebase verifies ownership of this email. Workspace access remains unavailable until Cush Admin approves the organisation."}
+                </p>
                 <button disabled={busy} className="min-h-12 w-full rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white hover:bg-[#275fb7] disabled:opacity-60">{busy ? "Creating account…" : "Create account and send verification email"}</button>
               </form>
             </>

@@ -45,6 +45,8 @@ key in a `VITE_` variable or commit it to the repository.
   institutional registration.
 - Apply `migrations/manual/create-cush-verify-email-activations.sql` before
   deploying the self-service activation flow.
+- Apply `migrations/manual/add-cush-verify-team-management.sql` after the
+  institutional accounts migration and before deploying team-management routes.
 - Keep the new tables server-only: RLS is enabled and direct `anon` and
   `authenticated` Data API grants are revoked. The application server uses its
   existing PostgreSQL connection.
@@ -58,6 +60,12 @@ key in a `VITE_` variable or commit it to the repository.
   Firebase identity. The full workspace opens after the user signs in.
 - The older admin review and invitation endpoints remain for existing
   invitation records; they are not part of new self-service signups.
+- Active organisation administrators can invite colleagues to an approved
+  institution. The colleague receives a separate Cush Verify identity and
+  active membership after confirming the invited email address; no additional
+  Cush Admin membership approval is required. Cush Admin can revoke active
+  membership access. Email confirmation proves mailbox control, not that the
+  email domain or legal identity belongs to the institution.
 
 ## Deployment order
 

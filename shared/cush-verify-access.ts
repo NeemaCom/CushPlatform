@@ -5,6 +5,20 @@ export interface CushVerifyAccessState {
   emailVerified?: boolean;
 }
 
+export function resolveCushVerifyInvitationAccess(state: {
+  applicationStatus: string;
+  institutionStatus: string;
+  invitationRole: string;
+}): { membershipStatus: "active" | "pending_approval"; accessGranted: boolean } | null {
+  if (state.applicationStatus === "approved" && state.institutionStatus === "approved") {
+    return { membershipStatus: "active", accessGranted: true };
+  }
+  if (state.institutionStatus === "pending_approval" && state.invitationRole === "organisation_admin") {
+    return { membershipStatus: "pending_approval", accessGranted: false };
+  }
+  return null;
+}
+
 export function canAccessCushVerifyWorkspace(state: CushVerifyAccessState): boolean {
   return state.applicationStatus === "approved" &&
     state.institutionStatus === "approved" &&

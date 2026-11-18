@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Express, Request, Response, NextFunction } from "express";
-import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, lt, or } from "drizzle-orm";
 import {
   cushVerifyApplications,
   cushVerifyApplicationEvents,
@@ -8,6 +8,7 @@ import {
   cushVerifyBillingAccounts,
   cushVerifyCreditLedger,
   cushVerifyInstitutionalMemberships,
+  cushVerifyMembershipEvents,
   cushVerifyInstitutionalUsers,
   cushVerifyInstitutions,
   cushVerifyInvitations,
@@ -16,11 +17,13 @@ import {
   cushVerifyApplicationSchema,
   cushVerifyInstitutionalRegistrationSchema,
   cushVerifyApplicationStatusSchema,
+  cushVerifyTeamInvitationSchema,
 } from "@shared/cush-verify";
 import { getCushVerifyActivationPromotionalGrant } from "@shared/cush-verify-billing-rules";
 import {
   canAccessCushVerifyWorkspace,
   canFinalApproveCushVerifyApplication,
+  resolveCushVerifyInvitationAccess,
 } from "@shared/cush-verify-access";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
 import { cushVerifyDb as db } from "./db";
@@ -125,6 +128,7 @@ function respondIfInstitutionalSchemaMissing(error: unknown, res: Response): boo
     "cush_verify_email_activations",
     "cush_verify_institutional_memberships",
     "cush_verify_application_events",
+    "cush_verify_membership_events",
   ];
   for (const candidate of getErrorChain(error)) {
     const code = candidate.code;
@@ -223,6 +227,10 @@ export async function getInstitutionalWorkspaceState(institutionalUserId: number
     institutionId: cushVerifyInstitutions.id,
     institutionName: cushVerifyInstitutions.legalName,
     tradingName: cushVerifyInstitutions.tradingName,
+    institutionType: cushVerifyInstitutions.institutionType,
+    countryOfRegistration: cushVerifyInstitutions.countryOfRegistration,
+    website: cushVerifyInstitutions.website,
+    businessEmail: cushVerifyInstitutions.businessEmail,
     institutionStatus: cushVerifyInstitutions.status,
     applicationId: cushVerifyApplications.id,
     applicationStatus: cushVerifyApplications.status,
@@ -784,24 +792,42 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       const [invite] = await db.select({
         email: cushVerifyInvitations.email,
         fullName: cushVerifyInvitations.fullName,
+        jobTitle: cushVerifyInvitations.jobTitle,
+        role: cushVerifyInvitations.role,
         expiresAt: cushVerifyInvitations.expiresAt,
         institutionName: cushVerifyInstitutions.legalName,
+        institutionStatus: cushVerifyInstitutions.status,
+        applicationStatus: cushVerifyApplications.status,
       })
         .from(cushVerifyInvitations)
         .innerJoin(cushVerifyInstitutions, eq(cushVerifyInstitutions.id, cushVerifyInvitations.institutionId))
+        .innerJoin(cushVerifyApplications, eq(cushVerifyApplications.id, cushVerifyInstitutions.sourceApplicationId))
         .where(and(
           eq(cushVerifyInvitations.tokenHash, hashInvitationToken(token)),
           isNull(cushVerifyInvitations.acceptedAt),
           isNull(cushVerifyInvitations.revokedAt),
           gt(cushVerifyInvitations.expiresAt, new Date()),
-          eq(cushVerifyInstitutions.status, "pending_approval"),
+          or(
+            and(
+              eq(cushVerifyInstitutions.status, "pending_approval"),
+              eq(cushVerifyInvitations.role, "organisation_admin"),
+            ),
+            and(
+              eq(cushVerifyInstitutions.status, "approved"),
+              eq(cushVerifyApplications.status, "approved"),
+            ),
+          ),
         ))
         .limit(1);
       if (!invite) return res.status(404).json({ error: "This invitation is invalid or has expired." });
       return res.json({
         email: invite.email,
         fullName: invite.fullName,
+        jobTitle: invite.jobTitle,
+        role: invite.role,
         institutionName: invite.institutionName,
+        institutionStatus: invite.institutionStatus,
+        applicationStatus: invite.applicationStatus,
         expiresAt: invite.expiresAt,
       });
     } catch (error) {
@@ -827,14 +853,15 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           error: "Verify your official email address before accepting this invitation.",
         });
       }
+      const normalizedIdentityEmail = normalizeEmail(identity.email);
       const tokenHash = hashInvitationToken(token);
       const now = new Date();
-      const member = await db.transaction(async (tx) => {
+      const accepted = await db.transaction(async (tx) => {
         const [invite] = await tx.update(cushVerifyInvitations)
           .set({ acceptedAt: now })
           .where(and(
             eq(cushVerifyInvitations.tokenHash, tokenHash),
-            eq(cushVerifyInvitations.email, identity.email),
+            eq(cushVerifyInvitations.email, normalizedIdentityEmail),
             isNull(cushVerifyInvitations.acceptedAt),
             isNull(cushVerifyInvitations.revokedAt),
             gt(cushVerifyInvitations.expiresAt, now),
@@ -844,33 +871,50 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
 
         const [institution] = await tx.select()
           .from(cushVerifyInstitutions)
-          .where(and(
-            eq(cushVerifyInstitutions.id, invite.institutionId),
-            eq(cushVerifyInstitutions.status, "pending_approval"),
-          ))
+          .where(eq(cushVerifyInstitutions.id, invite.institutionId))
+          .for("update")
           .limit(1);
-        if (!institution) throw new Error("INSTITUTION_NOT_PENDING");
+        if (!institution || !["pending_approval", "approved"].includes(institution.status)) {
+          throw new Error("INSTITUTION_NOT_ACCEPTING_INVITES");
+        }
+        const [application] = await tx.select({ status: cushVerifyApplications.status })
+          .from(cushVerifyApplications)
+          .where(eq(cushVerifyApplications.id, invite.applicationId))
+          .limit(1);
+        if (!application) throw new Error("APPLICATION_NOT_FOUND");
+        const invitationAccess = resolveCushVerifyInvitationAccess({
+          applicationStatus: application.status,
+          institutionStatus: institution.status,
+          invitationRole: invite.role,
+        });
+        if (!invitationAccess) {
+          throw new Error(institution.status === "approved"
+            ? "APPLICATION_NOT_APPROVED"
+            : "INITIAL_INVITATION_ROLE_INVALID");
+        }
+        const approvedTeamInvite = invitationAccess.accessGranted;
 
         let [institutionalUser] = await tx.select()
           .from(cushVerifyInstitutionalUsers)
           .where(or(
             eq(cushVerifyInstitutionalUsers.firebaseUid, identity.uid),
-            eq(cushVerifyInstitutionalUsers.email, identity.email),
+            eq(cushVerifyInstitutionalUsers.email, normalizedIdentityEmail),
           ))
+          .for("update")
           .limit(1);
         if (institutionalUser && (
           institutionalUser.firebaseUid !== identity.uid ||
-          institutionalUser.email !== identity.email
+          normalizeEmail(institutionalUser.email) !== normalizedIdentityEmail
         )) {
           throw new Error("INSTITUTIONAL_EMAIL_ALREADY_REGISTERED");
         }
         if (!institutionalUser) {
           [institutionalUser] = await tx.insert(cushVerifyInstitutionalUsers).values({
             firebaseUid: identity.uid,
-            email: identity.email,
+            email: normalizedIdentityEmail,
             fullName: invite.fullName,
             jobTitle: invite.jobTitle,
-            businessTelephone: invite.businessTelephone,
+            businessTelephone: invite.businessTelephone ?? null,
             isEmailVerified: true,
           }).returning();
         } else {
@@ -880,24 +924,51 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             .returning();
         }
 
+        const [existingMembership] = await tx.select({ id: cushVerifyInstitutionalMemberships.id })
+          .from(cushVerifyInstitutionalMemberships)
+          .where(eq(cushVerifyInstitutionalMemberships.institutionalUserId, institutionalUser.id))
+          .for("update")
+          .limit(1);
+        if (existingMembership) throw new Error("MEMBERSHIP_ALREADY_EXISTS");
+
         const [membership] = await tx.insert(cushVerifyInstitutionalMemberships).values({
           institutionId: invite.institutionId,
           institutionalUserId: institutionalUser.id,
-          role: "organisation_admin",
-          status: "pending_approval",
+          role: invite.role,
+          status: invitationAccess.membershipStatus,
         }).returning();
         await tx.insert(cushVerifyApplicationEvents).values({
           applicationId: invite.applicationId,
           institutionId: invite.institutionId,
           eventType: "invitation_accepted",
+          details: {
+            invitationId: invite.id,
+            membershipId: membership.id,
+            role: invite.role,
+            teamMembership: approvedTeamInvite,
+          },
         });
-        return { institutionalUser, membership };
+        if (approvedTeamInvite) {
+          await tx.insert(cushVerifyMembershipEvents).values({
+            institutionId: invite.institutionId,
+            invitationId: invite.id,
+            membershipId: membership.id,
+            actorType: "institutional_user",
+            actorInstitutionalUserId: institutionalUser.id,
+            eventType: "invitation_accepted",
+            details: { role: invite.role },
+          });
+        }
+        return { institutionalUser, membership, approvedTeamInvite };
       });
-      await createInstitutionalSession(req, member.institutionalUser.id);
+      await createInstitutionalSession(req, accepted.institutionalUser.id);
       return res.status(201).json({
         success: true,
-        accessGranted: false,
-        message: "Your institutional account is registered. Cush Admin must complete the organisation review before workspace access is enabled.",
+        accessGranted: accepted.approvedTeamInvite,
+        membershipStatus: accepted.membership.status,
+        message: accepted.approvedTeamInvite
+          ? "Your email is verified and your organisation membership is active. You can now use the Cush Verify workspace."
+          : "Your institutional account is registered. Cush Admin must complete the organisation review before workspace access is enabled.",
       });
     } catch (error) {
       if (respondIfInstitutionalSchemaMissing(error, res)) return;
@@ -905,8 +976,17 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       if (message === "INVITATION_INVALID_OR_USED") {
         return res.status(409).json({ error: "This invitation is invalid, expired, or has already been used." });
       }
-      if (message === "INSTITUTION_NOT_PENDING") {
+      if (message === "INSTITUTION_NOT_ACCEPTING_INVITES" || message === "APPLICATION_NOT_APPROVED") {
         return res.status(409).json({ error: "This organisation is no longer accepting this invitation." });
+      }
+      if (message === "APPLICATION_NOT_FOUND") {
+        return res.status(409).json({ error: "This invitation is no longer available." });
+      }
+      if (message === "INITIAL_INVITATION_ROLE_INVALID") {
+        return res.status(409).json({ error: "This invitation cannot be accepted while the organisation is under review." });
+      }
+      if (message === "MEMBERSHIP_ALREADY_EXISTS") {
+        return res.status(409).json({ error: "This person already has a membership for this organisation." });
       }
       if (message === "INSTITUTIONAL_EMAIL_ALREADY_REGISTERED" || isUniqueViolation(error)) {
         return res.status(409).json({ error: "This institutional email is already registered. Contact Cush support." });
@@ -956,7 +1036,15 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
         return res.status(403).json({ error: "This institutional membership is not active." });
       }
       await createInstitutionalSession(req, user.id);
-      return res.json({ success: true, accessGranted: membership.membershipStatus === "active" && membership.institutionStatus === "approved" });
+      return res.json({
+        success: true,
+        accessGranted: canAccessCushVerifyWorkspace({
+          applicationStatus: membership.applicationStatus,
+          institutionStatus: membership.institutionStatus,
+          membershipStatus: membership.membershipStatus,
+          emailVerified: true,
+        }),
+      });
     } catch (error) {
       if (respondIfInstitutionalSchemaMissing(error, res)) return;
       console.error("Cush Verify institutional sign-in failed", {
@@ -990,6 +1078,10 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           id: membership.institutionId,
           legalName: membership.institutionName,
           tradingName: membership.tradingName,
+          institutionType: membership.institutionType,
+          countryOfRegistration: membership.countryOfRegistration,
+          website: membership.website,
+          businessEmail: membership.businessEmail,
           status: membership.institutionStatus,
         },
         membership: { role: membership.role, status: membership.membershipStatus },
@@ -1001,6 +1093,361 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       return res.status(503).json({ error: "Institutional account status is temporarily unavailable." });
     }
   });
+
+  app.get(
+    "/api/verify/team",
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      try {
+        const institutionalUserId = req.cushVerifyInstitutionalUserId!;
+        const workspace = await getInstitutionalWorkspaceState(institutionalUserId);
+        if (!workspace) return res.status(403).json({ error: "Institutional membership is not available." });
+        const canManage = workspace.role === "organisation_admin";
+        const memberFilters = canManage
+          ? eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId)
+          : and(
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              eq(cushVerifyInstitutionalMemberships.role, "organisation_admin"),
+              eq(cushVerifyInstitutionalMemberships.status, "active"),
+            );
+        const members = await db.select({
+          membershipId: cushVerifyInstitutionalMemberships.id,
+          fullName: cushVerifyInstitutionalUsers.fullName,
+          email: cushVerifyInstitutionalUsers.email,
+          jobTitle: cushVerifyInstitutionalUsers.jobTitle,
+          role: cushVerifyInstitutionalMemberships.role,
+          status: cushVerifyInstitutionalMemberships.status,
+          emailVerified: cushVerifyInstitutionalUsers.isEmailVerified,
+          createdAt: cushVerifyInstitutionalMemberships.createdAt,
+        })
+          .from(cushVerifyInstitutionalMemberships)
+          .innerJoin(
+            cushVerifyInstitutionalUsers,
+            eq(cushVerifyInstitutionalUsers.id, cushVerifyInstitutionalMemberships.institutionalUserId),
+          )
+          .where(memberFilters)
+          .orderBy(desc(cushVerifyInstitutionalMemberships.createdAt))
+          .limit(100);
+
+        const invitationRows = canManage
+          ? await db.select({
+              invitationId: cushVerifyInvitations.id,
+              fullName: cushVerifyInvitations.fullName,
+              email: cushVerifyInvitations.email,
+              jobTitle: cushVerifyInvitations.jobTitle,
+              role: cushVerifyInvitations.role,
+              createdAt: cushVerifyInvitations.createdAt,
+              expiresAt: cushVerifyInvitations.expiresAt,
+              acceptedAt: cushVerifyInvitations.acceptedAt,
+              revokedAt: cushVerifyInvitations.revokedAt,
+            })
+              .from(cushVerifyInvitations)
+              .where(eq(cushVerifyInvitations.institutionId, workspace.institutionId))
+              .orderBy(desc(cushVerifyInvitations.createdAt))
+              .limit(100)
+          : [];
+        const now = new Date();
+        const invitations = invitationRows.map((invitation) => ({
+          invitationId: invitation.invitationId,
+          fullName: invitation.fullName,
+          email: invitation.email,
+          jobTitle: invitation.jobTitle,
+          role: invitation.role,
+          status: invitation.revokedAt
+            ? "revoked"
+            : invitation.acceptedAt
+              ? "accepted"
+              : invitation.expiresAt <= now
+                ? "expired"
+                : "pending",
+          createdAt: invitation.createdAt,
+          expiresAt: invitation.expiresAt,
+          acceptedAt: invitation.acceptedAt,
+        }));
+        return res.json({
+          institution: {
+            id: workspace.institutionId,
+            legalName: workspace.institutionName,
+            tradingName: workspace.tradingName,
+            institutionType: workspace.institutionType,
+            countryOfRegistration: workspace.countryOfRegistration,
+            website: workspace.website,
+            businessEmail: workspace.businessEmail,
+            status: workspace.institutionStatus,
+            applicationStatus: workspace.applicationStatus,
+          },
+          members,
+          invitations,
+        });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify team listing failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "Team details are temporarily unavailable." });
+      }
+    },
+  );
+
+  app.post(
+    "/api/verify/team/invitations",
+    authRateLimit,
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const parsed = cushVerifyTeamInvitationSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Enter a valid name, official email address, job title, and workspace role." });
+      }
+      const institutionalUserId = req.cushVerifyInstitutionalUserId!;
+      const workspace = await getInstitutionalWorkspaceState(institutionalUserId).catch(() => null);
+      if (!workspace) return res.status(403).json({ error: "Institutional membership is not available." });
+      if (workspace.role !== "organisation_admin" || workspace.membershipStatus !== "active") {
+        return res.status(403).json({ error: "Only active organisation administrators can invite colleagues." });
+      }
+
+      const normalizedEmail = normalizeEmail(parsed.data.email);
+      const token = randomBytes(32).toString("hex");
+      const tokenHash = hashInvitationToken(token);
+      const now = new Date();
+      let created: { invitationId: number; institutionName: string };
+      try {
+        created = await db.transaction(async (tx) => {
+          const [actorMembership] = await tx.select({
+            role: cushVerifyInstitutionalMemberships.role,
+            status: cushVerifyInstitutionalMemberships.status,
+          })
+            .from(cushVerifyInstitutionalMemberships)
+            .where(and(
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              eq(cushVerifyInstitutionalMemberships.institutionalUserId, institutionalUserId),
+            ))
+            .for("update")
+            .limit(1);
+          if (!actorMembership || actorMembership.role !== "organisation_admin" || actorMembership.status !== "active") {
+            throw new Error("CUSH_VERIFY_ADMIN_MEMBERSHIP_CHANGED");
+          }
+          const [institution] = await tx.select()
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, workspace.institutionId))
+            .for("update")
+            .limit(1);
+          if (!institution || institution.status !== "approved") {
+            throw new Error("CUSH_VERIFY_INSTITUTION_NOT_APPROVED");
+          }
+          const [application] = await tx.select({
+            id: cushVerifyApplications.id,
+            status: cushVerifyApplications.status,
+          })
+            .from(cushVerifyApplications)
+            .where(eq(cushVerifyApplications.id, institution.sourceApplicationId))
+            .limit(1);
+          if (!application || application.status !== "approved") {
+            throw new Error("CUSH_VERIFY_APPLICATION_NOT_APPROVED");
+          }
+
+          const expiredInvitations = await tx.update(cushVerifyInvitations)
+            .set({ revokedAt: now })
+            .where(and(
+              eq(cushVerifyInvitations.institutionId, institution.id),
+              eq(cushVerifyInvitations.email, normalizedEmail),
+              isNull(cushVerifyInvitations.acceptedAt),
+              isNull(cushVerifyInvitations.revokedAt),
+              lt(cushVerifyInvitations.expiresAt, now),
+            ))
+            .returning({ id: cushVerifyInvitations.id });
+          for (const expired of expiredInvitations) {
+            await tx.insert(cushVerifyMembershipEvents).values({
+              institutionId: institution.id,
+              invitationId: expired.id,
+              actorType: "system",
+              eventType: "invitation_revoked",
+              details: { reason: "expired_replaced" },
+            });
+          }
+
+          const [existingUser] = await tx.select({ id: cushVerifyInstitutionalUsers.id })
+            .from(cushVerifyInstitutionalUsers)
+            .where(eq(cushVerifyInstitutionalUsers.email, normalizedEmail))
+            .limit(1);
+          if (existingUser) {
+            const [existingMembership] = await tx.select({ id: cushVerifyInstitutionalMemberships.id })
+              .from(cushVerifyInstitutionalMemberships)
+              .where(eq(cushVerifyInstitutionalMemberships.institutionalUserId, existingUser.id))
+              .limit(1);
+            if (existingMembership) throw new Error("CUSH_VERIFY_ACCOUNT_ALREADY_LINKED");
+          }
+          const [existingInvitation] = await tx.select({ id: cushVerifyInvitations.id })
+            .from(cushVerifyInvitations)
+            .where(and(
+              eq(cushVerifyInvitations.institutionId, institution.id),
+              eq(cushVerifyInvitations.email, normalizedEmail),
+              isNull(cushVerifyInvitations.acceptedAt),
+              isNull(cushVerifyInvitations.revokedAt),
+              gt(cushVerifyInvitations.expiresAt, now),
+            ))
+            .limit(1);
+          if (existingInvitation) throw new Error("CUSH_VERIFY_INVITATION_EXISTS");
+
+          const [invitation] = await tx.insert(cushVerifyInvitations).values({
+            institutionId: institution.id,
+            applicationId: application.id,
+            email: normalizedEmail,
+            fullName: parsed.data.fullName,
+            jobTitle: parsed.data.jobTitle,
+            businessTelephone: null,
+            role: parsed.data.role,
+            tokenHash,
+            expiresAt: new Date(now.getTime() + INVITATION_TTL_MS),
+            createdBy: institutionalUserId,
+            createdByType: "organisation_admin",
+          }).returning({ id: cushVerifyInvitations.id });
+          await tx.insert(cushVerifyMembershipEvents).values({
+            institutionId: institution.id,
+            invitationId: invitation.id,
+            actorType: "organisation_admin",
+            actorInstitutionalUserId: institutionalUserId,
+            eventType: "invitation_created",
+            details: { role: parsed.data.role },
+          });
+          return {
+            invitationId: invitation.id,
+            institutionName: institution.legalName,
+          };
+        });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        const message = error instanceof Error ? error.message : "";
+        if (message === "CUSH_VERIFY_INSTITUTION_NOT_APPROVED" || message === "CUSH_VERIFY_APPLICATION_NOT_APPROVED") {
+          return res.status(409).json({ error: "Only an approved institution can invite colleagues." });
+        }
+        if (message === "CUSH_VERIFY_ADMIN_MEMBERSHIP_CHANGED") {
+          return res.status(403).json({ error: "Only active organisation administrators can invite colleagues." });
+        }
+        if (message === "CUSH_VERIFY_ACCOUNT_ALREADY_LINKED") {
+          return res.status(409).json({ error: "This institutional account is already linked to an organisation." });
+        }
+        if (message === "CUSH_VERIFY_INVITATION_EXISTS" || isUniqueViolation(error)) {
+          return res.status(409).json({ error: "An active invitation already exists for this email address." });
+        }
+        console.error("Cush Verify team invitation creation failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "The invitation could not be created. Please try again." });
+      }
+
+      const url = invitationUrl(req, token);
+      const emailResult = url
+        ? await sendCushVerifyInvitationEmail({
+            email: normalizedEmail,
+            contactName: parsed.data.fullName,
+            institutionName: created.institutionName,
+            inviteUrl: url,
+            invitationId: created.invitationId,
+            role: parsed.data.role,
+            institutionApproved: true,
+          })
+        : { status: "failed" as const, reason: "request_failed" as const };
+      if (emailResult.status !== "sent") {
+        await db.update(cushVerifyInvitations)
+          .set({ revokedAt: new Date() })
+          .where(and(
+            eq(cushVerifyInvitations.id, created.invitationId),
+            isNull(cushVerifyInvitations.acceptedAt),
+            isNull(cushVerifyInvitations.revokedAt),
+          ))
+          .catch((error) => {
+            console.error("Cush Verify failed invitation cleanup failed", {
+              errorType: error instanceof Error ? error.name : "UnknownError",
+            });
+          });
+        await db.insert(cushVerifyMembershipEvents).values({
+          institutionId: workspace.institutionId,
+          invitationId: created.invitationId,
+          actorType: "system",
+          eventType: "invitation_delivery_failed",
+          details: { providerStatus: emailResult.status },
+        }).catch((error) => {
+          console.error("Cush Verify invitation delivery failure could not be recorded", {
+            errorType: error instanceof Error ? error.name : "UnknownError",
+          });
+        });
+        return res.status(502).json({ error: "The invitation was created but the email could not be sent. Please try again." });
+      }
+      await db.insert(cushVerifyMembershipEvents).values({
+        institutionId: workspace.institutionId,
+        invitationId: created.invitationId,
+        actorType: "system",
+        eventType: "invitation_sent",
+      }).catch((error) => {
+        console.error("Cush Verify invitation delivery event could not be recorded", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+      });
+      return res.status(201).json({
+        success: true,
+        invitationEmailStatus: emailResult.status,
+        message: `Invitation sent to ${normalizedEmail}. The membership becomes active after official-email verification.`,
+      });
+    },
+  );
+
+  app.delete(
+    "/api/verify/team/invitations/:invitationId",
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const invitationId = Number(req.params.invitationId);
+      if (!Number.isSafeInteger(invitationId) || invitationId <= 0) {
+        return res.status(400).json({ error: "Choose a valid invitation." });
+      }
+      const institutionalUserId = req.cushVerifyInstitutionalUserId!;
+      const workspace = await getInstitutionalWorkspaceState(institutionalUserId).catch(() => null);
+      if (!workspace || workspace.role !== "organisation_admin" || workspace.membershipStatus !== "active") {
+        return res.status(403).json({ error: "Only active organisation administrators can manage invitations." });
+      }
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [invitation] = await tx.select()
+            .from(cushVerifyInvitations)
+            .where(and(
+              eq(cushVerifyInvitations.id, invitationId),
+              eq(cushVerifyInvitations.institutionId, workspace.institutionId),
+            ))
+            .for("update")
+            .limit(1);
+          if (!invitation) return { kind: "not_found" as const };
+          if (invitation.acceptedAt) return { kind: "already_accepted" as const };
+          if (invitation.revokedAt) return { kind: "already_revoked" as const };
+          if (invitation.expiresAt <= new Date()) return { kind: "expired" as const };
+          await tx.update(cushVerifyInvitations)
+            .set({ revokedAt: new Date() })
+            .where(eq(cushVerifyInvitations.id, invitation.id));
+          await tx.insert(cushVerifyMembershipEvents).values({
+            institutionId: workspace.institutionId,
+            invitationId: invitation.id,
+            actorType: "organisation_admin",
+            actorInstitutionalUserId: institutionalUserId,
+            eventType: "invitation_revoked",
+            details: { reason: "cancelled_by_organisation_admin" },
+          });
+          return { kind: "revoked" as const };
+        });
+        if (result.kind === "not_found") return res.status(404).json({ error: "Invitation not found." });
+        if (result.kind === "already_accepted") return res.status(409).json({ error: "This invitation has already been accepted." });
+        if (result.kind === "already_revoked") return res.status(409).json({ error: "This invitation has already been cancelled." });
+        if (result.kind === "expired") return res.status(409).json({ error: "This invitation has expired." });
+        return res.json({ success: true, message: "Invitation cancelled." });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify invitation cancellation failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "Invitation status could not be changed." });
+      }
+    },
+  );
 
   app.get(
     "/api/verify/workspace",
@@ -1171,6 +1618,104 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(500).json({ error: "Unable to load institutional applications." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/cush-verify/memberships",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verificationsRead),
+    async (_req, res) => {
+      try {
+        const memberships = await db.select({
+          membershipId: cushVerifyInstitutionalMemberships.id,
+          institutionId: cushVerifyInstitutions.id,
+          institutionLegalName: cushVerifyInstitutions.legalName,
+          institutionStatus: cushVerifyInstitutions.status,
+          userId: cushVerifyInstitutionalUsers.id,
+          fullName: cushVerifyInstitutionalUsers.fullName,
+          email: cushVerifyInstitutionalUsers.email,
+          jobTitle: cushVerifyInstitutionalUsers.jobTitle,
+          role: cushVerifyInstitutionalMemberships.role,
+          status: cushVerifyInstitutionalMemberships.status,
+          emailVerified: cushVerifyInstitutionalUsers.isEmailVerified,
+          createdAt: cushVerifyInstitutionalMemberships.createdAt,
+          applicationStatus: cushVerifyApplications.status,
+        })
+          .from(cushVerifyInstitutionalMemberships)
+          .innerJoin(
+            cushVerifyInstitutionalUsers,
+            eq(cushVerifyInstitutionalUsers.id, cushVerifyInstitutionalMemberships.institutionalUserId),
+          )
+          .innerJoin(
+            cushVerifyInstitutions,
+            eq(cushVerifyInstitutions.id, cushVerifyInstitutionalMemberships.institutionId),
+          )
+          .innerJoin(
+            cushVerifyApplications,
+            eq(cushVerifyApplications.id, cushVerifyInstitutions.sourceApplicationId),
+          )
+          .orderBy(desc(cushVerifyInstitutionalMemberships.createdAt))
+          .limit(500);
+        return res.json({ memberships });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify memberships list failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to load institutional memberships." });
+      }
+    },
+  );
+
+  app.put(
+    "/api/admin/cush-verify/memberships/:membershipId",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verificationsManage),
+    requireTrustedAdminOrigin,
+    async (req: AdminRequest, res) => {
+      const membershipId = Number(req.params.membershipId);
+      if (!Number.isSafeInteger(membershipId) || membershipId <= 0 || req.body?.action !== "revoke") {
+        return res.status(400).json({ error: "Choose a valid membership and revoke action." });
+      }
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [membership] = await tx.select()
+            .from(cushVerifyInstitutionalMemberships)
+            .where(eq(cushVerifyInstitutionalMemberships.id, membershipId))
+            .for("update")
+            .limit(1);
+          if (!membership) return { kind: "not_found" as const };
+          if (membership.status !== "active") return { kind: "not_active" as const };
+          await tx.update(cushVerifyInstitutionalMemberships)
+            .set({ status: "revoked", updatedAt: new Date() })
+            .where(eq(cushVerifyInstitutionalMemberships.id, membership.id));
+          await tx.insert(cushVerifyMembershipEvents).values({
+            institutionId: membership.institutionId,
+            membershipId: membership.id,
+            actorType: "cush_admin",
+            actorAdminUserId: req.userId ?? null,
+            eventType: "membership_revoked",
+            details: { role: membership.role },
+          });
+          return { kind: "revoked" as const };
+        });
+        if (result.kind === "not_found") return res.status(404).json({ error: "Membership not found." });
+        if (result.kind === "not_active") return res.status(409).json({ error: "Only active memberships can be revoked here." });
+        await recordAdminAuditEventAfterCommit(req, {
+          action: "admin.cush_verify_membership.revoked",
+          resourceType: "cush_verify_membership",
+          resourceId: membershipId,
+        });
+        return res.json({ success: true, status: "revoked" });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify membership revocation failed", {
+          adminUserId: req.userId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(500).json({ error: "Unable to revoke this institutional membership." });
       }
     },
   );

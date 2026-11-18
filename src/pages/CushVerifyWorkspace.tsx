@@ -9,12 +9,14 @@ import { broadcastCushVerifyLogout } from "@/lib/cush-verify-session";
 import { useQueryClient } from "@tanstack/react-query";
 import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorkspace";
 import CushVerifyBillingWorkspace from "@/components/verify/CushVerifyBillingWorkspace";
+import CushVerifyTeamManagement from "@/components/verify/team-management/CushVerifyTeamManagement";
+import type { MemberRole } from "@/components/verify/team-management/team-management-shared";
 import type { CushVerifyReportRequestView } from "@shared/cush-verify-reports";
 
 type WorkspaceIdentity = {
   user: { id: number; email: string; fullName: string; jobTitle: string };
   institution: { id: number; legalName: string; tradingName: string | null; status: string };
-  membership: { role: string; status: string };
+  membership: { role: MemberRole; status: string };
   applicationStatus: string;
   accessGranted: boolean;
 };
@@ -186,11 +188,8 @@ export default function CushVerifyWorkspace() {
               </div>
             </>
           ) : section === "settings" ? (
-            <div className="mt-5 grid max-w-2xl gap-4 sm:grid-cols-2">
-              <div><p className="text-xs text-[#71819b]">Legal name</p><p className="mt-1 text-sm font-semibold">{data.institution.legalName}</p></div>
-              <div><p className="text-xs text-[#71819b]">Trading name</p><p className="mt-1 text-sm font-semibold">{data.institution.tradingName || "Not provided"}</p></div>
-              <div><p className="text-xs text-[#71819b]">Your account</p><p className="mt-1 text-sm font-semibold">{data.user.fullName} · Organisation Administrator</p></div>
-              <p className="text-xs leading-5 text-[#71819b] sm:col-span-2">Organisation settings are read-only in this initial account release. Contact Cush support for changes.</p>
+            <div className="mt-5">
+              <CushVerifyTeamManagement currentRole={data.membership.role} />
             </div>
           ) : section === "api" ? (
             <div className="mt-5 max-w-2xl space-y-4">

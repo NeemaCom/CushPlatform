@@ -37,6 +37,7 @@ into the editor.
    catalog migration did not already create and seed the FAQ items)
 9. `migrations/manual/create-cush-verify-billing-ledger.sql`
 10. `migrations/manual/create-cush-verify-sessions-table.sql`
+11. `migrations/manual/add-cush-verify-team-management.sql`
 
 The schema stores Passport user and admin IDs as opaque references where needed.
 There are no foreign keys from the Verify database to Passport's database.

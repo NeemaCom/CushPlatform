@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canAccessCushVerifyWorkspace,
   canFinalApproveCushVerifyApplication,
+  resolveCushVerifyInvitationAccess,
 } from "./cush-verify-access";
 
 describe("Cush Verify institutional access gates", () => {
@@ -55,5 +56,36 @@ describe("Cush Verify institutional access gates", () => {
     };
     expect(canAccessCushVerifyWorkspace(activatedAccount)).toBe(true);
     expect(canAccessCushVerifyWorkspace({ ...activatedAccount, emailVerified: false })).toBe(false);
+  });
+
+  it("activates a verified colleague immediately for an already-approved institution", () => {
+    expect(resolveCushVerifyInvitationAccess({
+      applicationStatus: "approved",
+      institutionStatus: "approved",
+      invitationRole: "analyst",
+    })).toEqual({ membershipStatus: "active", accessGranted: true });
+    expect(resolveCushVerifyInvitationAccess({
+      applicationStatus: "approved",
+      institutionStatus: "approved",
+      invitationRole: "viewer",
+    })).toEqual({ membershipStatus: "active", accessGranted: true });
+  });
+
+  it("keeps the initial organisation-admin invitation behind the institution approval gate", () => {
+    expect(resolveCushVerifyInvitationAccess({
+      applicationStatus: "under_review",
+      institutionStatus: "pending_approval",
+      invitationRole: "organisation_admin",
+    })).toEqual({ membershipStatus: "pending_approval", accessGranted: false });
+    expect(resolveCushVerifyInvitationAccess({
+      applicationStatus: "under_review",
+      institutionStatus: "pending_approval",
+      invitationRole: "analyst",
+    })).toBeNull();
+    expect(resolveCushVerifyInvitationAccess({
+      applicationStatus: "under_review",
+      institutionStatus: "approved",
+      invitationRole: "viewer",
+    })).toBeNull();
   });
 });
