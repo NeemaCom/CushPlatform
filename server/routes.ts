@@ -62,6 +62,7 @@ import { registerCushVerifyInstitutionalRoutes } from "./cush-verify-institution
 import { registerCushVerifyPricingRoutes } from "./cush-verify-pricing-routes";
 import { registerCushVerifyReportRoutes } from "./cush-verify-report-routes";
 import { registerCushVerifyBillingRoutes } from "./cush-verify-billing-routes";
+import { registerCushVerifyApiRoutes } from "./cush-verify-api-routes";
 import { startCushVerifyBillingWorkers } from "./cush-verify-billing-service";
 
 const profilePictureSchema = z.object({
@@ -194,6 +195,7 @@ export async function registerRoutes(
   registerCushVerifyRoutes(app);
   registerCushVerifyInstitutionalRoutes(app);
   registerCushVerifyPricingRoutes(app);
+  registerCushVerifyApiRoutes(app);
   registerCushVerifyReportRoutes(app);
   registerCushVerifyBillingRoutes(app);
   startCushVerifyBillingWorkers();

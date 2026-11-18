@@ -1,6 +1,6 @@
-import type { Express, Response } from "express";
+import type { Express, NextFunction, Request, Response } from "express";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
-import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, gt, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   cushVerifyDiscoverySearches,
@@ -9,6 +9,7 @@ import {
   cushVerifyReportDeliveries,
   cushVerifyReportEvents,
   cushVerifyReportRequests,
+  cushVerifyApiUsage,
 } from "@shared/schema";
 import {
   cushVerifyReportDecisionSchema,
@@ -23,6 +24,7 @@ import {
   requireApprovedInstitution,
   type InstitutionalRequest,
 } from "./cush-verify-institutional-routes";
+import { requireCushVerifyApiScope } from "./cush-verify-api-key-service";
 import { authRateLimit } from "./security";
 import { isV2SchemaMissing } from "./cush-score-v2";
 import {
@@ -162,10 +164,19 @@ function billingSchemaUnavailable(error: unknown, res: Response): boolean {
   return false;
 }
 
+function reportRouteRateLimit(req: Request, res: Response, next: NextFunction) {
+  if (req.originalUrl.startsWith("/api/v1/")) {
+    next();
+    return;
+  }
+  return authRateLimit(req, res, next);
+}
+
 export function registerCushVerifyReportRoutes(app: Express): void {
   app.post(
-    "/api/verify/passport-discovery",
-    authRateLimit,
+    ["/api/verify/passport-discovery", "/api/v1/verify/passport-discovery"],
+    reportRouteRateLimit,
+    requireCushVerifyApiScope("passport:discover"),
     isInstitutionalAuthenticated,
     requireApprovedInstitution,
     async (req: InstitutionalRequest, res) => {
@@ -232,8 +243,9 @@ export function registerCushVerifyReportRoutes(app: Express): void {
   );
 
   app.post(
-    "/api/verify/report-requests",
-    authRateLimit,
+    ["/api/verify/report-requests", "/api/v1/verify/report-requests"],
+    reportRouteRateLimit,
+    requireCushVerifyApiScope("reports:request"),
     isInstitutionalAuthenticated,
     requireApprovedInstitution,
     async (req: InstitutionalRequest, res) => {
@@ -328,7 +340,8 @@ export function registerCushVerifyReportRoutes(app: Express): void {
   );
 
   app.get(
-    "/api/verify/report-requests",
+    ["/api/verify/report-requests", "/api/v1/verify/report-requests"],
+    requireCushVerifyApiScope("reports:read"),
     isInstitutionalAuthenticated,
     requireApprovedInstitution,
     async (req: InstitutionalRequest, res) => {
@@ -661,8 +674,9 @@ export function registerCushVerifyReportRoutes(app: Express): void {
   );
 
   app.post(
-    "/api/verify/report-requests/:requestId/deliver",
-    authRateLimit,
+    ["/api/verify/report-requests/:requestId/deliver", "/api/v1/verify/report-requests/:requestId/deliver"],
+    reportRouteRateLimit,
+    requireCushVerifyApiScope("reports:read"),
     isInstitutionalAuthenticated,
     requireApprovedInstitution,
     async (req: InstitutionalRequest, res) => {
@@ -735,6 +749,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
         const reportDigest = getCushVerifyReportDigest(report);
 
         const delivery = await cushVerifyDb.transaction(async (tx) => {
+          if (req.cushVerifyApiContext) {
+            await tx.select({ id: cushVerifyInstitutions.id })
+              .from(cushVerifyInstitutions)
+              .where(eq(cushVerifyInstitutions.id, actor.institutionId))
+              .for("update")
+              .limit(1);
+          }
           const [lockedRequest] = await tx.select()
             .from(cushVerifyReportRequests)
             .where(eq(cushVerifyReportRequests.id, requestId))
@@ -770,7 +791,37 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             !finalAuthorization.allowed ||
             lockedRequest?.targetUserId !== request.targetUserId ||
             !isCategorySubset(reportCategories, finalAuthorization.categories)
-          ) return null;
+          ) return { denied: true as const };
+
+          const [priorDelivery] = await tx.select({
+            id: cushVerifyReportDeliveries.id,
+          })
+            .from(cushVerifyReportDeliveries)
+            .where(and(
+              eq(cushVerifyReportDeliveries.requestId, requestId),
+              eq(cushVerifyReportDeliveries.reportDigest, reportDigest),
+            ))
+            .limit(1);
+          const apiContext = req.cushVerifyApiContext;
+          if (
+            apiContext &&
+            !priorDelivery &&
+            apiContext.apiLimits?.monthlyReportLimit !== null &&
+            apiContext.apiLimits?.monthlyReportLimit !== undefined &&
+            !apiContext.overageConfigured
+          ) {
+            const [usageCount] = await tx.select({ used: count() })
+              .from(cushVerifyApiUsage)
+              .where(and(
+                eq(cushVerifyApiUsage.institutionId, actor.institutionId),
+                eq(cushVerifyApiUsage.environment, "production"),
+                eq(cushVerifyApiUsage.billableReport, true),
+                gte(cushVerifyApiUsage.createdAt, apiContext.periodStartAt),
+              ));
+            if (Number(usageCount?.used ?? 0) >= apiContext.apiLimits.monthlyReportLimit) {
+              return { monthlyLimitExceeded: true as const };
+            }
+          }
 
           const [inserted] = await tx.insert(cushVerifyReportDeliveries).values({
             requestId,
@@ -799,6 +850,11 @@ export function registerCushVerifyReportRoutes(app: Express): void {
                 now,
               })
             : { charged: false as const, overageLedgerId: null };
+          if (inserted && apiContext) {
+            await tx.update(cushVerifyApiUsage)
+              .set({ billableReport: billing.charged })
+              .where(eq(cushVerifyApiUsage.id, apiContext.usageId));
+          }
           await tx.insert(cushVerifyReportEvents).values({
             requestId,
             eventType: inserted ? "report_delivered" : "report_accessed",
@@ -806,10 +862,16 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             actorInstitutionalUserId: actor.institutionalUserId,
             details: { reportDigest, categories: reportCategories },
           });
-          return { ...existing, newDeliveryEvent: Boolean(inserted), billing };
+          return { ...existing, denied: false as const, newDeliveryEvent: Boolean(inserted), billing };
         });
 
-        if (!delivery) return res.status(403).json({ error: "There is no active authorization for this report." });
+        if ("monthlyLimitExceeded" in delivery) {
+          return res.status(429).json({
+            code: "CUSH_VERIFY_MONTHLY_REPORT_LIMIT",
+            error: "The configured monthly API report limit has been reached. Contact Cush about the plan’s overage option.",
+          });
+        }
+        if (delivery.denied) return res.status(403).json({ error: "There is no active authorization for this report." });
         if (delivery.billing.overageLedgerId !== null) {
           res.once("finish", () => {
             void processPendingCushVerifyBillingOutbox(1).catch((error) => {

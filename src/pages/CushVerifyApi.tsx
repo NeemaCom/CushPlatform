@@ -7,8 +7,8 @@ import { CUSH_VERIFY_BILLING_EVENTS, CUSH_VERIFY_REPORT_CREDIT_RULE } from "@sha
 const readiness = [
   {
     number: "01",
-    title: "Institutional review",
-    text: "Every organization is reviewed by Cush before workspace access is granted. An enquiry is the first step, not an approval.",
+    title: "Approved institution",
+    text: "API credentials are available only to active institutional accounts with approved organisation status.",
     icon: FileCheck2,
   },
   {
@@ -19,8 +19,8 @@ const readiness = [
   },
   {
     number: "03",
-    title: "Integration availability",
-    text: "API access and integration details are not currently published. Contact Cush to discuss present availability and next steps.",
+    title: "Plan-based production access",
+    text: "Production keys require an active subscription whose published plan includes API access and limits.",
     icon: Code2,
   },
 ];
@@ -37,14 +37,14 @@ export default function CushVerifyApi() {
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-300">Cush Verify · API</p>
             <h1 className="mt-5 max-w-4xl font-serif text-[clamp(2.7rem,6vw,5.5rem)] leading-[0.98] tracking-[-0.06em]">
-              Build with care. <span className="text-[#79aaff]">Start with a conversation.</span>
+              Integrate with care. <span className="text-[#79aaff]">Consent comes first.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-blue-100/75 sm:text-lg">
-              Cush Verify is a separate institutional workspace for organizations seeking consent-led financial identity reports. API integration details are shared only as availability is confirmed with each reviewed institution.
+              Cush Verify’s institutional API is in controlled rollout. Production requests are designed to enforce organisation approval, individual consent, category scope, expiry, and report-credit rules.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link href="/verify/apply" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#4b89f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
-                Submit an institutional enquiry <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <Link href="/verify/login" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#4b89f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
+                Institutional sign in <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/verify/how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
                 Review the consent process
@@ -59,14 +59,14 @@ export default function CushVerifyApi() {
               </span>
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-emerald-300">Integration status</p>
-                <h2 className="mt-2 font-serif text-2xl leading-tight tracking-[-0.03em]">Partner API details are not public yet.</h2>
+                <h2 className="mt-2 font-serif text-2xl leading-tight tracking-[-0.03em]">API access is being prepared for controlled activation.</h2>
               </div>
             </div>
             <p className="mt-5 border-t border-white/10 pt-5 text-sm leading-6 text-blue-100/75">
-              There is no public developer reference, public API key flow, or documented versioned API available yet. Existing Cush Verify web experiences do not constitute a published partner API.
+              The institutional workspace includes separate sandbox and production key controls. Full key values are shown once and only hashes are stored. Production access stays disabled unless the organisation is approved and its active plan enables API access.
             </p>
             <p className="mt-4 rounded-xl bg-[#0c1830]/70 px-4 py-3 text-xs leading-5 text-blue-100/70">
-              Checkout, subscriptions, report retrieval, and credit balances are not currently available. Enquiries help confirm current availability; they do not activate access.
+              Sandbox workflows use synthetic outcomes only. They do not query Passport, send consent emails, or change report credits. Staging verification is required before these integrations are presented as ready for live use.
             </p>
           </aside>
         </div>
@@ -76,12 +76,12 @@ export default function CushVerifyApi() {
         <div className="grid gap-10 lg:grid-cols-[.72fr_1.28fr] lg:gap-16">
           <div className="max-w-md">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Before integration</p>
-            <h2 className="mt-3 font-serif text-3xl tracking-[-0.04em] text-[#12213d] sm:text-4xl">Access is reviewed, not self-served.</h2>
+            <h2 className="mt-3 font-serif text-3xl tracking-[-0.04em] text-[#12213d] sm:text-4xl">Access follows organisation and plan status.</h2>
             <p className="mt-4 text-sm leading-6 text-[#52627b]">
-              API readiness depends on institutional review and current product availability. We do not offer an open registration or self-issued integration credential flow.
+              API key management is available only after institutional account activation. Production access additionally checks the active subscription’s API feature and configured request limits; sandbox keys remain isolated from real customer records.
             </p>
             <Link href="/verify/apply" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#275fb7] hover:text-[#153d7e]">
-              Tell us about your institution <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Apply for institutional access <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
           <ol className="grid gap-3 sm:grid-cols-3">
@@ -107,7 +107,7 @@ export default function CushVerifyApi() {
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Report credits</p>
             <h2 className="mt-3 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">One successful, authorized full report.</h2>
             <p className="mt-4 text-sm leading-6 text-[#52627b]">
-              {CUSH_VERIFY_REPORT_CREDIT_RULE} This describes the intended billing rule; report retrieval and credit balances are not currently available.
+              {CUSH_VERIFY_REPORT_CREDIT_RULE} Dashboard and production API report retrieval share the same idempotent delivery and credit ledger.
             </p>
             <Link href="/verify/pricing" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#275fb7] hover:text-[#153d7e]">
               View the published pricing catalog <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -143,10 +143,10 @@ export default function CushVerifyApi() {
         <div className="grid gap-5 lg:grid-cols-[.8fr_1.2fr]">
           <div className="rounded-[24px] bg-[#eaf1fb] p-6 sm:p-8">
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#3973c8]">Plan for readiness</p>
-            <h2 className="mt-3 font-serif text-2xl tracking-[-0.035em] text-[#12213d]">A useful first conversation.</h2>
-            <p className="mt-3 text-sm leading-6 text-[#52627b]">Share your organization’s intended use, expected journey, and integration questions through the institutional enquiry.</p>
+            <h2 className="mt-3 font-serif text-2xl tracking-[-0.035em] text-[#12213d]">Start in the sandbox.</h2>
+            <p className="mt-3 text-sm leading-6 text-[#52627b]">Once your organisation is active, an administrator can create a sandbox key and try simulated discovery, consent, report, failure, and rate-limit outcomes.</p>
             <Link href="/verify/apply" className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#275fb7]">
-              Submit an enquiry <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Apply for institutional access <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
           <aside className="rounded-[24px] border border-[#dce5f1] bg-white p-6 sm:p-8">
@@ -155,7 +155,7 @@ export default function CushVerifyApi() {
               <div>
                 <h2 className="font-serif text-2xl tracking-[-0.035em] text-[#12213d]">A note on availability</h2>
                 <p className="mt-3 text-sm leading-6 text-[#52627b]">
-                  Public pricing describes the published catalog, not a live purchase flow. Any access, integration scope, and commercial terms must be confirmed by Cush. Submission does not create a subscription, API access, or workspace approval.
+                  Published plan details describe available features and limits. Creating an institutional enquiry does not activate an account, create a subscription, or grant production API access. Production keys are available only when the organisation and its active plan meet the server-side checks.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
                   <Link href="/verify/pricing" className="text-[#275fb7] hover:underline">Published pricing</Link>

@@ -10,6 +10,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorkspace";
 import CushVerifyBillingWorkspace from "@/components/verify/CushVerifyBillingWorkspace";
 import CushVerifyTeamManagement from "@/components/verify/team-management/CushVerifyTeamManagement";
+import CushVerifyApiWorkspace from "@/components/verify/CushVerifyApiWorkspace";
 import type { MemberRole } from "@/components/verify/team-management/team-management-shared";
 import type { CushVerifyReportRequestView } from "@shared/cush-verify-reports";
 
@@ -222,19 +223,7 @@ export default function CushVerifyWorkspace() {
               <p className="text-xs leading-5 text-[#71819b]">Email verification confirms mailbox ownership only; these details have not been independently verified by Cush Verify. Contact Cush Verify support to request profile changes.</p>
             </div>
           ) : activeSection === "api" ? (
-            <div className="mt-5 max-w-2xl space-y-4">
-              <p className="text-sm leading-6 text-[#52627b]">Institutional report requests and delivery are enforced by the Cush Verify server. Each report retrieval checks tenant membership, active individual consent, approved categories, expiry, and the shared credit ledger.</p>
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                <p className="text-sm font-semibold text-amber-950">Machine-to-machine credentials are not enabled</p>
-                <p className="mt-1 text-sm leading-6 text-amber-900">Use the signed-in workspace for now. Do not put API secrets in browser code. API credential provisioning and external integrations are not active in this release.</p>
-              </div>
-              <div className="rounded-xl border border-[#dce5f1] bg-[#f8fbff] p-4 text-sm text-[#52627b]">
-                <p className="font-semibold text-[#12213d]">Current report endpoints</p>
-                <code className="mt-2 block text-xs">POST /api/verify/report-requests</code>
-                <code className="mt-1 block text-xs">POST /api/verify/report-requests/:requestId/deliver</code>
-                <p className="mt-2 text-xs leading-5">These endpoints require the institution’s secure web session; they are not public API-key endpoints.</p>
-              </div>
-            </div>
+            <CushVerifyApiWorkspace role={data.membership.role} />
           ) : activeSection === "billing" ? (
             <CushVerifyBillingWorkspace
               role={data.membership.role}

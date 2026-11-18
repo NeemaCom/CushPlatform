@@ -1012,6 +1012,145 @@ export const cushVerifyBillingOutbox = pgTable("cush_verify_billing_outbox", {
     .on(table.status, table.nextAttemptAt),
 })).enableRLS();
 
+export type CushVerifyApiEnvironment = "sandbox" | "production";
+export type CushVerifyApiKeyStatus = "active" | "revoked";
+export type CushVerifyApiUsageStatus = "processing" | "completed";
+
+export const cushVerifyApiKeys = pgTable("cush_verify_api_keys", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  createdByInstitutionalUserId: integer("created_by_institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  environment: text("environment").$type<CushVerifyApiEnvironment>().notNull(),
+  keyPrefix: text("key_prefix").notNull().unique(),
+  secretHash: text("secret_hash").notNull().unique(),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  status: text("status").$type<CushVerifyApiKeyStatus>().notNull().default("active"),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true, mode: "date" }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  environmentCheck: check(
+    "cush_verify_api_keys_environment_check",
+    sql`${table.environment} in ('sandbox', 'production')`,
+  ),
+  statusCheck: check(
+    "cush_verify_api_keys_status_check",
+    sql`(${table.status} = 'active' and ${table.revokedAt} is null)
+      or (${table.status} = 'revoked' and ${table.revokedAt} is not null)`,
+  ),
+  nameCheck: check(
+    "cush_verify_api_keys_name_check",
+    sql`char_length(btrim(${table.name})) between 1 and 80`,
+  ),
+  prefixCheck: check(
+    "cush_verify_api_keys_prefix_check",
+    sql`${table.keyPrefix} ~ '^cvk_(sandbox|production)_[a-f0-9]{24}$'`,
+  ),
+  secretHashCheck: check(
+    "cush_verify_api_keys_secret_hash_check",
+    sql`${table.secretHash} ~ '^[a-f0-9]{64}$'`,
+  ),
+  scopesArrayCheck: check(
+    "cush_verify_api_keys_scopes_array_check",
+    sql`jsonb_typeof(${table.scopes}) = 'array'`,
+  ),
+  institutionEnvironmentStatusIndex: index("cush_verify_api_keys_institution_environment_status_idx")
+    .on(table.institutionId, table.environment, table.status, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyApiUsage = pgTable("cush_verify_api_usage", {
+  id: serial("id").primaryKey(),
+  requestId: uuid("request_id").notNull().unique(),
+  institutionId: integer("institution_id")
+    .references(() => cushVerifyInstitutions.id, { onDelete: "set null" }),
+  apiKeyId: integer("api_key_id")
+    .references(() => cushVerifyApiKeys.id, { onDelete: "set null" }),
+  environment: text("environment").$type<CushVerifyApiEnvironment>().notNull(),
+  endpoint: text("endpoint").notNull(),
+  method: text("method").notNull(),
+  state: text("state").$type<CushVerifyApiUsageStatus>().notNull().default("processing"),
+  responseStatus: integer("response_status"),
+  durationMs: integer("duration_ms"),
+  billableReport: boolean("billable_report").notNull().default(false),
+  clientIpHash: text("client_ip_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  environmentCheck: check(
+    "cush_verify_api_usage_environment_check",
+    sql`${table.environment} in ('sandbox', 'production')`,
+  ),
+  endpointCheck: check(
+    "cush_verify_api_usage_endpoint_check",
+    sql`char_length(${table.endpoint}) between 1 and 180`,
+  ),
+  methodCheck: check(
+    "cush_verify_api_usage_method_check",
+    sql`${table.method} in ('GET', 'POST', 'PUT', 'PATCH', 'DELETE')`,
+  ),
+  stateCheck: check(
+    "cush_verify_api_usage_state_check",
+    sql`(${table.state} = 'processing' and ${table.completedAt} is null)
+      or (${table.state} = 'completed' and ${table.completedAt} is not null)`,
+  ),
+  statusCodeCheck: check(
+    "cush_verify_api_usage_status_code_check",
+    sql`${table.responseStatus} is null or ${table.responseStatus} between 100 and 599`,
+  ),
+  durationCheck: check(
+    "cush_verify_api_usage_duration_check",
+    sql`${table.durationMs} is null or ${table.durationMs} >= 0`,
+  ),
+  clientIpHashCheck: check(
+    "cush_verify_api_usage_client_ip_hash_check",
+    sql`${table.clientIpHash} is null or ${table.clientIpHash} ~ '^[a-f0-9]{64}$'`,
+  ),
+  institutionCreatedIndex: index("cush_verify_api_usage_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+  institutionEnvironmentCreatedIndex: index("cush_verify_api_usage_institution_environment_created_idx")
+    .on(table.institutionId, table.environment, table.createdAt),
+  keyCreatedIndex: index("cush_verify_api_usage_key_created_idx")
+    .on(table.apiKeyId, table.createdAt),
+  inFlightIndex: index("cush_verify_api_usage_in_flight_idx")
+    .on(table.institutionId, table.createdAt)
+    .where(sql`${table.state} = 'processing'`),
+  clientIpHashCreatedIndex: index("cush_verify_api_usage_client_ip_hash_created_idx")
+    .on(table.clientIpHash, table.createdAt)
+    .where(sql`${table.clientIpHash} is not null`),
+}));
+
+export const cushVerifyApiKeyEvents = pgTable("cush_verify_api_key_events", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  apiKeyId: integer("api_key_id")
+    .references(() => cushVerifyApiKeys.id, { onDelete: "set null" }),
+  actorInstitutionalUserId: integer("actor_institutional_user_id")
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "set null" }),
+  eventType: text("event_type").$type<"created" | "rotated" | "revoked">().notNull(),
+  environment: text("environment").$type<CushVerifyApiEnvironment>().notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check(
+    "cush_verify_api_key_events_type_check",
+    sql`${table.eventType} in ('created', 'rotated', 'revoked')`,
+  ),
+  environmentCheck: check(
+    "cush_verify_api_key_events_environment_check",
+    sql`${table.environment} in ('sandbox', 'production')`,
+  ),
+  detailsObjectCheck: check(
+    "cush_verify_api_key_events_details_check",
+    sql`jsonb_typeof(${table.details}) = 'object'`,
+  ),
+  institutionCreatedIndex: index("cush_verify_api_key_events_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });

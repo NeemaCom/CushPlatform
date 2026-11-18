@@ -47,6 +47,7 @@ import {
 } from "./cush-verify-invitation-email";
 import { authRateLimit } from "./security";
 import { SESSION_IDLE_TIMEOUT_MS } from "@shared/auth-constants";
+import type { CushVerifyApiRequestContext } from "@shared/cush-verify-api";
 
 const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ACTIVATION_TTL_MS = 24 * 60 * 60 * 1000;
@@ -55,6 +56,7 @@ const GENERIC_ACTIVATION_RESEND_MESSAGE =
 
 export type InstitutionalRequest = Request & {
   cushVerifyInstitutionalUserId?: number;
+  cushVerifyApiContext?: CushVerifyApiRequestContext;
 };
 
 type AdminRequest = Request & { userId?: number };
@@ -280,21 +282,24 @@ export async function isInstitutionalAuthenticated(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const userId = req.session.cushVerifyInstitutionalUserId;
+  const apiContext = req.cushVerifyApiContext;
+  const userId = apiContext?.createdByInstitutionalUserId ?? req.session.cushVerifyInstitutionalUserId;
   if (!userId) {
     res.status(401).json({ code: "CUSH_VERIFY_SIGN_IN_REQUIRED", error: "Sign in to your Cush Verify institutional account." });
     return;
   }
-  const now = Date.now();
-  const lastActivity = req.session.lastActivity ?? 0;
-  if (now - lastActivity >= SESSION_IDLE_TIMEOUT_MS) {
-    destroyInstitutionalSession(req, res, 401, {
-      code: "CUSH_VERIFY_SESSION_EXPIRED",
-      error: "Your institutional session expired after 20 minutes of inactivity. Sign in again.",
-    });
-    return;
+  if (!apiContext) {
+    const now = Date.now();
+    const lastActivity = req.session.lastActivity ?? 0;
+    if (now - lastActivity >= SESSION_IDLE_TIMEOUT_MS) {
+      destroyInstitutionalSession(req, res, 401, {
+        code: "CUSH_VERIFY_SESSION_EXPIRED",
+        error: "Your institutional session expired after 20 minutes of inactivity. Sign in again.",
+      });
+      return;
+    }
+    req.session.lastActivity = now;
   }
-  req.session.lastActivity = now;
   try {
     const [user] = await db.select()
       .from(cushVerifyInstitutionalUsers)

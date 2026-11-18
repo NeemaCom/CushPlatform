@@ -72,6 +72,7 @@ vi.mock("../server/cush-verify-billing-service", () => ({
 
 import type { Express } from "express";
 import {
+  cushVerifyApiUsage,
   cushVerifyReportConsents,
   cushVerifyReportDeliveries,
   cushVerifyReportEvents,
@@ -80,7 +81,7 @@ import {
 import { registerCushVerifyReportRoutes } from "../server/cush-verify-report-routes";
 
 type Handler = (...args: any[]) => unknown;
-type RegisteredRoute = { path: string; handlers: Handler[] };
+type RegisteredRoute = { path: string | string[]; handlers: Handler[] };
 
 const requestId = "b70fa5c4-0f68-4cc8-b7b7-2f4db5af59a1";
 const deliveryDate = new Date("2026-11-18T12:00:00.000Z");
@@ -112,6 +113,8 @@ let nextDeliveryId: number;
 let latestDeliveryInsert: { requestId: string; reportDigest: string } | null;
 let reportContent: Record<string, unknown>;
 let failReportEventInsert: boolean;
+let apiUsageBillableCount: number;
+let apiUsageBillableUpdates: boolean[];
 
 function selectBuilder() {
   let selectedTable: unknown;
@@ -137,6 +140,12 @@ function selectBuilder() {
         if (delivery) return [{ id: delivery.id, deliveredAt: delivery.deliveredAt }];
       }
       return [];
+    },
+    then(resolve: (value: Array<{ used?: number }>) => unknown, reject?: (reason: unknown) => unknown) {
+      const result = selectedTable === cushVerifyApiUsage
+        ? [{ used: apiUsageBillableCount }]
+        : [];
+      return Promise.resolve(result).then(resolve, reject);
     },
   };
   return builder;
@@ -179,16 +188,30 @@ function createTransaction() {
         },
       };
     },
+    update(table: unknown) {
+      return {
+        set(values: Record<string, unknown>) {
+          return {
+            async where() {
+              if (table === cushVerifyApiUsage && typeof values.billableReport === "boolean") {
+                apiUsageBillableUpdates.push(values.billableReport);
+                if (values.billableReport) apiUsageBillableCount += 1;
+              }
+            },
+          };
+        },
+      };
+    },
   };
 }
 
 function createApp() {
   const routes: RegisteredRoute[] = [];
   const app = {
-    get(path: string, ...handlers: Handler[]) {
+    get(path: string | string[], ...handlers: Handler[]) {
       routes.push({ path, handlers });
     },
-    post(path: string, ...handlers: Handler[]) {
+    post(path: string | string[], ...handlers: Handler[]) {
       routes.push({ path, handlers });
     },
   } as unknown as Express;
@@ -216,11 +239,45 @@ function createResponse() {
 async function invokeDeliveryRoute() {
   const { app, routes } = createApp();
   registerCushVerifyReportRoutes(app);
-  const route = routes.find(({ path }) => path === "/api/verify/report-requests/:requestId/deliver");
+  const route = routes.find(({ path }) => Array.isArray(path)
+    ? path.includes("/api/verify/report-requests/:requestId/deliver")
+    : path === "/api/verify/report-requests/:requestId/deliver");
   if (!route) throw new Error("Report delivery route was not registered.");
   const req = {
     params: { requestId },
     cushVerifyInstitutionalUserId: 92,
+  } as any;
+  const res = createResponse();
+  await route.handlers.at(-1)!(req, res);
+  return res;
+}
+
+async function invokeApiDeliveryRoute() {
+  const { app, routes } = createApp();
+  registerCushVerifyReportRoutes(app);
+  const route = routes.find(({ path }) => Array.isArray(path)
+    ? path.includes("/api/v1/verify/report-requests/:requestId/deliver")
+    : false);
+  if (!route) throw new Error("Versioned report delivery route was not registered.");
+  const req = {
+    params: { requestId },
+    cushVerifyInstitutionalUserId: 92,
+    cushVerifyApiContext: {
+      apiKeyId: 8,
+      institutionId: 41,
+      createdByInstitutionalUserId: 92,
+      usageId: 15,
+      environment: "production",
+      scopes: ["reports:read"],
+      apiLimits: {
+        requestsPerMinute: null,
+        requestsPerHour: null,
+        maxConcurrentRequests: null,
+        monthlyReportLimit: 1,
+      },
+      overageConfigured: false,
+      periodStartAt: new Date(deliveryDate.getTime() - 86_400_000),
+    },
   } as any;
   const res = createResponse();
   await route.handlers.at(-1)!(req, res);
@@ -281,6 +338,8 @@ describe("Cush Verify report delivery route billing", () => {
     creditBalance = 5;
     latestDeliveryInsert = null;
     failReportEventInsert = false;
+    apiUsageBillableCount = 0;
+    apiUsageBillableUpdates = [];
     recordReportCreditUse.mockImplementation(async (_tx, input: { reportDeliveryId: number }) => {
       if (reportDebits.includes(input.reportDeliveryId)) {
         return { charged: false as const, overageLedgerId: null };
@@ -310,6 +369,34 @@ describe("Cush Verify report delivery route billing", () => {
     expect(deliveryRows[0]).toMatchObject({ id: 100, requestId });
     expect(creditBalance).toBe(4);
     expect(reportEvents.map((event) => event.eventType)).toEqual(["report_delivered", "report_accessed"]);
+  });
+
+  it("meters an API report charge in the same transaction and permits a free duplicate", async () => {
+    const firstResponse = await invokeApiDeliveryRoute();
+    const duplicateResponse = await invokeApiDeliveryRoute();
+
+    expect(firstResponse.statusCode).toBe(200);
+    expect(duplicateResponse.statusCode).toBe(200);
+    expect(reportDebits).toHaveLength(1);
+    expect(apiUsageBillableUpdates).toEqual([true]);
+    expect(apiUsageBillableCount).toBe(1);
+  });
+
+  it("blocks a new API report after the configured monthly limit when overage is unavailable", async () => {
+    apiUsageBillableCount = 1;
+    reportContent = {
+      generatedAt: deliveryDate.toISOString(),
+      reportingPeriod: { start: null, end: null },
+      categories: { scoreSummary: { score: 701 } },
+    };
+
+    const response = await invokeApiDeliveryRoute();
+
+    expect(response.statusCode).toBe(429);
+    expect(response.payload).toMatchObject({ code: "CUSH_VERIFY_MONTHLY_REPORT_LIMIT" });
+    expect(recordReportCreditUse).not.toHaveBeenCalled();
+    expect(deliveryRows).toHaveLength(0);
+    expect(apiUsageBillableUpdates).toHaveLength(0);
   });
 
   it("charges a second time only when report content changes", async () => {
