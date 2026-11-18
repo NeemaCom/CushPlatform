@@ -8,17 +8,17 @@ and session store.
 
 1. Create the Verify database in the dedicated Supabase project.
 2. Apply the Verify schema migrations below.
-3. Run the data-transfer script in dry-run mode, review its counts, then run it
-   with `--apply` to copy the Verify institution, member, request, consent, and
-   history rows. Do not copy Passport user or financial tables into this project.
-   The script checks that the seeded published version 1 catalog exactly matches
-   the source catalog; it does not duplicate or overwrite prices.
-4. Verify the transferred institution can sign in and its approved workspace
-   still opens.
-5. Only then configure the application to use this database.
-
-Do not switch the application to an empty Verify database: existing institutional
-accounts and the approved test institution would no longer be available.
+3. Choose one cutover path:
+   - **Preserve existing records:** run the data-transfer script in dry-run mode,
+     review its counts, then run it with `--apply` to copy Verify-owned records.
+     Do not copy Passport user or financial tables. The script checks that the
+     published version 1 catalog matches and refuses to transfer billing/Stripe
+     state.
+   - **Start clean:** skip the transfer. The source database remains untouched,
+     but the approved test institution, institutional logins, and request history
+     must be recreated in the dedicated Verify database after cutover.
+4. Only after the selected path is complete, configure the application to use
+   this database and verify institutional sign-in.
 
 ## Apply the schema migrations in order
 
@@ -33,7 +33,8 @@ into the editor.
 5. `migrations/manual/create-cush-verify-authorized-reports.sql`
 6. `migrations/manual/add-cush-verify-workspace-mvp.sql`
 7. `migrations/manual/create-cush-verify-pricing-catalog.sql`
-8. `migrations/manual/add-cush-verify-pricing-faqs.sql`
+8. `migrations/manual/add-cush-verify-pricing-faqs.sql` (only if the pricing
+   catalog migration did not already create and seed the FAQ items)
 9. `migrations/manual/create-cush-verify-billing-ledger.sql`
 10. `migrations/manual/create-cush-verify-sessions-table.sql`
 
