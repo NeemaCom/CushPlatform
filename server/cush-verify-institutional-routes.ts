@@ -18,6 +18,7 @@ import {
   cushVerifyInstitutionalRegistrationSchema,
   cushVerifyApplicationStatusSchema,
   cushVerifyTeamInvitationSchema,
+  cushVerifyMembershipActionSchema,
 } from "@shared/cush-verify";
 import { getCushVerifyActivationPromotionalGrant } from "@shared/cush-verify-billing-rules";
 import {
@@ -60,6 +61,30 @@ type AdminRequest = Request & { userId?: number };
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function membershipRoleLabel(role: unknown): string {
+  if (role === "organisation_admin") return "Organisation administrator";
+  if (role === "analyst") return "Analyst";
+  if (role === "viewer") return "Viewer";
+  return "Unknown role";
+}
+
+function membershipEventSummary(eventType: string, details: Record<string, unknown>): string {
+  if (eventType === "membership_role_changed") {
+    return `${membershipRoleLabel(details.previousRole)} → ${membershipRoleLabel(details.newRole)}`;
+  }
+  if (eventType === "invitation_created" || eventType === "invitation_accepted") {
+    const role = membershipRoleLabel(details.role);
+    return eventType === "invitation_created" ? `Invited as ${role}` : `Joined as ${role}`;
+  }
+  if (eventType === "invitation_delivery_failed") return "Invitation email could not be sent";
+  if (eventType === "invitation_revoked") return "Invitation cancelled or expired";
+  if (eventType === "membership_suspended") return "Workspace access suspended";
+  if (eventType === "membership_reactivated") return "Workspace access restored";
+  if (eventType === "membership_revoked") return "Workspace access revoked";
+  if (eventType === "invitation_sent") return "Invitation email sent";
+  return "Team access updated";
 }
 
 function normalizeDuplicateKey(legalName: string, country: string): string {
@@ -1190,6 +1215,310 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
     },
   );
 
+  app.get(
+    "/api/verify/team/events",
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const institutionalUserId = req.cushVerifyInstitutionalUserId!;
+      const workspace = await getInstitutionalWorkspaceState(institutionalUserId).catch(() => null);
+      if (!workspace || workspace.role !== "organisation_admin" || workspace.membershipStatus !== "active") {
+        return res.status(403).json({ error: "Only active organisation administrators can review team access history." });
+      }
+      const rawBeforeId = req.query.beforeId;
+      const beforeId = rawBeforeId === undefined ? undefined : Number(rawBeforeId);
+      if (rawBeforeId !== undefined && (!Number.isSafeInteger(beforeId) || beforeId! <= 0)) {
+        return res.status(400).json({ error: "Choose a valid history cursor." });
+      }
+
+      try {
+        const conditions = [eq(cushVerifyMembershipEvents.institutionId, workspace.institutionId)];
+        if (beforeId !== undefined) conditions.push(lt(cushVerifyMembershipEvents.id, beforeId));
+        const eventRows = await db.select({
+          id: cushVerifyMembershipEvents.id,
+          invitationId: cushVerifyMembershipEvents.invitationId,
+          membershipId: cushVerifyMembershipEvents.membershipId,
+          actorType: cushVerifyMembershipEvents.actorType,
+          actorInstitutionalUserId: cushVerifyMembershipEvents.actorInstitutionalUserId,
+          eventType: cushVerifyMembershipEvents.eventType,
+          details: cushVerifyMembershipEvents.details,
+          createdAt: cushVerifyMembershipEvents.createdAt,
+        })
+          .from(cushVerifyMembershipEvents)
+          .where(and(...conditions))
+          .orderBy(desc(cushVerifyMembershipEvents.id))
+          .limit(51);
+        const hasMore = eventRows.length > 50;
+        const pageRows = eventRows.slice(0, 50);
+        const membershipIds = [...new Set(pageRows.flatMap((event) => event.membershipId ? [event.membershipId] : []))];
+        const invitationIds = [...new Set(pageRows.flatMap((event) => event.invitationId ? [event.invitationId] : []))];
+        const actorIds = [...new Set(pageRows.flatMap((event) => event.actorInstitutionalUserId
+          ? [event.actorInstitutionalUserId]
+          : []))];
+
+        const [targetMemberships, invitations, actors] = await Promise.all([
+          membershipIds.length
+            ? db.select({
+                membershipId: cushVerifyInstitutionalMemberships.id,
+                fullName: cushVerifyInstitutionalUsers.fullName,
+                email: cushVerifyInstitutionalUsers.email,
+              })
+                .from(cushVerifyInstitutionalMemberships)
+                .innerJoin(
+                  cushVerifyInstitutionalUsers,
+                  eq(cushVerifyInstitutionalUsers.id, cushVerifyInstitutionalMemberships.institutionalUserId),
+                )
+                .where(and(
+                  eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+                  inArray(cushVerifyInstitutionalMemberships.id, membershipIds),
+                ))
+            : Promise.resolve([]),
+          invitationIds.length
+            ? db.select({
+                invitationId: cushVerifyInvitations.id,
+                fullName: cushVerifyInvitations.fullName,
+                email: cushVerifyInvitations.email,
+              })
+                .from(cushVerifyInvitations)
+                .where(and(
+                  eq(cushVerifyInvitations.institutionId, workspace.institutionId),
+                  inArray(cushVerifyInvitations.id, invitationIds),
+                ))
+            : Promise.resolve([]),
+          actorIds.length
+            ? db.select({
+                id: cushVerifyInstitutionalUsers.id,
+                fullName: cushVerifyInstitutionalUsers.fullName,
+                email: cushVerifyInstitutionalUsers.email,
+              })
+                .from(cushVerifyInstitutionalUsers)
+                .where(inArray(cushVerifyInstitutionalUsers.id, actorIds))
+            : Promise.resolve([]),
+        ]);
+        const membershipsById = new Map(targetMemberships.map((member) => [member.membershipId, member]));
+        const invitationsById = new Map(invitations.map((invite) => [invite.invitationId, invite]));
+        const actorsById = new Map(actors.map((actor) => [actor.id, actor]));
+        const events = pageRows.map((event) => {
+          const target = (event.membershipId && membershipsById.get(event.membershipId))
+            || (event.invitationId && invitationsById.get(event.invitationId));
+          const actor = event.actorType === "cush_admin"
+            ? { name: "Cush Admin", email: null }
+            : event.actorType === "system"
+              ? { name: "System", email: null }
+              : event.actorInstitutionalUserId && actorsById.get(event.actorInstitutionalUserId)
+                ? {
+                    name: actorsById.get(event.actorInstitutionalUserId)!.fullName,
+                    email: actorsById.get(event.actorInstitutionalUserId)!.email,
+                  }
+                : { name: "Former teammate", email: null };
+          const details = event.details && typeof event.details === "object"
+            ? event.details as Record<string, unknown>
+            : {};
+          return {
+            id: event.id,
+            action: event.eventType,
+            actionLabel: event.eventType.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+            actor,
+            target: target ? { name: target.fullName, email: target.email } : null,
+            summary: membershipEventSummary(event.eventType, details),
+            createdAt: event.createdAt,
+          };
+        });
+        return res.json({
+          events,
+          nextBeforeId: hasMore ? pageRows.at(-1)?.id ?? null : null,
+        });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify team access history failed", {
+          institutionId: workspace.institutionId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "Team access history is temporarily unavailable." });
+      }
+    },
+  );
+
+  app.put(
+    "/api/verify/team/members/:membershipId",
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const membershipId = Number(req.params.membershipId);
+      const parsed = cushVerifyMembershipActionSchema.safeParse(req.body);
+      if (!Number.isSafeInteger(membershipId) || membershipId <= 0 || !parsed.success) {
+        return res.status(400).json({ error: "Choose a valid membership action." });
+      }
+      const institutionalUserId = req.cushVerifyInstitutionalUserId!;
+      const workspace = await getInstitutionalWorkspaceState(institutionalUserId).catch(() => null);
+      if (!workspace || workspace.role !== "organisation_admin" || workspace.membershipStatus !== "active") {
+        return res.status(403).json({ error: "Only active organisation administrators can manage team access." });
+      }
+
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [institution] = await tx.select({
+            id: cushVerifyInstitutions.id,
+            status: cushVerifyInstitutions.status,
+            sourceApplicationId: cushVerifyInstitutions.sourceApplicationId,
+          })
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, workspace.institutionId))
+            .for("update")
+            .limit(1);
+          if (!institution || institution.status !== "approved") return { kind: "institution_unavailable" as const };
+
+          const [actorMembership] = await tx.select({
+            role: cushVerifyInstitutionalMemberships.role,
+            status: cushVerifyInstitutionalMemberships.status,
+          })
+            .from(cushVerifyInstitutionalMemberships)
+            .where(and(
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              eq(cushVerifyInstitutionalMemberships.institutionalUserId, institutionalUserId),
+            ))
+            .for("update")
+            .limit(1);
+          if (!actorMembership || actorMembership.role !== "organisation_admin" || actorMembership.status !== "active") {
+            return { kind: "admin_membership_changed" as const };
+          }
+          const [application] = await tx.select({ status: cushVerifyApplications.status })
+            .from(cushVerifyApplications)
+            .where(eq(cushVerifyApplications.id, institution.sourceApplicationId))
+            .limit(1);
+          if (!application || application.status !== "approved") return { kind: "institution_unavailable" as const };
+
+          const [target] = await tx.select()
+            .from(cushVerifyInstitutionalMemberships)
+            .where(and(
+              eq(cushVerifyInstitutionalMemberships.id, membershipId),
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+            ))
+            .for("update")
+            .limit(1);
+          if (!target) return { kind: "not_found" as const };
+          if (target.status === "revoked" || target.status === "pending_approval") {
+            return { kind: "membership_unavailable" as const };
+          }
+
+          const now = new Date();
+          if (parsed.data.action === "change_role") {
+            if (target.role === parsed.data.role) {
+              return { kind: "unchanged" as const, role: target.role, status: target.status };
+            }
+            if (target.role === "organisation_admin" && target.status === "active" && parsed.data.role !== "organisation_admin") {
+              const activeAdmins = await tx.select({ id: cushVerifyInstitutionalMemberships.id })
+                .from(cushVerifyInstitutionalMemberships)
+                .where(and(
+                  eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+                  eq(cushVerifyInstitutionalMemberships.role, "organisation_admin"),
+                  eq(cushVerifyInstitutionalMemberships.status, "active"),
+                ));
+              if (activeAdmins.length <= 1) return { kind: "last_admin" as const };
+            }
+            await tx.update(cushVerifyInstitutionalMemberships)
+              .set({ role: parsed.data.role, updatedAt: now })
+              .where(and(
+                eq(cushVerifyInstitutionalMemberships.id, target.id),
+                eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              ));
+            await tx.insert(cushVerifyMembershipEvents).values({
+              institutionId: workspace.institutionId,
+              membershipId: target.id,
+              actorType: "organisation_admin",
+              actorInstitutionalUserId: institutionalUserId,
+              eventType: "membership_role_changed",
+              details: { previousRole: target.role, newRole: parsed.data.role },
+            });
+            return { kind: "updated" as const, role: parsed.data.role, status: target.status };
+          }
+
+          if (parsed.data.action === "suspend") {
+            if (target.status === "suspended") {
+              return { kind: "unchanged" as const, role: target.role, status: target.status };
+            }
+            if (target.institutionalUserId === institutionalUserId) return { kind: "cannot_suspend_self" as const };
+            if (target.role === "organisation_admin") {
+              const activeAdmins = await tx.select({ id: cushVerifyInstitutionalMemberships.id })
+                .from(cushVerifyInstitutionalMemberships)
+                .where(and(
+                  eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+                  eq(cushVerifyInstitutionalMemberships.role, "organisation_admin"),
+                  eq(cushVerifyInstitutionalMemberships.status, "active"),
+                ));
+              if (activeAdmins.length <= 1) return { kind: "last_admin" as const };
+            }
+            await tx.update(cushVerifyInstitutionalMemberships)
+              .set({ status: "suspended", updatedAt: now })
+              .where(and(
+                eq(cushVerifyInstitutionalMemberships.id, target.id),
+                eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              ));
+            await tx.insert(cushVerifyMembershipEvents).values({
+              institutionId: workspace.institutionId,
+              membershipId: target.id,
+              actorType: "organisation_admin",
+              actorInstitutionalUserId: institutionalUserId,
+              eventType: "membership_suspended",
+              details: { role: target.role },
+            });
+            return { kind: "updated" as const, role: target.role, status: "suspended" };
+          }
+
+          if (target.status === "active") {
+            return { kind: "unchanged" as const, role: target.role, status: target.status };
+          }
+          await tx.update(cushVerifyInstitutionalMemberships)
+            .set({ status: "active", updatedAt: now })
+            .where(and(
+              eq(cushVerifyInstitutionalMemberships.id, target.id),
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+            ));
+          await tx.insert(cushVerifyMembershipEvents).values({
+            institutionId: workspace.institutionId,
+            membershipId: target.id,
+            actorType: "organisation_admin",
+            actorInstitutionalUserId: institutionalUserId,
+            eventType: "membership_reactivated",
+            details: { role: target.role },
+          });
+          return { kind: "updated" as const, role: target.role, status: "active" };
+        });
+
+        if (result.kind === "not_found") return res.status(404).json({ error: "Team membership not found." });
+        if (result.kind === "last_admin") {
+          return res.status(409).json({ error: "An organisation must keep at least one active administrator." });
+        }
+        if (result.kind === "cannot_suspend_self") {
+          return res.status(409).json({ error: "You cannot suspend your own membership. Ask another organisation administrator to do this." });
+        }
+        if (result.kind === "admin_membership_changed") {
+          return res.status(403).json({ error: "Only active organisation administrators can manage team access." });
+        }
+        if (result.kind === "institution_unavailable") {
+          return res.status(409).json({ error: "Team access can only be changed for an approved organisation." });
+        }
+        if (result.kind === "membership_unavailable") {
+          return res.status(409).json({ error: "This membership is no longer available for organisation-admin changes." });
+        }
+        return res.json({
+          success: true,
+          status: result.status,
+          role: result.role,
+          unchanged: result.kind === "unchanged",
+        });
+      } catch (error) {
+        if (respondIfInstitutionalSchemaMissing(error, res)) return;
+        console.error("Cush Verify team membership update failed", {
+          institutionId: workspace.institutionId,
+          membershipId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "Team access could not be updated. Please try again." });
+      }
+    },
+  );
+
   app.post(
     "/api/verify/team/invitations",
     authRateLimit,
@@ -1214,6 +1543,14 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       let created: { invitationId: number; institutionName: string };
       try {
         created = await db.transaction(async (tx) => {
+          const [institution] = await tx.select()
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, workspace.institutionId))
+            .for("update")
+            .limit(1);
+          if (!institution || institution.status !== "approved") {
+            throw new Error("CUSH_VERIFY_INSTITUTION_NOT_APPROVED");
+          }
           const [actorMembership] = await tx.select({
             role: cushVerifyInstitutionalMemberships.role,
             status: cushVerifyInstitutionalMemberships.status,
@@ -1227,14 +1564,6 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
             .limit(1);
           if (!actorMembership || actorMembership.role !== "organisation_admin" || actorMembership.status !== "active") {
             throw new Error("CUSH_VERIFY_ADMIN_MEMBERSHIP_CHANGED");
-          }
-          const [institution] = await tx.select()
-            .from(cushVerifyInstitutions)
-            .where(eq(cushVerifyInstitutions.id, workspace.institutionId))
-            .for("update")
-            .limit(1);
-          if (!institution || institution.status !== "approved") {
-            throw new Error("CUSH_VERIFY_INSTITUTION_NOT_APPROVED");
           }
           const [application] = await tx.select({
             id: cushVerifyApplications.id,
@@ -1409,6 +1738,26 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
       }
       try {
         const result = await db.transaction(async (tx) => {
+          const [institution] = await tx.select({ status: cushVerifyInstitutions.status })
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, workspace.institutionId))
+            .for("update")
+            .limit(1);
+          if (!institution || institution.status !== "approved") return { kind: "institution_unavailable" as const };
+          const [actorMembership] = await tx.select({
+            role: cushVerifyInstitutionalMemberships.role,
+            status: cushVerifyInstitutionalMemberships.status,
+          })
+            .from(cushVerifyInstitutionalMemberships)
+            .where(and(
+              eq(cushVerifyInstitutionalMemberships.institutionId, workspace.institutionId),
+              eq(cushVerifyInstitutionalMemberships.institutionalUserId, institutionalUserId),
+            ))
+            .for("update")
+            .limit(1);
+          if (!actorMembership || actorMembership.role !== "organisation_admin" || actorMembership.status !== "active") {
+            return { kind: "admin_membership_changed" as const };
+          }
           const [invitation] = await tx.select()
             .from(cushVerifyInvitations)
             .where(and(
@@ -1434,6 +1783,12 @@ export function registerCushVerifyInstitutionalRoutes(app: Express): void {
           });
           return { kind: "revoked" as const };
         });
+        if (result.kind === "institution_unavailable") {
+          return res.status(409).json({ error: "Only an approved organisation can manage invitations." });
+        }
+        if (result.kind === "admin_membership_changed") {
+          return res.status(403).json({ error: "Only active organisation administrators can manage invitations." });
+        }
         if (result.kind === "not_found") return res.status(404).json({ error: "Invitation not found." });
         if (result.kind === "already_accepted") return res.status(409).json({ error: "This invitation has already been accepted." });
         if (result.kind === "already_revoked") return res.status(409).json({ error: "This invitation has already been cancelled." });

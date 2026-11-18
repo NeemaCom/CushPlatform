@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, Check, Clock3, Mail, Plus, RefreshCw, ShieldCheck, Users, X } from "lucide-react";
+import { AlertTriangle, Building2, Check, Clock3, History, Mail, PauseCircle, PlayCircle, Plus, RefreshCw, ShieldCheck, Users, X } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
+import CushVerifyTeamAccessHistory from "./CushVerifyTeamAccessHistory";
 import {
   formatDate,
   readableError,
@@ -15,6 +16,9 @@ import {
 
 type TeamResponse = { institution: Institution; members: Member[]; invitations: Invitation[] };
 type InviteResult = { success: boolean; invitationEmailStatus: string; message: string };
+type MemberAction = { membershipId: number; action: "change_role"; role: MemberRole }
+  | { membershipId: number; action: "suspend" | "reactivate" };
+type MemberActionResult = { success: boolean; status: Member["status"]; role: MemberRole; unchanged: boolean };
 
 const panel = "rounded-2xl border border-[#d8e3f1] bg-white";
 const inputClass = "mt-1.5 min-h-11 w-full rounded-xl border border-[#cad7e8] bg-[#f8fbff] px-3.5 text-sm text-[#14213a] outline-none transition focus:border-[#3977e6] focus:ring-4 focus:ring-[#3977e6]/10";
@@ -23,7 +27,7 @@ const roleOptions: MemberRole[] = ["organisation_admin", "analyst", "viewer"];
 function StatusPill({ value }: { value: string }) {
   const style = value === "active" || value === "approved"
     ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-    : value === "pending" || value === "pending_approval"
+    : value === "pending" || value === "pending_approval" || value === "suspended"
       ? "border-amber-200 bg-amber-50 text-amber-900"
       : "border-[#d8e3f1] bg-[#f3f7fc] text-[#61728a]";
   return <span className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-semibold tracking-wide ${style}`}>{statusLabel(value)}</span>;
@@ -47,6 +51,8 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
   const [email, setEmail] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [role, setRole] = useState<MemberRole>("viewer");
+  const [roleDrafts, setRoleDrafts] = useState<Record<number, MemberRole>>({});
+  const [view, setView] = useState<"members" | "history">("members");
   const [notice, setNotice] = useState("");
 
   const teamQuery = useQuery<TeamResponse>({
@@ -70,6 +76,7 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
       setRole("viewer");
       setFormOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["/api/verify/team"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/verify/team/events"] });
     },
   });
   const cancelMutation = useMutation({
@@ -80,6 +87,21 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
     onSuccess: async (result) => {
       setNotice(result.message || "Invitation cancelled.");
       await queryClient.invalidateQueries({ queryKey: ["/api/verify/team"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/verify/team/events"] });
+    },
+  });
+  const memberMutation = useMutation({
+    mutationFn: async ({ membershipId, ...payload }: MemberAction) => {
+      const response = await apiRequest("PUT", `/api/verify/team/members/${membershipId}`, payload);
+      return response.json() as Promise<MemberActionResult>;
+    },
+    onSuccess: async (result) => {
+      setNotice(result.unchanged ? "No change was needed." : "Team access updated.");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/verify/team"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/verify/team/events"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/verify/auth/me"] }),
+      ]);
     },
   });
 
@@ -125,13 +147,24 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
           <h2 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#12213d]">Team & access</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52627b]">Manage who can access your organisation’s Cush Verify workspace.</p>
         </div>
-        {canInvite && (
+        {canInvite && view === "members" && (
           <button type="button" onClick={() => { setFormOpen((open) => !open); setNotice(""); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#275fb7] focus:outline-none focus:ring-4 focus:ring-[#3977e6]/20">
             {formOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
             {formOpen ? "Close invite form" : "Invite a colleague"}
           </button>
         )}
       </header>
+
+      {canInvite && (
+        <div role="group" aria-label="Team management views" className="flex flex-wrap gap-2">
+          <button type="button" aria-pressed={view === "members"} onClick={() => setView("members")} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold ${view === "members" ? "bg-[#0c1830] text-white" : "border border-[#d8e3f1] bg-white text-[#52627b] hover:bg-[#f8fbff]"}`}>
+            <Users className="h-4 w-4" />Members & invitations
+          </button>
+          <button type="button" aria-pressed={view === "history"} onClick={() => { setView("history"); setFormOpen(false); }} className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold ${view === "history" ? "bg-[#0c1830] text-white" : "border border-[#d8e3f1] bg-white text-[#52627b] hover:bg-[#f8fbff]"}`}>
+            <History className="h-4 w-4" />Access history
+          </button>
+        </div>
+      )}
 
       <section className={`${panel} overflow-hidden`}>
         <div className="flex items-start gap-3 border-b border-[#e6edf6] bg-[#f8fbff] px-5 py-4 sm:px-6">
@@ -161,7 +194,12 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
       {notice && <p role="status" className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-5 text-emerald-900"><Check className="mt-0.5 h-4 w-4 shrink-0" />{notice}</p>}
       {inviteMutation.isError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-5 text-rose-800">{readableError(inviteMutation.error)}</p>}
       {cancelMutation.isError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-5 text-rose-800">{readableError(cancelMutation.error)}</p>}
+      {memberMutation.isError && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-5 text-rose-800">{readableError(memberMutation.error)}</p>}
 
+      {view === "history" && canInvite ? (
+        <CushVerifyTeamAccessHistory />
+      ) : (
+      <>
       {formOpen && canInvite && (
         <section className={`${panel} p-5 sm:p-6`} aria-labelledby="invite-colleague-heading">
           <div className="max-w-3xl">
@@ -191,24 +229,84 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
 
       <section className={`${panel} overflow-hidden`}>
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[#e6edf6] px-5 py-4 sm:px-6">
-          <div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-[#3471d2]" /><h3 className="font-semibold text-[#12213d]">Team members</h3></div><p className="mt-1 text-xs text-[#71819b]">{canInvite ? "Current and awaiting-email memberships" : "Active organisation administrators"}</p></div>
+          <div><div className="flex items-center gap-2"><Users className="h-4 w-4 text-[#3471d2]" /><h3 className="font-semibold text-[#12213d]">Team members</h3></div><p className="mt-1 text-xs text-[#71819b]">{canInvite ? "Current, suspended, and past memberships" : "Active organisation administrators"}</p></div>
           <span className="rounded-full border border-[#d8e3f1] bg-[#f8fbff] px-2.5 py-1 text-[11px] font-semibold text-[#52627b]">{visibleMembers.length} {visibleMembers.length === 1 ? "person" : "people"}</span>
         </div>
         {visibleMembers.length === 0 ? (
           <div className="px-5 py-10 text-center sm:px-6"><Users className="mx-auto h-6 w-6 text-[#91a1b6]" /><h4 className="mt-3 text-sm font-semibold text-[#243650]">No team members to show</h4><p className="mt-1 text-xs leading-5 text-[#71819b]">{canInvite ? "Invited colleagues and existing memberships will appear here." : "No active organisation administrators are currently listed."}</p></div>
         ) : (
           <ul className="divide-y divide-[#edf1f6]">
-            {visibleMembers.map((member) => <li key={member.membershipId} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-[#243650]">{member.fullName}</p><StatusPill value={member.status} /></div>
-                <p className="mt-1 break-all text-xs text-[#52627b]">{member.email}</p>
-                <p className="mt-1 text-xs text-[#71819b]">{member.jobTitle} · {roleLabel(member.role)}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-2 text-xs text-[#61728a]">
-                {member.emailVerified ? <><ShieldCheck className="h-4 w-4 text-[#16816f]" /> Email verified</> : <><Clock3 className="h-4 w-4 text-[#a97518]" /> Email not verified</>}
-                <span className="hidden text-[#a6b2c1] sm:inline">·</span><span>Added {formatDate(member.createdAt)}</span>
-              </div>
-            </li>)}
+            {visibleMembers.map((member) => {
+              const editable = canInvite && (member.status === "active" || member.status === "suspended");
+              const selectedRole = roleDrafts[member.membershipId] ?? member.role;
+              return (
+                <li key={member.membershipId} className="flex flex-col gap-4 px-5 py-4 sm:px-6">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2"><p className="text-sm font-semibold text-[#243650]">{member.fullName}</p><StatusPill value={member.status} /></div>
+                      <p className="mt-1 break-all text-xs text-[#52627b]">{member.email}</p>
+                      <p className="mt-1 text-xs text-[#71819b]">{member.jobTitle} · {roleLabel(member.role)}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2 text-xs text-[#61728a]">
+                      {member.emailVerified ? <><ShieldCheck className="h-4 w-4 text-[#16816f]" /> Email verified</> : <><Clock3 className="h-4 w-4 text-[#a97518]" /> Email not verified</>}
+                      <span className="hidden text-[#a6b2c1] sm:inline">·</span><span>Added {formatDate(member.createdAt)}</span>
+                    </div>
+                  </div>
+                  {editable && (
+                    <div className="flex flex-col gap-2 rounded-xl bg-[#f8fbff] p-3 sm:flex-row sm:items-end">
+                      <label className="min-w-0 flex-1 text-[11px] font-semibold text-[#61728a]">
+                        Workspace role
+                        <select
+                          aria-label={`Workspace role for ${member.fullName}`}
+                          className="mt-1 min-h-10 w-full rounded-lg border border-[#cad7e8] bg-white px-3 text-sm text-[#243650] outline-none focus:border-[#3977e6] focus:ring-4 focus:ring-[#3977e6]/10"
+                          value={selectedRole}
+                          disabled={memberMutation.isPending}
+                          onChange={(event) => setRoleDrafts((current) => ({
+                            ...current,
+                            [member.membershipId]: event.target.value as MemberRole,
+                          }))}
+                        >
+                          {roleOptions.map((option) => <option key={option} value={option}>{roleLabel(option)}</option>)}
+                        </select>
+                      </label>
+                      {selectedRole !== member.role && (
+                        <button
+                          type="button"
+                          disabled={memberMutation.isPending}
+                          onClick={() => memberMutation.mutate({ membershipId: member.membershipId, action: "change_role", role: selectedRole })}
+                          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-[#3475e7] px-3.5 text-xs font-semibold text-white hover:bg-[#275fb7] disabled:opacity-50"
+                        >
+                          Save role
+                        </button>
+                      )}
+                      {member.status === "active" ? (
+                        <button
+                          type="button"
+                          disabled={memberMutation.isPending}
+                          onClick={() => {
+                            if (window.confirm(`Suspend workspace access for ${member.fullName}? They will lose access immediately.`)) {
+                              memberMutation.mutate({ membershipId: member.membershipId, action: "suspend" });
+                            }
+                          }}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-white px-3.5 text-xs font-semibold text-amber-900 hover:bg-amber-50 disabled:opacity-50"
+                        >
+                          <PauseCircle className="h-4 w-4" />Suspend access
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={memberMutation.isPending}
+                          onClick={() => memberMutation.mutate({ membershipId: member.membershipId, action: "reactivate" })}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-3.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50"
+                        >
+                          <PlayCircle className="h-4 w-4" />Restore access
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
@@ -228,6 +326,8 @@ export default function CushVerifyTeamManagement({ currentRole }: { currentRole:
             </li>)}</ul>
           )}
         </section>
+      )}
+      </>
       )}
     </div>
   );

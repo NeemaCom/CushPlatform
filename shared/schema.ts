@@ -426,7 +426,7 @@ export const cushVerifyMembershipEvents = pgTable("cush_verify_membership_events
   ),
   eventTypeCheck: check(
     "cush_verify_membership_events_type_check",
-    sql`${table.eventType} in ('invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_revoked', 'invitation_accepted', 'membership_revoked')`,
+    sql`${table.eventType} in ('invitation_created', 'invitation_sent', 'invitation_delivery_failed', 'invitation_revoked', 'invitation_accepted', 'membership_role_changed', 'membership_suspended', 'membership_reactivated', 'membership_revoked')`,
   ),
   institutionCreatedIndex: index("cush_verify_membership_events_institution_created_idx")
     .on(table.institutionId, table.createdAt),

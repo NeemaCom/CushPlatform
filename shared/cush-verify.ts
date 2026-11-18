@@ -72,6 +72,11 @@ export const cushVerifyTeamInvitationSchema = z.object({
   jobTitle: z.string().trim().min(2).max(120),
   role: z.enum(cushVerifyMembershipRoles),
 }).strict();
+export const cushVerifyMembershipActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("change_role"), role: z.enum(cushVerifyMembershipRoles) }).strict(),
+  z.object({ action: z.literal("suspend") }).strict(),
+  z.object({ action: z.literal("reactivate") }).strict(),
+]);
 export const cushVerifyMembershipRoleSchema = z.enum(cushVerifyMembershipRoles);
 
 export type CushVerifyInstitutionInterestInput = z.infer<typeof cushVerifyInstitutionInterestSchema>;
@@ -79,3 +84,4 @@ export type CushVerifyReviewStatus = z.infer<typeof cushVerifyReviewStatusSchema
 export type CushVerifyApplicationInput = z.infer<typeof cushVerifyApplicationSchema>;
 export type CushVerifyInstitutionalRegistrationInput = z.infer<typeof cushVerifyInstitutionalRegistrationSchema>;
 export type CushVerifyApplicationStatus = z.infer<typeof cushVerifyApplicationStatusSchema>;
+export type CushVerifyMembershipAction = z.infer<typeof cushVerifyMembershipActionSchema>;
