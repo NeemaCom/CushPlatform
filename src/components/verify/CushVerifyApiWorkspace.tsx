@@ -9,6 +9,7 @@ import {
   type CushVerifyApiKeyEnvironment,
   type CushVerifyApiScope,
 } from "@shared/cush-verify-api";
+import CushVerifyWebhookWorkspace from "@/components/verify/CushVerifyWebhookWorkspace";
 
 type ApiKeyItem = {
   id: number;
@@ -395,6 +396,7 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
 
       {isAdmin ? (
         <section className="space-y-4">
+          <CushVerifyWebhookWorkspace isAdmin={isAdmin} />
           {keysQuery.data && (
             <section className="rounded-2xl border border-[#dce5f1] bg-white p-4 sm:p-5" aria-labelledby="production-api-access-heading">
               <div className="flex flex-wrap items-start justify-between gap-3">

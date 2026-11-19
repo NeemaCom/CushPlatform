@@ -1,4 +1,4 @@
-import { ArrowRight, CircleAlert, Code2, FileCheck2, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
+import { ArrowRight, BookOpen, CircleAlert, Code2, FileCheck2, LockKeyhole, ShieldCheck, WalletCards } from "lucide-react";
 import { Link } from "wouter";
 import CushVerifyPublicFooter from "@/components/verify/CushVerifyPublicFooter";
 import CushVerifyPublicNav from "@/components/verify/CushVerifyPublicNav";
@@ -48,6 +48,9 @@ export default function CushVerifyApi() {
               </Link>
               <Link href="/verify/how-it-works" className="inline-flex min-h-12 items-center justify-center rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
                 Review the consent process
+              </Link>
+              <Link href="/verify/api-reference" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/20 px-5 text-sm font-semibold text-blue-50 transition hover:bg-white/5">
+                <BookOpen className="h-4 w-4" /> API reference
               </Link>
             </div>
           </div>

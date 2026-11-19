@@ -26,7 +26,7 @@ import { randomBytes } from "node:crypto";
 
 const usageThresholdOptions = [5, 10, 20, 25, 50, 75, 80, 90, 95, 100] as const;
 
-const webhookDestinationInputSchema = z.object({
+export const webhookDestinationInputSchema = z.object({
   name: z.string().trim().min(1).max(80),
   url: z.string().trim().min(1).max(2048),
   eventTypes: z.array(z.enum(CUSH_VERIFY_WEBHOOK_EVENT_TYPES)).min(1).max(8),
@@ -52,7 +52,7 @@ const webhookDestinationInputSchema = z.object({
   }
 });
 
-const updateWebhookDestinationSchema = z.object({
+export const updateWebhookDestinationSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
   url: z.string().trim().min(1).max(2048).optional(),
   eventTypes: z.array(z.enum(CUSH_VERIFY_WEBHOOK_EVENT_TYPES)).min(1).max(8).optional(),
@@ -75,7 +75,7 @@ const updateWebhookDestinationSchema = z.object({
   }
 });
 
-function safeDestinationView(destination: typeof cushVerifyWebhookDestinations.$inferSelect) {
+export function safeDestinationView(destination: typeof cushVerifyWebhookDestinations.$inferSelect) {
   return {
     id: destination.id,
     name: destination.name,
@@ -89,7 +89,7 @@ function safeDestinationView(destination: typeof cushVerifyWebhookDestinations.$
   };
 }
 
-async function getWebhookAdmin(req: InstitutionalRequest) {
+export async function getWebhookAdmin(req: InstitutionalRequest) {
   const userId = req.cushVerifyInstitutionalUserId ?? req.cushVerifyApiContext?.createdByInstitutionalUserId;
   if (!userId) return null;
   const membership = await getInstitutionalWorkspaceState(userId);
@@ -256,7 +256,7 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
           eq(cushVerifyWebhookDestinations.id, id),
           eq(cushVerifyWebhookDestinations.institutionId, actor.institutionId),
           eq(cushVerifyWebhookDestinations.environment, "production"),
-          eq(cushVerifyWebhookDestinations.status, "active"),
+          inArray(cushVerifyWebhookDestinations.status, ["active", "disabled"]),
         )).limit(1);
         if (!current) return res.status(404).json({ error: "Webhook destination not found." });
         const nextEventTypes = parsed.data.eventTypes ?? current.eventTypes;
@@ -281,7 +281,9 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
             eq(cushVerifyWebhookDestinations.id, id),
             eq(cushVerifyWebhookDestinations.institutionId, actor.institutionId),
             eq(cushVerifyWebhookDestinations.environment, "production"),
+            inArray(cushVerifyWebhookDestinations.status, ["active", "disabled"]),
           )).returning();
+          if (!row) return [];
           if (parsed.data.status === "disabled") {
             await tx.update(cushVerifyWebhookDeliveries).set({
               status: "cancelled",
@@ -305,6 +307,7 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
           });
           return [row];
         });
+        if (!updated) return res.status(404).json({ error: "Webhook destination not found." });
         return res.json({ destination: safeDestinationView(updated) });
       } catch (error) {
         console.error("Cush Verify webhook destination update failed", {

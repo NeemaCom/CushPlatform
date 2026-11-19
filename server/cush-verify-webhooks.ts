@@ -12,6 +12,10 @@ import {
   type CushVerifyApiEnvironment,
 } from "@shared/schema";
 import { cushVerifyDb as db } from "./db";
+import {
+  processCushVerifyWebhookFailureNotificationEmails,
+  queueCushVerifyWebhookFailureNotifications,
+} from "./cush-verify-webhook-notifications";
 
 export const CUSH_VERIFY_WEBHOOK_EVENT_TYPES = [
   "report.requested",
@@ -454,7 +458,7 @@ async function deliverOne(input: {
       eq(cushVerifyWebhookDeliveryAttempts.deliveryId, input.deliveryId),
       eq(cushVerifyWebhookDeliveryAttempts.attemptNumber, input.attemptNumber),
     ));
-    await tx.update(cushVerifyWebhookDeliveries).set({
+    const [updatedDelivery] = await tx.update(cushVerifyWebhookDeliveries).set({
       status: outcome === "delivered" ? "delivered" : nextAttemptAt ? "pending" : "failed",
       nextAttemptAt: nextAttemptAt ?? completedAt,
       lockedUntil: null,
@@ -465,7 +469,13 @@ async function deliverOne(input: {
     }).where(and(
       eq(cushVerifyWebhookDeliveries.id, input.deliveryId),
       eq(cushVerifyWebhookDeliveries.status, "processing"),
-    ));
+    )).returning({ id: cushVerifyWebhookDeliveries.id });
+    if (updatedDelivery && outcome === "failed") {
+      await queueCushVerifyWebhookFailureNotifications(tx, {
+        deliveryId: input.deliveryId,
+        institutionId: input.event.institutionId,
+      });
+    }
   });
 }
 
@@ -533,6 +543,7 @@ export async function processPendingCushVerifyWebhookDeliveries(limit = 10): Pro
 
 let webhookWorkerStarted = false;
 let webhookWorkerFailureLogged = false;
+let notificationWorkerFailureLogged = false;
 export function startCushVerifyWebhookWorkers(): void {
   if (webhookWorkerStarted) return;
   webhookWorkerStarted = true;
@@ -545,6 +556,16 @@ export function startCushVerifyWebhookWorkers(): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         webhookWorkerFailureLogged = true;
+      }
+    });
+    void processCushVerifyWebhookFailureNotificationEmails().then(() => {
+      notificationWorkerFailureLogged = false;
+    }, (error) => {
+      if (!notificationWorkerFailureLogged) {
+        console.error("Cush Verify webhook notification worker failed; it will retry", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        notificationWorkerFailureLogged = true;
       }
     });
   };

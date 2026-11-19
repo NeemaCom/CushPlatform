@@ -1,0 +1,1103 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cush Verify Institutional API",
+    "version": "1.0.0",
+    "description": "Versioned institutional API for consent-led Passport discovery, report requests and retrieval, usage, and signed webhooks. Production access requires an approved organisation, Cush approval, and an eligible active plan. Sandbox endpoints use synthetic data only."
+  },
+  "externalDocs": {
+    "description": "Complete integration setup, consent flow, credit rules, and webhook signature verification.",
+    "url": "https://verify.we-cush.com/verify-api-integration.md"
+  },
+  "servers": [
+    {
+      "url": "https://verify.we-cush.com/api/v1",
+      "description": "Cush Verify production API"
+    }
+  ],
+  "security": [
+    {
+      "CushVerifyBearerKey": []
+    }
+  ],
+  "tags": [
+    { "name": "Passport discovery" },
+    { "name": "Report requests" },
+    { "name": "Reports" },
+    { "name": "Usage" },
+    { "name": "Webhooks" },
+    { "name": "Sandbox" }
+  ],
+  "paths": {
+    "/verify/passport-discovery": {
+      "post": {
+        "operationId": "discoverPassport",
+        "tags": ["Passport discovery"],
+        "summary": "Search for a Passport using an approved identifier",
+        "description": "Discovery is non-billable. Results reveal only a minimal display label and reference. Use a server-side key with the passport:discover scope. A no-match response does not prove that an email address is or is not registered.",
+        "x-required-scope": "passport:discover",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DiscoveryRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Minimal discovery result.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DiscoveryResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/verify/report-requests": {
+      "post": {
+        "operationId": "createReportRequest",
+        "tags": ["Report requests"],
+        "summary": "Create a purpose-specific consent request",
+        "description": "The individual receives a consent link. This action does not itself consume a report credit. Protected data is available only after explicit, active consent.",
+        "x-required-scope": "reports:request",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReportRequest" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Consent request created.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReportRequestResponse" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "get": {
+        "operationId": "listReportRequests",
+        "tags": ["Report requests"],
+        "summary": "List request history",
+        "description": "Returns the latest 100 requests for this institution, newest first. Older requests remain visible in the institutional workspace.",
+        "x-required-scope": "reports:read",
+        "responses": {
+          "200": {
+            "description": "Paginated report requests.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReportRequestList" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/verify/report-requests/{requestId}": {
+      "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+      "get": {
+        "operationId": "getReportRequestStatus",
+        "tags": ["Report requests"],
+        "summary": "Get request, consent, and delivery status",
+        "x-required-scope": "reports:read",
+        "responses": {
+          "200": {
+            "description": "Current status and any authorized report references.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReportRequestStatusResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/verify/report-requests/{requestId}/deliver": {
+      "parameters": [{ "$ref": "#/components/parameters/RequestId" }],
+      "post": {
+        "operationId": "retrieveAuthorizedReport",
+        "tags": ["Reports"],
+        "summary": "Retrieve a report covered by active consent",
+        "description": "Consent and approved categories are rechecked server-side at retrieval time. A new report delivery deducts one credit only when an authorized report is successfully returned. Repeating an unchanged report delivery does not deduct another credit.",
+        "x-required-scope": "reports:read",
+        "responses": {
+          "200": {
+            "description": "Authorized report and delivery/billing receipt.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReportDeliveryResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "402": { "$ref": "#/components/responses/PaymentRequired" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/reports": {
+      "get": {
+        "operationId": "listReports",
+        "tags": ["Reports"],
+        "summary": "List currently accessible reports",
+        "description": "Lists report deliveries whose authorization remains active. Filters accept an ISO 8601 date-time range of up to 90 days.",
+        "x-required-scope": "reports:read",
+        "parameters": [
+          { "$ref": "#/components/parameters/From" },
+          { "$ref": "#/components/parameters/To" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated report history.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReportList" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/reports/{reportId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ReportId" }],
+      "get": {
+        "operationId": "getReport",
+        "tags": ["Reports"],
+        "summary": "Retrieve an accessible report",
+        "description": "The server rechecks consent, institution ownership, selected categories, and expiry on every retrieval.",
+        "x-required-scope": "reports:read",
+        "responses": {
+          "200": {
+            "description": "Authorized report payload.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReportRetrievalResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "operationId": "getUsage",
+        "tags": ["Usage"],
+        "summary": "Get API usage and report-credit balance",
+        "description": "Production keys only. Reports consumed count successful billable report deliveries, not searches, consent requests, failed requests, or sandbox simulations.",
+        "x-required-scope": "usage:read",
+        "parameters": [
+          { "$ref": "#/components/parameters/From" },
+          { "$ref": "#/components/parameters/To" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "$ref": "#/components/parameters/ApiKeyId" },
+          { "$ref": "#/components/parameters/Endpoint" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage summary and production credits.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageSummary" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/usage/breakdown": {
+      "get": {
+        "operationId": "getUsageBreakdown",
+        "tags": ["Usage"],
+        "summary": "Get usage grouped by day, endpoint, and key",
+        "x-required-scope": "usage:read",
+        "parameters": [
+          { "$ref": "#/components/parameters/From" },
+          { "$ref": "#/components/parameters/To" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "$ref": "#/components/parameters/ApiKeyId" },
+          { "$ref": "#/components/parameters/Endpoint" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated usage breakdown.",
+            "headers": { "X-Request-Id": { "$ref": "#/components/headers/RequestId" } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageBreakdown" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "operationId": "listWebhookDestinations",
+        "tags": ["Webhooks"],
+        "summary": "List production webhook destinations",
+        "x-required-scope": "webhooks:manage",
+        "responses": {
+          "200": { "description": "Destination metadata. Signing secrets are never returned.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookDestinationList" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "post": {
+        "operationId": "createWebhookDestination",
+        "tags": ["Webhooks"],
+        "summary": "Create a signed webhook destination",
+        "description": "The HTTPS URL is DNS-checked and public-network addresses only are allowed. An organisation can configure at most 20 destinations. The generated signing secret is returned once; store it securely.",
+        "x-required-scope": "webhooks:manage",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateWebhookDestination" } } }
+        },
+        "responses": {
+          "201": { "description": "Destination created; signing secret shown once.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookDestinationCreated" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/webhooks/audit": {
+      "get": {
+        "operationId": "listWebhookAuditEvents",
+        "tags": ["Webhooks"],
+        "summary": "Review webhook configuration history",
+        "x-required-scope": "webhooks:manage",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Recent changes to webhook destinations.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookAuditList" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/webhooks/{destinationId}": {
+      "parameters": [{ "$ref": "#/components/parameters/DestinationId" }],
+      "patch": {
+        "operationId": "updateWebhookDestination",
+        "tags": ["Webhooks"],
+        "summary": "Update, disable, or re-enable a destination",
+        "x-required-scope": "webhooks:manage",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateWebhookDestination" } } }
+        },
+        "responses": {
+          "200": { "description": "Updated destination; signing secret is omitted.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookDestinationResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "delete": {
+        "operationId": "deleteWebhookDestination",
+        "tags": ["Webhooks"],
+        "summary": "Delete a destination and cancel pending deliveries",
+        "x-required-scope": "webhooks:manage",
+        "responses": {
+          "204": { "description": "Destination deleted and signing secret removed." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/webhooks/{destinationId}/deliveries": {
+      "parameters": [{ "$ref": "#/components/parameters/DestinationId" }],
+      "get": {
+        "operationId": "listWebhookDeliveries",
+        "tags": ["Webhooks"],
+        "summary": "Review delivery outcomes and retry attempts",
+        "x-required-scope": "webhooks:manage",
+        "responses": {
+          "200": { "description": "Recent delivery history without event payloads.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WebhookDeliveryList" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/webhooks/{destinationId}/rotate-secret": {
+      "parameters": [{ "$ref": "#/components/parameters/DestinationId" }],
+      "post": {
+        "operationId": "rotateWebhookSigningSecret",
+        "tags": ["Webhooks"],
+        "summary": "Rotate a webhook signing secret",
+        "description": "The previous secret stops working immediately. The replacement is returned once.",
+        "x-required-scope": "webhooks:manage",
+        "responses": {
+          "200": { "description": "New signing secret shown once.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RotatedWebhookSecret" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/sandbox/status": {
+      "get": {
+        "operationId": "getSandboxStatus",
+        "tags": ["Sandbox"],
+        "summary": "Confirm sandbox is synthetic",
+        "description": "Requires a sandbox API key. No live Passport data, consent emails, report credits, or billing are used.",
+        "x-required-scope": "sandbox:simulate",
+        "responses": {
+          "200": { "description": "Sandbox environment status.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SandboxStatus" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/sandbox/discovery": {
+      "post": {
+        "operationId": "simulateSandboxDiscovery",
+        "tags": ["Sandbox"],
+        "summary": "Simulate discovery",
+        "x-required-scope": "sandbox:simulate",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SandboxDiscoveryRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Synthetic match or no-match result.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SandboxDiscoveryResponse" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/sandbox/report-workflow": {
+      "post": {
+        "operationId": "simulateSandboxReportWorkflow",
+        "tags": ["Sandbox"],
+        "summary": "Simulate report and consent outcomes",
+        "description": "The authorized scenario returns synthetic report data and always reports zero credits used.",
+        "x-required-scope": "sandbox:simulate",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SandboxWorkflowRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Synthetic workflow outcome.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SandboxWorkflowResponse" } } } },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "410": { "$ref": "#/components/responses/Gone" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/sandbox/usage": {
+      "get": {
+        "operationId": "getSandboxUsage",
+        "tags": ["Sandbox"],
+        "summary": "Get sandbox API usage",
+        "x-required-scope": "sandbox:simulate",
+        "parameters": [
+          { "$ref": "#/components/parameters/From" },
+          { "$ref": "#/components/parameters/To" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Offset" },
+          { "$ref": "#/components/parameters/Endpoint" }
+        ],
+        "responses": {
+          "200": { "description": "Sandbox usage summary. Report credits remain zero.", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageSummary" } } } },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "CushVerifyBearerKey": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Cush Verify API key. Store server-side; never expose in browser code."
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "Request reference for support and audit correlation.",
+        "schema": { "type": "string" }
+      }
+    },
+    "parameters": {
+      "RequestId": {
+        "name": "requestId",
+        "in": "path",
+        "required": true,
+        "description": "UUID of the report request.",
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "ReportId": {
+        "name": "reportId",
+        "in": "path",
+        "required": true,
+        "description": "Numeric report-delivery identifier.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "DestinationId": {
+        "name": "destinationId",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "From": {
+        "name": "from",
+        "in": "query",
+        "required": false,
+        "description": "ISO 8601 date-time. The range may not exceed 90 days.",
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      "To": {
+        "name": "to",
+        "in": "query",
+        "required": false,
+        "description": "ISO 8601 date-time.",
+        "schema": { "type": "string", "format": "date-time" }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 }
+      },
+      "Offset": {
+        "name": "offset",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "integer", "minimum": 0, "maximum": 10000, "default": 0 }
+      },
+      "ApiKeyId": {
+        "name": "apiKeyId",
+        "in": "query",
+        "required": false,
+        "description": "Optional production API key filter. Not supported for sandbox usage.",
+        "schema": { "type": "integer", "minimum": 1 }
+      },
+      "Endpoint": {
+        "name": "endpoint",
+        "in": "query",
+        "required": false,
+        "description": "Filter by the versioned endpoint path.",
+        "schema": { "type": "string" }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid request or query.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unauthorized": {
+        "description": "API key is missing, invalid, revoked, or not available in this environment.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Forbidden": {
+        "description": "Key scope, institution status, consent, or requested data access is insufficient.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "NotFound": {
+        "description": "The resource is unavailable to this institution or does not exist.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Conflict": {
+        "description": "A conflicting request or state already exists.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Gone": {
+        "description": "Consent or authorization expired or was revoked.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "PaymentRequired": {
+        "description": "Billing or subscription requirements prevent report retrieval.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "RateLimited": {
+        "description": "Configured API limit reached. Wait at least Retry-After seconds before retrying.",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer" } },
+          "RateLimit-Limit": { "schema": { "type": "integer" } },
+          "RateLimit-Remaining": { "schema": { "type": "integer" } },
+          "RateLimit-Reset": { "description": "Seconds until the current limit window resets.", "schema": { "type": "integer" } }
+        },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      },
+      "Unavailable": {
+        "description": "The service or required data is temporarily unavailable. Failed requests are not report-credit deductions.",
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "code": { "type": "string" },
+          "error": { "type": "string" }
+        }
+      },
+      "ReportCategory": {
+        "type": "string",
+        "enum": ["income_employment", "rent_housing", "savings", "financial_commitments", "score_summary", "assessment_status", "evidence_summary"]
+      },
+      "DiscoveryRequest": {
+        "type": "object",
+        "required": ["identifierType", "identifier"],
+        "properties": {
+          "identifierType": { "type": "string", "enum": ["email", "reference_code"] },
+          "identifier": { "type": "string", "minLength": 1, "maxLength": 254 }
+        }
+      },
+      "DiscoveryResponse": {
+        "type": "object",
+        "required": ["matchFound", "recipientLabel", "message"],
+        "properties": {
+          "matchFound": { "type": "boolean" },
+          "recipientLabel": { "type": "string", "nullable": true, "description": "Masked label only; never financial information." },
+          "message": { "type": "string" }
+        }
+      },
+      "CreateReportRequest": {
+        "type": "object",
+        "required": ["recipientEmail", "purpose", "categories", "authorizationDays"],
+        "properties": {
+          "recipientEmail": { "type": "string", "format": "email", "maxLength": 254 },
+          "purpose": { "type": "string", "minLength": 10, "maxLength": 500 },
+          "categories": { "type": "array", "minItems": 1, "maxItems": 7, "uniqueItems": true, "items": { "$ref": "#/components/schemas/ReportCategory" } },
+          "authorizationDays": { "type": "integer", "minimum": 1, "maximum": 90 }
+        },
+        "additionalProperties": false
+      },
+      "ReportRequest": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["awaiting_consent", "authorized", "declined", "expired", "revoked"] },
+          "purpose": { "type": "string" },
+          "recipientLabel": { "type": "string", "nullable": true },
+          "requestedCategories": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCategory" } },
+          "requestedAuthorizationDays": { "type": "integer" },
+          "requestExpiresAt": { "type": "string", "format": "date-time" },
+          "authorizationExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CreateReportRequestResponse": {
+        "type": "object",
+        "required": ["success", "requestId", "invitationEmailStatus", "invitationUrl", "message"],
+        "properties": {
+          "success": { "type": "boolean" },
+          "requestId": { "type": "string", "format": "uuid" },
+          "invitationEmailStatus": { "type": "string", "enum": ["sent", "failed", "not_configured"] },
+          "invitationUrl": { "type": "string", "format": "uri", "description": "Capability link; treat as sensitive and do not expose in public logs." },
+          "message": { "type": "string" }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "properties": {
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" },
+          "hasMore": { "type": "boolean" }
+        }
+      },
+      "ReportRequestList": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string", "format": "uuid" },
+                "recipientLabel": { "type": "string", "nullable": true },
+                "purpose": { "type": "string" },
+                "requestedCategories": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCategory" } },
+                "requestedAuthorizationDays": { "type": "integer" },
+                "status": { "type": "string" },
+                "requestExpiresAt": { "type": "string", "format": "date-time" },
+                "authorizationExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+                "createdAt": { "type": "string", "format": "date-time" },
+                "lastReportDeliveredAt": { "type": "string", "format": "date-time", "nullable": true },
+                "deliveredReportCount": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "DateRange": {
+        "type": "object",
+        "properties": {
+          "from": { "type": "string", "format": "date-time" },
+          "to": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ReportRequestStatusResponse": {
+        "type": "object",
+        "properties": {
+          "request": { "$ref": "#/components/schemas/ReportRequest" },
+          "consent": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["pending", "approved", "declined", "revoked", "expired"] },
+              "approvedCategories": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCategory" } },
+              "approvedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "expiresAt": { "type": "string", "format": "date-time", "nullable": true },
+              "accessAvailable": { "type": "boolean" }
+            }
+          },
+          "reports": { "type": "array", "items": { "$ref": "#/components/schemas/ReportReference" } }
+        }
+      },
+      "ReportReference": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "categories": { "type": "array", "items": { "$ref": "#/components/schemas/ReportCategory" } },
+          "deliveredAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "description": "The categories property contains only the approved, currently authorized report categories.",
+        "properties": {
+          "generatedAt": { "type": "string", "format": "date-time" },
+          "reportingPeriod": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "string", "format": "date", "nullable": true },
+              "end": { "type": "string", "format": "date", "nullable": true }
+            }
+          },
+          "categories": {
+            "type": "object",
+            "properties": {
+              "financialEvidence": {
+                "type": "object",
+                "description": "Only present when one or more financial evidence categories were approved.",
+                "properties": {
+                  "income_employment": { "$ref": "#/components/schemas/FinancialEvidenceCategory" },
+                  "rent_housing": { "$ref": "#/components/schemas/FinancialEvidenceCategory" },
+                  "savings": { "$ref": "#/components/schemas/FinancialEvidenceCategory" },
+                  "financial_commitments": { "$ref": "#/components/schemas/FinancialEvidenceCategory" }
+                },
+                "additionalProperties": false
+              },
+              "scoreSummary": { "$ref": "#/components/schemas/ScoreSummary" },
+              "assessmentStatus": { "$ref": "#/components/schemas/AssessmentStatus" },
+              "evidenceSummary": { "$ref": "#/components/schemas/EvidenceSummary" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": true
+      },
+      "FinancialEvidenceCategory": {
+        "type": "object",
+        "properties": {
+          "recordCount": { "type": "integer" },
+          "latestRecordDate": { "type": "string", "format": "date", "nullable": true },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "recordType": { "type": "string" },
+                "activityDate": { "type": "string", "format": "date", "nullable": true },
+                "countryCode": { "type": "string" },
+                "currencyCode": { "type": "string" },
+                "evidenceClassification": {
+                  "type": "string",
+                  "enum": ["self_declared", "document_supported", "independently_verified", "pending_review", "disputed_or_rejected"]
+                },
+                "details": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "oneOf": [{ "type": "string" }, { "type": "boolean" }]
+                  }
+                }
+              }
+            }
+          },
+          "evidenceClassifications": {
+            "type": "object",
+            "properties": {
+              "selfDeclared": { "type": "integer" },
+              "documentSupported": { "type": "integer" },
+              "independentlyVerified": { "type": "integer" },
+              "pendingReview": { "type": "integer" },
+              "disputedOrRejected": { "type": "integer" }
+            }
+          }
+        }
+      },
+      "ScoreSummary": {
+        "type": "object",
+        "properties": {
+          "score": { "type": "number", "nullable": true },
+          "provisionalScore": { "type": "number", "nullable": true },
+          "confidenceScore": { "type": "number", "nullable": true },
+          "confidenceBand": { "type": "string", "nullable": true }
+        }
+      },
+      "AssessmentStatus": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["not_started", "incomplete", "provisional", "complete"] },
+          "algorithmVersion": { "type": "string" },
+          "missingRequirements": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "EvidenceSummary": {
+        "type": "object",
+        "properties": {
+          "bankStatements": {
+            "type": "object",
+            "properties": {
+              "status": { "type": "string", "enum": ["evidence_imported", "no_imported_evidence", "source_unavailable"] },
+              "importedAccounts": { "type": "integer" },
+              "statementPeriodsMonths": { "type": "array", "items": { "type": "integer" } },
+              "latestImportDate": { "type": "string", "format": "date-time", "nullable": true }
+            }
+          }
+        }
+      },
+      "ReportList": {
+        "type": "object",
+        "properties": {
+          "range": { "$ref": "#/components/schemas/DateRange" },
+          "page": { "$ref": "#/components/schemas/Page" },
+          "reports": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                { "$ref": "#/components/schemas/ReportReference" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "purpose": { "type": "string" },
+                    "authorizationExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "consentExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "consentReference": { "type": "string", "format": "uuid" },
+                    "accessAvailable": { "type": "boolean" }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "ReportDeliveryResponse": {
+        "type": "object",
+        "properties": {
+          "report": { "$ref": "#/components/schemas/Report" },
+          "delivery": {
+            "type": "object",
+            "properties": {
+              "id": { "oneOf": [{ "type": "integer" }, { "type": "string" }] },
+              "deliveredAt": { "type": "string", "format": "date-time" },
+              "consentReference": { "type": "string", "format": "uuid" },
+              "consentApprovedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "authorizationExpiresAt": { "type": "string", "format": "date-time", "nullable": true },
+              "newDeliveryEvent": { "type": "boolean" },
+              "billing": {
+                "type": "object",
+                "properties": {
+                  "charged": { "type": "boolean" },
+                  "type": { "type": "string", "enum": ["none", "report_credit", "overage"] },
+                  "reason": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ReportRetrievalResponse": {
+        "allOf": [
+          { "$ref": "#/components/schemas/ReportDeliveryResponse" },
+          {
+            "type": "object",
+            "properties": {
+              "delivery": {
+                "type": "object",
+                "properties": {
+                  "newDeliveryEvent": { "type": "boolean", "nullable": true },
+                  "billing": {
+                    "type": "object",
+                    "properties": {
+                      "reason": { "type": "string", "enum": ["previously_delivered"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "UsageSummary": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string", "enum": ["production", "sandbox"] },
+          "range": { "$ref": "#/components/schemas/DateRange" },
+          "summary": {
+            "type": "object",
+            "properties": {
+              "totalRequests": { "type": "integer" },
+              "successfulRequests": { "type": "integer" },
+              "failedRequests": { "type": "integer" },
+              "rateLimitedRequests": { "type": "integer" },
+              "reportsConsumed": { "type": "integer" }
+            }
+          },
+          "credits": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "allocatedThisPeriod": { "type": "integer" },
+              "remaining": { "type": "integer" },
+              "usedThisPeriod": { "type": "integer" },
+              "periodStartAt": { "type": "string", "format": "date-time", "nullable": true },
+              "periodEndAt": { "type": "string", "format": "date-time", "nullable": true }
+            }
+          }
+        }
+      },
+      "UsageBreakdown": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string", "enum": ["production", "sandbox"] },
+          "range": { "$ref": "#/components/schemas/DateRange" },
+          "page": { "$ref": "#/components/schemas/Page" },
+          "breakdown": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "day": { "type": "string", "format": "date-time" },
+                "endpoint": { "type": "string" },
+                "apiKeyId": { "type": "integer", "nullable": true },
+                "total": { "type": "integer" },
+                "successful": { "type": "integer" },
+                "failed": { "type": "integer" },
+                "reportsBilled": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "WebhookEventType": {
+        "type": "string",
+        "enum": ["report.requested", "request.linked", "consent.approved", "consent.declined", "consent.revoked", "report.delivered", "report.accessed", "usage.threshold_reached"]
+      },
+      "CreateWebhookDestination": {
+        "type": "object",
+        "required": ["name", "url", "eventTypes"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "url": { "type": "string", "format": "uri", "description": "HTTPS URL with no embedded credentials or query string." },
+          "eventTypes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/components/schemas/WebhookEventType" } },
+          "usageThresholdPercentages": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "integer", "enum": [5, 10, 20, 25, 50, 75, 80, 90, 95, 100] }
+          }
+        },
+        "additionalProperties": false
+      },
+      "WebhookDestination": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "url": { "type": "string", "format": "uri" },
+          "environment": { "type": "string", "enum": ["production"] },
+          "eventTypes": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookEventType" } },
+          "usageThresholdPercentages": { "type": "array", "items": { "type": "integer" } },
+          "status": { "type": "string", "enum": ["active", "disabled", "deleted"] },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "WebhookDestinationResponse": {
+        "type": "object",
+        "properties": { "destination": { "$ref": "#/components/schemas/WebhookDestination" } }
+      },
+      "WebhookDestinationList": {
+        "type": "object",
+        "properties": { "destinations": { "type": "array", "items": { "$ref": "#/components/schemas/WebhookDestination" } } }
+      },
+      "WebhookDestinationCreated": {
+        "type": "object",
+        "properties": {
+          "destination": { "$ref": "#/components/schemas/WebhookDestination" },
+          "signingSecret": { "type": "string", "writeOnly": true },
+          "secretNotice": { "type": "string" }
+        }
+      },
+      "UpdateWebhookDestination": {
+        "type": "object",
+        "minProperties": 1,
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "url": { "type": "string", "format": "uri" },
+          "eventTypes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/components/schemas/WebhookEventType" } },
+          "usageThresholdPercentages": { "type": "array", "uniqueItems": true, "items": { "type": "integer", "enum": [5, 10, 20, 25, 50, 75, 80, 90, 95, 100] } },
+          "status": { "type": "string", "enum": ["active", "disabled"] }
+        },
+        "additionalProperties": false
+      },
+      "WebhookAuditList": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "destinationId": { "type": "integer", "nullable": true },
+                "eventType": { "type": "string" },
+                "details": { "type": "object", "additionalProperties": true },
+                "createdAt": { "type": "string", "format": "date-time" }
+              }
+            }
+          }
+        }
+      },
+      "WebhookDeliveryList": {
+        "type": "object",
+        "properties": {
+          "deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "eventId": { "type": "string" },
+                "eventType": { "$ref": "#/components/schemas/WebhookEventType" },
+                "status": { "type": "string", "enum": ["pending", "processing", "delivered", "failed", "cancelled"] },
+                "attemptCount": { "type": "integer" },
+                "lastStatusCode": { "type": "integer", "nullable": true },
+                "lastErrorCode": { "type": "string", "nullable": true },
+                "createdAt": { "type": "string", "format": "date-time" },
+                "deliveredAt": { "type": "string", "format": "date-time", "nullable": true },
+                "attempts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "attemptNumber": { "type": "integer" },
+                      "outcome": { "type": "string" },
+                      "responseStatus": { "type": "integer", "nullable": true },
+                      "errorCode": { "type": "string", "nullable": true },
+                      "durationMs": { "type": "integer", "nullable": true },
+                      "startedAt": { "type": "string", "format": "date-time" },
+                      "completedAt": { "type": "string", "format": "date-time", "nullable": true }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RotatedWebhookSecret": {
+        "type": "object",
+        "properties": {
+          "destinationId": { "type": "integer" },
+          "signingSecret": { "type": "string", "writeOnly": true },
+          "secretNotice": { "type": "string" }
+        }
+      },
+      "SandboxStatus": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string", "enum": ["sandbox"] },
+          "liveData": { "type": "boolean", "enum": [false] },
+          "reportCreditsUsed": { "type": "integer", "enum": [0] },
+          "note": { "type": "string" }
+        }
+      },
+      "SandboxDiscoveryRequest": {
+        "type": "object",
+        "required": ["scenario"],
+        "properties": { "scenario": { "type": "string", "enum": ["match", "no_match"] } },
+        "additionalProperties": false
+      },
+      "SandboxDiscoveryResponse": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string", "enum": ["sandbox"] },
+          "simulated": { "type": "boolean", "enum": [true] },
+          "matchFound": { "type": "boolean" },
+          "passportReference": { "type": "string", "nullable": true },
+          "displayLabel": { "type": "string", "nullable": true },
+          "financialInformation": { "type": "object", "nullable": true }
+        }
+      },
+      "SandboxWorkflowRequest": {
+        "type": "object",
+        "required": ["scenario"],
+        "properties": { "scenario": { "type": "string", "enum": ["authorized", "declined", "expired", "failed_report", "unauthorized", "rate_limited"] } },
+        "additionalProperties": false
+      },
+      "SandboxWorkflowResponse": {
+        "type": "object",
+        "properties": {
+          "environment": { "type": "string", "enum": ["sandbox"] },
+          "simulated": { "type": "boolean", "enum": [true] },
+          "requestId": { "type": "string" },
+          "status": { "type": "string" },
+          "report": { "type": "object", "nullable": true, "additionalProperties": true },
+          "creditsUsed": { "type": "integer", "enum": [0] },
+          "code": { "type": "string" },
+          "consent": { "type": "object", "nullable": true, "additionalProperties": true },
+          "note": { "type": "string" }
+        }
+      }
+    }
+  }
+}

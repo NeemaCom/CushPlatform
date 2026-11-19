@@ -16,6 +16,7 @@ import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorks
 import CushVerifyBillingWorkspace from "@/components/verify/CushVerifyBillingWorkspace";
 import CushVerifyTeamManagement from "@/components/verify/team-management/CushVerifyTeamManagement";
 import CushVerifyApiWorkspace from "@/components/verify/CushVerifyApiWorkspace";
+import CushVerifyWebhookAdminAlert from "@/components/verify/CushVerifyWebhookAdminAlert";
 import type { MemberRole } from "@/components/verify/team-management/team-management-shared";
 import type { CushVerifyReportRequestView } from "@shared/cush-verify-reports";
 
@@ -224,6 +225,10 @@ export default function CushVerifyWorkspace() {
           </div>
         </div>
       </header>
+      <CushVerifyWebhookAdminAlert
+        role={data.membership.role}
+        onOpen={() => setSection("api")}
+      />
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-8 lg:grid-cols-[250px_1fr] lg:py-9">
         <nav aria-label="Institutional workspace" className="flex gap-2 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible">
           {visibleSections.map(({ id, label, icon: Icon }) => (

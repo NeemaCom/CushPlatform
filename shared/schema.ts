@@ -1373,6 +1373,8 @@ export const cushVerifyWebhookDeliveries = pgTable("cush_verify_webhook_deliveri
       or (${table.status} <> 'delivered' and ${table.deliveredAt} is null)`),
   eventDestinationUnique: unique("cush_verify_webhook_deliveries_event_destination_uq")
     .on(table.eventId, table.destinationId),
+  idInstitutionUnique: unique("cush_verify_webhook_deliveries_id_institution_uq")
+    .on(table.id, table.institutionId),
   queueIndex: index("cush_verify_webhook_deliveries_queue_idx")
     .on(table.status, table.nextAttemptAt, table.lockedUntil),
   tenantCreatedIndex: index("cush_verify_webhook_deliveries_tenant_created_idx")
@@ -1402,6 +1404,50 @@ export const cushVerifyWebhookDeliveryAttempts = pgTable("cush_verify_webhook_de
     sql`${table.durationMs} is null or ${table.durationMs} >= 0`),
   uniqueDeliveryAttempt: unique("cush_verify_webhook_delivery_attempts_delivery_number_uq")
     .on(table.deliveryId, table.attemptNumber),
+})).enableRLS();
+
+export const cushVerifyWebhookFailureNotifications = pgTable("cush_verify_webhook_failure_notifications", {
+  id: serial("id").primaryKey(),
+  deliveryId: integer("delivery_id").notNull(),
+  institutionId: integer("institution_id").notNull(),
+  institutionalUserId: integer("institutional_user_id").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true, mode: "date" }),
+  emailStatus: text("email_status").$type<"pending" | "sending" | "sent" | "failed" | "not_configured">()
+    .notNull().default("pending"),
+  emailAttemptCount: integer("email_attempt_count").notNull().default(0),
+  emailNextAttemptAt: timestamp("email_next_attempt_at", { withTimezone: true, mode: "date" })
+    .notNull().defaultNow(),
+  emailLockedUntil: timestamp("email_locked_until", { withTimezone: true, mode: "date" }),
+  emailLastAttemptedAt: timestamp("email_last_attempted_at", { withTimezone: true, mode: "date" }),
+  emailLastErrorCode: text("email_last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  deliveryTenantForeignKey: foreignKey({
+    name: "cush_verify_webhook_failure_notifications_delivery_tenant_fk",
+    columns: [table.deliveryId, table.institutionId],
+    foreignColumns: [cushVerifyWebhookDeliveries.id, cushVerifyWebhookDeliveries.institutionId],
+  }).onDelete("cascade"),
+  membershipForeignKey: foreignKey({
+    name: "cush_verify_webhook_failure_notifications_membership_fk",
+    columns: [table.institutionId, table.institutionalUserId],
+    foreignColumns: [
+      cushVerifyInstitutionalMemberships.institutionId,
+      cushVerifyInstitutionalMemberships.institutionalUserId,
+    ],
+  }).onDelete("cascade"),
+  emailStatusCheck: check("cush_verify_webhook_failure_notifications_email_status_check",
+    sql`${table.emailStatus} in ('pending', 'sending', 'sent', 'failed', 'not_configured')`),
+  emailAttemptsCheck: check("cush_verify_webhook_failure_notifications_email_attempts_check",
+    sql`${table.emailAttemptCount} between 0 and 5`),
+  emailErrorCodeCheck: check("cush_verify_webhook_failure_notifications_email_error_code_check",
+    sql`${table.emailLastErrorCode} is null or ${table.emailLastErrorCode} ~ '^[a-z0-9_]{1,60}$'`),
+  recipientCreatedIndex: index("cush_verify_webhook_failure_notifications_recipient_created_idx")
+    .on(table.institutionId, table.institutionalUserId, table.createdAt),
+  emailQueueIndex: index("cush_verify_webhook_failure_notifications_email_queue_idx")
+    .on(table.emailStatus, table.emailNextAttemptAt, table.emailLockedUntil),
+  deliveryRecipientUnique: unique("cush_verify_webhook_failure_notifications_delivery_recipient_uq")
+    .on(table.deliveryId, table.institutionalUserId),
 })).enableRLS();
 
 export const cushVerifyWebhookAuditEvents = pgTable("cush_verify_webhook_audit_events", {
