@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
   cushVerifyWebhookAuditEvents,
@@ -7,6 +7,7 @@ import {
   cushVerifyWebhookDeliveries,
   cushVerifyWebhookDestinations,
   cushVerifyWebhookEvents,
+  cushVerifyInstitutions,
 } from "@shared/schema";
 import { cushVerifyDb as db } from "./db";
 import {
@@ -136,6 +137,44 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
     },
   );
 
+  app.get(
+    "/api/v1/webhooks/audit",
+    scope,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const limit = Number(req.query.limit ?? 50);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+        return res.status(400).json({ error: "Choose an audit-history limit between 1 and 100." });
+      }
+      try {
+        const actor = await getWebhookAdmin(req);
+        if (!actor) return res.status(403).json({ code: "ORGANISATION_ADMIN_REQUIRED", error: "Only an active organisation administrator can view webhook audit history." });
+        const events = await db.select({
+          id: cushVerifyWebhookAuditEvents.id,
+          destinationId: cushVerifyWebhookAuditEvents.destinationId,
+          actorInstitutionalUserId: cushVerifyWebhookAuditEvents.actorInstitutionalUserId,
+          eventType: cushVerifyWebhookAuditEvents.eventType,
+          details: cushVerifyWebhookAuditEvents.details,
+          createdAt: cushVerifyWebhookAuditEvents.createdAt,
+        }).from(cushVerifyWebhookAuditEvents)
+          .where(eq(cushVerifyWebhookAuditEvents.institutionId, actor.institutionId))
+          .orderBy(desc(cushVerifyWebhookAuditEvents.createdAt))
+          .limit(limit);
+        return res.json({
+          events: events.map((event) => ({
+            ...event,
+            createdAt: event.createdAt.toISOString(),
+          })),
+        });
+      } catch (error) {
+        console.error("Cush Verify webhook audit history failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "Webhook audit history is temporarily unavailable." });
+      }
+    },
+  );
+
   app.post(
     "/api/v1/webhooks",
     scope,
@@ -149,7 +188,20 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
         const validatedUrl = await validateCushVerifyWebhookUrl(parsed.data.url);
         const signingSecret = randomBytes(32).toString("base64url");
         const encrypted = encryptCushVerifyWebhookSecret(signingSecret);
-        const [destination] = await db.transaction(async (tx) => {
+        const result = await db.transaction(async (tx) => {
+          await tx.select({ id: cushVerifyInstitutions.id })
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, actor.institutionId))
+            .for("update")
+            .limit(1);
+          const [existingCount] = await tx.select({ total: count() })
+            .from(cushVerifyWebhookDestinations)
+            .where(and(
+              eq(cushVerifyWebhookDestinations.institutionId, actor.institutionId),
+              eq(cushVerifyWebhookDestinations.environment, "production"),
+              inArray(cushVerifyWebhookDestinations.status, ["active", "disabled"]),
+            ));
+          if (Number(existingCount?.total ?? 0) >= 20) return null;
           const [created] = await tx.insert(cushVerifyWebhookDestinations).values({
             institutionId: actor.institutionId,
             createdByInstitutionalUserId: actor.userId,
@@ -167,8 +219,10 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
             eventType: "created",
             details: { eventTypes: parsed.data.eventTypes },
           });
-          return [created];
+          return created;
         });
+        if (!result) return res.status(429).json({ error: "An organisation can have at most 20 webhook destinations." });
+        const destination = result;
         return res.status(201).json({
           destination: safeDestinationView(destination),
           signingSecret,
@@ -278,6 +332,9 @@ export function registerCushVerifyWebhookRoutes(app: Express): void {
           const [destination] = await tx.update(cushVerifyWebhookDestinations).set({
             status: "deleted",
             deletedAt: now,
+            secretCiphertext: "",
+            secretIv: "",
+            secretTag: "",
             updatedAt: now,
           }).where(and(
             eq(cushVerifyWebhookDestinations.id, id),

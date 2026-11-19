@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_webhook_destinations (
   CONSTRAINT cush_verify_webhook_destinations_status_timestamp_check CHECK (
     (status IN ('active', 'disabled') AND deleted_at IS NULL)
     OR (status = 'deleted' AND deleted_at IS NOT NULL)
-  )
+  ),
+  CONSTRAINT cush_verify_webhook_destinations_encrypted_secret_state_check CHECK (
+    (status = 'deleted' AND secret_ciphertext = '' AND secret_iv = '' AND secret_tag = '')
+    OR (status IN ('active', 'disabled') AND secret_ciphertext <> '' AND secret_iv <> '' AND secret_tag <> '')
+  ),
+  CONSTRAINT cush_verify_webhook_destinations_id_institution_uq UNIQUE (id, institution_id)
 );
 CREATE INDEX IF NOT EXISTS cush_verify_webhook_destinations_tenant_status_idx
   ON public.cush_verify_webhook_destinations (institution_id, environment, status, created_at DESC);
@@ -49,16 +54,16 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_webhook_events (
   ),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT cush_verify_webhook_events_tenant_idempotency_uq
-    UNIQUE (institution_id, environment, idempotency_key)
+    UNIQUE (institution_id, environment, idempotency_key),
+  CONSTRAINT cush_verify_webhook_events_id_institution_uq UNIQUE (id, institution_id)
 );
 CREATE INDEX IF NOT EXISTS cush_verify_webhook_events_tenant_created_idx
   ON public.cush_verify_webhook_events (institution_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS public.cush_verify_webhook_deliveries (
   id SERIAL PRIMARY KEY,
-  event_id UUID NOT NULL REFERENCES public.cush_verify_webhook_events(id) ON DELETE RESTRICT,
-  destination_id INTEGER NOT NULL
-    REFERENCES public.cush_verify_webhook_destinations(id) ON DELETE RESTRICT,
+  event_id UUID NOT NULL,
+  destination_id INTEGER NOT NULL,
   institution_id INTEGER NOT NULL REFERENCES public.cush_verify_institutions(id) ON DELETE RESTRICT,
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending', 'processing', 'delivered', 'failed', 'cancelled')),
@@ -74,6 +79,12 @@ CREATE TABLE IF NOT EXISTS public.cush_verify_webhook_deliveries (
     (status = 'delivered' AND delivered_at IS NOT NULL)
     OR (status <> 'delivered' AND delivered_at IS NULL)
   ),
+  CONSTRAINT cush_verify_webhook_deliveries_event_tenant_fk
+    FOREIGN KEY (event_id, institution_id)
+    REFERENCES public.cush_verify_webhook_events(id, institution_id) ON DELETE RESTRICT,
+  CONSTRAINT cush_verify_webhook_deliveries_destination_tenant_fk
+    FOREIGN KEY (destination_id, institution_id)
+    REFERENCES public.cush_verify_webhook_destinations(id, institution_id) ON DELETE RESTRICT,
   CONSTRAINT cush_verify_webhook_deliveries_event_destination_uq UNIQUE (event_id, destination_id)
 );
 CREATE INDEX IF NOT EXISTS cush_verify_webhook_deliveries_queue_idx

@@ -4,12 +4,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildCushVerifyWebhookSignature,
   classifyCushVerifyWebhookResponse,
+  createCushVerifyPinnedWebhookLookup,
   decryptCushVerifyWebhookSecret,
   encryptCushVerifyWebhookSecret,
   getCushVerifyWebhookRetryAt,
   isPublicWebhookAddress,
   validateCushVerifyWebhookUrl,
+  enqueueCushVerifyWebhookEvent,
 } from "../server/cush-verify-webhooks";
+import {
+  cushVerifyWebhookDestinations,
+  cushVerifyWebhookEvents,
+} from "@shared/schema";
 
 describe("Cush Verify webhook endpoint safety", () => {
   const originalSessionSecret = process.env.SESSION_SECRET;
@@ -67,6 +73,23 @@ describe("Cush Verify webhook endpoint safety", () => {
       .rejects.toMatchObject({ code: "destination_host_not_public" });
   });
 
+  it("pins the actual socket lookup to the already-checked public DNS answer", () => {
+    const lookup = createCushVerifyPinnedWebhookLookup("hooks.example.org", [
+      { address: "93.184.216.34", family: 4 },
+    ]);
+    let resolvedAddress = "";
+    lookup("hooks.example.org", {}, (error, address) => {
+      expect(error).toBeNull();
+      resolvedAddress = String(address);
+    });
+    expect(resolvedAddress).toBe("93.184.216.34");
+    let mismatch: Error | null = null;
+    lookup("internal.service", {}, (error) => {
+      mismatch = error;
+    });
+    expect(mismatch).toMatchObject({ code: "destination_lookup_mismatch" });
+  });
+
   it.each([
     "http://hooks.example.org/events",
     "https://user:password@hooks.example.org/events",
@@ -108,5 +131,120 @@ describe("Cush Verify webhook endpoint safety", () => {
     expect(getCushVerifyWebhookRetryAt(1, now)?.getTime()).toBe(now + 30_000);
     expect(getCushVerifyWebhookRetryAt(7, now)?.getTime()).toBe(now + 12 * 60 * 60_000);
     expect(getCushVerifyWebhookRetryAt(8, now)).toBeNull();
+  });
+
+  it("creates one stable event and delivery for repeated idempotency keys", async () => {
+    const events: Array<Record<string, unknown>> = [];
+    const deliveries: Array<Record<string, unknown>> = [];
+    const destinations: Array<{
+      id: number;
+      eventTypes: string[];
+      usageThresholdPercentages: number[];
+    }> = [{
+      id: 41,
+      eventTypes: ["consent.approved"],
+      usageThresholdPercentages: [],
+    }];
+    const tx = {
+      insert(table: unknown) {
+        return {
+          values(value: Record<string, unknown>) {
+            if (table === cushVerifyWebhookEvents) {
+              return {
+                onConflictDoNothing() {
+                  return {
+                    async returning() {
+                      const duplicate = events.find((event) =>
+                        event.institutionId === value.institutionId &&
+                        event.environment === value.environment &&
+                        event.idempotencyKey === value.idempotencyKey,
+                      );
+                      if (duplicate) return [];
+                      events.push(value);
+                      return [{ id: value.id }];
+                    },
+                  };
+                },
+              };
+            }
+            if (table === cushVerifyWebhookDestinations) {
+              throw new Error("Unexpected insert into destinations.");
+            }
+            return {
+              onConflictDoNothing() {
+                const duplicate = deliveries.some((delivery) =>
+                  delivery.eventId === value.eventId &&
+                  delivery.destinationId === value.destinationId,
+                );
+                if (!duplicate) deliveries.push(value);
+                return Promise.resolve();
+              },
+            };
+          },
+        };
+      },
+      select() {
+        let selectedTable: unknown;
+        const query: {
+          from(table: unknown): typeof query;
+          where(): typeof query;
+          limit(): Promise<Array<Record<string, unknown>>>;
+          then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown): Promise<unknown>;
+        } = {
+          from(table) {
+            selectedTable = table;
+            return query;
+          },
+          where() {
+            return query;
+          },
+          async limit() {
+            return events.filter((event) => selectedTable === cushVerifyWebhookEvents);
+          },
+          then(resolve, reject) {
+            const rows = selectedTable === cushVerifyWebhookDestinations ? destinations : [];
+            return Promise.resolve(rows).then(resolve, reject);
+          },
+        };
+        return query;
+      },
+    };
+    const input = {
+      institutionId: 12,
+      eventType: "consent.approved" as const,
+      idempotencyKey: "consent-decision:request-1:approved",
+      data: { requestId: "request-1", status: "authorized" },
+      createdAt: new Date("2026-11-19T12:00:00.000Z"),
+    };
+
+    await enqueueCushVerifyWebhookEvent(tx as never, input);
+    const firstEventId = events[0]?.id;
+    await enqueueCushVerifyWebhookEvent(tx as never, input);
+
+    expect(events).toHaveLength(1);
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.eventId).toBe(firstEventId);
+    expect(deliveries[0]?.destinationId).toBe(41);
+
+    destinations.push({
+      id: 42,
+      eventTypes: ["usage.threshold_reached"],
+      usageThresholdPercentages: [50],
+    });
+    await enqueueCushVerifyWebhookEvent(tx as never, {
+      institutionId: 12,
+      eventType: "usage.threshold_reached",
+      idempotencyKey: "usage-threshold:production:period:50",
+      data: { thresholdPercentage: 50, reportsUsed: 5, reportLimit: 10 },
+    });
+    await enqueueCushVerifyWebhookEvent(tx as never, {
+      institutionId: 12,
+      eventType: "usage.threshold_reached",
+      idempotencyKey: "usage-threshold:production:period:75",
+      data: { thresholdPercentage: 75, reportsUsed: 8, reportLimit: 10 },
+    });
+    expect(events).toHaveLength(2);
+    expect(deliveries).toHaveLength(2);
+    expect(deliveries[1]?.destinationId).toBe(42);
   });
 });

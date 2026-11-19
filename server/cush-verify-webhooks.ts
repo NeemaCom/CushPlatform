@@ -41,7 +41,7 @@ const blockedAddresses = new BlockList();
   ["224.0.0.0", 4], ["240.0.0.0", 4],
 ].forEach(([address, prefix]) => blockedAddresses.addSubnet(String(address), Number(prefix), "ipv4"));
 [
-  ["::", 128], ["::1", 128], ["64:ff9b:1::", 48],
+  ["::", 96], ["64:ff9b::", 96], ["64:ff9b:1::", 48],
   ["100::", 64], ["2001::", 23], ["2001:db8::", 32], ["2002::", 16],
   ["fc00::", 7], ["fe80::", 10], ["ff00::", 8],
 ].forEach(([address, prefix]) => blockedAddresses.addSubnet(String(address), Number(prefix), "ipv6"));
@@ -214,6 +214,25 @@ export function classifyCushVerifyWebhookResponse(statusCode: number) {
   };
 }
 
+export function createCushVerifyPinnedWebhookLookup(
+  hostname: string,
+  addresses: Array<{ address: string; family: number }>,
+): LookupFunction {
+  const expectedHostname = normalizeHostname(hostname);
+  return (requestedHostname, options, callback) => {
+    if (normalizeHostname(requestedHostname) !== expectedHostname) {
+      callback(new CushVerifyWebhookError("destination_lookup_mismatch"), "", 0);
+      return;
+    }
+    if (options && typeof options === "object" && "all" in options && options.all) {
+      callback(null, addresses);
+    } else {
+      const address = addresses[0]!;
+      callback(null, address.address, address.family);
+    }
+  };
+}
+
 type WebhookTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function enqueueCushVerifyWebhookEvent(
@@ -230,6 +249,25 @@ export async function enqueueCushVerifyWebhookEvent(
   const environment = input.environment ?? "production";
   const eventId = randomUUID();
   const createdAt = input.createdAt ?? new Date();
+  const destinations = await tx.select({
+    id: cushVerifyWebhookDestinations.id,
+    eventTypes: cushVerifyWebhookDestinations.eventTypes,
+    usageThresholdPercentages: cushVerifyWebhookDestinations.usageThresholdPercentages,
+  })
+    .from(cushVerifyWebhookDestinations)
+    .where(and(
+      eq(cushVerifyWebhookDestinations.institutionId, input.institutionId),
+      eq(cushVerifyWebhookDestinations.environment, environment),
+      eq(cushVerifyWebhookDestinations.status, "active"),
+    ));
+  const threshold = Number(input.data.thresholdPercentage);
+  const eligibleDestinations = destinations.filter((destination) =>
+    destination.eventTypes.includes(input.eventType) &&
+    (input.eventType !== "usage.threshold_reached" ||
+      destination.usageThresholdPercentages.includes(threshold)),
+  );
+  if (!eligibleDestinations.length) return;
+
   const payload = {
     id: eventId,
     type: input.eventType,
@@ -257,24 +295,7 @@ export async function enqueueCushVerifyWebhookEvent(
         .limit(1);
   if (!event) return;
 
-  const destinations = await tx.select({
-    id: cushVerifyWebhookDestinations.id,
-    eventTypes: cushVerifyWebhookDestinations.eventTypes,
-    usageThresholdPercentages: cushVerifyWebhookDestinations.usageThresholdPercentages,
-  })
-    .from(cushVerifyWebhookDestinations)
-    .where(and(
-      eq(cushVerifyWebhookDestinations.institutionId, input.institutionId),
-      eq(cushVerifyWebhookDestinations.environment, environment),
-      eq(cushVerifyWebhookDestinations.status, "active"),
-    ));
-  const threshold = Number(input.data.thresholdPercentage);
-  for (const destination of destinations) {
-    if (!destination.eventTypes.includes(input.eventType)) continue;
-    if (
-      input.eventType === "usage.threshold_reached" &&
-      !destination.usageThresholdPercentages.includes(threshold)
-    ) continue;
+  for (const destination of eligibleDestinations) {
     await tx.insert(cushVerifyWebhookDeliveries).values({
       eventId: event.id,
       destinationId: destination.id,
@@ -314,18 +335,7 @@ function requestPinnedWebhook(
       resolve(result);
     };
     const hostname = normalizeHostname(url.hostname);
-    const lookup: LookupFunction = (requestedHostname, options, callback) => {
-      if (normalizeHostname(requestedHostname) !== hostname) {
-        callback(new CushVerifyWebhookError("destination_lookup_mismatch"), "", 0);
-        return;
-      }
-      if (options && typeof options === "object" && "all" in options && options.all) {
-        callback(null, addresses);
-      } else {
-        const address = addresses[0]!;
-        callback(null, address.address, address.family);
-      }
-    };
+    const lookup = createCushVerifyPinnedWebhookLookup(hostname, addresses);
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signature = buildCushVerifyWebhookSignature(secret, timestamp, rawBody);
     const request = https.request(url, {
@@ -419,6 +429,7 @@ async function deliverOne(input: {
         "event_payload_too_large",
         "webhook_secret_unavailable",
         "webhook_encryption_unavailable",
+        "destination_lookup_mismatch",
       ].includes(code),
     };
   }
@@ -451,7 +462,10 @@ async function deliverOne(input: {
       lastErrorCode: result.errorCode,
       deliveredAt: outcome === "delivered" ? completedAt : null,
       updatedAt: completedAt,
-    }).where(eq(cushVerifyWebhookDeliveries.id, input.deliveryId));
+    }).where(and(
+      eq(cushVerifyWebhookDeliveries.id, input.deliveryId),
+      eq(cushVerifyWebhookDeliveries.status, "processing"),
+    ));
   });
 }
 
@@ -518,14 +532,20 @@ export async function processPendingCushVerifyWebhookDeliveries(limit = 10): Pro
 }
 
 let webhookWorkerStarted = false;
+let webhookWorkerFailureLogged = false;
 export function startCushVerifyWebhookWorkers(): void {
   if (webhookWorkerStarted) return;
   webhookWorkerStarted = true;
   const run = () => {
-    void processPendingCushVerifyWebhookDeliveries().catch((error) => {
-      console.error("Cush Verify webhook delivery worker failed", {
-        errorType: error instanceof Error ? error.name : "UnknownError",
-      });
+    void processPendingCushVerifyWebhookDeliveries().then(() => {
+      webhookWorkerFailureLogged = false;
+    }, (error) => {
+      if (!webhookWorkerFailureLogged) {
+        console.error("Cush Verify webhook delivery worker failed; it will retry", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        webhookWorkerFailureLogged = true;
+      }
     });
   };
   run();

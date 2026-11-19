@@ -21,6 +21,7 @@ export const CUSH_VERIFY_API_ENDPOINTS = [
   "/api/v1/usage",
   "/api/v1/usage/breakdown",
   "/api/v1/webhooks",
+  "/api/v1/webhooks/audit",
   "/api/v1/webhooks/:id",
   "/api/v1/webhooks/:id/deliveries",
   "/api/v1/webhooks/:id/rotate-secret",

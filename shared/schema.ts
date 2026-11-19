@@ -1296,6 +1296,13 @@ export const cushVerifyWebhookDestinations = pgTable("cush_verify_webhook_destin
     sql`(${table.status} = 'active' and ${table.deletedAt} is null)
       or (${table.status} = 'disabled' and ${table.deletedAt} is null)
       or (${table.status} = 'deleted' and ${table.deletedAt} is not null)`),
+  encryptedSecretStateCheck: check("cush_verify_webhook_destinations_encrypted_secret_state_check",
+    sql`(${table.status} = 'deleted' and ${table.secretCiphertext} = ''
+        and ${table.secretIv} = '' and ${table.secretTag} = '')
+      or (${table.status} in ('active', 'disabled') and ${table.secretCiphertext} <> ''
+        and ${table.secretIv} <> '' and ${table.secretTag} <> '')`),
+  idInstitutionUnique: unique("cush_verify_webhook_destinations_id_institution_uq")
+    .on(table.id, table.institutionId),
   institutionEnvironmentStatusIndex: index("cush_verify_webhook_destinations_tenant_status_idx")
     .on(table.institutionId, table.environment, table.status, table.createdAt),
 })).enableRLS();
@@ -1322,16 +1329,16 @@ export const cushVerifyWebhookEvents = pgTable("cush_verify_webhook_events", {
     sql`jsonb_typeof(${table.payload}) = 'object' and octet_length(${table.payload}::text) <= 8192`),
   tenantIdempotencyUnique: unique("cush_verify_webhook_events_tenant_idempotency_uq")
     .on(table.institutionId, table.environment, table.idempotencyKey),
+  idInstitutionUnique: unique("cush_verify_webhook_events_id_institution_uq")
+    .on(table.id, table.institutionId),
   institutionCreatedIndex: index("cush_verify_webhook_events_tenant_created_idx")
     .on(table.institutionId, table.createdAt),
 })).enableRLS();
 
 export const cushVerifyWebhookDeliveries = pgTable("cush_verify_webhook_deliveries", {
   id: serial("id").primaryKey(),
-  eventId: uuid("event_id").notNull()
-    .references(() => cushVerifyWebhookEvents.id, { onDelete: "restrict" }),
-  destinationId: integer("destination_id").notNull()
-    .references(() => cushVerifyWebhookDestinations.id, { onDelete: "restrict" }),
+  eventId: uuid("event_id").notNull(),
+  destinationId: integer("destination_id").notNull(),
   institutionId: integer("institution_id").notNull()
     .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
   status: text("status").$type<"pending" | "processing" | "delivered" | "failed" | "cancelled">()
@@ -1345,6 +1352,16 @@ export const cushVerifyWebhookDeliveries = pgTable("cush_verify_webhook_deliveri
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
+  eventTenantForeignKey: foreignKey({
+    name: "cush_verify_webhook_deliveries_event_tenant_fk",
+    columns: [table.eventId, table.institutionId],
+    foreignColumns: [cushVerifyWebhookEvents.id, cushVerifyWebhookEvents.institutionId],
+  }).onDelete("restrict"),
+  destinationTenantForeignKey: foreignKey({
+    name: "cush_verify_webhook_deliveries_destination_tenant_fk",
+    columns: [table.destinationId, table.institutionId],
+    foreignColumns: [cushVerifyWebhookDestinations.id, cushVerifyWebhookDestinations.institutionId],
+  }).onDelete("restrict"),
   statusCheck: check("cush_verify_webhook_deliveries_status_check",
     sql`${table.status} in ('pending', 'processing', 'delivered', 'failed', 'cancelled')`),
   attemptsCheck: check("cush_verify_webhook_deliveries_attempts_check",

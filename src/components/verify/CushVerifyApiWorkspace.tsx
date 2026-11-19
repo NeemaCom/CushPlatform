@@ -93,6 +93,15 @@ type ApiUsageResponse = {
   }>;
 };
 
+const apiScopeLabels: Record<CushVerifyApiScope, string> = {
+  "passport:discover": "Find Passport profiles",
+  "reports:request": "Request reports",
+  "reports:read": "Retrieve reports",
+  "usage:read": "View usage",
+  "webhooks:manage": "Manage signed webhooks",
+  "sandbox:simulate": "Run sandbox simulations",
+};
+
 async function requestJson<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
@@ -533,7 +542,7 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
                   .map((scope) => (
                     <label key={scope} className="inline-flex items-center gap-2 text-xs text-[#40516d]">
                       <input type="checkbox" checked={selectedScopes.includes(scope)} onChange={() => toggleScope(scope)} className="h-4 w-4 accent-[#3475e7]" />
-                      {scope}
+                      {apiScopeLabels[scope]}
                     </label>
                   ))}
               </div>
@@ -614,7 +623,7 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
                       <td className="px-4 py-3">
                         <p className="font-semibold text-[#243650]">{key.name}</p>
                         <code className="mt-1 block text-[11px] text-[#71819b]">{key.prefix}…</code>
-                        <p className="mt-1 text-[10px] text-[#71819b]">{key.scopes.join(" · ")}</p>
+                        <p className="mt-1 text-[10px] text-[#71819b]">{key.scopes.map((scope) => apiScopeLabels[scope as CushVerifyApiScope] ?? scope).join(" · ")}</p>
                       </td>
                       <td className="px-4 py-3 capitalize">{key.environment}</td>
                       <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${key.status === "active" ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>{key.status}</span></td>
