@@ -1,6 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
-import { and, count, desc, eq, gte, gt, inArray } from "drizzle-orm";
+import { and, count, desc, eq, gte, gt, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
   cushVerifyDiscoverySearches,
@@ -16,6 +16,7 @@ import {
   cushVerifyReportRequestSchema,
   type CushVerifyReportCategory,
 } from "@shared/cush-verify-reports";
+import { cushVerifyApiReportHistoryQuerySchema } from "@shared/cush-verify-api";
 import { isAuthenticated, type AuthenticatedRequest } from "./auth";
 import { cushVerifyDb } from "./db";
 import {
@@ -397,6 +398,301 @@ export function registerCushVerifyReportRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(500).json({ error: "Report request history could not be loaded." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/v1/verify/report-requests/:requestId",
+    requireCushVerifyApiScope("reports:read"),
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const parsedId = z.string().uuid().safeParse(req.params.requestId);
+      if (!parsedId.success) return res.status(404).json({ code: "REQUEST_NOT_FOUND", error: "Report request not found." });
+      try {
+        const actor = await getWorkspaceActor(req);
+        if (!actor || !canManageRequests(actor.role)) {
+          return res.status(403).json({ error: "Your organisation role cannot view report requests." });
+        }
+        const [request] = await cushVerifyDb.select()
+          .from(cushVerifyReportRequests)
+          .where(and(
+            eq(cushVerifyReportRequests.id, parsedId.data),
+            eq(cushVerifyReportRequests.institutionId, actor.institutionId),
+          ))
+          .limit(1);
+        if (!request) return res.status(404).json({ code: "REQUEST_NOT_FOUND", error: "Report request not found." });
+
+        const [consent] = request.targetUserId
+          ? await cushVerifyDb.select()
+              .from(cushVerifyReportConsents)
+              .where(and(
+                eq(cushVerifyReportConsents.requestId, request.id),
+                eq(cushVerifyReportConsents.userId, request.targetUserId),
+              ))
+              .limit(1)
+          : [];
+        const now = new Date();
+        const authorization = checkCushVerifyReportAuthorization({
+          requestInstitutionId: request.institutionId,
+          expectedInstitutionId: actor.institutionId,
+          targetUserId: request.targetUserId,
+          consentUserId: consent?.userId ?? null,
+          requestStatus: request.status,
+          consentStatus: consent?.status ?? null,
+          requestedCategories: request.requestedCategories,
+          approvedCategories: consent?.approvedCategories ?? [],
+          requestExpiresAt: request.requestExpiresAt,
+          authorizationExpiresAt: request.authorizationExpiresAt,
+          consentExpiresAt: consent?.expiresAt ?? null,
+          now,
+        });
+        const deliveries = authorization.allowed
+          ? await cushVerifyDb.select({
+              id: cushVerifyReportDeliveries.id,
+              categories: cushVerifyReportDeliveries.categories,
+              deliveredAt: cushVerifyReportDeliveries.deliveredAt,
+            }).from(cushVerifyReportDeliveries)
+              .where(eq(cushVerifyReportDeliveries.requestId, request.id))
+              .orderBy(desc(cushVerifyReportDeliveries.deliveredAt))
+              .limit(100)
+          : [];
+        const currentStatus = effectiveStatus(request, now);
+        return res.json({
+          request: {
+            id: request.id,
+            status: currentStatus,
+            purpose: request.purpose,
+            recipientLabel: request.recipientLabel,
+            requestedCategories: request.requestedCategories,
+            requestedAuthorizationDays: request.requestedAuthorizationDays,
+            requestExpiresAt: request.requestExpiresAt.toISOString(),
+            authorizationExpiresAt: request.authorizationExpiresAt?.toISOString() ?? null,
+            createdAt: request.createdAt.toISOString(),
+            updatedAt: request.updatedAt.toISOString(),
+          },
+          consent: {
+            status: consent?.status ?? "pending",
+            approvedCategories: authorization.allowed ? authorization.categories : [],
+            approvedAt: consent?.approvedAt?.toISOString() ?? null,
+            expiresAt: consent?.expiresAt?.toISOString() ?? null,
+            accessAvailable: authorization.allowed,
+          },
+          reports: authorization.allowed
+            ? deliveries.map((delivery) => ({
+                id: String(delivery.id),
+                categories: delivery.categories,
+                deliveredAt: delivery.deliveredAt.toISOString(),
+              }))
+            : [],
+        });
+      } catch (error) {
+        if (reportSchemaUnavailable(error, res)) return;
+        console.error("Cush Verify report request status lookup failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ code: "REQUEST_STATUS_UNAVAILABLE", error: "Report request status is temporarily unavailable." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/v1/reports",
+    requireCushVerifyApiScope("reports:read"),
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const parsed = cushVerifyApiReportHistoryQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({ code: "INVALID_QUERY", error: "Choose a valid report-history date range and page." });
+      }
+      try {
+        const actor = await getWorkspaceActor(req);
+        if (!actor || !canManageRequests(actor.role)) {
+          return res.status(403).json({ error: "Your organisation role cannot view reports." });
+        }
+        const now = new Date();
+        const to = parsed.data.to ? new Date(parsed.data.to) : now;
+        const from = parsed.data.from
+          ? new Date(parsed.data.from)
+          : parsed.data.to
+            ? new Date(to.getTime() - 90 * DAY_MS)
+            : new Date(now.getTime() - 30 * DAY_MS);
+        const rows = await cushVerifyDb.select({
+          id: cushVerifyReportDeliveries.id,
+          requestId: cushVerifyReportRequests.id,
+          purpose: cushVerifyReportRequests.purpose,
+          categories: cushVerifyReportDeliveries.categories,
+          deliveredAt: cushVerifyReportDeliveries.deliveredAt,
+          authorizationExpiresAt: cushVerifyReportRequests.authorizationExpiresAt,
+          consentExpiresAt: cushVerifyReportConsents.expiresAt,
+        }).from(cushVerifyReportDeliveries)
+          .innerJoin(
+            cushVerifyReportRequests,
+            eq(cushVerifyReportRequests.id, cushVerifyReportDeliveries.requestId),
+          )
+          .innerJoin(
+            cushVerifyReportConsents,
+            and(
+              eq(cushVerifyReportConsents.requestId, cushVerifyReportRequests.id),
+              eq(cushVerifyReportConsents.userId, cushVerifyReportRequests.targetUserId),
+            ),
+          )
+          .where(and(
+            eq(cushVerifyReportRequests.institutionId, actor.institutionId),
+            eq(cushVerifyReportRequests.status, "authorized"),
+            eq(cushVerifyReportConsents.status, "approved"),
+            gt(cushVerifyReportRequests.authorizationExpiresAt, now),
+            gt(cushVerifyReportConsents.expiresAt, now),
+            gte(cushVerifyReportDeliveries.deliveredAt, from),
+            lte(cushVerifyReportDeliveries.deliveredAt, to),
+          ))
+          .orderBy(desc(cushVerifyReportDeliveries.deliveredAt), desc(cushVerifyReportDeliveries.id))
+          .offset(parsed.data.offset)
+          .limit(parsed.data.limit + 1);
+        const hasMore = rows.length > parsed.data.limit;
+        return res.json({
+          range: { from: from.toISOString(), to: to.toISOString() },
+          page: { limit: parsed.data.limit, offset: parsed.data.offset, hasMore },
+          reports: rows.slice(0, parsed.data.limit).map((row) => ({
+            id: String(row.id),
+            requestId: row.requestId,
+            purpose: row.purpose,
+            categories: row.categories,
+            deliveredAt: row.deliveredAt.toISOString(),
+            authorizationExpiresAt: row.authorizationExpiresAt?.toISOString() ?? null,
+            consentExpiresAt: row.consentExpiresAt?.toISOString() ?? null,
+            consentReference: row.requestId,
+            accessAvailable: true,
+          })),
+        });
+      } catch (error) {
+        if (reportSchemaUnavailable(error, res)) return;
+        console.error("Cush Verify report history query failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ code: "REPORT_HISTORY_UNAVAILABLE", error: "Report history is temporarily unavailable." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/v1/reports/:reportId",
+    requireCushVerifyApiScope("reports:read"),
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const reportId = Number(req.params.reportId);
+      if (!Number.isSafeInteger(reportId) || reportId <= 0) {
+        return res.status(404).json({ code: "REPORT_NOT_FOUND", error: "Report not found." });
+      }
+      try {
+        const actor = await getWorkspaceActor(req);
+        if (!actor || !canManageRequests(actor.role)) {
+          return res.status(403).json({ error: "Your organisation role cannot retrieve reports." });
+        }
+        const [stored] = await cushVerifyDb.select({
+          delivery: cushVerifyReportDeliveries,
+          request: cushVerifyReportRequests,
+        }).from(cushVerifyReportDeliveries)
+          .innerJoin(
+            cushVerifyReportRequests,
+            eq(cushVerifyReportRequests.id, cushVerifyReportDeliveries.requestId),
+          )
+          .where(and(
+            eq(cushVerifyReportDeliveries.id, reportId),
+            eq(cushVerifyReportRequests.institutionId, actor.institutionId),
+          ))
+          .limit(1);
+        if (!stored) return res.status(404).json({ code: "REPORT_NOT_FOUND", error: "Report not found." });
+        const request = stored.request;
+        const [consent] = request.targetUserId
+          ? await cushVerifyDb.select()
+              .from(cushVerifyReportConsents)
+              .where(and(
+                eq(cushVerifyReportConsents.requestId, request.id),
+                eq(cushVerifyReportConsents.userId, request.targetUserId),
+              ))
+              .limit(1)
+          : [];
+        const now = new Date();
+        const authorization = checkCushVerifyReportAuthorization({
+          requestInstitutionId: request.institutionId,
+          expectedInstitutionId: actor.institutionId,
+          targetUserId: request.targetUserId,
+          consentUserId: consent?.userId ?? null,
+          requestStatus: request.status,
+          consentStatus: consent?.status ?? null,
+          requestedCategories: request.requestedCategories,
+          approvedCategories: consent?.approvedCategories ?? [],
+          requestExpiresAt: request.requestExpiresAt,
+          authorizationExpiresAt: request.authorizationExpiresAt,
+          consentExpiresAt: consent?.expiresAt ?? null,
+          now,
+        });
+        if (!authorization.allowed || !request.targetUserId) {
+          return res.status(403).json({ code: "CONSENT_REQUIRED", error: "Current consent is not available for this report." });
+        }
+        const categories = stored.delivery.categories as CushVerifyReportCategory[];
+        if (!isCategorySubset(categories, authorization.categories)) {
+          return res.status(403).json({ code: "CONSENT_SCOPE_CHANGED", error: "Current consent does not cover this report." });
+        }
+        const passportData = await getConsentBoundPassportReportData(request.targetUserId, categories);
+        const report = buildCushVerifyReport(
+          passportData.assessment.calculation,
+          categories,
+          now,
+          passportData.assessment,
+          passportData.financialRecords.map((record) => ({
+            recordType: record.recordType,
+            activityDate: record.activityDate,
+            countryCode: record.countryCode,
+            currencyCode: record.currencyCode,
+            evidenceStatus: record.evidenceStatus,
+            details: record.details,
+          })),
+        );
+        if (getCushVerifyReportDigest(report) !== stored.delivery.reportDigest) {
+          return res.status(410).json({
+            code: "REPORT_SNAPSHOT_UNAVAILABLE",
+            error: "This historical report snapshot is no longer available. Request a fresh report; it will be charged only if successfully delivered.",
+          });
+        }
+        await cushVerifyDb.insert(cushVerifyReportEvents).values({
+          requestId: request.id,
+          eventType: "report_accessed",
+          actorType: "institutional_user",
+          actorInstitutionalUserId: actor.institutionalUserId,
+          details: {
+            reportDeliveryId: reportId,
+            reportDigest: stored.delivery.reportDigest,
+            categories,
+          },
+          createdAt: now,
+        });
+        return res.json({
+          report,
+          delivery: {
+            id: String(stored.delivery.id),
+            deliveredAt: stored.delivery.deliveredAt.toISOString(),
+            consentReference: request.id,
+            authorizationExpiresAt: request.authorizationExpiresAt?.toISOString() ?? null,
+            billing: { charged: false, type: "none", reason: "previously_delivered" },
+          },
+        });
+      } catch (error) {
+        if (isV2SchemaMissing(error)) {
+          return res.status(503).json({
+            code: "CUSH_VERIFY_REPORT_DATA_UNAVAILABLE",
+            error: "The data needed to retrieve this report is not available right now.",
+          });
+        }
+        if (reportSchemaUnavailable(error, res)) return;
+        console.error("Cush Verify report retrieval failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ code: "REPORT_RETRIEVAL_UNAVAILABLE", error: "Report retrieval is temporarily unavailable." });
       }
     },
   );

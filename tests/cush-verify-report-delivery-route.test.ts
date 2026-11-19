@@ -13,6 +13,7 @@ const {
 } = vi.hoisted(() => ({
   database: {
     select: vi.fn(),
+    insert: vi.fn(),
     transaction: vi.fn(),
   },
   getWorkspaceState: vi.fn(),
@@ -91,9 +92,14 @@ const requestRow = {
   institutionId: 41,
   targetUserId: 73,
   status: "authorized",
+  recipientLabel: "te***t@example.org",
+  purpose: "Test the institutional report retrieval workflow.",
   requestExpiresAt: new Date(Date.now() + 86_400_000),
   authorizationExpiresAt: new Date(Date.now() + 86_400_000),
   requestedCategories: ["score_summary"],
+  requestedAuthorizationDays: 30,
+  createdAt: new Date(Date.now() - 60_000),
+  updatedAt: new Date(Date.now() - 30_000),
 };
 
 const consentRow = {
@@ -105,7 +111,16 @@ const consentRow = {
   approvedAt: new Date(Date.now() - 1_000),
 };
 
-let deliveryRows: Array<{ id: number; deliveredAt: Date; requestId: string; reportDigest: string }>;
+let deliveryRows: Array<{
+  id: number;
+  deliveredAt: Date;
+  requestId: string;
+  reportDigest: string;
+  categories: string[];
+  purpose: string;
+  authorizationExpiresAt: Date;
+  consentExpiresAt: Date;
+}>;
 let reportEvents: Array<Record<string, unknown>>;
 let reportDebits: number[];
 let creditBalance: number;
@@ -116,14 +131,28 @@ let failReportEventInsert: boolean;
 let apiUsageBillableCount: number;
 let apiUsageBillableUpdates: boolean[];
 
-function selectBuilder() {
+function selectBuilder(initialSelection?: unknown) {
   let selectedTable: unknown;
+  let selection: unknown = initialSelection;
   const builder: any = {
+    select(fields?: unknown) {
+      selection = fields;
+      return builder;
+    },
     from(table: unknown) {
       selectedTable = table;
       return builder;
     },
+    innerJoin() {
+      return builder;
+    },
     where() {
+      return builder;
+    },
+    orderBy() {
+      return builder;
+    },
+    offset() {
       return builder;
     },
     for() {
@@ -132,12 +161,20 @@ function selectBuilder() {
     async limit() {
       if (selectedTable === cushVerifyReportRequests) return [requestRow];
       if (selectedTable === cushVerifyReportConsents) return [consentRow];
+      if (
+        selectedTable === cushVerifyReportDeliveries &&
+        selection && typeof selection === "object" &&
+        "delivery" in selection && "request" in selection
+      ) {
+        const delivery = deliveryRows[0];
+        return delivery ? [{ delivery, request: requestRow }] : [];
+      }
       if (selectedTable === cushVerifyReportDeliveries && latestDeliveryInsert) {
         const delivery = deliveryRows.find((row) =>
           row.requestId === latestDeliveryInsert?.requestId &&
           row.reportDigest === latestDeliveryInsert?.reportDigest,
         );
-        if (delivery) return [{ id: delivery.id, deliveredAt: delivery.deliveredAt }];
+        if (delivery) return [delivery];
       }
       return [];
     },
@@ -171,6 +208,12 @@ function createTransaction() {
             deliveredAt: deliveryDate,
             requestId: request,
             reportDigest: digest,
+            categories: Array.isArray(insertedValues.categories)
+              ? insertedValues.categories as string[]
+              : ["score_summary"],
+            purpose: requestRow.purpose,
+            authorizationExpiresAt: requestRow.authorizationExpiresAt,
+            consentExpiresAt: consentRow.expiresAt,
           };
           deliveryRows.push(delivery);
           return [{ id: delivery.id, deliveredAt: delivery.deliveredAt }];
@@ -284,13 +327,86 @@ async function invokeApiDeliveryRoute() {
   return res;
 }
 
+async function invokeReportRetrievalRoute(reportId = 100, institutionId = 41) {
+  getWorkspaceState.mockResolvedValueOnce({
+    institutionId,
+    institutionalUserId: 92,
+    membershipStatus: "active",
+    institutionStatus: "approved",
+    applicationStatus: "approved",
+    role: "organisation_admin",
+  });
+  const { app, routes } = createApp();
+  registerCushVerifyReportRoutes(app);
+  const route = routes.find(({ path }) => path === "/api/v1/reports/:reportId");
+  if (!route) throw new Error("Versioned report retrieval route was not registered.");
+  const req = {
+    params: { reportId: String(reportId) },
+    cushVerifyInstitutionalUserId: 92,
+    cushVerifyApiContext: {
+      apiKeyId: 8,
+      institutionId,
+      createdByInstitutionalUserId: 92,
+      usageId: 15,
+      environment: "production",
+      scopes: ["reports:read"],
+      apiLimits: null,
+      overageConfigured: false,
+      periodStartAt: new Date(deliveryDate.getTime() - 86_400_000),
+    },
+  } as any;
+  const res = createResponse();
+  await route.handlers.at(-1)!(req, res);
+  return res;
+}
+
+async function invokeRequestStatusRoute() {
+  const { app, routes } = createApp();
+  registerCushVerifyReportRoutes(app);
+  const route = routes.find(({ path }) => path === "/api/v1/verify/report-requests/:requestId");
+  if (!route) throw new Error("Versioned report request status route was not registered.");
+  const res = createResponse();
+  await route.handlers.at(-1)!({
+    params: { requestId },
+    cushVerifyInstitutionalUserId: 92,
+  } as any, res);
+  return res;
+}
+
+async function invokeReportHistoryRoute(query: Record<string, unknown> = {}) {
+  getWorkspaceState.mockResolvedValueOnce({
+    institutionId: 41,
+    institutionalUserId: 92,
+    membershipStatus: "active",
+    institutionStatus: "approved",
+    applicationStatus: "approved",
+    role: "organisation_admin",
+  });
+  const { app, routes } = createApp();
+  registerCushVerifyReportRoutes(app);
+  const route = routes.find(({ path }) => path === "/api/v1/reports");
+  if (!route) throw new Error("Versioned report history route was not registered.");
+  const res = createResponse();
+  await route.handlers.at(-1)!({
+    query,
+    cushVerifyInstitutionalUserId: 92,
+  } as any, res);
+  return res;
+}
+
 describe("Cush Verify report delivery route billing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     reportEvents = [];
     nextDeliveryId = 100;
 
-    database.select.mockImplementation(() => selectBuilder());
+    database.select.mockImplementation((selection?: unknown) => selectBuilder(selection));
+    database.insert.mockImplementation((table: unknown) => ({
+      values: async (values: Record<string, unknown>) => {
+        if (table === cushVerifyReportEvents) reportEvents.push(values);
+        return undefined;
+      },
+    }));
     database.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
       const previousDeliveries = [...deliveryRows];
       const previousEvents = [...reportEvents];
@@ -316,6 +432,7 @@ describe("Cush Verify report delivery route billing", () => {
       institutionName: "Test Institution",
       tradingName: null,
     });
+    consentRow.status = "approved";
     getPassportReportData.mockResolvedValue({
       assessment: { calculation: {} },
       financialRecords: [],
@@ -380,6 +497,103 @@ describe("Cush Verify report delivery route billing", () => {
     expect(reportDebits).toHaveLength(1);
     expect(apiUsageBillableUpdates).toEqual([true]);
     expect(apiUsageBillableCount).toBe(1);
+  });
+
+  it("retrieves an unchanged prior report without another credit debit", async () => {
+    await invokeApiDeliveryRoute();
+    const response = await invokeReportRetrievalRoute();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload.report).toEqual(reportContent);
+    expect(response.payload.delivery).toMatchObject({
+      id: "100",
+      billing: { charged: false, type: "none", reason: "previously_delivered" },
+    });
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
+    expect(reportEvents.map((event) => event.eventType)).toContain("report_accessed");
+  });
+
+  it("returns per-request consent and delivery status without financial report data", async () => {
+    await invokeApiDeliveryRoute();
+    const response = await invokeRequestStatusRoute();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload).toMatchObject({
+      request: { id: requestId, status: "authorized", purpose: requestRow.purpose },
+      consent: { status: "approved", approvedCategories: ["score_summary"], accessAvailable: true },
+      reports: [{ id: "100", categories: ["score_summary"] }],
+    });
+    expect(JSON.stringify(response.payload)).not.toContain("financialRecords");
+    expect(JSON.stringify(response.payload)).not.toContain("scoreSummary");
+  });
+
+  it("does not reveal delivered report references in status after consent is revoked", async () => {
+    await invokeApiDeliveryRoute();
+    consentRow.status = "revoked";
+    const response = await invokeRequestStatusRoute();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload.consent).toMatchObject({ status: "revoked", accessAvailable: false });
+    expect(response.payload.reports).toEqual([]);
+  });
+
+  it("lists authorized report metadata with bounded pagination", async () => {
+    await invokeApiDeliveryRoute();
+    const response = await invokeReportHistoryRoute();
+
+    expect(response.statusCode).toBe(200);
+    expect(response.payload.page).toMatchObject({ limit: 20, offset: 0, hasMore: false });
+    expect(response.payload.reports).toMatchObject([{
+      id: "100",
+      requestId,
+      purpose: requestRow.purpose,
+      categories: ["score_summary"],
+      consentReference: requestId,
+      accessAvailable: true,
+    }]);
+    expect(JSON.stringify(response.payload)).not.toContain("scoreSummary");
+  });
+
+  it("rejects an out-of-range report-history page before querying reports", async () => {
+    const response = await invokeReportHistoryRoute({ limit: "101" });
+    expect(response.statusCode).toBe(400);
+    expect(response.payload).toMatchObject({ code: "INVALID_QUERY" });
+  });
+
+  it("denies report history retrieval after consent is revoked", async () => {
+    await invokeApiDeliveryRoute();
+    consentRow.status = "revoked";
+
+    const response = await invokeReportRetrievalRoute();
+
+    expect(response.statusCode).toBe(403);
+    expect(response.payload).toMatchObject({ code: "CONSENT_REQUIRED" });
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not return another institution's report", async () => {
+    await invokeApiDeliveryRoute();
+
+    const response = await invokeReportRetrievalRoute(100, 99);
+
+    expect(response.statusCode).toBe(403);
+    expect(response.payload).toMatchObject({ code: "CONSENT_REQUIRED" });
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not serve a changed profile under an old report reference", async () => {
+    await invokeApiDeliveryRoute();
+    reportContent = {
+      generatedAt: deliveryDate.toISOString(),
+      reportingPeriod: { start: null, end: null },
+      categories: { scoreSummary: { score: 701 } },
+    };
+
+    const response = await invokeReportRetrievalRoute();
+
+    expect(response.statusCode).toBe(410);
+    expect(response.payload).toMatchObject({ code: "REPORT_SNAPSHOT_UNAVAILABLE" });
+    expect(recordReportCreditUse).toHaveBeenCalledTimes(1);
   });
 
   it("blocks a new API report after the configured monthly limit when overage is unavailable", async () => {

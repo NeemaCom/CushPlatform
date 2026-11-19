@@ -244,6 +244,11 @@ function safeEndpoint(path: string): string {
 
 export function requiredCushVerifyApiScopeForRequest(req: Request): CushVerifyApiScope | null {
   const path = req.originalUrl.split("?", 1)[0];
+  if (path === "/api/v1/sandbox/usage" && req.method === "GET") return "sandbox:simulate";
+  if (
+    (path === "/api/v1/usage" || path === "/api/v1/usage/breakdown") &&
+    req.method === "GET"
+  ) return "usage:read";
   if (path.startsWith("/api/v1/sandbox/")) {
     return "sandbox:simulate";
   }
@@ -251,7 +256,10 @@ export function requiredCushVerifyApiScopeForRequest(req: Request): CushVerifyAp
   if (path.endsWith("/report-requests") && req.method === "POST") return "reports:request";
   if (
     (path.endsWith("/report-requests") && req.method === "GET") ||
-    (/\/report-requests\/[^/]+\/deliver$/.test(path) && req.method === "POST")
+    (/\/report-requests\/[^/]+$/.test(path) && req.method === "GET") ||
+    (/\/report-requests\/[^/]+\/deliver$/.test(path) && req.method === "POST") ||
+    (path === "/api/v1/reports" && req.method === "GET") ||
+    (/\/api\/v1\/reports\/\d+$/.test(path) && req.method === "GET")
   ) return "reports:read";
   return null;
 }

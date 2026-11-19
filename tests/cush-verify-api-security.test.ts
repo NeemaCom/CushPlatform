@@ -11,6 +11,8 @@ import { cushVerifyPricingApiLimitsSchema } from "@shared/cush-verify-pricing";
 import {
   createCushVerifyApiAccessRequestSchema,
   decideCushVerifyApiAccessRequestSchema,
+  cushVerifyApiPublicUsageQuerySchema,
+  cushVerifyApiReportHistoryQuerySchema,
 } from "@shared/cush-verify-api";
 
 describe("Cush Verify API credential handling", () => {
@@ -91,7 +93,7 @@ describe("Cush Verify configured API limits", () => {
 });
 
 describe("Cush Verify API scope enforcement", () => {
-  function invokeScope(scope: "passport:discover" | "reports:request" | "reports:read" | "sandbox:simulate", apiScopes?: string[]) {
+  function invokeScope(scope: "passport:discover" | "reports:request" | "reports:read" | "usage:read" | "sandbox:simulate", apiScopes?: string[]) {
     let nextCalled = false;
     let responseStatus = 200;
     let responseBody: unknown;
@@ -141,6 +143,56 @@ describe("Cush Verify API scope enforcement", () => {
     ]) {
       expect(requiredCushVerifyApiScopeForRequest({ originalUrl, method: "POST" } as never)).toBe("sandbox:simulate");
     }
+    expect(requiredCushVerifyApiScopeForRequest({
+      originalUrl: "/api/v1/sandbox/usage",
+      method: "GET",
+    } as never)).toBe("sandbox:simulate");
+  });
+
+  it("requires separate usage and report-read scopes for versioned resources", () => {
+    expect(requiredCushVerifyApiScopeForRequest({
+      originalUrl: "/api/v1/usage",
+      method: "GET",
+    } as never)).toBe("usage:read");
+    expect(requiredCushVerifyApiScopeForRequest({
+      originalUrl: "/api/v1/usage/breakdown",
+      method: "GET",
+    } as never)).toBe("usage:read");
+    expect(requiredCushVerifyApiScopeForRequest({
+      originalUrl: "/api/v1/verify/report-requests/b70fa5c4-0f68-4cc8-b7b7-2f4db5af59a1",
+      method: "GET",
+    } as never)).toBe("reports:read");
+    expect(requiredCushVerifyApiScopeForRequest({
+      originalUrl: "/api/v1/reports/17",
+      method: "GET",
+    } as never)).toBe("reports:read");
+    expect(invokeScope("usage:read", ["reports:read"])).toMatchObject({
+      nextCalled: false,
+      responseStatus: 403,
+    });
+    expect(invokeScope("usage:read", ["usage:read"])).toMatchObject({
+      nextCalled: true,
+      responseStatus: 200,
+    });
+  });
+});
+
+describe("Cush Verify versioned API query validation", () => {
+  it("provides bounded report-history pagination defaults", () => {
+    expect(cushVerifyApiReportHistoryQuerySchema.parse({})).toEqual({
+      limit: 20,
+      offset: 0,
+    });
+    expect(cushVerifyApiReportHistoryQuerySchema.safeParse({ limit: "101" }).success).toBe(false);
+    expect(cushVerifyApiReportHistoryQuerySchema.safeParse({ offset: "-1" }).success).toBe(false);
+  });
+
+  it("rejects overlong usage ranges and client-selected environments", () => {
+    expect(cushVerifyApiPublicUsageQuerySchema.safeParse({
+      from: "2026-01-01T00:00:00.000Z",
+      to: "2026-04-15T00:00:00.000Z",
+    }).success).toBe(false);
+    expect(cushVerifyApiPublicUsageQuerySchema.safeParse({ environment: "production" }).success).toBe(false);
   });
 });
 

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../server/db", () => ({ cushVerifyDb: {} }));
+const { database } = vi.hoisted(() => ({
+  database: { select: vi.fn() },
+}));
+
+vi.mock("../server/db", () => ({ cushVerifyDb: database }));
 vi.mock("../server/cush-verify-institutional-routes", () => ({
   getInstitutionalWorkspaceState: vi.fn(),
   isInstitutionalAuthenticated: vi.fn(),
@@ -15,6 +19,11 @@ vi.mock("../server/cush-verify-api-key-service", () => ({
 
 import type { Express } from "express";
 import { registerCushVerifyApiRoutes } from "../server/cush-verify-api-routes";
+import {
+  cushVerifyApiUsage,
+  cushVerifyBillingAccounts,
+  cushVerifySubscriptions,
+} from "@shared/schema";
 
 type Handler = (...args: any[]) => unknown;
 type Route = { method: "get" | "post" | "put"; path: string; handlers: Handler[] };
@@ -50,17 +59,59 @@ function response() {
   };
 }
 
-async function invoke(method: Route["method"], path: string, body?: unknown) {
+function createUsageQueryBuilder() {
+  let table: unknown;
+  const builder: any = {
+    from(value: unknown) {
+      table = value;
+      return builder;
+    },
+    where() {
+      return builder;
+    },
+    orderBy() {
+      return builder;
+    },
+    async limit() {
+      if (table === cushVerifyBillingAccounts) {
+        return [{
+          availableCredits: 8,
+          currentPeriodUsed: 2,
+          currentPeriodStartAt: new Date("2026-11-01T00:00:00.000Z"),
+          currentPeriodEndAt: new Date("2026-12-01T00:00:00.000Z"),
+        }];
+      }
+      if (table === cushVerifySubscriptions) {
+        return [{
+          includedReports: 10,
+          currentPeriodStartAt: new Date("2026-11-01T00:00:00.000Z"),
+          currentPeriodEndAt: new Date("2026-12-01T00:00:00.000Z"),
+        }];
+      }
+      return [];
+    },
+    then(resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) {
+      const rows = table === cushVerifyApiUsage
+        ? [{ total: 7, successful: 5, failed: 2, rateLimited: 1, reportsConsumed: 1 }]
+        : [];
+      return Promise.resolve(rows).then(resolve, reject);
+    },
+  };
+  return builder;
+}
+
+async function invoke(method: Route["method"], path: string, body?: unknown, context?: unknown) {
   const route = routes.find((item) => item.method === method && item.path === path);
   if (!route) throw new Error(`Sandbox route ${method} ${path} was not registered.`);
   const res = response();
-  await route.handlers.at(-1)!({ body }, res);
+  await route.handlers.at(-1)!({ body, query: {}, cushVerifyApiContext: context }, res);
   return res;
 }
 
 describe("Cush Verify API sandbox", () => {
   beforeEach(() => {
     routes.length = 0;
+    database.select.mockImplementation(() => createUsageQueryBuilder());
     registerCushVerifyApiRoutes(buildApp());
   });
 
@@ -71,6 +122,39 @@ describe("Cush Verify API sandbox", () => {
       environment: "sandbox",
       liveData: false,
       reportCreditsUsed: 0,
+    });
+  });
+
+  it("registers the versioned usage summary for the sandbox key", () => {
+    expect(routes.some((route) => route.method === "get" && route.path === "/api/v1/sandbox/usage")).toBe(true);
+  });
+
+  it("returns sandbox usage without exposing production credit balances", async () => {
+    const result = await invoke("get", "/api/v1/sandbox/usage", undefined, {
+      institutionId: 31,
+      environment: "sandbox",
+    });
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({
+      environment: "sandbox",
+      summary: { totalRequests: 7, successfulRequests: 5, failedRequests: 2, reportsConsumed: 1 },
+      credits: null,
+    });
+  });
+
+  it("returns production allocation and remaining credits only for the API key's institution", async () => {
+    const result = await invoke("get", "/api/v1/usage", undefined, {
+      institutionId: 31,
+      environment: "production",
+    });
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toMatchObject({
+      environment: "production",
+      credits: {
+        allocatedThisPeriod: 10,
+        remaining: 8,
+        usedThisPeriod: 2,
+      },
     });
   });
 

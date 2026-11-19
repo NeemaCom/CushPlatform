@@ -12,12 +12,14 @@ import {
   cushVerifyBillingAccounts,
   cushVerifyInstitutionalUsers,
   cushVerifyInstitutions,
+  cushVerifySubscriptions,
 } from "@shared/schema";
 import {
   CUSH_VERIFY_API_SCOPES,
   createCushVerifyApiAccessRequestSchema,
   createCushVerifyApiKeySchema,
   decideCushVerifyApiAccessRequestSchema,
+  cushVerifyApiPublicUsageQuerySchema,
   cushVerifyApiUsageQuerySchema,
 } from "@shared/cush-verify-api";
 import {
@@ -936,6 +938,133 @@ export function registerCushVerifyApiRoutes(app: Express): void {
       }
     },
   );
+
+  async function sendVersionedUsage(
+    req: InstitutionalRequest,
+    res: Response,
+    environment: "production" | "sandbox",
+    breakdown: boolean,
+  ) {
+    const parsed = cushVerifyApiPublicUsageQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({ code: "INVALID_QUERY", error: "Choose a valid usage date range and page." });
+    }
+    const apiContext = req.cushVerifyApiContext;
+    if (!apiContext || apiContext.environment !== environment) {
+      return res.status(403).json({ code: "API_ENVIRONMENT_MISMATCH", error: "This key cannot access that usage environment." });
+    }
+    if (parsed.data.apiKeyId && environment === "sandbox") {
+      return res.status(400).json({ code: "INVALID_QUERY", error: "Sandbox usage cannot be filtered by production key." });
+    }
+    try {
+      const now = new Date();
+      const [account] = environment === "production"
+        ? await db.select({
+            availableCredits: cushVerifyBillingAccounts.availableCredits,
+            currentPeriodUsed: cushVerifyBillingAccounts.currentPeriodUsed,
+            currentPeriodStartAt: cushVerifyBillingAccounts.currentPeriodStartAt,
+            currentPeriodEndAt: cushVerifyBillingAccounts.currentPeriodEndAt,
+          }).from(cushVerifyBillingAccounts)
+            .where(eq(cushVerifyBillingAccounts.institutionId, apiContext.institutionId))
+            .limit(1)
+        : [];
+      const [subscription] = environment === "production"
+        ? await db.select({
+            includedReports: cushVerifySubscriptions.includedReports,
+            currentPeriodStartAt: cushVerifySubscriptions.currentPeriodStartAt,
+            currentPeriodEndAt: cushVerifySubscriptions.currentPeriodEndAt,
+          }).from(cushVerifySubscriptions)
+            .where(and(
+              eq(cushVerifySubscriptions.institutionId, apiContext.institutionId),
+              sql`${cushVerifySubscriptions.status} in ('active', 'trialing')`,
+            ))
+            .orderBy(desc(cushVerifySubscriptions.updatedAt))
+            .limit(1)
+        : [];
+      const to = parsed.data.to ? new Date(parsed.data.to) : now;
+      const from = parsed.data.from
+        ? new Date(parsed.data.from)
+        : parsed.data.to
+          ? new Date(to.getTime() - 90 * 24 * 60 * 60 * 1000)
+          : account?.currentPeriodStartAt ?? subscription?.currentPeriodStartAt ?? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const filters: SQL[] = [
+        eq(cushVerifyApiUsage.institutionId, apiContext.institutionId),
+        eq(cushVerifyApiUsage.environment, environment),
+        gte(cushVerifyApiUsage.createdAt, from),
+        lte(cushVerifyApiUsage.createdAt, to),
+      ];
+      if (parsed.data.apiKeyId) filters.push(eq(cushVerifyApiUsage.apiKeyId, parsed.data.apiKeyId));
+      if (parsed.data.endpoint) filters.push(eq(cushVerifyApiUsage.endpoint, parsed.data.endpoint));
+      const where = and(...filters);
+
+      if (breakdown) {
+        const groupedDay = sql<string>`date_trunc('day', ${cushVerifyApiUsage.createdAt})`.mapWith(String);
+        const rows = await db.select({
+          day: groupedDay,
+          endpoint: cushVerifyApiUsage.endpoint,
+          apiKeyId: cushVerifyApiUsage.apiKeyId,
+          total: count(),
+          successful: sql<number>`count(*) filter (where ${cushVerifyApiUsage.responseStatus} between 200 and 399)`.mapWith(Number),
+          failed: sql<number>`count(*) filter (where ${cushVerifyApiUsage.responseStatus} >= 400)`.mapWith(Number),
+          reportsBilled: sql<number>`count(*) filter (where ${cushVerifyApiUsage.billableReport})`.mapWith(Number),
+        }).from(cushVerifyApiUsage)
+          .where(where)
+          .groupBy(groupedDay, cushVerifyApiUsage.endpoint, cushVerifyApiUsage.apiKeyId)
+          .orderBy(desc(groupedDay))
+          .offset(parsed.data.offset)
+          .limit(parsed.data.limit + 1);
+        const hasMore = rows.length > parsed.data.limit;
+        return res.json({
+          environment,
+          range: { from: from.toISOString(), to: to.toISOString() },
+          page: { limit: parsed.data.limit, offset: parsed.data.offset, hasMore },
+          breakdown: rows.slice(0, parsed.data.limit),
+        });
+      }
+
+      const [summary] = await db.select({
+        total: count(),
+        successful: sql<number>`count(*) filter (where ${cushVerifyApiUsage.responseStatus} between 200 and 399)`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${cushVerifyApiUsage.responseStatus} >= 400)`.mapWith(Number),
+        rateLimited: sql<number>`count(*) filter (where ${cushVerifyApiUsage.responseStatus} = 429)`.mapWith(Number),
+        reportsConsumed: sql<number>`count(*) filter (where ${cushVerifyApiUsage.billableReport})`.mapWith(Number),
+      }).from(cushVerifyApiUsage).where(where);
+      return res.json({
+        environment,
+        range: { from: from.toISOString(), to: to.toISOString() },
+        summary: {
+          totalRequests: summary?.total ?? 0,
+          successfulRequests: summary?.successful ?? 0,
+          failedRequests: summary?.failed ?? 0,
+          rateLimitedRequests: summary?.rateLimited ?? 0,
+          reportsConsumed: summary?.reportsConsumed ?? 0,
+        },
+        credits: environment === "production"
+          ? {
+              allocatedThisPeriod: subscription?.includedReports ?? 0,
+              remaining: account?.availableCredits ?? 0,
+              usedThisPeriod: account?.currentPeriodUsed ?? 0,
+              periodStartAt: account?.currentPeriodStartAt?.toISOString() ?? subscription?.currentPeriodStartAt?.toISOString() ?? null,
+              periodEndAt: account?.currentPeriodEndAt?.toISOString() ?? subscription?.currentPeriodEndAt?.toISOString() ?? null,
+            }
+          : null,
+      });
+    } catch (error) {
+      console.error("Cush Verify versioned API usage query failed", {
+        environment,
+        breakdown,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
+      return res.status(503).json({ code: "USAGE_UNAVAILABLE", error: "API usage is temporarily unavailable." });
+    }
+  }
+
+  app.get("/api/v1/usage", requireCushVerifyApiScope("usage:read"), (req: InstitutionalRequest, res) =>
+    sendVersionedUsage(req, res, "production", false));
+  app.get("/api/v1/usage/breakdown", requireCushVerifyApiScope("usage:read"), (req: InstitutionalRequest, res) =>
+    sendVersionedUsage(req, res, "production", true));
+  app.get("/api/v1/sandbox/usage", requireCushVerifyApiScope("sandbox:simulate"), (req: InstitutionalRequest, res) =>
+    sendVersionedUsage(req, res, "sandbox", false));
 
   app.get("/api/v1/sandbox/status", requireCushVerifyApiScope("sandbox:simulate"), (_req, res) => {
     return res.json({
