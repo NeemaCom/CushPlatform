@@ -99,6 +99,9 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
   const [environment, setEnvironment] = useState<CushVerifyApiKeyEnvironment>("sandbox");
   const [selectedScopes, setSelectedScopes] = useState<CushVerifyApiScope[]>(["sandbox:simulate", "passport:discover", "reports:request", "reports:read"]);
   const [oneTimeSecret, setOneTimeSecret] = useState("");
+  const [oneTimeEnvironment, setOneTimeEnvironment] = useState<CushVerifyApiKeyEnvironment | null>(null);
+  const [sandboxTestBusy, setSandboxTestBusy] = useState(false);
+  const [sandboxTestMessage, setSandboxTestMessage] = useState("");
   const [error, setError] = useState("");
   const [busyKey, setBusyKey] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
@@ -142,6 +145,8 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
   async function createKey() {
     setError("");
     setOneTimeSecret("");
+    setOneTimeEnvironment(null);
+    setSandboxTestMessage("");
     try {
       const result = await requestJson<{ key: string }>("/api/verify/api-keys", "POST", {
         name,
@@ -149,6 +154,7 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
         scopes: selectedScopes.filter((scope) => environment === "sandbox" ? scope === "sandbox:simulate" : scope !== "sandbox:simulate"),
       });
       setOneTimeSecret(result.key);
+      setOneTimeEnvironment(environment);
       setName("");
       await refresh();
     } catch (caught) {
@@ -175,9 +181,12 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
     setBusyKey(key.id);
     setError("");
     setOneTimeSecret("");
+    setOneTimeEnvironment(null);
+    setSandboxTestMessage("");
     try {
       const result = await requestJson<{ key: string }>(`/api/verify/api-keys/${key.id}/rotate`, "POST", {});
       setOneTimeSecret(result.key);
+      setOneTimeEnvironment(key.environment);
       await refresh();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The API key could not be rotated.");
@@ -193,6 +202,62 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
       setError("Clipboard access was blocked. Select and copy the key manually.");
+    }
+  }
+
+  async function runSandboxKeyTest() {
+    if (!oneTimeSecret || oneTimeEnvironment !== "sandbox") return;
+    setSandboxTestBusy(true);
+    setSandboxTestMessage("");
+    const headers = { Authorization: `Bearer ${oneTimeSecret}` };
+
+    try {
+      const statusResponse = await fetch(`${apiOrigin}/sandbox/status`, {
+        method: "GET",
+        credentials: "omit",
+        cache: "no-store",
+        headers,
+      });
+      const status = await statusResponse.json().catch(() => ({})) as {
+        environment?: string;
+        liveData?: boolean;
+        reportCreditsUsed?: number;
+      };
+      if (!statusResponse.ok) {
+        throw new Error(`Sandbox status check failed (${statusResponse.status}).`);
+      }
+
+      const workflowResponse = await fetch(`${apiOrigin}/sandbox/report-workflow`, {
+        method: "POST",
+        credentials: "omit",
+        cache: "no-store",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ scenario: "authorized" }),
+      });
+      const workflow = await workflowResponse.json().catch(() => ({})) as {
+        environment?: string;
+        simulated?: boolean;
+        status?: string;
+        creditsUsed?: number;
+      };
+      if (!workflowResponse.ok) {
+        throw new Error(`Simulated report check failed (${workflowResponse.status}).`);
+      }
+
+      const statusIsSafe = status.environment === "sandbox" && status.liveData === false && status.reportCreditsUsed === 0;
+      const workflowIsSafe = workflow.environment === "sandbox"
+        && workflow.simulated === true
+        && workflow.status === "authorized"
+        && workflow.creditsUsed === 0;
+      if (!statusIsSafe || !workflowIsSafe) {
+        throw new Error("The sandbox returned an unexpected result; no report credit should be used.");
+      }
+
+      setSandboxTestMessage("Sandbox key works. The simulated authorized flow used 0 report credits.");
+    } catch (caught) {
+      setSandboxTestMessage(caught instanceof Error ? caught.message : "The sandbox key test could not be completed.");
+    } finally {
+      setSandboxTestBusy(false);
     }
   }
 
@@ -327,8 +392,34 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
                     <button type="button" onClick={() => void copySecret()} className="inline-flex items-center gap-2 rounded-lg bg-emerald-800 px-3 py-2 text-xs font-semibold text-white">
                       {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}{copied ? "Copied" : "Copy key"}
                     </button>
-                    <button type="button" onClick={() => setOneTimeSecret("")} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-900"><XCircle className="h-3.5 w-3.5" /> Hide secret</button>
+                    {oneTimeEnvironment === "sandbox" && (
+                      <button
+                        type="button"
+                        onClick={() => void runSandboxKeyTest()}
+                        disabled={sandboxTestBusy}
+                        className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-950 disabled:opacity-60"
+                      >
+                        {sandboxTestBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+                        {sandboxTestBusy ? "Testing sandbox…" : "Test sandbox key"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOneTimeSecret("");
+                        setOneTimeEnvironment(null);
+                        setSandboxTestMessage("");
+                      }}
+                      className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 px-3 py-2 text-xs font-semibold text-emerald-900"
+                    >
+                      <XCircle className="h-3.5 w-3.5" /> Hide secret
+                    </button>
                   </div>
+                  {sandboxTestMessage && (
+                    <p role="status" className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-medium text-emerald-950">
+                      {sandboxTestMessage}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
