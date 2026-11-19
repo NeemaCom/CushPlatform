@@ -93,7 +93,7 @@ describe("Cush Verify configured API limits", () => {
 });
 
 describe("Cush Verify API scope enforcement", () => {
-  function invokeScope(scope: "passport:discover" | "reports:request" | "reports:read" | "usage:read" | "sandbox:simulate", apiScopes?: string[]) {
+  function invokeScope(scope: "passport:discover" | "reports:request" | "reports:read" | "usage:read" | "webhooks:manage" | "sandbox:simulate", apiScopes?: string[]) {
     let nextCalled = false;
     let responseStatus = 200;
     let responseBody: unknown;
@@ -171,6 +171,26 @@ describe("Cush Verify API scope enforcement", () => {
       responseStatus: 403,
     });
     expect(invokeScope("usage:read", ["usage:read"])).toMatchObject({
+      nextCalled: true,
+      responseStatus: 200,
+    });
+  });
+
+  it("requires the webhook-management permission for all versioned webhook routes", () => {
+    for (const [originalUrl, method] of [
+      ["/api/v1/webhooks", "GET"],
+      ["/api/v1/webhooks", "POST"],
+      ["/api/v1/webhooks/7", "PATCH"],
+      ["/api/v1/webhooks/7/deliveries", "GET"],
+      ["/api/v1/webhooks/7/rotate-secret", "POST"],
+    ]) {
+      expect(requiredCushVerifyApiScopeForRequest({ originalUrl, method } as never)).toBe("webhooks:manage");
+    }
+    expect(invokeScope("webhooks:manage", ["reports:read"])).toMatchObject({
+      nextCalled: false,
+      responseStatus: 403,
+    });
+    expect(invokeScope("webhooks:manage", ["webhooks:manage"])).toMatchObject({
       nextCalled: true,
       responseStatus: 200,
     });

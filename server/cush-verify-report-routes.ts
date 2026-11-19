@@ -47,6 +47,7 @@ import {
   refreshBillingSubscriptionStatus,
   recordReportCreditUse,
 } from "./cush-verify-billing-service";
+import { enqueueCushVerifyWebhookEvent } from "./cush-verify-webhooks";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const REQUEST_TTL_MS = 14 * DAY_MS;
@@ -309,6 +310,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
               categories: parsed.data.categories,
               requestedAuthorizationDays: parsed.data.authorizationDays,
             },
+            createdAt: now,
+          });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: actor.institutionId,
+            eventType: "report.requested",
+            idempotencyKey: `report-request:${requestId}`,
+            data: { requestId, status: "awaiting_consent" },
             createdAt: now,
           });
         });
@@ -659,17 +667,26 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             error: "This historical report snapshot is no longer available. Request a fresh report; it will be charged only if successfully delivered.",
           });
         }
-        await cushVerifyDb.insert(cushVerifyReportEvents).values({
-          requestId: request.id,
-          eventType: "report_accessed",
-          actorType: "institutional_user",
-          actorInstitutionalUserId: actor.institutionalUserId,
-          details: {
-            reportDeliveryId: reportId,
-            reportDigest: stored.delivery.reportDigest,
-            categories,
-          },
-          createdAt: now,
+        await cushVerifyDb.transaction(async (tx) => {
+          await tx.insert(cushVerifyReportEvents).values({
+            requestId: request.id,
+            eventType: "report_accessed",
+            actorType: "institutional_user",
+            actorInstitutionalUserId: actor.institutionalUserId,
+            details: {
+              reportDeliveryId: reportId,
+              reportDigest: stored.delivery.reportDigest,
+              categories,
+            },
+            createdAt: now,
+          });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: actor.institutionId,
+            eventType: "report.accessed",
+            idempotencyKey: `report-access:${randomUUID()}`,
+            data: { requestId: request.id, reportDeliveryId: reportId, status: "accessed" },
+            createdAt: now,
+          });
         });
         return res.json({
           report,
@@ -781,6 +798,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             details: {},
             createdAt: now,
           });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: request.institutionId,
+            eventType: "request.linked",
+            idempotencyKey: `request-linked:${request.id}:${passportUser.id}`,
+            data: { requestId: request.id, status: "awaiting_consent" },
+            createdAt: now,
+          });
           return "linked" as const;
         });
         if (result === "not_found") {
@@ -856,6 +880,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
               details: { categories: decision.categories, authorizationDays: decision.authorizationDays },
               createdAt: now,
             });
+            await enqueueCushVerifyWebhookEvent(tx, {
+              institutionId: request.institutionId,
+              eventType: "consent.approved",
+              idempotencyKey: `consent-decision:${request.id}:approved`,
+              data: { requestId: request.id, status: "authorized" },
+              createdAt: now,
+            });
             return { status: 200 as const, decision: "approved" as const };
           }
 
@@ -879,6 +910,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             actorType: "passport_user",
             actorUserId: req.userId!,
             details: {},
+            createdAt: now,
+          });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: request.institutionId,
+            eventType: "consent.declined",
+            idempotencyKey: `consent-decision:${request.id}:declined`,
+            data: { requestId: request.id, status: "declined" },
             createdAt: now,
           });
           return { status: 200 as const, decision: "declined" as const };
@@ -947,6 +985,13 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             actorType: "passport_user",
             actorUserId: req.userId!,
             details: {},
+            createdAt: now,
+          });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: request.institutionId,
+            eventType: "consent.revoked",
+            idempotencyKey: `consent-revoked:${requestId}`,
+            data: { requestId, status: "revoked" },
             createdAt: now,
           });
           return "revoked" as const;
@@ -1158,6 +1203,55 @@ export function registerCushVerifyReportRoutes(app: Express): void {
             actorInstitutionalUserId: actor.institutionalUserId,
             details: { reportDigest, categories: reportCategories },
           });
+          await enqueueCushVerifyWebhookEvent(tx, {
+            institutionId: actor.institutionId,
+            environment: apiContext?.environment ?? "production",
+            eventType: inserted ? "report.delivered" : "report.accessed",
+            idempotencyKey: inserted
+              ? `report-delivery:${existing.id}`
+              : `report-access:${randomUUID()}`,
+            data: {
+              requestId,
+              reportDeliveryId: existing.id,
+              status: inserted ? "delivered" : "accessed",
+            },
+            createdAt: now,
+          });
+          if (
+            inserted &&
+            billing.charged &&
+            apiContext?.apiLimits?.monthlyReportLimit &&
+            apiContext.apiLimits.monthlyReportLimit > 0
+          ) {
+            const [periodUsage] = await tx.select({ used: count() })
+              .from(cushVerifyApiUsage)
+              .where(and(
+                eq(cushVerifyApiUsage.institutionId, actor.institutionId),
+                eq(cushVerifyApiUsage.environment, apiContext.environment),
+                eq(cushVerifyApiUsage.billableReport, true),
+                gte(cushVerifyApiUsage.createdAt, apiContext.periodStartAt),
+              ));
+            const reportsUsed = Number(periodUsage?.used ?? 0);
+            const reportLimit = apiContext.apiLimits.monthlyReportLimit;
+            for (const thresholdPercentage of [5, 10, 20, 25, 50, 75, 80, 90, 95, 100]) {
+              const thresholdCount = Math.ceil(reportLimit * thresholdPercentage / 100);
+              if (reportsUsed < thresholdCount) continue;
+              await enqueueCushVerifyWebhookEvent(tx, {
+                institutionId: actor.institutionId,
+                environment: apiContext.environment,
+                eventType: "usage.threshold_reached",
+                idempotencyKey: `usage-threshold:${apiContext.environment}:${apiContext.periodStartAt.toISOString()}:${thresholdPercentage}`,
+                data: {
+                  metric: "monthly_reports",
+                  thresholdPercentage,
+                  reportsUsed,
+                  reportLimit,
+                  periodStartAt: apiContext.periodStartAt.toISOString(),
+                },
+                createdAt: now,
+              });
+            }
+          }
           return { ...existing, denied: false as const, newDeliveryEvent: Boolean(inserted), billing };
         });
 

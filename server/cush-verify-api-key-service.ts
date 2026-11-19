@@ -249,6 +249,9 @@ export function requiredCushVerifyApiScopeForRequest(req: Request): CushVerifyAp
     (path === "/api/v1/usage" || path === "/api/v1/usage/breakdown") &&
     req.method === "GET"
   ) return "usage:read";
+  if (path === "/api/v1/webhooks" || path.startsWith("/api/v1/webhooks/")) {
+    return "webhooks:manage";
+  }
   if (path.startsWith("/api/v1/sandbox/")) {
     return "sandbox:simulate";
   }

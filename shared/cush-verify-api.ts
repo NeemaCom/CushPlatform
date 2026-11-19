@@ -7,6 +7,7 @@ export const CUSH_VERIFY_API_SCOPES = [
   "reports:request",
   "reports:read",
   "usage:read",
+  "webhooks:manage",
   "sandbox:simulate",
 ] as const;
 
@@ -19,6 +20,10 @@ export const CUSH_VERIFY_API_ENDPOINTS = [
   "/api/v1/reports/:id",
   "/api/v1/usage",
   "/api/v1/usage/breakdown",
+  "/api/v1/webhooks",
+  "/api/v1/webhooks/:id",
+  "/api/v1/webhooks/:id/deliveries",
+  "/api/v1/webhooks/:id/rotate-secret",
   "/api/v1/sandbox/status",
   "/api/v1/sandbox/discovery",
   "/api/v1/sandbox/report-workflow",

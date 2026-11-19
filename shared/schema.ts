@@ -1259,6 +1259,155 @@ export const cushVerifyApiKeyEvents = pgTable("cush_verify_api_key_events", {
     .on(table.institutionId, table.createdAt),
 })).enableRLS();
 
+export const cushVerifyWebhookDestinations = pgTable("cush_verify_webhook_destinations", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  createdByInstitutionalUserId: integer("created_by_institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  environment: text("environment").$type<CushVerifyApiEnvironment>().notNull(),
+  eventTypes: text("event_types").array().$type<string[]>().notNull(),
+  usageThresholdPercentages: integer("usage_threshold_percentages").array().notNull().default([]),
+  secretCiphertext: text("secret_ciphertext").notNull(),
+  secretIv: text("secret_iv").notNull(),
+  secretTag: text("secret_tag").notNull(),
+  status: text("status").$type<"active" | "disabled" | "deleted">().notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  nameCheck: check("cush_verify_webhook_destinations_name_check",
+    sql`char_length(btrim(${table.name})) between 1 and 80`),
+  urlCheck: check("cush_verify_webhook_destinations_url_check",
+    sql`${table.url} ~ '^https://' and char_length(${table.url}) <= 2048`),
+  environmentCheck: check("cush_verify_webhook_destinations_environment_check",
+    sql`${table.environment} in ('sandbox', 'production')`),
+  eventTypesCheck: check("cush_verify_webhook_destinations_event_types_check",
+    sql`cardinality(${table.eventTypes}) between 1 and 8
+      and ${table.eventTypes} <@ ARRAY['report.requested', 'request.linked', 'consent.approved',
+        'consent.declined', 'consent.revoked', 'report.delivered', 'report.accessed',
+        'usage.threshold_reached']::text[]`),
+  usageThresholdsCheck: check("cush_verify_webhook_destinations_thresholds_check",
+    sql`cardinality(${table.usageThresholdPercentages}) <= 10
+      and ${table.usageThresholdPercentages} <@ ARRAY[5,10,20,25,50,75,80,90,95,100]::integer[]`),
+  statusCheck: check("cush_verify_webhook_destinations_status_check",
+    sql`(${table.status} = 'active' and ${table.deletedAt} is null)
+      or (${table.status} = 'disabled' and ${table.deletedAt} is null)
+      or (${table.status} = 'deleted' and ${table.deletedAt} is not null)`),
+  institutionEnvironmentStatusIndex: index("cush_verify_webhook_destinations_tenant_status_idx")
+    .on(table.institutionId, table.environment, table.status, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyWebhookEvents = pgTable("cush_verify_webhook_events", {
+  id: uuid("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  environment: text("environment").$type<CushVerifyApiEnvironment>().notNull(),
+  eventType: text("event_type").notNull(),
+  idempotencyKey: text("idempotency_key").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  environmentCheck: check("cush_verify_webhook_events_environment_check",
+    sql`${table.environment} in ('sandbox', 'production')`),
+  eventTypeCheck: check("cush_verify_webhook_events_type_check",
+    sql`${table.eventType} in ('report.requested', 'request.linked', 'consent.approved',
+      'consent.declined', 'consent.revoked', 'report.delivered', 'report.accessed',
+      'usage.threshold_reached')`),
+  idempotencyCheck: check("cush_verify_webhook_events_idempotency_check",
+    sql`char_length(${table.idempotencyKey}) between 1 and 180`),
+  payloadObjectCheck: check("cush_verify_webhook_events_payload_check",
+    sql`jsonb_typeof(${table.payload}) = 'object' and octet_length(${table.payload}::text) <= 8192`),
+  tenantIdempotencyUnique: unique("cush_verify_webhook_events_tenant_idempotency_uq")
+    .on(table.institutionId, table.environment, table.idempotencyKey),
+  institutionCreatedIndex: index("cush_verify_webhook_events_tenant_created_idx")
+    .on(table.institutionId, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyWebhookDeliveries = pgTable("cush_verify_webhook_deliveries", {
+  id: serial("id").primaryKey(),
+  eventId: uuid("event_id").notNull()
+    .references(() => cushVerifyWebhookEvents.id, { onDelete: "restrict" }),
+  destinationId: integer("destination_id").notNull()
+    .references(() => cushVerifyWebhookDestinations.id, { onDelete: "restrict" }),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  status: text("status").$type<"pending" | "processing" | "delivered" | "failed" | "cancelled">()
+    .notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  lockedUntil: timestamp("locked_until", { withTimezone: true, mode: "date" }),
+  lastStatusCode: integer("last_status_code"),
+  lastErrorCode: text("last_error_code"),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  statusCheck: check("cush_verify_webhook_deliveries_status_check",
+    sql`${table.status} in ('pending', 'processing', 'delivered', 'failed', 'cancelled')`),
+  attemptsCheck: check("cush_verify_webhook_deliveries_attempts_check",
+    sql`${table.attemptCount} between 0 and 8`),
+  responseStatusCheck: check("cush_verify_webhook_deliveries_response_status_check",
+    sql`${table.lastStatusCode} is null or ${table.lastStatusCode} between 100 and 599`),
+  deliveredTimestampCheck: check("cush_verify_webhook_deliveries_delivered_at_check",
+    sql`(${table.status} = 'delivered' and ${table.deliveredAt} is not null)
+      or (${table.status} <> 'delivered' and ${table.deliveredAt} is null)`),
+  eventDestinationUnique: unique("cush_verify_webhook_deliveries_event_destination_uq")
+    .on(table.eventId, table.destinationId),
+  queueIndex: index("cush_verify_webhook_deliveries_queue_idx")
+    .on(table.status, table.nextAttemptAt, table.lockedUntil),
+  tenantCreatedIndex: index("cush_verify_webhook_deliveries_tenant_created_idx")
+    .on(table.institutionId, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyWebhookDeliveryAttempts = pgTable("cush_verify_webhook_delivery_attempts", {
+  id: serial("id").primaryKey(),
+  deliveryId: integer("delivery_id").notNull()
+    .references(() => cushVerifyWebhookDeliveries.id, { onDelete: "cascade" }),
+  attemptNumber: integer("attempt_number").notNull(),
+  outcome: text("outcome").$type<"processing" | "delivered" | "retrying" | "failed">()
+    .notNull().default("processing"),
+  responseStatus: integer("response_status"),
+  errorCode: text("error_code"),
+  durationMs: integer("duration_ms"),
+  startedAt: timestamp("started_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  attemptNumberCheck: check("cush_verify_webhook_delivery_attempts_number_check",
+    sql`${table.attemptNumber} between 1 and 8`),
+  outcomeCheck: check("cush_verify_webhook_delivery_attempts_outcome_check",
+    sql`${table.outcome} in ('processing', 'delivered', 'retrying', 'failed')`),
+  responseStatusCheck: check("cush_verify_webhook_delivery_attempts_status_check",
+    sql`${table.responseStatus} is null or ${table.responseStatus} between 100 and 599`),
+  durationCheck: check("cush_verify_webhook_delivery_attempts_duration_check",
+    sql`${table.durationMs} is null or ${table.durationMs} >= 0`),
+  uniqueDeliveryAttempt: unique("cush_verify_webhook_delivery_attempts_delivery_number_uq")
+    .on(table.deliveryId, table.attemptNumber),
+})).enableRLS();
+
+export const cushVerifyWebhookAuditEvents = pgTable("cush_verify_webhook_audit_events", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  destinationId: integer("destination_id")
+    .references(() => cushVerifyWebhookDestinations.id, { onDelete: "set null" }),
+  actorInstitutionalUserId: integer("actor_institutional_user_id")
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "set null" }),
+  eventType: text("event_type").$type<"created" | "updated" | "disabled" | "deleted" | "secret_rotated">()
+    .notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  eventTypeCheck: check("cush_verify_webhook_audit_events_type_check",
+    sql`${table.eventType} in ('created', 'updated', 'disabled', 'deleted', 'secret_rotated')`),
+  detailsObjectCheck: check("cush_verify_webhook_audit_events_details_check",
+    sql`jsonb_typeof(${table.details}) = 'object'`),
+  tenantCreatedIndex: index("cush_verify_webhook_audit_events_tenant_created_idx")
+    .on(table.institutionId, table.createdAt),
+})).enableRLS();
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true, createdAt: true, updatedAt: true,
 });
