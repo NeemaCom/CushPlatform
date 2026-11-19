@@ -3,6 +3,7 @@ import type { Express, NextFunction, Request, Response } from "express";
 import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import {
   cushVerifyApiKeys,
+  cushVerifyApiAccessRequests,
   cushVerifyApiUsage,
   cushVerifyInstitutions,
   cushVerifyInstitutionalUsers,
@@ -37,7 +38,34 @@ export type ProductionApiAccess = {
   apiLimits: CushVerifyApiRequestContext["apiLimits"];
   overageConfigured: boolean;
   periodStartAt: Date;
+  requestStatus: "submitted" | "approved" | "rejected" | null;
+  requestSubmittedAt: Date | null;
+  requestReviewedAt: Date | null;
+  decisionNote: string | null;
 };
+
+export function resolveProductionApiAccessEntitlement(
+  planIncludesApi: boolean,
+  requestStatus: ProductionApiAccess["requestStatus"],
+): { enabled: boolean; reason: string | null } {
+  if (!planIncludesApi) {
+    return {
+      enabled: false,
+      reason: "Your current subscription does not include production API access.",
+    };
+  }
+  if (requestStatus !== "approved") {
+    return {
+      enabled: false,
+      reason: requestStatus === "submitted"
+        ? "Your production API access request is awaiting Cush review."
+        : requestStatus === "rejected"
+          ? "Your production API access request was not approved. You may submit a new request."
+          : "Submit a production API access request to enable production keys.",
+    };
+  }
+  return { enabled: true, reason: null };
+}
 
 export type CushVerifyApiLimitUsage = {
   requestsInMinute: number;
@@ -101,6 +129,24 @@ export function mintCushVerifyApiKey(environment: CushVerifyApiKeyEnvironment) {
 }
 
 export async function getProductionApiAccess(institutionId: number): Promise<ProductionApiAccess> {
+  const [latestRequest] = await db.select({
+    status: cushVerifyApiAccessRequests.status,
+    createdAt: cushVerifyApiAccessRequests.createdAt,
+    reviewedAt: cushVerifyApiAccessRequests.reviewedAt,
+    decisionNote: cushVerifyApiAccessRequests.decisionNote,
+  })
+    .from(cushVerifyApiAccessRequests)
+    .where(eq(cushVerifyApiAccessRequests.institutionId, institutionId))
+    .orderBy(desc(cushVerifyApiAccessRequests.createdAt))
+    .limit(1);
+
+  const requestSummary = {
+    requestStatus: latestRequest?.status ?? null,
+    requestSubmittedAt: latestRequest?.createdAt ?? null,
+    requestReviewedAt: latestRequest?.reviewedAt ?? null,
+    decisionNote: latestRequest?.decisionNote ?? null,
+  };
+
   const [subscription] = await db.select()
     .from(cushVerifySubscriptions)
     .where(and(
@@ -116,6 +162,7 @@ export async function getProductionApiAccess(institutionId: number): Promise<Pro
       apiLimits: null,
       overageConfigured: false,
       periodStartAt: new Date(),
+      ...requestSummary,
     };
   }
 
@@ -138,16 +185,26 @@ export async function getProductionApiAccess(institutionId: number): Promise<Pro
       apiLimits: null,
       overageConfigured: false,
       periodStartAt: subscription.currentPeriodStartAt,
+      ...requestSummary,
+    };
+  }
+  const entitlement = resolveProductionApiAccessEntitlement(flags.data.apiAccess, latestRequest?.status ?? null);
+  if (!entitlement.enabled) {
+    return {
+      enabled: false,
+      reason: entitlement.reason,
+      apiLimits: limits.data,
+      overageConfigured: subscription.additionalReportPriceMinor !== null,
+      periodStartAt: subscription.currentPeriodStartAt,
+      ...requestSummary,
     };
   }
   return {
-    enabled: flags.data.apiAccess,
-    reason: flags.data.apiAccess
-      ? null
-      : "Your current subscription does not include production API access.",
+    ...entitlement,
     apiLimits: limits.data,
     overageConfigured: subscription.additionalReportPriceMinor !== null,
     periodStartAt: subscription.currentPeriodStartAt,
+    ...requestSummary,
   };
 }
 

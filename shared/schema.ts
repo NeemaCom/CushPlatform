@@ -1015,6 +1015,92 @@ export const cushVerifyBillingOutbox = pgTable("cush_verify_billing_outbox", {
 export type CushVerifyApiEnvironment = "sandbox" | "production";
 export type CushVerifyApiKeyStatus = "active" | "revoked";
 export type CushVerifyApiUsageStatus = "processing" | "completed";
+export type CushVerifyApiAccessRequestStatus = "submitted" | "approved" | "rejected";
+
+export const cushVerifyApiAccessRequests = pgTable("cush_verify_api_access_requests", {
+  id: serial("id").primaryKey(),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  requestedByInstitutionalUserId: integer("requested_by_institutional_user_id").notNull()
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  intendedUse: text("intended_use").notNull(),
+  estimatedMonthlyRequests: integer("estimated_monthly_requests"),
+  status: text("status").$type<CushVerifyApiAccessRequestStatus>().notNull().default("submitted"),
+  reviewedByAdminUserId: integer("reviewed_by_admin_user_id"),
+  decisionNote: text("decision_note"),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+}, (table) => ({
+  statusCheck: check(
+    "cush_verify_api_access_requests_status_check",
+    sql`${table.status} in ('submitted', 'approved', 'rejected')`,
+  ),
+  intendedUseCheck: check(
+    "cush_verify_api_access_requests_intended_use_check",
+    sql`char_length(btrim(${table.intendedUse})) between 10 and 1200`,
+  ),
+  estimatedMonthlyRequestsCheck: check(
+    "cush_verify_api_access_requests_estimated_monthly_check",
+    sql`${table.estimatedMonthlyRequests} is null or ${table.estimatedMonthlyRequests} between 0 and 10000000`,
+  ),
+  decisionNoteCheck: check(
+    "cush_verify_api_access_requests_decision_note_check",
+    sql`${table.decisionNote} is null or char_length(btrim(${table.decisionNote})) between 1 and 1200`,
+  ),
+  decisionActorTimestampCheck: check(
+    "cush_verify_api_access_requests_decision_actor_timestamp_check",
+    sql`(${table.status} = 'submitted' and ${table.reviewedByAdminUserId} is null and ${table.reviewedAt} is null)
+      or (${table.status} in ('approved', 'rejected') and ${table.reviewedByAdminUserId} is not null and ${table.reviewedAt} is not null)`,
+  ),
+  rejectedDecisionNoteCheck: check(
+    "cush_verify_api_access_requests_rejection_note_check",
+    sql`${table.status} <> 'rejected' or ${table.decisionNote} is not null`,
+  ),
+  oneSubmittedRequestPerInstitution: uniqueIndex("cush_verify_api_access_requests_one_submitted_per_institution_idx")
+    .on(table.institutionId)
+    .where(sql`${table.status} = 'submitted'`),
+  institutionCreatedIndex: index("cush_verify_api_access_requests_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+  statusCreatedIndex: index("cush_verify_api_access_requests_status_created_idx")
+    .on(table.status, table.createdAt),
+})).enableRLS();
+
+export const cushVerifyApiAccessRequestEvents = pgTable("cush_verify_api_access_request_events", {
+  id: serial("id").primaryKey(),
+  requestId: integer("request_id").notNull()
+    .references(() => cushVerifyApiAccessRequests.id, { onDelete: "restrict" }),
+  institutionId: integer("institution_id").notNull()
+    .references(() => cushVerifyInstitutions.id, { onDelete: "restrict" }),
+  actorType: text("actor_type").$type<"organisation_admin" | "cush_admin">().notNull(),
+  actorInstitutionalUserId: integer("actor_institutional_user_id")
+    .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
+  actorCushUserId: integer("actor_cush_user_id"),
+  eventType: text("event_type").$type<"submitted" | "approved" | "rejected">().notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  actorTypeCheck: check(
+    "cush_verify_api_access_request_events_actor_type_check",
+    sql`${table.actorType} in ('organisation_admin', 'cush_admin')`,
+  ),
+  actorIdentityCheck: check(
+    "cush_verify_api_access_request_events_actor_identity_check",
+    sql`(${table.actorType} = 'organisation_admin' and ${table.actorInstitutionalUserId} is not null and ${table.actorCushUserId} is null)
+      or (${table.actorType} = 'cush_admin' and ${table.actorInstitutionalUserId} is null and ${table.actorCushUserId} is not null)`,
+  ),
+  eventTypeCheck: check(
+    "cush_verify_api_access_request_events_type_check",
+    sql`${table.eventType} in ('submitted', 'approved', 'rejected')`,
+  ),
+  detailsObjectCheck: check(
+    "cush_verify_api_access_request_events_details_check",
+    sql`jsonb_typeof(${table.details}) = 'object'`,
+  ),
+  institutionCreatedIndex: index("cush_verify_api_access_request_events_institution_created_idx")
+    .on(table.institutionId, table.createdAt),
+  requestCreatedIndex: index("cush_verify_api_access_request_events_request_created_idx")
+    .on(table.requestId, table.createdAt),
+})).enableRLS();
 
 export const cushVerifyApiKeys = pgTable("cush_verify_api_keys", {
   id: serial("id").primaryKey(),

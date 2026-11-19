@@ -19,8 +19,8 @@ const readiness = [
   },
   {
     number: "03",
-    title: "Plan-based production access",
-    text: "Production keys require an active subscription whose published plan includes API access and limits.",
+    title: "Reviewed, plan-based access",
+    text: "Production keys require Cush approval of an API access request and an active subscription whose published plan includes API access and limits.",
     icon: Code2,
   },
 ];
@@ -40,7 +40,7 @@ export default function CushVerifyApi() {
               Integrate with care. <span className="text-[#79aaff]">Consent comes first.</span>
             </h1>
             <p className="mt-6 max-w-2xl text-base leading-7 text-blue-100/75 sm:text-lg">
-              Cush Verify’s institutional API is in controlled rollout. Production requests are designed to enforce organisation approval, individual consent, category scope, expiry, and report-credit rules.
+              Cush Verify’s institutional API is in controlled rollout. Production requests are designed to enforce organisation approval, Cush review of API access, individual consent, category scope, expiry, and report-credit rules.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/verify/login" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#3475e7] px-5 text-sm font-semibold text-white transition hover:bg-[#4b89f3] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-300">
@@ -63,7 +63,7 @@ export default function CushVerifyApi() {
               </div>
             </div>
             <p className="mt-5 border-t border-white/10 pt-5 text-sm leading-6 text-blue-100/75">
-              The institutional workspace includes separate sandbox and production key controls. Full key values are shown once and only hashes are stored. Production access stays disabled unless the organisation is approved and its active plan enables API access.
+              The institutional workspace includes separate sandbox and production key controls. Full key values are shown once and only hashes are stored. Production access requires an approved organisation, an approved API access request, and an active plan that includes API access.
             </p>
             <p className="mt-4 rounded-xl bg-[#0c1830]/70 px-4 py-3 text-xs leading-5 text-blue-100/70">
               Sandbox workflows use synthetic outcomes only. They do not query Passport, send consent emails, or change report credits. Staging verification is required before these integrations are presented as ready for live use.
@@ -155,7 +155,7 @@ export default function CushVerifyApi() {
               <div>
                 <h2 className="font-serif text-2xl tracking-[-0.035em] text-[#12213d]">A note on availability</h2>
                 <p className="mt-3 text-sm leading-6 text-[#52627b]">
-                  Published plan details describe available features and limits. Creating an institutional enquiry does not activate an account, create a subscription, or grant production API access. Production keys are available only when the organisation and its active plan meet the server-side checks.
+                  Published plan details describe available features and limits. Creating an institutional enquiry does not activate an account, create a subscription, or grant production API access. Production keys require an approved organisation, Cush approval of an API access request, and an active subscription whose plan includes API access.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm font-semibold">
                   <Link href="/verify/pricing" className="text-[#275fb7] hover:underline">Published pricing</Link>

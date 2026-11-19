@@ -4,9 +4,14 @@ import {
   mintCushVerifyApiKey,
   parseCushVerifyApiKey,
   requireCushVerifyApiScope,
+  resolveProductionApiAccessEntitlement,
   requiredCushVerifyApiScopeForRequest,
 } from "../server/cush-verify-api-key-service";
 import { cushVerifyPricingApiLimitsSchema } from "@shared/cush-verify-pricing";
+import {
+  createCushVerifyApiAccessRequestSchema,
+  decideCushVerifyApiAccessRequestSchema,
+} from "@shared/cush-verify-api";
 
 describe("Cush Verify API credential handling", () => {
   it.each(["sandbox", "production"] as const)("mints a %s key with a verifiable prefix and hash", (environment) => {
@@ -136,6 +141,57 @@ describe("Cush Verify API scope enforcement", () => {
     ]) {
       expect(requiredCushVerifyApiScopeForRequest({ originalUrl, method: "POST" } as never)).toBe("sandbox:simulate");
     }
+  });
+});
+
+describe("Cush Verify production API access approval gate", () => {
+  it("does not enable API access from Cush approval alone when the plan excludes API", () => {
+    expect(resolveProductionApiAccessEntitlement(false, "approved")).toEqual({
+      enabled: false,
+      reason: "Your current subscription does not include production API access.",
+    });
+  });
+
+  it.each([
+    [null, "Submit a production API access request to enable production keys."],
+    ["submitted", "Your production API access request is awaiting Cush review."],
+    ["rejected", "Your production API access request was not approved. You may submit a new request."],
+  ] as const)("keeps production API disabled when the plan includes API but request status is %s", (status, reason) => {
+    expect(resolveProductionApiAccessEntitlement(true, status)).toEqual({ enabled: false, reason });
+  });
+
+  it("enables production API only when both the plan and Cush review allow it", () => {
+    expect(resolveProductionApiAccessEntitlement(true, "approved")).toEqual({
+      enabled: true,
+      reason: null,
+    });
+  });
+});
+
+describe("Cush Verify production API access request validation", () => {
+  it("requires a clear use case and bounds optional request volume", () => {
+    expect(createCushVerifyApiAccessRequestSchema.safeParse({ intendedUse: "Too short" }).success).toBe(false);
+    expect(createCushVerifyApiAccessRequestSchema.safeParse({
+      intendedUse: "Use the API to retrieve consented applicant reports.",
+      estimatedMonthlyRequests: 1200,
+    }).success).toBe(true);
+    expect(createCushVerifyApiAccessRequestSchema.safeParse({
+      intendedUse: "Use the API to retrieve consented applicant reports.",
+      estimatedMonthlyRequests: 10_000_001,
+    }).success).toBe(false);
+  });
+
+  it("requires an explanation for rejected requests", () => {
+    expect(decideCushVerifyApiAccessRequestSchema.safeParse({
+      decision: "rejected",
+    }).success).toBe(false);
+    expect(decideCushVerifyApiAccessRequestSchema.safeParse({
+      decision: "rejected",
+      decisionNote: "Please provide more details.",
+    }).success).toBe(true);
+    expect(decideCushVerifyApiAccessRequestSchema.safeParse({
+      decision: "approved",
+    }).success).toBe(true);
   });
 });
 

@@ -3,16 +3,29 @@ import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
+  cushVerifyApiAccessRequestEvents,
+  cushVerifyApiAccessRequests,
   cushVerifyApiKeyEvents,
   cushVerifyApiKeys,
   cushVerifyApiUsage,
   cushVerifyBillingAccounts,
+  cushVerifyInstitutionalUsers,
+  cushVerifyInstitutions,
 } from "@shared/schema";
 import {
   CUSH_VERIFY_API_SCOPES,
+  createCushVerifyApiAccessRequestSchema,
   createCushVerifyApiKeySchema,
+  decideCushVerifyApiAccessRequestSchema,
   cushVerifyApiUsageQuerySchema,
 } from "@shared/cush-verify-api";
+import {
+  isAuthenticated,
+  requireAdminPermission,
+  requireTrustedAdminOrigin,
+  type AuthenticatedRequest,
+} from "./auth";
+import { ADMIN_PERMISSION } from "@shared/admin-permissions";
 import { cushVerifyDb as db } from "./db";
 import { getAllowedFrontendOrigins } from "./origin-policy";
 import {
@@ -99,6 +112,243 @@ export function registerCushVerifyApiRoutes(app: Express): void {
   registerCushVerifyApiMiddleware(app);
 
   app.get(
+    "/api/verify/api-access-requests",
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      try {
+        const actor = await getAdminActor(req);
+        if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
+        if (!isOrganisationAdmin(actor.role)) {
+          return res.status(403).json({ error: "Only organisation administrators can view API access requests." });
+        }
+        const [requests, events] = await Promise.all([
+          db.select().from(cushVerifyApiAccessRequests)
+            .where(eq(cushVerifyApiAccessRequests.institutionId, actor.institutionId))
+            .orderBy(desc(cushVerifyApiAccessRequests.createdAt))
+            .limit(50),
+          db.select({
+            id: cushVerifyApiAccessRequestEvents.id,
+            requestId: cushVerifyApiAccessRequestEvents.requestId,
+            eventType: cushVerifyApiAccessRequestEvents.eventType,
+            actorType: cushVerifyApiAccessRequestEvents.actorType,
+            details: cushVerifyApiAccessRequestEvents.details,
+            createdAt: cushVerifyApiAccessRequestEvents.createdAt,
+          }).from(cushVerifyApiAccessRequestEvents)
+            .where(eq(cushVerifyApiAccessRequestEvents.institutionId, actor.institutionId))
+            .orderBy(desc(cushVerifyApiAccessRequestEvents.createdAt))
+            .limit(100),
+        ]);
+        return res.json({
+          requests: requests.map((request) => ({
+            id: request.id,
+            intendedUse: request.intendedUse,
+            estimatedMonthlyRequests: request.estimatedMonthlyRequests,
+            status: request.status,
+            decisionNote: request.decisionNote,
+            createdAt: request.createdAt.toISOString(),
+            reviewedAt: request.reviewedAt?.toISOString() ?? null,
+          })),
+          events: events.map((event) => ({
+            id: event.id,
+            requestId: event.requestId,
+            eventType: event.eventType,
+            actorType: event.actorType,
+            details: event.details,
+            createdAt: event.createdAt.toISOString(),
+          })),
+        });
+      } catch (error) {
+        console.error("Cush Verify API access request history failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "API access request history is temporarily unavailable." });
+      }
+    },
+  );
+
+  app.post(
+    "/api/verify/api-access-requests",
+    requireTrustedInstitutionalOrigin,
+    isInstitutionalAuthenticated,
+    requireApprovedInstitution,
+    async (req: InstitutionalRequest, res) => {
+      const parsed = createCushVerifyApiAccessRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Enter a valid API access request." });
+      }
+      try {
+        const actor = await getAdminActor(req);
+        if (!actor) return res.status(403).json({ error: "Your organisation membership is not active." });
+        if (!isOrganisationAdmin(actor.role)) {
+          return res.status(403).json({ error: "Only organisation administrators can request production API access." });
+        }
+        const result = await db.transaction(async (tx) => {
+          await tx.select({ id: cushVerifyInstitutions.id })
+            .from(cushVerifyInstitutions)
+            .where(eq(cushVerifyInstitutions.id, actor.institutionId))
+            .for("update")
+            .limit(1);
+          const [latest] = await tx.select({
+            id: cushVerifyApiAccessRequests.id,
+            status: cushVerifyApiAccessRequests.status,
+          }).from(cushVerifyApiAccessRequests)
+            .where(eq(cushVerifyApiAccessRequests.institutionId, actor.institutionId))
+            .orderBy(desc(cushVerifyApiAccessRequests.createdAt))
+            .limit(1);
+          if (latest?.status === "submitted" || latest?.status === "approved") {
+            return { existing: latest } as const;
+          }
+          const [request] = await tx.insert(cushVerifyApiAccessRequests).values({
+            institutionId: actor.institutionId,
+            requestedByInstitutionalUserId: actor.userId,
+            intendedUse: parsed.data.intendedUse,
+            estimatedMonthlyRequests: parsed.data.estimatedMonthlyRequests ?? null,
+          }).returning();
+          await tx.insert(cushVerifyApiAccessRequestEvents).values({
+            requestId: request.id,
+            institutionId: actor.institutionId,
+            actorType: "organisation_admin",
+            actorInstitutionalUserId: actor.userId,
+            eventType: "submitted",
+            details: { status: "submitted" },
+          });
+          return { request } as const;
+        });
+        if ("existing" in result && result.existing) {
+          return res.status(409).json({
+            error: result.existing.status === "submitted"
+              ? "An API access request is already awaiting review."
+              : "This organisation already has an approved API access request.",
+          });
+        }
+        return res.status(201).json({
+          request: {
+            id: result.request.id,
+            status: result.request.status,
+            createdAt: result.request.createdAt.toISOString(),
+          },
+          message: "Your request was submitted. Production access still requires an API-enabled subscription and Cush approval.",
+        });
+      } catch (error) {
+        console.error("Cush Verify API access request submission failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "The API access request could not be submitted." });
+      }
+    },
+  );
+
+  app.get(
+    "/api/admin/cush-verify/api-access-requests",
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verificationsRead),
+    async (_req, res) => {
+      try {
+        const requests = await db.select({
+          id: cushVerifyApiAccessRequests.id,
+          institutionId: cushVerifyApiAccessRequests.institutionId,
+          institutionName: cushVerifyInstitutions.legalName,
+          institutionType: cushVerifyInstitutions.institutionType,
+          requesterName: cushVerifyInstitutionalUsers.fullName,
+          requesterEmail: cushVerifyInstitutionalUsers.email,
+          intendedUse: cushVerifyApiAccessRequests.intendedUse,
+          estimatedMonthlyRequests: cushVerifyApiAccessRequests.estimatedMonthlyRequests,
+          status: cushVerifyApiAccessRequests.status,
+          decisionNote: cushVerifyApiAccessRequests.decisionNote,
+          createdAt: cushVerifyApiAccessRequests.createdAt,
+          reviewedAt: cushVerifyApiAccessRequests.reviewedAt,
+        }).from(cushVerifyApiAccessRequests)
+          .innerJoin(cushVerifyInstitutions, eq(cushVerifyInstitutions.id, cushVerifyApiAccessRequests.institutionId))
+          .innerJoin(cushVerifyInstitutionalUsers, eq(
+            cushVerifyInstitutionalUsers.id,
+            cushVerifyApiAccessRequests.requestedByInstitutionalUserId,
+          ))
+          .orderBy(desc(cushVerifyApiAccessRequests.createdAt))
+          .limit(200);
+        return res.json({
+          requests: requests.map((request) => ({
+            ...request,
+            createdAt: request.createdAt.toISOString(),
+            reviewedAt: request.reviewedAt?.toISOString() ?? null,
+          })),
+        });
+      } catch (error) {
+        console.error("Cush Verify API access review queue failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "The API access review queue is temporarily unavailable." });
+      }
+    },
+  );
+
+  app.put(
+    "/api/admin/cush-verify/api-access-requests/:requestId",
+    requireTrustedAdminOrigin,
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verificationsManage),
+    async (req: AuthenticatedRequest, res) => {
+      const requestId = Number(req.params.requestId);
+      if (!Number.isSafeInteger(requestId) || requestId < 1) {
+        return res.status(400).json({ error: "The API access request reference is invalid." });
+      }
+      const parsed = decideCushVerifyApiAccessRequestSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Choose a valid review decision." });
+      }
+      if (!req.userId) return res.status(401).json({ error: "Sign in as a Cush administrator to review this request." });
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [request] = await tx.select().from(cushVerifyApiAccessRequests)
+            .where(eq(cushVerifyApiAccessRequests.id, requestId))
+            .for("update")
+            .limit(1);
+          if (!request) return { kind: "missing" } as const;
+          if (request.status !== "submitted") {
+            return { kind: "decided", status: request.status } as const;
+          }
+          const reviewedAt = new Date();
+          const decisionNote = parsed.data.decisionNote.trim() || null;
+          const [updated] = await tx.update(cushVerifyApiAccessRequests).set({
+            status: parsed.data.decision,
+            reviewedByAdminUserId: req.userId!,
+            decisionNote,
+            reviewedAt,
+          }).where(eq(cushVerifyApiAccessRequests.id, request.id)).returning();
+          await tx.insert(cushVerifyApiAccessRequestEvents).values({
+            requestId: request.id,
+            institutionId: request.institutionId,
+            actorType: "cush_admin",
+            actorCushUserId: req.userId!,
+            eventType: parsed.data.decision,
+            details: { status: parsed.data.decision },
+          });
+          return { kind: "updated", request: updated } as const;
+        });
+        if (result.kind === "missing") return res.status(404).json({ error: "The API access request was not found." });
+        if (result.kind === "decided") {
+          return res.status(409).json({ error: `This request has already been ${result.status}.` });
+        }
+        return res.json({
+          request: {
+            id: result.request.id,
+            status: result.request.status,
+            reviewedAt: result.request.reviewedAt?.toISOString() ?? null,
+          },
+          message: result.request.status === "approved"
+            ? "Request approved. An API-enabled subscription is still required before production keys can be created."
+            : "Request rejected and recorded.",
+        });
+      } catch (error) {
+        console.error("Cush Verify API access request decision failed", {
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "The API access request decision could not be saved." });
+      }
+    },
+  );
+
+  app.get(
     "/api/verify/api-keys",
     isInstitutionalAuthenticated,
     requireApprovedInstitution,
@@ -141,6 +391,10 @@ export function registerCushVerifyApiRoutes(app: Express): void {
             enabled: productionAccess.enabled,
             reason: productionAccess.reason,
             limits: productionAccess.apiLimits,
+            requestStatus: productionAccess.requestStatus,
+            requestSubmittedAt: productionAccess.requestSubmittedAt?.toISOString() ?? null,
+            requestReviewedAt: productionAccess.requestReviewedAt?.toISOString() ?? null,
+            decisionNote: productionAccess.decisionNote,
           },
           scopes: CUSH_VERIFY_API_SCOPES,
         });

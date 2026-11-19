@@ -17,7 +17,7 @@ import type { Express } from "express";
 import { registerCushVerifyApiRoutes } from "../server/cush-verify-api-routes";
 
 type Handler = (...args: any[]) => unknown;
-type Route = { method: "get" | "post"; path: string; handlers: Handler[] };
+type Route = { method: "get" | "post" | "put"; path: string; handlers: Handler[] };
 const routes: Route[] = [];
 
 function buildApp() {
@@ -28,6 +28,9 @@ function buildApp() {
     },
     post(path: string, ...handlers: Handler[]) {
       routes.push({ method: "post", path, handlers });
+    },
+    put(path: string, ...handlers: Handler[]) {
+      routes.push({ method: "put", path, handlers });
     },
   } as unknown as Express;
 }

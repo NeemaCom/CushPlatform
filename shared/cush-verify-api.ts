@@ -62,9 +62,28 @@ export const cushVerifyApiUsageQuerySchema = z.object({
   }
 });
 
+export const createCushVerifyApiAccessRequestSchema = z.object({
+  intendedUse: z.string().trim().min(10).max(1200),
+  estimatedMonthlyRequests: z.number().int().min(0).max(10_000_000).nullable().optional(),
+}).strict();
+
+export const decideCushVerifyApiAccessRequestSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  decisionNote: z.string().trim().max(1200).optional().default(""),
+}).strict().superRefine((value, context) => {
+  if (value.decision === "rejected" && value.decisionNote.length < 5) {
+    context.addIssue({
+      code: "custom",
+      path: ["decisionNote"],
+      message: "Add a brief reason when rejecting an access request.",
+    });
+  }
+});
+
 export type CushVerifyApiScope = typeof CUSH_VERIFY_API_SCOPES[number];
 export type CushVerifyApiKeyInput = z.infer<typeof createCushVerifyApiKeySchema>;
 export type CushVerifyApiKeyEnvironment = CushVerifyApiEnvironment;
+export type CushVerifyApiAccessRequestInput = z.infer<typeof createCushVerifyApiAccessRequestSchema>;
 export type CushVerifyApiRequestContext = {
   apiKeyId: number;
   institutionId: number;

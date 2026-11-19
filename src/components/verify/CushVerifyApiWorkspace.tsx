@@ -35,6 +35,10 @@ type ApiKeysResponse = {
   productionAccess: {
     enabled: boolean;
     reason: string | null;
+    requestStatus?: "submitted" | "approved" | "rejected" | null;
+    requestSubmittedAt?: string | null;
+    requestReviewedAt?: string | null;
+    decisionNote?: string | null;
     limits: {
       requestsPerMinute: number | null;
       requestsPerHour: number | null;
@@ -44,6 +48,25 @@ type ApiKeysResponse = {
   };
   sandboxLimits: ApiKeysResponse["productionAccess"]["limits"];
   scopes: CushVerifyApiScope[];
+};
+
+type ApiAccessRequestsResponse = {
+  requests: Array<{
+    id: number;
+    intendedUse: string;
+    estimatedMonthlyRequests: number | null;
+    status: "submitted" | "approved" | "rejected";
+    decisionNote: string | null;
+    createdAt: string;
+    reviewedAt: string | null;
+  }>;
+  events: Array<{
+    id: number;
+    requestId: number;
+    eventType: "submitted" | "approved" | "rejected";
+    actorType: "organisation_admin" | "cush_admin";
+    createdAt: string;
+  }>;
 };
 
 type ApiUsageResponse = {
@@ -100,6 +123,11 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
   const [selectedScopes, setSelectedScopes] = useState<CushVerifyApiScope[]>(["sandbox:simulate", "passport:discover", "reports:request", "reports:read"]);
   const [oneTimeSecret, setOneTimeSecret] = useState("");
   const [oneTimeEnvironment, setOneTimeEnvironment] = useState<CushVerifyApiKeyEnvironment | null>(null);
+  const [accessIntendedUse, setAccessIntendedUse] = useState("");
+  const [accessMonthlyEstimate, setAccessMonthlyEstimate] = useState("");
+  const [accessRequestError, setAccessRequestError] = useState("");
+  const [accessRequestSuccess, setAccessRequestSuccess] = useState("");
+  const [accessRequestBusy, setAccessRequestBusy] = useState(false);
   const [sandboxTestBusy, setSandboxTestBusy] = useState(false);
   const [sandboxTestMessage, setSandboxTestMessage] = useState("");
   const [error, setError] = useState("");
@@ -114,6 +142,13 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
   const keysQuery = useQuery<ApiKeysResponse>({
     queryKey: ["/api/verify/api-keys"],
     queryFn: () => requestJson("/api/verify/api-keys"),
+    enabled: isAdmin,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const accessRequestsQuery = useQuery<ApiAccessRequestsResponse>({
+    queryKey: ["/api/verify/api-access-requests"],
+    queryFn: () => requestJson("/api/verify/api-access-requests"),
     enabled: isAdmin,
     retry: false,
     staleTime: 30_000,
@@ -139,7 +174,28 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["/api/verify/api-keys"] }),
       queryClient.invalidateQueries({ queryKey: ["/api/verify/api-usage"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/verify/api-access-requests"] }),
     ]);
+  }
+
+  async function submitApiAccessRequest() {
+    setAccessRequestError("");
+    setAccessRequestSuccess("");
+    setAccessRequestBusy(true);
+    try {
+      await requestJson("/api/verify/api-access-requests", "POST", {
+        intendedUse: accessIntendedUse,
+        estimatedMonthlyRequests: accessMonthlyEstimate.trim() ? Number(accessMonthlyEstimate) : null,
+      });
+      setAccessIntendedUse("");
+      setAccessMonthlyEstimate("");
+      setAccessRequestSuccess("Request submitted. Production keys remain locked until Cush approves the request and your subscription includes API access.");
+      await refresh();
+    } catch (caught) {
+      setAccessRequestError(caught instanceof Error ? caught.message : "The API access request could not be submitted.");
+    } finally {
+      setAccessRequestBusy(false);
+    }
   }
 
   async function createKey() {
@@ -270,6 +326,8 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
   const errorMessage = error || (
     keysQuery.isError ? (keysQuery.error instanceof Error ? keysQuery.error.message : "API keys are unavailable.") : ""
   ) || (
+    accessRequestsQuery.isError ? (accessRequestsQuery.error instanceof Error ? accessRequestsQuery.error.message : "API access request history is unavailable.") : ""
+  ) || (
     usageQuery.isError ? (usageQuery.error instanceof Error ? usageQuery.error.message : "API usage is unavailable.") : ""
   );
   const displayedLimits = usageQuery.data
@@ -328,6 +386,123 @@ export default function CushVerifyApiWorkspace({ role }: { role: string }) {
 
       {isAdmin ? (
         <section className="space-y-4">
+          {keysQuery.data && (
+            <section className="rounded-2xl border border-[#dce5f1] bg-white p-4 sm:p-5" aria-labelledby="production-api-access-heading">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#6c7c94]">Production API</p>
+                  <h3 id="production-api-access-heading" className="mt-1 text-base font-semibold text-[#12213d]">Access request</h3>
+                  <p className="mt-1 max-w-2xl text-sm leading-6 text-[#61728a]">
+                    Cush reviews production access separately. Approval does not replace the requirement for an active subscription whose plan includes API access.
+                  </p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                  keysQuery.data.productionAccess.enabled
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-amber-100 text-amber-900"
+                }`}>
+                  {keysQuery.data.productionAccess.enabled ? "Enabled" : "Not enabled"}
+                </span>
+              </div>
+
+              {!keysQuery.data.productionAccess.enabled && keysQuery.data.productionAccess.reason && (
+                <p className="mt-3 rounded-lg bg-[#f5f7fb] px-3 py-2 text-sm text-[#52627b]">
+                  {keysQuery.data.productionAccess.reason}
+                </p>
+              )}
+
+              {accessRequestError && <p role="alert" className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{accessRequestError}</p>}
+              {accessRequestSuccess && <p role="status" className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">{accessRequestSuccess}</p>}
+
+              {accessRequestsQuery.isLoading ? (
+                <p className="mt-4 text-sm text-[#71819b]">Loading access request history…</p>
+              ) : (
+                <>
+                  {accessRequestsQuery.data?.requests.length ? (
+                    <div className="mt-4 space-y-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wide text-[#71819b]">Request history</h4>
+                      {accessRequestsQuery.data.requests.map((request) => {
+                        const statusLabel = request.status === "submitted" ? "Awaiting review" : request.status === "approved" ? "Approved" : "Not approved";
+                        const relatedEvents = accessRequestsQuery.data?.events.filter((event) => event.requestId === request.id) ?? [];
+                        return (
+                          <article key={request.id} className="rounded-xl border border-[#e4eaf2] bg-[#f8fbff] p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-[#24354f]">{statusLabel}</span>
+                              <span className="text-xs text-[#71819b]">Submitted {formatDate(request.createdAt)}</span>
+                            </div>
+                            <p className="mt-2 whitespace-pre-wrap text-sm leading-5 text-[#52627b]">{request.intendedUse}</p>
+                            {request.estimatedMonthlyRequests !== null && (
+                              <p className="mt-1 text-xs text-[#71819b]">Estimated monthly requests: {request.estimatedMonthlyRequests.toLocaleString()}</p>
+                            )}
+                            {request.decisionNote && (
+                              <p className="mt-2 rounded-lg border border-[#e3e8ef] bg-white p-2 text-xs leading-5 text-[#52627b]">
+                                Cush review note: {request.decisionNote}
+                              </p>
+                            )}
+                            {relatedEvents.length > 0 && (
+                              <p className="mt-2 text-[11px] text-[#8794a7]">
+                                Activity: {relatedEvents.map((event) =>
+                                  `${event.eventType === "submitted" ? "Submitted" : event.eventType === "approved" ? "Approved" : "Rejected"} · ${formatDate(event.createdAt)}`
+                                ).join(" · ")}
+                              </p>
+                            )}
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
+                  {!keysQuery.data.productionAccess.enabled
+                    && keysQuery.data.productionAccess.requestStatus !== "submitted"
+                    && keysQuery.data.productionAccess.requestStatus !== "approved" && (
+                      <div className="mt-4 border-t border-[#e7edf4] pt-4">
+                        <h4 className="text-sm font-semibold text-[#24354f]">
+                          {keysQuery.data.productionAccess.requestStatus === "rejected" ? "Submit a new request" : "Request production API access"}
+                        </h4>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px]">
+                          <label className="text-xs font-semibold text-[#52627b]">
+                            Intended API use
+                            <textarea
+                              value={accessIntendedUse}
+                              onChange={(event) => setAccessIntendedUse(event.target.value)}
+                              minLength={10}
+                              maxLength={1200}
+                              rows={3}
+                              placeholder="Describe the product or workflow that will use the Cush Verify API."
+                              className="mt-1.5 w-full rounded-lg border border-[#d5deea] bg-white px-3 py-2 text-sm font-normal text-[#12213d]"
+                            />
+                            <span className="mt-1 block font-normal text-[#8794a7]">{accessIntendedUse.trim().length}/1200 characters</span>
+                          </label>
+                          <label className="text-xs font-semibold text-[#52627b]">
+                            Estimated monthly requests
+                            <input
+                              type="number"
+                              min={0}
+                              max={10_000_000}
+                              value={accessMonthlyEstimate}
+                              onChange={(event) => setAccessMonthlyEstimate(event.target.value)}
+                              placeholder="Optional"
+                              className="mt-1.5 min-h-10 w-full rounded-lg border border-[#d5deea] bg-white px-3 text-sm font-normal text-[#12213d]"
+                            />
+                            <span className="mt-1 block font-normal text-[#8794a7]">Optional estimate to help review.</span>
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void submitApiAccessRequest()}
+                          disabled={accessRequestBusy || accessIntendedUse.trim().length < 10 || accessIntendedUse.trim().length > 1200}
+                          className="mt-3 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-[#0c1830] px-4 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {accessRequestBusy ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                          {accessRequestBusy ? "Submitting…" : "Submit access request"}
+                        </button>
+                      </div>
+                    )}
+                </>
+              )}
+            </section>
+          )}
+
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <h3 className="text-lg font-semibold text-[#12213d]">API credentials</h3>
