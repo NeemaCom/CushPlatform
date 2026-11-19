@@ -119,13 +119,7 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
       )}
       {decisionMutation.isSuccess && (
         <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          {decisionMutation.data.request.status === "approved"
-            ? decisionMutation.data.emailNotificationStatus === "sent"
-              ? "Approval saved and email sent to the requester. Production keys still require a subscription with API access."
-              : decisionMutation.data.emailNotificationStatus === "not_configured"
-                ? "Approval saved, but email is not configured. The requester will see an in-workspace notification; check the Resend sender settings."
-                : "Approval saved, but the email could not be sent. The requester will see an in-workspace notification; check the Resend delivery logs."
-            : "Decision saved. The organisation administrator can review the update in the API workspace."}
+          Decision saved. Delivery status is shown with the updated request below.
         </p>
       )}
 
@@ -140,6 +134,10 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
           {requests.map((request) => {
             const note = decisionNoteById[request.id] ?? "";
             const pending = request.status === "submitted";
+            const decisionForRequest = decisionMutation.isSuccess && decisionMutation.data.request.id === request.id
+              ? decisionMutation.data
+              : null;
+            const displayedStatus = decisionForRequest?.request.status ?? request.status;
             return (
               <article key={request.id} className="rounded-2xl border border-[#e4e2d9] bg-[#fbfaf6] p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -175,6 +173,35 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
                   <p className="mt-3 rounded-lg border border-[#e5e3db] bg-white p-3 text-sm text-[#555750]">
                     <span className="font-semibold">Review note:</span> {request.decisionNote}
                   </p>
+                )}
+                {decisionForRequest && (
+                  <div role="status" className={`mt-3 rounded-xl border-l-4 p-4 text-sm ${
+                    displayedStatus === "approved"
+                      ? decisionForRequest.emailNotificationStatus === "sent"
+                        ? "border-emerald-500 bg-emerald-50 text-emerald-950"
+                        : decisionForRequest.emailNotificationStatus === "not_configured"
+                          ? "border-amber-500 bg-amber-50 text-amber-950"
+                          : "border-rose-500 bg-rose-50 text-rose-950"
+                      : "border-slate-400 bg-slate-100 text-slate-800"
+                  }`}>
+                    <p className="font-semibold">
+                      {displayedStatus === "approved" ? "Production API request approved" : "API access request not approved"}
+                    </p>
+                    {displayedStatus === "approved" && (
+                      <p className="mt-1 leading-5">
+                        {decisionForRequest.emailNotificationStatus === "sent"
+                          ? "Resend accepted the approval email for delivery to the requester."
+                          : decisionForRequest.emailNotificationStatus === "not_configured"
+                            ? "Approval email is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL on the Render service. The dashboard popup still works."
+                            : decisionForRequest.emailNotificationStatus === "failed"
+                              ? "Approval email could not be sent. Check the Resend sender settings and delivery logs; the dashboard popup still works."
+                              : "No email delivery status was returned. Confirm the latest Render deployment is live."}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs leading-5 opacity-85">
+                      Production keys remain locked unless the organisation has an active subscription that includes API access.
+                    </p>
+                  </div>
                 )}
                 {pending && canManage && (
                   <div className="mt-4 border-t border-[#e5e3db] pt-4">

@@ -133,6 +133,7 @@ export default function CushVerifyWorkspace() {
       description: data.productionAccess.enabled
         ? "Cush approved your request. You can create a production key under API & Integrations."
         : "Cush approved your request. Production keys remain locked until your active subscription includes API access.",
+      className: "border-2 border-emerald-300 bg-[#0c1830] text-white shadow-[0_18px_50px_rgba(12,24,48,.45)] ring-2 ring-emerald-300/30",
     });
   }, [apiAccessNotificationsQuery.data, identityQuery.data, toast]);
 
