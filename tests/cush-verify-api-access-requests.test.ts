@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock, workspaceStateMock, sendApiAccessEmailMock } = vi.hoisted(() => ({
-  dbMock: { transaction: vi.fn(), select: vi.fn() },
+const { dbMock, dbUpdateValues, workspaceStateMock, sendApiAccessEmailMock } = vi.hoisted(() => ({
+  dbMock: { transaction: vi.fn(), select: vi.fn(), update: vi.fn(), insert: vi.fn() },
+  dbUpdateValues: [] as Array<Record<string, unknown>>,
   workspaceStateMock: vi.fn(),
   sendApiAccessEmailMock: vi.fn(),
 }));
@@ -78,6 +79,10 @@ function requestTx({ latest, existing }: {
     createdAt: new Date("2026-11-19T12:00:00.000Z"),
     reviewedAt: null,
     reviewedByAdminUserId: null,
+      emailNotificationStatus: null,
+      emailNotificationAttemptCount: 0,
+      emailNotificationAttemptedAt: null,
+      emailNotificationLastAttemptedByAdminUserId: null,
   };
   const tx = {
     select: vi.fn(() => {
@@ -131,6 +136,7 @@ function findRoute(method: Route["method"], path: string) {
 describe("Cush Verify production API access request routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dbUpdateValues.length = 0;
     routes.length = 0;
     registerCushVerifyApiRoutes(buildApp());
     workspaceStateMock.mockResolvedValue({
@@ -141,6 +147,15 @@ describe("Cush Verify production API access request routes", () => {
       role: "organisation_admin",
     });
     sendApiAccessEmailMock.mockResolvedValue({ status: "sent" });
+    dbMock.update.mockImplementation(() => ({
+      set(values: Record<string, unknown>) {
+        dbUpdateValues.push(values);
+        return { where: async () => undefined };
+      },
+    }));
+    dbMock.insert.mockImplementation(() => ({
+      values: async () => undefined,
+    }));
   });
 
   it("submits a request and records its audit event in the same transaction", async () => {
@@ -229,9 +244,23 @@ describe("Cush Verify production API access request routes", () => {
     }, res);
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toMatchObject({ request: { id: 41, status: "approved" } });
+    expect(res.body).toMatchObject({
+      request: {
+        id: 41,
+        status: "approved",
+        emailNotificationStatus: "sent",
+        emailNotificationAttemptCount: 1,
+      },
+    });
     expect(res.body).toMatchObject({ emailNotificationStatus: "sent" });
-    expect(updated[0]).toMatchObject({ status: "approved", reviewedByAdminUserId: 7 });
+    expect(updated[0]).toMatchObject({
+      status: "approved",
+      reviewedByAdminUserId: 7,
+      emailNotificationStatus: "sending",
+      emailNotificationAttemptCount: 1,
+      emailNotificationLastAttemptedByAdminUserId: 7,
+    });
+    expect(dbUpdateValues).toContainEqual({ emailNotificationStatus: "sent" });
     expect(inserted[0]).toMatchObject({
       requestId: 41,
       institutionId: 11,
@@ -285,6 +314,164 @@ describe("Cush Verify production API access request routes", () => {
     expect(res.body).toMatchObject({
       request: { id: 41, status: "approved" },
       emailNotificationStatus: "failed",
+    });
+  });
+
+  it("persists failed delivery, retries only through the admin endpoint, and records the retry result", async () => {
+    const lastAttempt = new Date("2026-11-19T11:59:00.000Z");
+    const retryRequest = {
+      id: 41,
+      institutionId: 11,
+      status: "approved",
+      emailNotificationStatus: "failed",
+      emailNotificationAttemptCount: 1,
+      emailNotificationAttemptedAt: lastAttempt,
+      emailNotificationLastAttemptedByAdminUserId: 6,
+    };
+    const { tx, inserted, updated } = requestTx({ existing: retryRequest });
+    dbMock.transaction.mockImplementation(async (work: (transaction: unknown) => Promise<unknown>) => work(tx));
+    dbMock.select.mockImplementation(() => {
+      const builder: any = {
+        from() { return builder; },
+        innerJoin() { return builder; },
+        where() { return builder; },
+        async limit() {
+          return [{ email: "admin@example.com", fullName: "Amina Admin", institutionName: "Example Housing" }];
+        },
+      };
+      return builder;
+    });
+    const route = findRoute("post", "/api/admin/cush-verify/api-access-requests/:requestId/email/retry");
+    const res = response();
+
+    await route.handlers.at(-1)!({ params: { requestId: "41" }, userId: 7 }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      emailNotificationStatus: "sent",
+      emailNotificationAttemptCount: 2,
+    });
+    expect(sendApiAccessEmailMock).toHaveBeenCalledWith({
+      email: "admin@example.com",
+      contactName: "Amina Admin",
+      institutionName: "Example Housing",
+      requestId: 41,
+    });
+    expect(updated[0]).toMatchObject({
+      emailNotificationStatus: "sending",
+      emailNotificationAttemptCount: 2,
+      emailNotificationLastAttemptedByAdminUserId: 7,
+    });
+    expect(inserted).toContainEqual(expect.objectContaining({
+      eventType: "approval_email_retry_started",
+      actorCushUserId: 7,
+      details: { attemptNumber: 2 },
+    }));
+    expect(dbMock.insert).toHaveBeenCalled();
+    expect(dbUpdateValues).toContainEqual({ emailNotificationStatus: "sent" });
+  });
+
+  it("does not send a duplicate approval email when Resend previously accepted it", async () => {
+    const { tx } = requestTx({
+      existing: {
+        id: 41,
+        institutionId: 11,
+        status: "approved",
+        emailNotificationStatus: "sent",
+        emailNotificationAttemptCount: 1,
+        emailNotificationAttemptedAt: new Date(),
+        emailNotificationLastAttemptedByAdminUserId: 7,
+      },
+    });
+    dbMock.transaction.mockImplementation(async (work: (transaction: unknown) => Promise<unknown>) => work(tx));
+    const route = findRoute("post", "/api/admin/cush-verify/api-access-requests/:requestId/email/retry");
+    const res = response();
+
+    await route.handlers.at(-1)!({ params: { requestId: "41" }, userId: 7 }, res);
+
+    expect(res.statusCode).toBe(409);
+    expect(sendApiAccessEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("allows retry after an earlier email attempt had no sender configuration", async () => {
+    const { tx } = requestTx({
+      existing: {
+        id: 41,
+        institutionId: 11,
+        status: "approved",
+        emailNotificationStatus: "not_configured",
+        emailNotificationAttemptCount: 1,
+        emailNotificationAttemptedAt: new Date(),
+        emailNotificationLastAttemptedByAdminUserId: 7,
+      },
+    });
+    dbMock.transaction.mockImplementation(async (work: (transaction: unknown) => Promise<unknown>) => work(tx));
+    dbMock.select.mockImplementation(() => {
+      const builder: any = {
+        from() { return builder; },
+        innerJoin() { return builder; },
+        where() { return builder; },
+        async limit() {
+          return [{ email: "admin@example.com", fullName: "Amina Admin", institutionName: "Example Housing" }];
+        },
+      };
+      return builder;
+    });
+    sendApiAccessEmailMock.mockResolvedValue({ status: "not_configured" });
+    const route = findRoute("post", "/api/admin/cush-verify/api-access-requests/:requestId/email/retry");
+    const res = response();
+
+    await route.handlers.at(-1)!({ params: { requestId: "41" }, userId: 7 }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      emailNotificationStatus: "not_configured",
+      emailNotificationAttemptCount: 2,
+    });
+    expect(sendApiAccessEmailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns saved email status and attempt time in the admin queue after reload", async () => {
+    const attemptedAt = new Date("2026-11-19T12:30:00.000Z");
+    dbMock.select.mockImplementation(() => {
+      const builder: any = {
+        from() { return builder; },
+        innerJoin() { return builder; },
+        orderBy() { return builder; },
+        async limit() {
+          return [{
+            id: 41,
+            institutionId: 11,
+            institutionName: "Example Housing",
+            institutionType: "housing",
+            requesterName: "Amina Admin",
+            requesterEmail: "admin@example.com",
+            intendedUse: "Retrieve consented applicant reports through the institution's case workflow.",
+            estimatedMonthlyRequests: 150,
+            status: "approved",
+            decisionNote: null,
+            emailNotificationStatus: "failed",
+            emailNotificationAttemptCount: 2,
+            emailNotificationAttemptedAt: attemptedAt,
+            createdAt: new Date("2026-11-19T12:00:00.000Z"),
+            reviewedAt: new Date("2026-11-19T12:10:00.000Z"),
+          }];
+        },
+      };
+      return builder;
+    });
+    const route = findRoute("get", "/api/admin/cush-verify/api-access-requests");
+    const res = response();
+
+    await route.handlers.at(-1)!({}, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      requests: [{
+        emailNotificationStatus: "failed",
+        emailNotificationAttemptCount: 2,
+        emailNotificationAttemptedAt: attemptedAt.toISOString(),
+      }],
     });
   });
 });

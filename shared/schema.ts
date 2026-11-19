@@ -1016,6 +1016,7 @@ export type CushVerifyApiEnvironment = "sandbox" | "production";
 export type CushVerifyApiKeyStatus = "active" | "revoked";
 export type CushVerifyApiUsageStatus = "processing" | "completed";
 export type CushVerifyApiAccessRequestStatus = "submitted" | "approved" | "rejected";
+export type CushVerifyApiAccessEmailStatus = "sending" | "sent" | "not_configured" | "failed";
 
 export const cushVerifyApiAccessRequests = pgTable("cush_verify_api_access_requests", {
   id: serial("id").primaryKey(),
@@ -1030,6 +1031,10 @@ export const cushVerifyApiAccessRequests = pgTable("cush_verify_api_access_reque
   decisionNote: text("decision_note"),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
   reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  emailNotificationStatus: text("email_notification_status").$type<CushVerifyApiAccessEmailStatus | null>(),
+  emailNotificationAttemptCount: integer("email_notification_attempt_count").notNull().default(0),
+  emailNotificationAttemptedAt: timestamp("email_notification_attempted_at", { withTimezone: true, mode: "date" }),
+  emailNotificationLastAttemptedByAdminUserId: integer("email_notification_last_attempted_by_admin_user_id"),
 }, (table) => ({
   statusCheck: check(
     "cush_verify_api_access_requests_status_check",
@@ -1056,6 +1061,21 @@ export const cushVerifyApiAccessRequests = pgTable("cush_verify_api_access_reque
     "cush_verify_api_access_requests_rejection_note_check",
     sql`${table.status} <> 'rejected' or ${table.decisionNote} is not null`,
   ),
+  emailNotificationStatusCheck: check(
+    "cush_verify_api_access_requests_email_notification_status_check",
+    sql`${table.emailNotificationStatus} is null or ${table.emailNotificationStatus} in ('sending', 'sent', 'not_configured', 'failed')`,
+  ),
+  emailNotificationAttemptCountCheck: check(
+    "cush_verify_api_access_requests_email_notification_attempt_count_check",
+    sql`${table.emailNotificationAttemptCount} >= 0`,
+  ),
+  emailNotificationAttemptMetadataCheck: check(
+    "cush_verify_api_access_requests_email_notification_metadata_check",
+    sql`(${table.emailNotificationStatus} is null and ${table.emailNotificationAttemptCount} = 0
+        and ${table.emailNotificationAttemptedAt} is null and ${table.emailNotificationLastAttemptedByAdminUserId} is null)
+      or (${table.emailNotificationStatus} is not null and ${table.emailNotificationAttemptCount} > 0
+        and ${table.emailNotificationAttemptedAt} is not null and ${table.emailNotificationLastAttemptedByAdminUserId} is not null)`,
+  ),
   oneSubmittedRequestPerInstitution: uniqueIndex("cush_verify_api_access_requests_one_submitted_per_institution_idx")
     .on(table.institutionId)
     .where(sql`${table.status} = 'submitted'`),
@@ -1075,7 +1095,9 @@ export const cushVerifyApiAccessRequestEvents = pgTable("cush_verify_api_access_
   actorInstitutionalUserId: integer("actor_institutional_user_id")
     .references(() => cushVerifyInstitutionalUsers.id, { onDelete: "restrict" }),
   actorCushUserId: integer("actor_cush_user_id"),
-  eventType: text("event_type").$type<"submitted" | "approved" | "rejected">().notNull(),
+  eventType: text("event_type").$type<
+    "submitted" | "approved" | "rejected" | "approval_email_retry_started" | "approval_email_retry_completed"
+  >().notNull(),
   details: jsonb("details").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }, (table) => ({
@@ -1090,7 +1112,7 @@ export const cushVerifyApiAccessRequestEvents = pgTable("cush_verify_api_access_
   ),
   eventTypeCheck: check(
     "cush_verify_api_access_request_events_type_check",
-    sql`${table.eventType} in ('submitted', 'approved', 'rejected')`,
+    sql`${table.eventType} in ('submitted', 'approved', 'rejected', 'approval_email_retry_started', 'approval_email_retry_completed')`,
   ),
   detailsObjectCheck: check(
     "cush_verify_api_access_request_events_details_check",

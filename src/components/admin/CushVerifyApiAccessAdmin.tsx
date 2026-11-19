@@ -14,13 +14,23 @@ type ApiAccessRequest = {
   estimatedMonthlyRequests: number | null;
   status: "submitted" | "approved" | "rejected";
   decisionNote: string | null;
+  emailNotificationStatus: "sending" | "sent" | "not_configured" | "failed" | null;
+  emailNotificationAttemptCount: number;
+  emailNotificationAttemptedAt: string | null;
   createdAt: string;
   reviewedAt: string | null;
 };
 
 type ApiAccessDecisionResponse = {
-  request: { id: number; status: "approved" | "rejected"; reviewedAt: string | null };
-  emailNotificationStatus: "sent" | "not_configured" | "failed" | null;
+  request: {
+    id: number;
+    status: "approved" | "rejected";
+    reviewedAt: string | null;
+    emailNotificationStatus: "sending" | "sent" | "not_configured" | "failed" | null;
+    emailNotificationAttemptCount: number;
+    emailNotificationAttemptedAt: string | null;
+  };
+  emailNotificationStatus: "sending" | "sent" | "not_configured" | "failed" | null;
   message: string;
 };
 
@@ -74,6 +84,18 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/cush-verify/api-access-requests"] }),
   });
+  const emailRetryMutation = useMutation({
+    mutationFn: async ({ id }: { id: number }) => {
+      const response = await apiRequest("POST", `/api/admin/cush-verify/api-access-requests/${id}/email/retry`);
+      return response.json() as Promise<{
+        emailNotificationStatus: "sending" | "sent" | "not_configured" | "failed";
+        emailNotificationAttemptCount: number;
+        emailNotificationAttemptedAt: string;
+        message: string;
+      }>;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/cush-verify/api-access-requests"] }),
+  });
 
   if (requestsQuery.isLoading) {
     return <div className="animate-pulse rounded-2xl border border-[#e4e2d9] bg-[#fbfaf6] p-8 text-sm text-[#777973]">Loading API access requests…</div>;
@@ -122,6 +144,11 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
           Decision saved. Delivery status is shown with the updated request below.
         </p>
       )}
+      {emailRetryMutation.isSuccess && (
+        <p role="status" className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-950">
+          {emailRetryMutation.data.message}
+        </p>
+      )}
 
       {requests.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-[#d9d7cd] bg-[#fbfaf6] px-5 py-12 text-center">
@@ -134,10 +161,21 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
           {requests.map((request) => {
             const note = decisionNoteById[request.id] ?? "";
             const pending = request.status === "submitted";
-            const decisionForRequest = decisionMutation.isSuccess && decisionMutation.data.request.id === request.id
-              ? decisionMutation.data
-              : null;
-            const displayedStatus = decisionForRequest?.request.status ?? request.status;
+            const staleSendingAttempt = request.emailNotificationStatus === "sending"
+              && request.emailNotificationAttemptedAt !== null
+              && Date.now() - new Date(request.emailNotificationAttemptedAt).getTime() >= 5 * 60_000;
+            const canRetryEmail = request.status === "approved" && canManage && (
+              request.emailNotificationStatus === "failed"
+              || request.emailNotificationStatus === "not_configured"
+              || staleSendingAttempt
+            );
+            const emailStatusStyle = request.emailNotificationStatus === "sent"
+              ? "border-emerald-500 bg-emerald-50 text-emerald-950"
+              : request.emailNotificationStatus === "not_configured"
+                ? "border-amber-500 bg-amber-50 text-amber-950"
+                : request.emailNotificationStatus === "failed"
+                  ? "border-rose-500 bg-rose-50 text-rose-950"
+                  : "border-slate-400 bg-slate-100 text-slate-800";
             return (
               <article key={request.id} className="rounded-2xl border border-[#e4e2d9] bg-[#fbfaf6] p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -174,33 +212,45 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
                     <span className="font-semibold">Review note:</span> {request.decisionNote}
                   </p>
                 )}
-                {decisionForRequest && (
-                  <div role="status" className={`mt-3 rounded-xl border-l-4 p-4 text-sm ${
-                    displayedStatus === "approved"
-                      ? decisionForRequest.emailNotificationStatus === "sent"
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-950"
-                        : decisionForRequest.emailNotificationStatus === "not_configured"
-                          ? "border-amber-500 bg-amber-50 text-amber-950"
-                          : "border-rose-500 bg-rose-50 text-rose-950"
-                      : "border-slate-400 bg-slate-100 text-slate-800"
-                  }`}>
-                    <p className="font-semibold">
-                      {displayedStatus === "approved" ? "Production API request approved" : "API access request not approved"}
+                {request.status === "approved" && (
+                  <div role="status" className={`mt-3 rounded-xl border-l-4 p-4 text-sm ${emailStatusStyle}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-semibold">Approval email: {
+                        request.emailNotificationStatus === "sent" ? "Accepted by Resend"
+                          : request.emailNotificationStatus === "not_configured" ? "Not configured"
+                            : request.emailNotificationStatus === "failed" ? "Not sent"
+                              : request.emailNotificationStatus === "sending" ? "Sending"
+                                : "No status recorded"
+                      }</p>
+                      {canRetryEmail && (
+                        <button
+                          type="button"
+                          onClick={() => emailRetryMutation.mutate({ id: request.id })}
+                          disabled={emailRetryMutation.isPending}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-current/25 bg-white/70 px-3 py-1.5 text-xs font-semibold disabled:opacity-60"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${emailRetryMutation.isPending ? "animate-spin" : ""}`} />
+                          {emailRetryMutation.isPending ? "Retrying…" : "Retry email"}
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1 leading-5">
+                      {request.emailNotificationStatus === "sent"
+                        ? "Resend accepted the message for delivery to the original requester; this does not confirm inbox placement."
+                        : request.emailNotificationStatus === "not_configured"
+                          ? "No email was sent. Configure RESEND_API_KEY and RESEND_FROM_EMAIL on Render, then retry."
+                          : request.emailNotificationStatus === "failed"
+                            ? "The email could not be sent. Check the Resend sender settings and delivery logs, then retry."
+                            : request.emailNotificationStatus === "sending"
+                              ? "An email attempt is in progress. Refresh shortly if this status does not change."
+                              : "This request predates email-status tracking, so no delivery result was saved."}
                     </p>
-                    {displayedStatus === "approved" && (
-                      <p className="mt-1 leading-5">
-                        {decisionForRequest.emailNotificationStatus === "sent"
-                          ? "Resend accepted the approval email for delivery to the requester."
-                          : decisionForRequest.emailNotificationStatus === "not_configured"
-                            ? "Approval email is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL on the Render service. The dashboard popup still works."
-                            : decisionForRequest.emailNotificationStatus === "failed"
-                              ? "Approval email could not be sent. Check the Resend sender settings and delivery logs; the dashboard popup still works."
-                              : "No email delivery status was returned. Confirm the latest Render deployment is live."}
-                      </p>
-                    )}
                     <p className="mt-2 text-xs leading-5 opacity-85">
-                      Production keys remain locked unless the organisation has an active subscription that includes API access.
+                      Attempts: {request.emailNotificationAttemptCount} · Last attempt: {request.emailNotificationAttemptedAt ? formatDate(request.emailNotificationAttemptedAt) : "Not recorded"} · Production keys still require an active API-enabled subscription.
                     </p>
+                    {emailRetryMutation.isError && emailRetryMutation.variables?.id === request.id && (
+                      <p role="alert" className="mt-2 font-medium">{readableError(emailRetryMutation.error)}</p>
+                    )}
                   </div>
                 )}
                 {pending && canManage && (

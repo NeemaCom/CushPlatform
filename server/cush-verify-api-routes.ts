@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import {
+  type CushVerifyApiAccessEmailStatus,
   cushVerifyApiAccessRequestEvents,
   cushVerifyApiAccessRequests,
   cushVerifyApiKeyEvents,
@@ -76,6 +77,58 @@ function requireTrustedInstitutionalOrigin(req: Request, res: Response, next: Ne
     return;
   }
   next();
+}
+
+async function sendApiAccessApprovalEmail(requestId: number): Promise<"sent" | "not_configured" | "failed"> {
+  try {
+    const [recipient] = await db.select({
+      email: cushVerifyInstitutionalUsers.email,
+      fullName: cushVerifyInstitutionalUsers.fullName,
+      institutionName: cushVerifyInstitutions.legalName,
+    }).from(cushVerifyApiAccessRequests)
+      .innerJoin(
+        cushVerifyInstitutionalUsers,
+        eq(cushVerifyInstitutionalUsers.id, cushVerifyApiAccessRequests.requestedByInstitutionalUserId),
+      )
+      .innerJoin(
+        cushVerifyInstitutions,
+        eq(cushVerifyInstitutions.id, cushVerifyApiAccessRequests.institutionId),
+      )
+      .where(eq(cushVerifyApiAccessRequests.id, requestId))
+      .limit(1);
+    if (!recipient) return "failed";
+    const result = await sendCushVerifyApiAccessApprovedEmail({
+      email: recipient.email,
+      contactName: recipient.fullName,
+      institutionName: recipient.institutionName,
+      requestId,
+    });
+    return result.status;
+  } catch (error) {
+    console.error("Cush Verify API access approval email failed", {
+      requestId,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
+    return "failed";
+  }
+}
+
+async function saveApiAccessApprovalEmailStatus(
+  requestId: number,
+  status: "sent" | "not_configured" | "failed",
+): Promise<CushVerifyApiAccessEmailStatus> {
+  try {
+    await db.update(cushVerifyApiAccessRequests)
+      .set({ emailNotificationStatus: status })
+      .where(eq(cushVerifyApiAccessRequests.id, requestId));
+    return status;
+  } catch (error) {
+    console.error("Cush Verify API access email status could not be saved", {
+      requestId,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
+    return "sending";
+  }
 }
 
 async function getAdminActor(req: InstitutionalRequest) {
@@ -262,6 +315,9 @@ export function registerCushVerifyApiRoutes(app: Express): void {
           estimatedMonthlyRequests: cushVerifyApiAccessRequests.estimatedMonthlyRequests,
           status: cushVerifyApiAccessRequests.status,
           decisionNote: cushVerifyApiAccessRequests.decisionNote,
+          emailNotificationStatus: cushVerifyApiAccessRequests.emailNotificationStatus,
+          emailNotificationAttemptCount: cushVerifyApiAccessRequests.emailNotificationAttemptCount,
+          emailNotificationAttemptedAt: cushVerifyApiAccessRequests.emailNotificationAttemptedAt,
           createdAt: cushVerifyApiAccessRequests.createdAt,
           reviewedAt: cushVerifyApiAccessRequests.reviewedAt,
         }).from(cushVerifyApiAccessRequests)
@@ -275,6 +331,7 @@ export function registerCushVerifyApiRoutes(app: Express): void {
         return res.json({
           requests: requests.map((request) => ({
             ...request,
+            emailNotificationAttemptedAt: request.emailNotificationAttemptedAt?.toISOString() ?? null,
             createdAt: request.createdAt.toISOString(),
             reviewedAt: request.reviewedAt?.toISOString() ?? null,
           })),
@@ -315,11 +372,20 @@ export function registerCushVerifyApiRoutes(app: Express): void {
           }
           const reviewedAt = new Date();
           const decisionNote = parsed.data.decisionNote.trim() || null;
+          const emailAttemptCount = parsed.data.decision === "approved"
+            ? (request.emailNotificationAttemptCount ?? 0) + 1
+            : request.emailNotificationAttemptCount;
           const [updated] = await tx.update(cushVerifyApiAccessRequests).set({
             status: parsed.data.decision,
             reviewedByAdminUserId: req.userId!,
             decisionNote,
             reviewedAt,
+            ...(parsed.data.decision === "approved" ? {
+              emailNotificationStatus: "sending" as const,
+              emailNotificationAttemptCount: emailAttemptCount,
+              emailNotificationAttemptedAt: reviewedAt,
+              emailNotificationLastAttemptedByAdminUserId: req.userId!,
+            } : {}),
           }).where(eq(cushVerifyApiAccessRequests.id, request.id)).returning();
           await tx.insert(cushVerifyApiAccessRequestEvents).values({
             requestId: request.id,
@@ -329,54 +395,25 @@ export function registerCushVerifyApiRoutes(app: Express): void {
             eventType: parsed.data.decision,
             details: { status: parsed.data.decision },
           });
-          return { kind: "updated", request: updated } as const;
+          return { kind: "updated", request: updated, emailAttemptCount } as const;
         });
         if (result.kind === "missing") return res.status(404).json({ error: "The API access request was not found." });
         if (result.kind === "decided") {
           return res.status(409).json({ error: `This request has already been ${result.status}.` });
         }
-        let emailNotificationStatus: "sent" | "not_configured" | "failed" | null = null;
+        let emailNotificationStatus: CushVerifyApiAccessEmailStatus | null = null;
         if (result.request.status === "approved") {
-          try {
-            const [recipient] = await db.select({
-              email: cushVerifyInstitutionalUsers.email,
-              fullName: cushVerifyInstitutionalUsers.fullName,
-              institutionName: cushVerifyInstitutions.legalName,
-            }).from(cushVerifyApiAccessRequests)
-              .innerJoin(
-                cushVerifyInstitutionalUsers,
-                eq(cushVerifyInstitutionalUsers.id, cushVerifyApiAccessRequests.requestedByInstitutionalUserId),
-              )
-              .innerJoin(
-                cushVerifyInstitutions,
-                eq(cushVerifyInstitutions.id, cushVerifyApiAccessRequests.institutionId),
-              )
-              .where(eq(cushVerifyApiAccessRequests.id, result.request.id))
-              .limit(1);
-            if (recipient) {
-              const delivery = await sendCushVerifyApiAccessApprovedEmail({
-                email: recipient.email,
-                contactName: recipient.fullName,
-                institutionName: recipient.institutionName,
-                requestId: result.request.id,
-              });
-              emailNotificationStatus = delivery.status;
-            } else {
-              emailNotificationStatus = "failed";
-            }
-          } catch (error) {
-            emailNotificationStatus = "failed";
-            console.error("Cush Verify API access approval email failed", {
-              requestId: result.request.id,
-              errorType: error instanceof Error ? error.name : "UnknownError",
-            });
-          }
+          const deliveryStatus = await sendApiAccessApprovalEmail(result.request.id);
+          emailNotificationStatus = await saveApiAccessApprovalEmailStatus(result.request.id, deliveryStatus);
         }
         return res.json({
           request: {
             id: result.request.id,
             status: result.request.status,
             reviewedAt: result.request.reviewedAt?.toISOString() ?? null,
+            emailNotificationStatus,
+            emailNotificationAttemptCount: result.emailAttemptCount,
+            emailNotificationAttemptedAt: result.request.emailNotificationAttemptedAt?.toISOString() ?? null,
           },
           emailNotificationStatus,
           message: result.request.status === "approved"
@@ -388,6 +425,123 @@ export function registerCushVerifyApiRoutes(app: Express): void {
           errorType: error instanceof Error ? error.name : "UnknownError",
         });
         return res.status(503).json({ error: "The API access request decision could not be saved." });
+      }
+    },
+  );
+
+  app.post(
+    "/api/admin/cush-verify/api-access-requests/:requestId/email/retry",
+    requireTrustedAdminOrigin,
+    isAuthenticated,
+    requireAdminPermission(ADMIN_PERMISSION.verificationsManage),
+    async (req: AuthenticatedRequest, res) => {
+      const requestId = Number(req.params.requestId);
+      if (!Number.isSafeInteger(requestId) || requestId < 1) {
+        return res.status(400).json({ error: "The API access request reference is invalid." });
+      }
+      if (!req.userId) return res.status(401).json({ error: "Sign in as a Cush administrator to retry this email." });
+
+      try {
+        const result = await db.transaction(async (tx) => {
+          const [request] = await tx.select().from(cushVerifyApiAccessRequests)
+            .where(eq(cushVerifyApiAccessRequests.id, requestId))
+            .for("update")
+            .limit(1);
+          if (!request) return { kind: "missing" } as const;
+          if (request.status !== "approved") return { kind: "not_approved" } as const;
+
+          const now = new Date();
+          const staleSending = request.emailNotificationStatus === "sending"
+            && request.emailNotificationAttemptedAt !== null
+            && now.getTime() - request.emailNotificationAttemptedAt.getTime() >= 5 * 60_000;
+          if (request.emailNotificationStatus === "sending" && !staleSending) {
+            return { kind: "in_progress" } as const;
+          }
+          if (
+            request.emailNotificationStatus !== "failed" &&
+            request.emailNotificationStatus !== "not_configured" &&
+            !staleSending
+          ) {
+            return { kind: "not_retryable", status: request.emailNotificationStatus } as const;
+          }
+
+          const attemptedAt = now;
+          const attemptNumber = (request.emailNotificationAttemptCount ?? 0) + 1;
+          await tx.update(cushVerifyApiAccessRequests).set({
+            emailNotificationStatus: "sending",
+            emailNotificationAttemptCount: attemptNumber,
+            emailNotificationAttemptedAt: attemptedAt,
+            emailNotificationLastAttemptedByAdminUserId: req.userId!,
+          }).where(eq(cushVerifyApiAccessRequests.id, request.id));
+          await tx.insert(cushVerifyApiAccessRequestEvents).values({
+            requestId: request.id,
+            institutionId: request.institutionId,
+            actorType: "cush_admin",
+            actorCushUserId: req.userId!,
+            eventType: "approval_email_retry_started",
+            details: { attemptNumber },
+          });
+          return {
+            kind: "started",
+            institutionId: request.institutionId,
+            attemptNumber,
+            attemptedAt,
+          } as const;
+        });
+
+        if (result.kind === "missing") return res.status(404).json({ error: "The API access request was not found." });
+        if (result.kind === "not_approved") {
+          return res.status(409).json({ error: "Only approved API access requests can have their email retried." });
+        }
+        if (result.kind === "in_progress") {
+          return res.status(409).json({ error: "An email attempt is already in progress. Refresh the queue shortly." });
+        }
+        if (result.kind === "not_retryable") {
+          return res.status(409).json({
+            error: result.status === "sent"
+              ? "Resend already accepted this email. No duplicate was sent."
+              : "This request has no failed or unconfigured email attempt to retry.",
+          });
+        }
+
+        const deliveryStatus = await sendApiAccessApprovalEmail(requestId);
+        const savedStatus = await saveApiAccessApprovalEmailStatus(requestId, deliveryStatus);
+        try {
+          await db.insert(cushVerifyApiAccessRequestEvents).values({
+            requestId,
+            institutionId: result.institutionId,
+            actorType: "cush_admin",
+            actorCushUserId: req.userId!,
+            eventType: "approval_email_retry_completed",
+            details: {
+              attemptNumber: result.attemptNumber,
+              emailNotificationStatus: savedStatus,
+            },
+          });
+        } catch (error) {
+          console.error("Cush Verify API access email retry audit event failed", {
+            requestId,
+            errorType: error instanceof Error ? error.name : "UnknownError",
+          });
+        }
+        return res.json({
+          emailNotificationStatus: savedStatus,
+          emailNotificationAttemptCount: result.attemptNumber,
+          emailNotificationAttemptedAt: result.attemptedAt.toISOString(),
+          message: savedStatus === "sent"
+            ? "Resend accepted the approval email for delivery to the original requester."
+            : savedStatus === "not_configured"
+              ? "The approval email is still not configured. No email was sent."
+              : savedStatus === "failed"
+                ? "The approval email could not be sent. You can retry after checking the sender settings."
+                : "The email result is still being recorded. Refresh the queue shortly.",
+        });
+      } catch (error) {
+        console.error("Cush Verify API access approval email retry failed", {
+          requestId,
+          errorType: error instanceof Error ? error.name : "UnknownError",
+        });
+        return res.status(503).json({ error: "The approval email could not be retried." });
       }
     },
   );
