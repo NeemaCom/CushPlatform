@@ -28,6 +28,7 @@ import {
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
 import { cushVerifyDb as db } from "./db";
 import { getAllowedFrontendOrigins } from "./origin-policy";
+import { sendCushVerifyApiAccessApprovedEmail } from "./cush-verify-api-access-email";
 import {
   getInstitutionalWorkspaceState,
   isInstitutionalAuthenticated,
@@ -122,7 +123,7 @@ export function registerCushVerifyApiRoutes(app: Express): void {
         if (!isOrganisationAdmin(actor.role)) {
           return res.status(403).json({ error: "Only organisation administrators can view API access requests." });
         }
-        const [requests, events] = await Promise.all([
+        const [requests, events, productionAccess] = await Promise.all([
           db.select().from(cushVerifyApiAccessRequests)
             .where(eq(cushVerifyApiAccessRequests.institutionId, actor.institutionId))
             .orderBy(desc(cushVerifyApiAccessRequests.createdAt))
@@ -138,6 +139,7 @@ export function registerCushVerifyApiRoutes(app: Express): void {
             .where(eq(cushVerifyApiAccessRequestEvents.institutionId, actor.institutionId))
             .orderBy(desc(cushVerifyApiAccessRequestEvents.createdAt))
             .limit(100),
+          getProductionApiAccess(actor.institutionId),
         ]);
         return res.json({
           requests: requests.map((request) => ({
@@ -157,6 +159,10 @@ export function registerCushVerifyApiRoutes(app: Express): void {
             details: event.details,
             createdAt: event.createdAt.toISOString(),
           })),
+          productionAccess: {
+            enabled: productionAccess.enabled,
+            reason: productionAccess.reason,
+          },
         });
       } catch (error) {
         console.error("Cush Verify API access request history failed", {
@@ -329,12 +335,50 @@ export function registerCushVerifyApiRoutes(app: Express): void {
         if (result.kind === "decided") {
           return res.status(409).json({ error: `This request has already been ${result.status}.` });
         }
+        let emailNotificationStatus: "sent" | "not_configured" | "failed" | null = null;
+        if (result.request.status === "approved") {
+          try {
+            const [recipient] = await db.select({
+              email: cushVerifyInstitutionalUsers.email,
+              fullName: cushVerifyInstitutionalUsers.fullName,
+              institutionName: cushVerifyInstitutions.legalName,
+            }).from(cushVerifyApiAccessRequests)
+              .innerJoin(
+                cushVerifyInstitutionalUsers,
+                eq(cushVerifyInstitutionalUsers.id, cushVerifyApiAccessRequests.requestedByInstitutionalUserId),
+              )
+              .innerJoin(
+                cushVerifyInstitutions,
+                eq(cushVerifyInstitutions.id, cushVerifyApiAccessRequests.institutionId),
+              )
+              .where(eq(cushVerifyApiAccessRequests.id, result.request.id))
+              .limit(1);
+            if (recipient) {
+              const delivery = await sendCushVerifyApiAccessApprovedEmail({
+                email: recipient.email,
+                contactName: recipient.fullName,
+                institutionName: recipient.institutionName,
+                requestId: result.request.id,
+              });
+              emailNotificationStatus = delivery.status;
+            } else {
+              emailNotificationStatus = "failed";
+            }
+          } catch (error) {
+            emailNotificationStatus = "failed";
+            console.error("Cush Verify API access approval email failed", {
+              requestId: result.request.id,
+              errorType: error instanceof Error ? error.name : "UnknownError",
+            });
+          }
+        }
         return res.json({
           request: {
             id: result.request.id,
             status: result.request.status,
             reviewedAt: result.request.reviewedAt?.toISOString() ?? null,
           },
+          emailNotificationStatus,
           message: result.request.status === "approved"
             ? "Request approved. An API-enabled subscription is still required before production keys can be created."
             : "Request rejected and recorded.",

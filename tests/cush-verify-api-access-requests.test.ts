@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock, workspaceStateMock } = vi.hoisted(() => ({
-  dbMock: { transaction: vi.fn() },
+const { dbMock, workspaceStateMock, sendApiAccessEmailMock } = vi.hoisted(() => ({
+  dbMock: { transaction: vi.fn(), select: vi.fn() },
   workspaceStateMock: vi.fn(),
+  sendApiAccessEmailMock: vi.fn(),
 }));
 
 vi.mock("../server/db", () => ({ cushVerifyDb: dbMock }));
+vi.mock("../server/cush-verify-api-access-email", () => ({
+  sendCushVerifyApiAccessApprovedEmail: sendApiAccessEmailMock,
+}));
 vi.mock("../server/cush-verify-institutional-routes", () => ({
   getInstitutionalWorkspaceState: workspaceStateMock,
   isInstitutionalAuthenticated: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -136,6 +140,7 @@ describe("Cush Verify production API access request routes", () => {
       institutionId: 11,
       role: "organisation_admin",
     });
+    sendApiAccessEmailMock.mockResolvedValue({ status: "sent" });
   });
 
   it("submits a request and records its audit event in the same transaction", async () => {
@@ -204,6 +209,17 @@ describe("Cush Verify production API access request routes", () => {
     };
     const { tx, inserted, updated } = requestTx({ existing: pendingRequest });
     dbMock.transaction.mockImplementation(async (work: (transaction: unknown) => Promise<unknown>) => work(tx));
+    dbMock.select.mockImplementation(() => {
+      const builder: any = {
+        from() { return builder; },
+        innerJoin() { return builder; },
+        where() { return builder; },
+        async limit() {
+          return [{ email: "admin@example.com", fullName: "Amina Admin", institutionName: "Example Housing" }];
+        },
+      };
+      return builder;
+    });
     const route = findRoute("put", "/api/admin/cush-verify/api-access-requests/:requestId");
     const res = response();
     await route.handlers.at(-1)!({
@@ -214,6 +230,7 @@ describe("Cush Verify production API access request routes", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toMatchObject({ request: { id: 41, status: "approved" } });
+    expect(res.body).toMatchObject({ emailNotificationStatus: "sent" });
     expect(updated[0]).toMatchObject({ status: "approved", reviewedByAdminUserId: 7 });
     expect(inserted[0]).toMatchObject({
       requestId: 41,
@@ -224,6 +241,50 @@ describe("Cush Verify production API access request routes", () => {
     });
     expect(res.body).toMatchObject({
       message: "Request approved. An API-enabled subscription is still required before production keys can be created.",
+    });
+    expect(sendApiAccessEmailMock).toHaveBeenCalledWith({
+      email: "admin@example.com",
+      contactName: "Amina Admin",
+      institutionName: "Example Housing",
+      requestId: 41,
+    });
+  });
+
+  it("keeps an approval successful when its email notification fails", async () => {
+    const pendingRequest = {
+      id: 41,
+      institutionId: 11,
+      status: "submitted",
+      decisionNote: null,
+      reviewedAt: null,
+    };
+    const { tx } = requestTx({ existing: pendingRequest });
+    dbMock.transaction.mockImplementation(async (work: (transaction: unknown) => Promise<unknown>) => work(tx));
+    dbMock.select.mockImplementation(() => {
+      const builder: any = {
+        from() { return builder; },
+        innerJoin() { return builder; },
+        where() { return builder; },
+        async limit() {
+          return [{ email: "admin@example.com", fullName: "Amina Admin", institutionName: "Example Housing" }];
+        },
+      };
+      return builder;
+    });
+    sendApiAccessEmailMock.mockResolvedValue({ status: "failed" });
+    const route = findRoute("put", "/api/admin/cush-verify/api-access-requests/:requestId");
+    const res = response();
+
+    await route.handlers.at(-1)!({
+      params: { requestId: "41" },
+      userId: 7,
+      body: { decision: "approved" },
+    }, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toMatchObject({
+      request: { id: 41, status: "approved" },
+      emailNotificationStatus: "failed",
     });
   });
 });

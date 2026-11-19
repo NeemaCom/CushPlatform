@@ -18,6 +18,12 @@ type ApiAccessRequest = {
   reviewedAt: string | null;
 };
 
+type ApiAccessDecisionResponse = {
+  request: { id: number; status: "approved" | "rejected"; reviewedAt: string | null };
+  emailNotificationStatus: "sent" | "not_configured" | "failed" | null;
+  message: string;
+};
+
 function readableError(error: unknown) {
   const message = error instanceof Error ? error.message : "Request failed.";
   const body = message.match(/^\d+:\s*(\{[\s\S]*\})$/)?.[1];
@@ -64,7 +70,7 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
         decision,
         decisionNote,
       });
-      return response.json();
+      return response.json() as Promise<ApiAccessDecisionResponse>;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/cush-verify/api-access-requests"] }),
   });
@@ -113,7 +119,13 @@ export default function CushVerifyApiAccessAdmin({ canManage }: { canManage: boo
       )}
       {decisionMutation.isSuccess && (
         <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
-          Decision saved. Production keys remain subject to the organisation’s plan entitlement.
+          {decisionMutation.data.request.status === "approved"
+            ? decisionMutation.data.emailNotificationStatus === "sent"
+              ? "Approval saved and email sent to the requester. Production keys still require a subscription with API access."
+              : decisionMutation.data.emailNotificationStatus === "not_configured"
+                ? "Approval saved, but email is not configured. The requester will see an in-workspace notification; check the Resend sender settings."
+                : "Approval saved, but the email could not be sent. The requester will see an in-workspace notification; check the Resend delivery logs."
+            : "Decision saved. The organisation administrator can review the update in the API workspace."}
         </p>
       )}
 

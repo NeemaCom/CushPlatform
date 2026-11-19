@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Building2, CreditCard, FileCheck2, FileClock, KeyRound, LogOut, Search, Settings2, ShieldCheck, Users } from "lucide-react";
@@ -7,6 +7,11 @@ import { getCushVerifyAuth, isCushVerifyFirebaseConfigured } from "@/lib/cush-ve
 import { signOut } from "firebase/auth";
 import { broadcastCushVerifyLogout } from "@/lib/cush-verify-session";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import {
+  consumeNewApiAccessApproval,
+  type ApiAccessNotificationEvent,
+} from "@/lib/cush-verify-api-access-notification";
 import CushVerifyReportWorkspace from "@/components/verify/CushVerifyReportWorkspace";
 import CushVerifyBillingWorkspace from "@/components/verify/CushVerifyBillingWorkspace";
 import CushVerifyTeamManagement from "@/components/verify/team-management/CushVerifyTeamManagement";
@@ -29,6 +34,11 @@ type WorkspaceIdentity = {
   membership: { role: MemberRole; status: string };
   applicationStatus: string;
   accessGranted: boolean;
+};
+
+type ApiAccessNotificationsResponse = {
+  events: ApiAccessNotificationEvent[];
+  productionAccess: { enabled: boolean; reason: string | null };
 };
 
 const applicationLabels: Record<string, string> = {
@@ -67,6 +77,8 @@ function apiError(error: unknown) {
 export default function CushVerifyWorkspace() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const lastNotifiedApproval = useRef<string | null>(null);
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("overview");
   const [selectedRecipientEmail, setSelectedRecipientEmail] = useState("");
   const [showRequestForm, setShowRequestForm] = useState(false);
@@ -87,6 +99,42 @@ export default function CushVerifyWorkspace() {
     enabled: identityQuery.data?.accessGranted === true,
     retry: false,
   });
+  const apiAccessNotificationsQuery = useQuery<ApiAccessNotificationsResponse>({
+    queryKey: ["/api/verify/api-access-requests"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/verify/api-access-requests");
+      return response.json() as Promise<ApiAccessNotificationsResponse>;
+    },
+    enabled: identityQuery.data?.accessGranted === true
+      && identityQuery.data.membership.role === "organisation_admin",
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+
+  useEffect(() => {
+    const identity = identityQuery.data;
+    const data = apiAccessNotificationsQuery.data;
+    if (!identity || !data) return;
+
+    let approvedEvent: ApiAccessNotificationEvent | null = null;
+    try {
+      approvedEvent = consumeNewApiAccessApproval(identity.institution.id, data.events, window.localStorage);
+    } catch {
+      approvedEvent = data.events.find((event) => event.eventType === "approved") ?? null;
+    }
+    if (!approvedEvent) return;
+
+    const notificationIdentity = `${identity.institution.id}:${approvedEvent.requestId}:${approvedEvent.id}`;
+    if (lastNotifiedApproval.current === notificationIdentity) return;
+    lastNotifiedApproval.current = notificationIdentity;
+    toast({
+      title: "Production API request approved",
+      description: data.productionAccess.enabled
+        ? "Cush approved your request. You can create a production key under API & Integrations."
+        : "Cush approved your request. Production keys remain locked until your active subscription includes API access.",
+    });
+  }, [apiAccessNotificationsQuery.data, identityQuery.data, toast]);
 
   useEffect(() => {
     if (identityQuery.error && String(identityQuery.error).includes("401")) setLocation("/verify/login");
