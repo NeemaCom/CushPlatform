@@ -1,27 +1,58 @@
 import Stripe from "stripe";
 import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import * as schema from "@shared/schema";
 import {
   cushVerifyPricingPlans,
   cushVerifyPricingVersions,
   cushVerifyStripePriceMappings,
 } from "@shared/schema";
 import { calculateAnnualPricing } from "@shared/cush-verify-pricing";
-import { db } from "../server/db";
+
+let verifyPool: Pool | undefined;
 
 async function main() {
   const secretKey = process.env.STRIPE_SECRET_KEY?.trim();
   if (!secretKey) throw new Error("Set STRIPE_SECRET_KEY through the workspace secrets flow before running this setup script.");
+  const verifyDatabaseUrl = process.env.CUSH_VERIFY_DATABASE_URL?.trim();
+  if (!verifyDatabaseUrl) {
+    throw new Error("Set CUSH_VERIFY_DATABASE_URL to the intended Cush Verify database before running this setup script.");
+  }
+  const deploymentEnvironment = process.env.CUSH_VERIFY_DEPLOYMENT_ENV?.trim();
   const isLive = secretKey.startsWith("sk_live_");
   if (!isLive && !secretKey.startsWith("sk_test_")) {
     throw new Error("STRIPE_SECRET_KEY must be a Stripe test key. Live mode requires --confirm-live.");
   }
-  if (isLive && !process.argv.includes("--confirm-live")) {
-    throw new Error("Live Stripe price creation requires the explicit --confirm-live flag.");
-  }
-  if (isLive && process.env.CONFIRM_LIVE_STRIPE_PRICE_SETUP !== "YES") {
-    throw new Error("Set CONFIRM_LIVE_STRIPE_PRICE_SETUP=YES only after confirming live product and price creation.");
+  if (isLive) {
+    if (deploymentEnvironment !== "production") {
+      throw new Error("Live Stripe prices require CUSH_VERIFY_DEPLOYMENT_ENV=production.");
+    }
+    if (!process.argv.includes("--confirm-live")) {
+      throw new Error("Live Stripe price creation requires the explicit --confirm-live flag.");
+    }
+    if (process.env.CONFIRM_LIVE_STRIPE_PRICE_SETUP !== "YES") {
+      throw new Error("Set CONFIRM_LIVE_STRIPE_PRICE_SETUP=YES only after confirming live product and price creation.");
+    }
+  } else {
+    if (deploymentEnvironment !== "staging") {
+      throw new Error("Stripe test prices require CUSH_VERIFY_DEPLOYMENT_ENV=staging.");
+    }
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.CUSH_VERIFY_ALLOW_TEST_MODE_IN_PRODUCTION !== "true"
+    ) {
+      throw new Error("Test-mode price setup on a production-mode staging service requires CUSH_VERIFY_ALLOW_TEST_MODE_IN_PRODUCTION=true.");
+    }
   }
 
+  verifyPool = new Pool({
+    connectionString: verifyDatabaseUrl,
+    ssl: { rejectUnauthorized: false },
+    max: 1,
+    connectionTimeoutMillis: 10000,
+  });
+  const db = drizzle(verifyPool as never, { schema });
   const stripe = new Stripe(secretKey);
   const [version] = await db.select().from(cushVerifyPricingVersions)
     .where(eq(cushVerifyPricingVersions.status, "published"))
@@ -124,4 +155,6 @@ main().catch((error) => {
     message: error instanceof Error ? error.message : "Unknown error",
   });
   process.exitCode = 1;
+}).finally(async () => {
+  await verifyPool?.end();
 });
