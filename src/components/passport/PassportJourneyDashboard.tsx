@@ -230,7 +230,7 @@ export default function PassportJourneyDashboard({
     setVisited((current) => mode === "post_arrival"
       ? { ...current, postArrival: true }
       : { ...current, preDetails: true });
-    setActiveSection("information");
+    setActiveSection(null);
     onModeChange(mode);
   }
 

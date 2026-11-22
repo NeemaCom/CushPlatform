@@ -102,11 +102,11 @@ describe("PassportJourneyDashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
 
     expect(onModeChange).toHaveBeenCalledWith("post_arrival");
-    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("1 outstanding item")).toBeTruthy();
   });
 
-  it("opens the Post-arrival information flow and updates the stage heading", () => {
+  it("switches to Post-arrival options without opening the information drawer", () => {
     const onModeChange = vi.fn();
     const props = {
       passport,
@@ -120,6 +120,7 @@ describe("PassportJourneyDashboard", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
     expect(onModeChange).toHaveBeenCalledWith("post_arrival");
+    expect(screen.queryByRole("dialog")).toBeNull();
 
     rerender(
       <PassportJourneyDashboard
@@ -132,7 +133,10 @@ describe("PassportJourneyDashboard", () => {
     expect(selectedTab.getAttribute("aria-selected")).toBe("true");
     expect(selectedTab.className).toContain("bg-teal-700");
     expect(screen.getByText("Build your new financial history")).toBeTruthy();
-    expect(screen.getByTestId("post-arrival-information")).toBeTruthy();
+    expect(screen.getByRole("tabpanel", { name: "Post-arrival steps" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Self-provided information/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Document upload/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Bank connection/ })).toBeTruthy();
   });
 
   it("closes after saving and preserves the financial draft when reopened", () => {
