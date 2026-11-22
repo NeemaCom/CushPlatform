@@ -316,14 +316,19 @@ export default function PassportEvidenceIntake({
     }
   }, [detailQuery.data]);
 
-  const invalidateIntake = () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", period] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] }),
-    ...(selectedId === null ? [] : [queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", selectedId] })]),
-  ]).then(() => undefined);
+  const invalidateIntake = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", period] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] }),
+      ...(selectedId === null ? [] : [queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", selectedId] })]),
+    ]);
+    await queryClient.invalidateQueries(
+      { queryKey: ["/api/passport/me"] },
+      { throwOnError: true },
+    );
+  };
 
   const saveProfileDraft = useMutation({
     mutationFn: (snapshot: FinancialProfile) =>
@@ -424,10 +429,21 @@ export default function PassportEvidenceIntake({
       setOpenProfileSections({ income: false, housing: false, savings: false, history: false });
       setProfileDraftStatus("idle");
       setHasSavedProfileDraft(false);
-      await invalidateIntake();
+      let scoreRefreshFailed = false;
+      try {
+        await invalidateIntake();
+      } catch {
+        scoreRefreshFailed = true;
+      }
       suspendProfileDraftSave.current = false;
-      toast({ title: "Financial profile saved", description: "Your confirmed financial details can contribute to your provisional assessment. Uploaded files remain separate; their review status affects Confidence, not Score by itself." });
-      onSaved?.();
+      toast({
+        title: scoreRefreshFailed ? "Profile saved; Score not refreshed" : "Financial profile saved",
+        description: scoreRefreshFailed
+          ? "Your details are saved, but the assessment could not be refreshed. Your saved information is safe; please try again shortly."
+          : "Your confirmed financial details can contribute to your provisional assessment. Uploaded files remain separate; their review status affects Confidence, not Score by itself.",
+        ...(scoreRefreshFailed ? { variant: "destructive" as const } : {}),
+      });
+      if (!scoreRefreshFailed) onSaved?.();
     },
     onError: (error: Error) => {
       suspendProfileDraftSave.current = false;

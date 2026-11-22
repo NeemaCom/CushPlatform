@@ -49,6 +49,10 @@ function monthEndDate(month: string): string {
   return `${month}-${String(lastDay).padStart(2, "0")}`;
 }
 
+export function rateLookupDateForMonth(month: string, asOfDate: string): string {
+  return monthEndDate(month) > asOfDate ? asOfDate : monthEndDate(month);
+}
+
 function withinSixMonthWindow(month: string, assessmentMonth: string): boolean {
   const [assessmentYear, assessmentNumber] = assessmentMonth.split("-").map(Number);
   const [year, monthNumber] = month.split("-").map(Number);
@@ -68,12 +72,13 @@ async function toGbpPence(
   currency: string,
   month: string,
   rateCache: Map<string, Awaited<ReturnType<typeof getCbnDailyRates>>>,
+  asOfDate: string,
 ): Promise<number | null> {
   if (!amount) return 0;
   const minor = minorUnits(amount);
   if (currency === "GBP") return minor;
   if (currency !== "USD" && currency !== "NGN") return null;
-  const date = monthEndDate(month);
+  const date = rateLookupDateForMonth(month, asOfDate);
   const cacheKey = `${currency}:${date}`;
   let rates = rateCache.get(cacheKey);
   if (!rates) {
@@ -175,6 +180,7 @@ function rowsForProfile(profile: PassportFinancialProfile, assessmentMonth: stri
 export async function buildProfileScoreInputs(
   profile: PassportFinancialProfile | null,
   assessmentMonth: string,
+  asOfDate = new Date().toISOString().slice(0, 10),
 ): Promise<Pick<V2AssessmentInput, "availableFunds" | "incomeHistory" | "cashFlowHistory"> & { unscoredCurrencyCodes: string[] }> {
   if (!profile) return { availableFunds: [], incomeHistory: [], cashFlowHistory: [], unscoredCurrencyCodes: [] };
   const rateCache = new Map<string, Awaited<ReturnType<typeof getCbnDailyRates>>>();
@@ -193,7 +199,7 @@ export async function buildProfileScoreInputs(
     }
   }
   for (const [key, value] of latestSavings) {
-    const amountPence = await toGbpPence(value.amount, value.row.currencyCode, value.row.month, rateCache);
+    const amountPence = await toGbpPence(value.amount, value.row.currencyCode, value.row.month, rateCache, asOfDate);
     if (amountPence === null) {
       unscoredCurrencyCodes.add(value.row.currencyCode);
       continue;
@@ -219,7 +225,7 @@ export async function buildProfileScoreInputs(
   for (const row of rows) {
     const hasIncome = Boolean(row.incomeAmount && row.incomeFrequency);
     const incomePence = hasIncome
-      ? await toGbpPence(monthlyAmount(row.incomeAmount, row.incomeFrequency), row.currencyCode, row.month, rateCache)
+      ? await toGbpPence(monthlyAmount(row.incomeAmount, row.incomeFrequency), row.currencyCode, row.month, rateCache, asOfDate)
       : 0;
     if (hasIncome && incomePence === null) {
       unscoredCurrencyCodes.add(row.currencyCode);
@@ -237,7 +243,7 @@ export async function buildProfileScoreInputs(
       });
     }
     if (!hasIncome && !row.expensesAmount && !row.completeCashFlow) continue;
-    const expensesPence = await toGbpPence(row.expensesAmount || "0", row.currencyCode, row.month, rateCache);
+    const expensesPence = await toGbpPence(row.expensesAmount || "0", row.currencyCode, row.month, rateCache, asOfDate);
     if (expensesPence === null) {
       unscoredCurrencyCodes.add(row.currencyCode);
       continue;

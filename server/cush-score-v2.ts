@@ -526,8 +526,16 @@ async function calculateV2AssessmentForUser(
   const preArrivalProfile = preArrivalProfileResult.profile;
   const postArrivalProfile = postArrivalProfileResult.profile;
   const [preArrivalInputs, postArrivalInputs] = await Promise.all([
-    buildProfileScoreInputs(preArrivalProfile, now.toISOString().slice(0, 7)),
-    buildProfileScoreInputs(postArrivalProfile, now.toISOString().slice(0, 7)),
+    buildProfileScoreInputs(
+      preArrivalProfile,
+      now.toISOString().slice(0, 7),
+      now.toISOString().slice(0, 10),
+    ),
+    buildProfileScoreInputs(
+      postArrivalProfile,
+      now.toISOString().slice(0, 7),
+      now.toISOString().slice(0, 10),
+    ),
   ]);
   const profileInputs = mergePassportScoreInputs(preArrivalInputs, postArrivalInputs);
   const inputs = mergeManualProfileInputs(storedInputs, profileInputs);

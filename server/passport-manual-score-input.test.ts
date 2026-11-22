@@ -1,8 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { passportFinancialProfileSchema } from "./passport-evidence-service";
-import { buildProfileScoreInputs } from "./passport-manual-score-input";
+import { clearCbnRateCacheForTests, getCbnDailyRates } from "./cbn-fx-rates";
+import { buildProfileScoreInputs, rateLookupDateForMonth } from "./passport-manual-score-input";
+
+afterEach(() => clearCbnRateCacheForTests());
 
 describe("Passport manual financial assessment inputs", () => {
+  it("uses today's available rate date when the current month-end is still in the future", async () => {
+    const lookupDate = rateLookupDateForMonth("2026-11", "2026-11-22");
+    expect(lookupDate).toBe("2026-11-22");
+    const rates = await getCbnDailyRates(lookupDate, async () => new Response(JSON.stringify([
+      { currency: "US DOLLAR", ratedate: "2026-11-20", centralrate: "1500.0000" },
+      { currency: "POUNDS STERLING", ratedate: "2026-11-20", centralrate: "2000.0000" },
+    ]), { status: 200 }));
+    expect(rates.effectiveDate).toBe("2026-11-20");
+  });
+
   it("maps current self-declared income, savings, and complete monthly expenses", async () => {
     const profile = passportFinancialProfileSchema.parse({
       countryCode: "GB",
