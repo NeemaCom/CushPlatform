@@ -51,6 +51,8 @@ type Progression = {
   }>;
 };
 
+type PassportMode = "pre_arrival" | "post_arrival";
+
 type Props = {
   passport: PassportSummary;
   progression?: Progression;
@@ -58,7 +60,7 @@ type Props = {
   sharePanel: ReactNode;
   modePending: boolean;
   monoCodePending: boolean;
-  onModeChange: (mode: string) => void;
+  onModeChange: (mode: PassportMode) => void | Promise<unknown>;
 };
 
 const sectionCopy: Record<JourneySection, { title: string; shortTitle: string; description: string }> = {
@@ -98,7 +100,10 @@ export default function PassportJourneyDashboard({
   monoCodePending,
   onModeChange,
 }: Props) {
-  const isPostArrival = passport.mode === "post_arrival";
+  const [requestedMode, setRequestedMode] = useState<PassportMode | null>(null);
+  const selectedMode: PassportMode = requestedMode
+    ?? (passport.mode === "post_arrival" ? "post_arrival" : "pre_arrival");
+  const isPostArrival = selectedMode === "post_arrival";
   const [activeSection, setActiveSection] = useState<JourneySection | null>(null);
   const [visited, setVisited] = useState({
     preDetails: false,
@@ -108,6 +113,11 @@ export default function PassportJourneyDashboard({
   const drawerRef = useRef<HTMLElement | null>(null);
   const drawerCloseRef = useRef<HTMLButtonElement | null>(null);
   const section = activeSection ? sectionCopy[activeSection] : null;
+  useEffect(() => {
+    if (requestedMode && passport.mode === requestedMode) {
+      setRequestedMode(null);
+    }
+  }, [passport.mode, requestedMode]);
   const postArrivalView = activeSection === "documents"
     ? "documents"
     : activeSection === "connections"
@@ -227,11 +237,18 @@ export default function PassportJourneyDashboard({
   const drawerTitle = section?.title ?? "Your financial identity";
 
   function selectStage(mode: "pre_arrival" | "post_arrival") {
+    setRequestedMode(mode);
     setVisited((current) => mode === "post_arrival"
       ? { ...current, postArrival: true }
       : { ...current, preDetails: true });
     setActiveSection(null);
-    onModeChange(mode);
+    try {
+      Promise.resolve(onModeChange(mode)).catch(() => {
+        setRequestedMode((current) => current === mode ? null : current);
+      });
+    } catch {
+      setRequestedMode((current) => current === mode ? null : current);
+    }
   }
 
   return (
@@ -255,12 +272,12 @@ export default function PassportJourneyDashboard({
                       key={value}
                       type="button"
                       role="tab"
-                      aria-selected={passport.mode === value}
+                      aria-selected={selectedMode === value}
                       aria-controls="passport-journey-options"
-                      disabled={modePending || passport.mode === value}
+                      disabled={modePending || selectedMode === value}
                       onClick={() => selectStage(value as "pre_arrival" | "post_arrival")}
                       className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
-                        passport.mode === value
+                        selectedMode === value
                           ? value === "post_arrival"
                             ? "bg-teal-700 text-white shadow-md ring-1 ring-teal-800"
                             : "bg-indigo-700 text-white shadow-md ring-1 ring-indigo-800"
@@ -269,7 +286,7 @@ export default function PassportJourneyDashboard({
                     >
                       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                       {label}
-                      {passport.mode === value && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">Selected</span>}
+                      {selectedMode === value && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">Selected</span>}
                     </button>
                   ))}
                 </div>

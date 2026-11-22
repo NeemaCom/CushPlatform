@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import PassportJourneyDashboard from "./PassportJourneyDashboard";
 
@@ -121,6 +121,8 @@ describe("PassportJourneyDashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
     expect(onModeChange).toHaveBeenCalledWith("post_arrival");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByRole("tab", { name: /Post-arrival/ }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText("UK income, employment, housing and financial history.")).toBeTruthy();
 
     rerender(
       <PassportJourneyDashboard
@@ -137,6 +139,19 @@ describe("PassportJourneyDashboard", () => {
     expect(screen.getByRole("button", { name: /Self-provided information/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Document upload/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Bank connection/ })).toBeTruthy();
+  });
+
+  it("reverts the visible stage if the mode request fails", async () => {
+    const onModeChange = vi.fn(() => Promise.reject(new Error("Network error")));
+    renderDashboard(onModeChange);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
+    expect(screen.getByRole("tab", { name: /Post-arrival/ }).getAttribute("aria-selected")).toBe("true");
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: /Pre-arrival/ }).getAttribute("aria-selected")).toBe("true");
+    });
+    expect(screen.getByText("Income, employment, housing, savings and commitments.")).toBeTruthy();
   });
 
   it("closes after saving and preserves the financial draft when reopened", () => {

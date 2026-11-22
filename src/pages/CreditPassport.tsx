@@ -387,8 +387,19 @@ export default function CreditPassport() {
     queryKey: ["/api/passport/me"],
     queryFn: () => apiRequest("GET", "/api/passport/me"),
   });
-  const toggleModeMutation = useMutation({
-    mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
+  const toggleModeMutation = useMutation<
+    { passport: PassportData["passport"] },
+    Error,
+    "pre_arrival" | "post_arrival",
+    { previous: PassportData | undefined }
+  >({
+    mutationFn: async (mode) => {
+      const result = await apiRequest("PUT", "/api/passport/mode", { mode });
+      if (result?.passport?.mode !== mode) {
+        throw new Error("We could not save the selected stage. Please try again.");
+      }
+      return result as { passport: PassportData["passport"] };
+    },
     onMutate: async (mode: string) => {
       const key = ["/api/passport/me"];
       await qc.cancelQueries({ queryKey: key });
@@ -518,7 +529,7 @@ export default function CreditPassport() {
           )}
           modePending={toggleModeMutation.isPending}
           monoCodePending={monoCodePending}
-          onModeChange={(mode) => toggleModeMutation.mutate(mode)}
+          onModeChange={(mode) => toggleModeMutation.mutateAsync(mode)}
         />
       </main>
     </div>
