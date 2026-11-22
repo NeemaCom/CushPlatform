@@ -5,11 +5,11 @@ description: Product rules for activating and handling UK Post-Arrival informati
 
 Post-Arrival activates when the user confirms their actual UK arrival date. Do not require proof of residency or immigration documents just to access the section. Existing users already marked as arrived should not have to repeat confirmation; if their arrival date is unknown, let them add it.
 
-Post-Arrival profile completion and user-entered records do not award points or imply evidence verification. Keep original transaction dates, country, and currency. Only records already eligible under the existing reviewed/provider-backed scoring policy may affect score; do not change scoring formulas as part of Post-Arrival work.
+Post-Arrival profile completion and user-entered records do not imply evidence verification. Keep original dates, country, and currency. Under the user's later direction, manual financial profile entries in both Pre-Arrival and Post-Arrival may affect provisional Score components as self-reported data and receive 5 source-quality Confidence points only after an authorized policy version is activated. They never satisfy final-score verification gates. Store recognized ISO currencies unchanged; score GBP directly and use existing dated CBN conversion for USD/NGN. No other FX source has been approved, so other currencies remain unscored until a dated rate source is approved. Plaid activity remains separate until an explicit integration/policy change.
 
-**Why:** The user approved persistent Post-Arrival storage and specified arrival status as the activation criterion while preserving the existing score policy.
+**Why:** The user first kept Post-Arrival scoring separate, then later explicitly directed that manual entries in both periods should influence provisional Score and Confidence, with 5 self-declared source-quality points; this later direction supersedes the earlier no-score rule. The user also asked for international currencies but did not select a conversion provider, so guessing exchange rates would be unsafe.
 
-**How to apply:** Keep arrival activation independent from document uploads, store user-entered records separately from verified evidence, and keep score updates restricted to the existing eligibility rules.
+**How to apply:** Keep arrival activation independent from document uploads, store manual records as self-reported, normalize only with approved dated exchange rates, preserve final-score verification gates and weights, and never label manual or Plaid data as verified.
 
 For Plaid, keep bank linking within Post-Arrival: show account-holder name, email, and phone for user review and optional profile copy; show transaction history only as temporary review data. Do not copy addresses, change sign-in identity, persist transaction details, or feed Plaid transactions into V2 scoring. Keep the existing Mono V2 statement/scoring flow separate.
 

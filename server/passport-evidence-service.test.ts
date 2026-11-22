@@ -5,6 +5,7 @@ import {
   EvidenceEncryptionUnavailableError,
   extractEvidenceDraft,
   passportFinancialProfileSchema,
+  validatePassportFinancialProfilePeriod,
 } from "./passport-evidence-service";
 
 const originalKey = process.env.PASSPORT_EVIDENCE_ENCRYPTION_KEY;
@@ -43,8 +44,8 @@ describe("Passport evidence intake safeguards", () => {
     expect(() => extractEvidenceDraft(Buffer.from("not a pdf"), "application/pdf")).toThrow(/valid PDF/);
   });
 
-  it("limits scoreable profile currencies to the supported conversion set", () => {
-    expect(() => passportFinancialProfileSchema.parse({
+  it("accepts valid currencies even when scoring conversion is not yet approved", () => {
+    expect(passportFinancialProfileSchema.parse({
       countryCode: "GB",
       currencyCode: "EUR",
       incomeAmount: "",
@@ -53,6 +54,50 @@ describe("Passport evidence intake safeguards", () => {
       commitmentsAmount: "",
       financialHistorySummary: "",
       financialHistory: [],
+    }).currencyCode).toBe("EUR");
+    expect(() => passportFinancialProfileSchema.parse({
+      countryCode: "GB",
+      currencyCode: "FOO",
+      incomeAmount: "",
+      housingCost: "",
+      savingsAmount: "",
+      commitmentsAmount: "",
+      financialHistorySummary: "",
+      financialHistory: [],
     })).toThrow();
+  });
+
+  it("keeps Post-Arrival history from predating the confirmed arrival month", () => {
+    const profile = passportFinancialProfileSchema.parse({
+      countryCode: "GB",
+      currencyCode: "GBP",
+      incomeAmount: "",
+      housingCost: "",
+      savingsAmount: "",
+      commitmentsAmount: "",
+      financialHistorySummary: "",
+      financialHistory: [{
+        id: "7dcf2e87-c8b9-4eae-8d31-3c7454e173a8",
+        month: "2026-03",
+        label: "Income",
+        countryCode: "GB",
+        currencyCode: "GBP",
+        incomeAmount: "2000",
+        incomeFrequency: "monthly",
+        incomeCategory: "salary",
+        recurring: true,
+        variable: false,
+        savingsAmount: "",
+        savingsLabel: "",
+        expensesAmount: "",
+        completeCashFlow: false,
+      }],
+    });
+
+    expect(validatePassportFinancialProfilePeriod(profile, "pre_arrival", null)).toBeNull();
+    expect(validatePassportFinancialProfilePeriod(profile, "post_arrival", null)).toBe("arrival_required");
+    expect(validatePassportFinancialProfilePeriod(profile, "post_arrival", "2026-04-20"))
+      .toBe("history_before_arrival");
+    expect(validatePassportFinancialProfilePeriod(profile, "post_arrival", "2026-03-15")).toBeNull();
   });
 });

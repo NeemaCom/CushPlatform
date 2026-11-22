@@ -17,6 +17,7 @@ interface V2AssessmentResponse {
   }>;
   schemaReady: true;
   monoDataReady: boolean;
+  unscoredCurrencyCodes?: string[];
 }
 
 interface InterswitchCreditHistoryResult {
@@ -147,6 +148,11 @@ export default function V2AssessmentPanel() {
 
   return (
     <div className="space-y-4">
+      {(view.unscoredCurrencyCodes?.length ?? 0) > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="status">
+          Your {view.unscoredCurrencyCodes!.join(", ")} entries are saved in their original currencies but are not included in the GBP-based Score until a dated approved conversion rate is available.
+        </div>
+      )}
       <MonoBankDataPanel />
 
       <AssessmentStep

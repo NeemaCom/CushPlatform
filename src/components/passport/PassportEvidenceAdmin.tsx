@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 
 type Submission = {
   id: number;
+  period: "pre_arrival" | "post_arrival";
   userId: number;
   email: string;
   displayName: string;
@@ -29,6 +30,11 @@ type Detail = {
   submission: Submission;
   extractedDraft: string;
   correctedDraft: string | null;
+  currencyDetection: {
+    detectedCurrencyCodes: string[];
+    suggestedCurrencyCode: string | null;
+    ambiguousSymbols: Array<{ symbol: string; candidates: string[] }>;
+  };
   review: { notes: string; reviewBasis: string };
   events: Array<{ eventType: string; actorType: string; createdAt: string }>;
 };
@@ -154,7 +160,7 @@ export default function PassportEvidenceAdmin({ canReview }: { canReview: boolea
                       <button type="button" onClick={() => setSelectedId(item.id)} aria-current={selectedId === item.id ? "true" : undefined} className={`w-full rounded-lg p-2 text-left ${selectedId === item.id ? "bg-[#eeedff]" : "hover:bg-white"}`}>
                         <span className="block truncate text-sm font-semibold text-[#24252a]">{item.label}</span>
                         <span className="mt-1 block text-xs text-[#6f706f]">{item.displayName} · {item.email}</span>
-                        <span className="mt-1 block text-xs text-[#777973]">{title(item.reviewStatus)} · {date(item.submittedAt)}</span>
+                        <span className="mt-1 block text-xs text-[#777973]">{title(item.period)} · {title(item.reviewStatus)} · {date(item.submittedAt)}</span>
                       </button>
                     </li>
                   ))}
@@ -178,7 +184,7 @@ export default function PassportEvidenceAdmin({ canReview }: { canReview: boolea
                     <div>
                       <h2 className="text-base font-semibold text-[#24252a]">{detail.data.submission.label}</h2>
                       <p className="mt-1 text-xs text-[#6f706f]">{detail.data.submission.displayName} · {detail.data.submission.email}</p>
-                      <p className="mt-1 text-xs text-[#777973]">{detail.data.submission.fileName} · {detail.data.submission.countryCode} / {detail.data.submission.currencyCode} · {(detail.data.submission.fileSize / 1024).toFixed(0)} KB</p>
+                      <p className="mt-1 text-xs text-[#777973]">{title(detail.data.submission.period)} · {detail.data.submission.fileName} · {detail.data.submission.countryCode} / {detail.data.submission.currencyCode} · {(detail.data.submission.fileSize / 1024).toFixed(0)} KB</p>
                     </div>
                     <button type="button" onClick={() => void downloadFile(selectedId, detail.data!.submission.fileName)} className="inline-flex items-center gap-2 rounded-lg border border-[#deddd4] bg-white px-3 py-2 text-xs font-semibold text-[#555750]">
                       <Download className="h-4 w-4" /> Original file
@@ -187,6 +193,14 @@ export default function PassportEvidenceAdmin({ canReview }: { canReview: boolea
                   <div>
                     <p className="mb-1 text-xs font-semibold text-[#555750]">User-reviewed extracted draft</p>
                     <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-xl border border-[#e4e1d8] bg-white p-3 text-xs leading-5 text-[#42443e]">{(detail.data.correctedDraft ?? detail.data.extractedDraft) || "No text was extracted."}</pre>
+                  </div>
+                  <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs leading-5 text-indigo-950">
+                    <p className="font-semibold">Currency detection: {detail.data.currencyDetection.detectedCurrencyCodes.length
+                      ? detail.data.currencyDetection.detectedCurrencyCodes.join(", ")
+                      : "no explicit code detected"}</p>
+                    {detail.data.currencyDetection.ambiguousSymbols.map(({ symbol, candidates }) => (
+                      <p key={symbol} className="mt-1">Ambiguous “{symbol}” symbol; possible codes: {candidates.join(", ")}. Check the source document before recording a currency.</p>
+                    ))}
                   </div>
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
                     Text extraction is not verification. Record the basis for any independent or institution-confirmed classification.

@@ -1596,9 +1596,21 @@ export const cushPassportFinancialProfiles = pgTable("cush_passport_financial_pr
   currencyCodeCheck: check("cush_passport_financial_profiles_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
 })).enableRLS();
 
+export const cushPassportPostArrivalFinancialProfiles = pgTable("cush_passport_post_arrival_financial_profiles", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  countryCode: text("country_code").notNull(),
+  currencyCode: text("currency_code").notNull(),
+  encryptedProfile: text("encrypted_profile").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  countryCodeCheck: check("cush_passport_post_arrival_financial_profiles_country_check", sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
+  currencyCodeCheck: check("cush_passport_post_arrival_financial_profiles_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
+})).enableRLS();
+
 export const cushPassportEvidenceSubmissions = pgTable("cush_passport_evidence_submissions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  period: text("period").notNull().default("pre_arrival"),
   documentType: text("document_type").notNull(),
   label: text("label").notNull(),
   fileName: text("file_name").notNull(),
@@ -1630,10 +1642,12 @@ export const cushPassportEvidenceSubmissions = pgTable("cush_passport_evidence_s
     "cush_passport_evidence_submissions_classification_check",
     sql`${table.evidenceClassification} in ('self_declared', 'document_supported', 'independently_verified', 'institution_confirmed')`,
   ),
+  periodCheck: check("cush_passport_evidence_submissions_period_check", sql`${table.period} in ('pre_arrival', 'post_arrival')`),
   fileSizeCheck: check("cush_passport_evidence_submissions_file_size_check", sql`${table.fileSize} between 1 and 5242880`),
   countryCodeCheck: check("cush_passport_evidence_submissions_country_check", sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
   currencyCodeCheck: check("cush_passport_evidence_submissions_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
   userCreatedIndex: index("cush_passport_evidence_submissions_user_created_idx").on(table.userId, table.createdAt),
+  userPeriodCreatedIndex: index("cush_passport_evidence_submissions_user_period_created_idx").on(table.userId, table.period, table.createdAt),
   statusCreatedIndex: index("cush_passport_evidence_submissions_status_created_idx").on(table.reviewStatus, table.createdAt),
 })).enableRLS();
 

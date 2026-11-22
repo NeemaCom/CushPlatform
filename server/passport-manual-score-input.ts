@@ -4,7 +4,6 @@ import type { V2AssessmentInput } from "@shared/schema";
 import {
   convertMinorToGbpPence,
   getCbnDailyRates,
-  type SupportedCurrency,
 } from "./cbn-fx-rates";
 import type { PassportFinancialProfile } from "./passport-evidence-service";
 
@@ -14,7 +13,7 @@ type ScoreRow = {
   id: string;
   month: string;
   countryCode: string;
-  currencyCode: SupportedCurrency;
+  currencyCode: string;
   label: string;
   incomeAmount: string;
   incomeFrequency: "weekly" | "monthly" | "annual" | "variable" | "";
@@ -66,13 +65,14 @@ function monthlyAmount(value: string, frequency: ScoreRow["incomeFrequency"]): s
 
 async function toGbpPence(
   amount: string,
-  currency: SupportedCurrency,
+  currency: string,
   month: string,
   rateCache: Map<string, Awaited<ReturnType<typeof getCbnDailyRates>>>,
-): Promise<number> {
+): Promise<number | null> {
   if (!amount) return 0;
   const minor = minorUnits(amount);
   if (currency === "GBP") return minor;
+  if (currency !== "USD" && currency !== "NGN") return null;
   const date = monthEndDate(month);
   const cacheKey = `${currency}:${date}`;
   let rates = rateCache.get(cacheKey);
@@ -175,11 +175,12 @@ function rowsForProfile(profile: PassportFinancialProfile, assessmentMonth: stri
 export async function buildProfileScoreInputs(
   profile: PassportFinancialProfile | null,
   assessmentMonth: string,
-): Promise<Pick<V2AssessmentInput, "availableFunds" | "incomeHistory" | "cashFlowHistory">> {
-  if (!profile) return { availableFunds: [], incomeHistory: [], cashFlowHistory: [] };
+): Promise<Pick<V2AssessmentInput, "availableFunds" | "incomeHistory" | "cashFlowHistory"> & { unscoredCurrencyCodes: string[] }> {
+  if (!profile) return { availableFunds: [], incomeHistory: [], cashFlowHistory: [], unscoredCurrencyCodes: [] };
   const rateCache = new Map<string, Awaited<ReturnType<typeof getCbnDailyRates>>>();
   const allRows = rowsForProfile(profile, assessmentMonth);
   const rows = allRows.filter((row) => withinSixMonthWindow(row.month, assessmentMonth));
+  const unscoredCurrencyCodes = new Set<string>();
   const availableFunds: V2AssessmentInput["availableFunds"] = [];
   const latestSavings = new Map<string, { row: ScoreRow; amount: string }>();
   for (const row of rows) {
@@ -193,6 +194,10 @@ export async function buildProfileScoreInputs(
   }
   for (const [key, value] of latestSavings) {
     const amountPence = await toGbpPence(value.amount, value.row.currencyCode, value.row.month, rateCache);
+    if (amountPence === null) {
+      unscoredCurrencyCodes.add(value.row.currencyCode);
+      continue;
+    }
     if (amountPence <= 0) continue;
     availableFunds.push({
       id: value.row.id,
@@ -216,7 +221,11 @@ export async function buildProfileScoreInputs(
     const incomePence = hasIncome
       ? await toGbpPence(monthlyAmount(row.incomeAmount, row.incomeFrequency), row.currencyCode, row.month, rateCache)
       : 0;
-    if (hasIncome && incomePence > 0) {
+    if (hasIncome && incomePence === null) {
+      unscoredCurrencyCodes.add(row.currencyCode);
+      continue;
+    }
+    if (hasIncome && incomePence !== null && incomePence > 0) {
       incomeHistory.push({
         id: row.id,
         month: row.month,
@@ -229,13 +238,17 @@ export async function buildProfileScoreInputs(
     }
     if (!hasIncome && !row.expensesAmount && !row.completeCashFlow) continue;
     const expensesPence = await toGbpPence(row.expensesAmount || "0", row.currencyCode, row.month, rateCache);
+    if (expensesPence === null) {
+      unscoredCurrencyCodes.add(row.currencyCode);
+      continue;
+    }
     const month = cashFlowByMonth.get(row.month) ?? {
       incomePence: 0,
       expensesPence: 0,
       complete: true,
       rowCount: 0,
     };
-    month.incomePence += row.recurring ? incomePence : 0;
+    month.incomePence += row.recurring ? (incomePence ?? 0) : 0;
     month.expensesPence += expensesPence;
     month.complete = month.complete && row.completeCashFlow;
     month.rowCount += 1;
@@ -256,5 +269,5 @@ export async function buildProfileScoreInputs(
       complete: value.complete,
     });
   }
-  return { availableFunds, incomeHistory, cashFlowHistory };
+  return { availableFunds, incomeHistory, cashFlowHistory, unscoredCurrencyCodes: [...unscoredCurrencyCodes].sort() };
 }

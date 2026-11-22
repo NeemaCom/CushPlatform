@@ -1,6 +1,7 @@
 import { createDecipheriv, createCipheriv, randomBytes } from "node:crypto";
 import { inflateSync } from "node:zlib";
 import { z } from "zod";
+import { isIsoCurrencyCode } from "./currency-catalog";
 
 export const MAX_EVIDENCE_FILE_BYTES = 5 * 1024 * 1024;
 export const MAX_EXTRACTED_TEXT_CHARS = 25_000;
@@ -16,7 +17,7 @@ const passportFinancialHistoryEntrySchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
   label: z.string().trim().min(1).max(100),
   countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
-  currencyCode: z.enum(["GBP", "USD", "NGN"]),
+  currencyCode: z.string().trim().toUpperCase().refine(isIsoCurrencyCode, "Enter a valid ISO 4217 currency code."),
   incomeAmount: amountText,
   incomeFrequency: z.enum(["weekly", "monthly", "annual", "variable", ""]).default(""),
   incomeCategory: z.enum(["salary", "contract", "business", "family_support", "other"]).default("other"),
@@ -30,7 +31,7 @@ const passportFinancialHistoryEntrySchema = z.object({
 
 export const passportFinancialProfileSchema = z.object({
   countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
-  currencyCode: z.enum(["GBP", "USD", "NGN"]),
+  currencyCode: z.string().trim().toUpperCase().refine(isIsoCurrencyCode, "Enter a valid ISO 4217 currency code."),
   employmentStatus: optionalText(80),
   employer: optionalText(160),
   jobTitle: optionalText(120),
@@ -112,6 +113,19 @@ export const passportFinancialProfileSchema = z.object({
 
 export type PassportFinancialProfile = z.infer<typeof passportFinancialProfileSchema>;
 
+export function validatePassportFinancialProfilePeriod(
+  profile: PassportFinancialProfile,
+  period: "pre_arrival" | "post_arrival",
+  arrivalDate: string | null,
+): "arrival_required" | "history_before_arrival" | null {
+  if (period === "pre_arrival") return null;
+  if (!arrivalDate) return "arrival_required";
+  const arrivalMonth = arrivalDate.slice(0, 7);
+  return profile.financialHistory.some((entry) => entry.month < arrivalMonth)
+    ? "history_before_arrival"
+    : null;
+}
+
 export const evidenceDocumentTypeSchema = z.enum([
   "payslip",
   "bank_statement",
@@ -129,12 +143,15 @@ export const evidenceUploadMetadataSchema = z.object({
   documentType: evidenceDocumentTypeSchema,
   label: z.string().trim().min(1).max(120),
   countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
-  currencyCode: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
+  currencyCode: z.string().trim().toUpperCase().refine(isIsoCurrencyCode, "Enter a valid ISO 4217 currency code."),
   fileName: z.string().trim().min(1).max(180),
 }).strict();
 
 export const evidenceDraftCorrectionSchema = z.object({
   correctedDraft: z.string().max(MAX_EXTRACTED_TEXT_CHARS, "Corrections must be 25,000 characters or fewer."),
+  currencyCode: z.string().trim().toUpperCase()
+    .refine(isIsoCurrencyCode, "Enter a valid ISO 4217 currency code.")
+    .optional(),
 }).strict();
 
 export const evidenceReviewSchema = z.object({

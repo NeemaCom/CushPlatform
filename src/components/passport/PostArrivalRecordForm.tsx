@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { PostArrivalRecordInput } from "@shared/schema";
+import CurrencyCodeField, { type CurrencyOption } from "./CurrencyCodeField";
 
 type RecordType = PostArrivalRecordInput["recordType"];
 type SavedRecord = {
@@ -18,6 +19,7 @@ type Props = {
   isSaving: boolean;
   onSubmit: (payload: PostArrivalRecordInput, recordId?: number) => void;
   onCancel?: () => void;
+  currencyOptions: CurrencyOption[];
 };
 
 const RECORD_TYPES: Array<{ value: RecordType; label: string }> = [
@@ -54,7 +56,7 @@ function toFormRecord(record?: SavedRecord) {
   return result;
 }
 
-export default function PostArrivalRecordForm({ initialRecord, isSaving, onSubmit, onCancel }: Props) {
+export default function PostArrivalRecordForm({ initialRecord, isSaving, onSubmit, onCancel, currencyOptions }: Props) {
   const [recordType, setRecordType] = useState<RecordType>(initialRecord?.recordType ?? "employment");
   const [label, setLabel] = useState(initialRecord?.label ?? "");
   const [activityDate, setActivityDate] = useState(initialRecord?.activityDate ?? "");
@@ -225,11 +227,15 @@ export default function PostArrivalRecordForm({ initialRecord, isSaving, onSubmi
           <input className={inputClass} maxLength={2} value={countryCode} onChange={(event) => setCountryCode(event.target.value.toUpperCase())} placeholder="GB" />
           <span className="mt-1 block text-xs font-normal text-slate-500">Two-letter code, such as GB or NG.</span>
         </label>
-        <label className="block text-sm font-medium text-slate-700">
-          Currency
-          <input className={inputClass} maxLength={3} value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} placeholder="GBP" />
-          <span className="mt-1 block text-xs font-normal text-slate-500">Three-letter code, such as GBP, USD or NGN.</span>
-        </label>
+        <CurrencyCodeField
+          id="post-arrival-record-currency"
+          label="Currency"
+          value={currencyCode}
+          options={currencyOptions}
+          onChange={setCurrencyCode}
+          className="block text-sm font-medium text-slate-700"
+          inputClassName={inputClass}
+        />
       </div>
 
       {recordType === "employment" && (

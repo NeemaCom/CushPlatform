@@ -21,6 +21,8 @@ import { API_BASE_URL } from "@/lib/api-base";
 import PostArrivalRecordForm, { type SavedRecord } from "./PostArrivalRecordForm";
 import type { PostArrivalRecordInput } from "@shared/schema";
 import PlaidConnectionPanel from "./PlaidConnectionPanel";
+import PassportEvidenceIntake from "./PassportEvidenceIntake";
+import type { CurrencyOption } from "./CurrencyCodeField";
 import { useToast } from "@/hooks/use-toast";
 
 type ProfileData = {
@@ -132,6 +134,11 @@ export default function PostArrivalPanel() {
     queryFn: () => request("GET", "/api/passport/post-arrival"),
     retry: false,
   });
+  const currencyOptionsQuery = useQuery<{ currencies: CurrencyOption[] }>({
+    queryKey: ["/api/passport/currencies"],
+    queryFn: () => request("GET", "/api/passport/currencies"),
+    staleTime: 24 * 60 * 60 * 1000,
+  });
 
   useEffect(() => {
     if (!profileQuery.data) return;
@@ -160,7 +167,7 @@ export default function PostArrivalPanel() {
       setProfileDetailsOpen(false);
       toast({
         title: "Your details are saved",
-        description: "They are stored in your profile and do not change your score.",
+        description: "These arrival and contact details are separate from the financial profile used in provisional scoring.",
         className: "border-emerald-300 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl",
       });
     },
@@ -560,16 +567,18 @@ export default function PostArrivalPanel() {
               <div>
                 <h3 className="text-sm font-semibold text-slate-900">Your assessment stays separate</h3>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Profile completion and arrival confirmation do not add score points. These records are user-entered and are not treated as verified evidence.
+                  Arrival confirmation and contact-profile completion do not add score points. The financial profile below can affect provisional Score components as self-reported data; none of it is treated as verified evidence.
                 </p>
                 <p className="mt-2 text-xs leading-5 text-slate-600">
-                  Information is saved with its original date, country and currency. Eligible provider-reviewed information continues through the existing assessment flow; the scoring method is unchanged.
+                  Amounts keep their original date, country and currency. GBP is scored directly; USD and NGN use the existing CBN rate for the relevant month. Other currencies remain saved but unscored until an approved rate is available.
                 </p>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <PassportEvidenceIntake period="post_arrival" />
 
       <PlaidConnectionPanel
         request={request}
@@ -596,6 +605,7 @@ export default function PostArrivalPanel() {
       {showRecordForm && (
         <PostArrivalRecordForm
           isSaving={saveRecord.isPending}
+          currencyOptions={currencyOptionsQuery.data?.currencies ?? []}
           onSubmit={(payload, id) => saveRecord.mutate({ payload, id })}
           onCancel={() => { setShowRecordForm(false); setEditingRecord(undefined); }}
         />
@@ -606,6 +616,7 @@ export default function PostArrivalPanel() {
           key={editingRecord.id}
           initialRecord={editingRecord}
           isSaving={saveRecord.isPending}
+          currencyOptions={currencyOptionsQuery.data?.currencies ?? []}
           onSubmit={(payload, id) => saveRecord.mutate({ payload, id })}
           onCancel={() => setEditingRecord(undefined)}
         />

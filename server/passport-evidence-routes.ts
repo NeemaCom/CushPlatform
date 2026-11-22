@@ -5,6 +5,8 @@ import {
   cushPassportEvidenceEvents,
   cushPassportEvidenceSubmissions,
   cushPassportFinancialProfiles,
+  cushPassportPostArrivalFinancialProfiles,
+  cushPostArrivalProfiles,
   users,
 } from "@shared/schema";
 import { ADMIN_PERMISSION } from "@shared/admin-permissions";
@@ -16,6 +18,7 @@ import {
 } from "./auth";
 import { db } from "./db";
 import { generalRateLimit } from "./security";
+import { detectCurrenciesInText, listIsoCurrencies } from "./currency-catalog";
 import {
   decryptEvidenceBytes,
   decryptEvidenceJson,
@@ -29,6 +32,7 @@ import {
   getFinancialProfileProgress,
   MAX_EVIDENCE_FILE_BYTES,
   passportFinancialProfileSchema,
+  validatePassportFinancialProfilePeriod,
 } from "./passport-evidence-service";
 
 const storedReviewSchema = z.object({
@@ -37,6 +41,25 @@ const storedReviewSchema = z.object({
 });
 
 type EvidenceExecutor = Pick<typeof db, "insert">;
+type IntakePeriod = "pre_arrival" | "post_arrival";
+
+const intakePeriodSchema = z.enum(["pre_arrival", "post_arrival"]);
+
+function parseIntakePeriod(value: unknown): IntakePeriod | null {
+  const parsed = intakePeriodSchema.safeParse(value ?? "pre_arrival");
+  return parsed.success ? parsed.data : null;
+}
+
+async function getConfirmedArrivalDate(userId: number): Promise<string | null> {
+  const [profile] = await db.select({
+    arrivalStatus: cushPostArrivalProfiles.arrivalStatus,
+    arrivalDate: cushPostArrivalProfiles.arrivalDate,
+  })
+    .from(cushPostArrivalProfiles)
+    .where(eq(cushPostArrivalProfiles.userId, userId))
+    .limit(1);
+  return profile?.arrivalStatus === "arrived" ? profile.arrivalDate : null;
+}
 
 function noStore(res: Response) {
   res.setHeader("Cache-Control", "private, no-store");
@@ -67,6 +90,7 @@ async function recordEvidenceEvent(
 function documentMetadata(row: typeof cushPassportEvidenceSubmissions.$inferSelect) {
   return {
     id: row.id,
+    period: row.period as IntakePeriod,
     documentType: row.documentType,
     label: row.label,
     fileName: row.fileName,
@@ -97,7 +121,7 @@ function sendEvidenceError(res: Response, error: unknown, fallback: string) {
       ["42P01", "42703"].includes(String((error as { code?: unknown }).code))) {
     return res.status(503).json({
       code: "PASSPORT_EVIDENCE_SCHEMA_MISSING",
-      error: "Secure evidence storage is not ready. Apply migrations/manual/create-cush-passport-evidence-intake.sql first.",
+      error: "Secure evidence storage is not ready. Apply the initial Passport evidence migration, then migrations/manual/extend-cush-passport-multicurrency.sql.",
     });
   }
   console.error(fallback, {
@@ -128,15 +152,33 @@ function sendEncryptedFile(
 }
 
 export function registerPassportEvidenceRoutes(app: Express) {
+  app.get("/api/passport/currencies", isAuthenticated, (_req: AuthenticatedRequest, res) => {
+    noStore(res);
+    return res.json({ currencies: listIsoCurrencies() });
+  });
+
   app.get("/api/passport/financial-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
     try {
-      const [row] = await db.select().from(cushPassportFinancialProfiles)
-        .where(eq(cushPassportFinancialProfiles.userId, req.userId!)).limit(1);
+      const arrivalDate = period === "post_arrival"
+        ? await getConfirmedArrivalDate(req.userId!)
+        : null;
+      if (period === "post_arrival" && !arrivalDate) {
+        return res.status(409).json({ error: "Confirm your arrival before adding post-arrival financial details." });
+      }
+      const [row] = period === "pre_arrival"
+        ? await db.select().from(cushPassportFinancialProfiles)
+          .where(eq(cushPassportFinancialProfiles.userId, req.userId!)).limit(1)
+        : await db.select().from(cushPassportPostArrivalFinancialProfiles)
+          .where(eq(cushPassportPostArrivalFinancialProfiles.userId, req.userId!)).limit(1);
       const profile = row
         ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
         : null;
       return res.json({
+        period,
+        arrivalDate,
         profile,
         progress: getFinancialProfileProgress(profile),
         updatedAt: row?.updatedAt.toISOString() ?? null,
@@ -148,6 +190,8 @@ export function registerPassportEvidenceRoutes(app: Express) {
 
   app.put("/api/passport/financial-profile", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
     noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
     const parsed = passportFinancialProfileSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Check the financial profile fields." });
@@ -156,31 +200,49 @@ export function registerPassportEvidenceRoutes(app: Express) {
       const profile = parsed.data;
       const now = new Date();
       const encryptedProfile = encryptEvidenceJson(profile);
+      const arrivalDate = period === "post_arrival"
+        ? await getConfirmedArrivalDate(req.userId!)
+        : null;
+      const periodError = validatePassportFinancialProfilePeriod(profile, period, arrivalDate);
+      if (periodError === "arrival_required") {
+        return res.status(409).json({ error: "Confirm your arrival before adding post-arrival financial details." });
+      }
+      if (periodError === "history_before_arrival") {
+        return res.status(400).json({ error: "Post-arrival financial history must begin in your confirmed arrival month." });
+      }
       await db.transaction(async (tx) => {
-        await tx.insert(cushPassportFinancialProfiles).values({
-          userId: req.userId!,
-          countryCode: profile.countryCode,
-          currencyCode: profile.currencyCode,
-          encryptedProfile,
-          updatedAt: now,
-        }).onConflictDoUpdate({
-          target: cushPassportFinancialProfiles.userId,
-          set: {
+        if (period === "pre_arrival") {
+          await tx.insert(cushPassportFinancialProfiles).values({
+            userId: req.userId!,
             countryCode: profile.countryCode,
             currencyCode: profile.currencyCode,
             encryptedProfile,
             updatedAt: now,
-          },
-        });
+          }).onConflictDoUpdate({
+            target: cushPassportFinancialProfiles.userId,
+            set: { countryCode: profile.countryCode, currencyCode: profile.currencyCode, encryptedProfile, updatedAt: now },
+          });
+        } else {
+          await tx.insert(cushPassportPostArrivalFinancialProfiles).values({
+            userId: req.userId!,
+            countryCode: profile.countryCode,
+            currencyCode: profile.currencyCode,
+            encryptedProfile,
+            updatedAt: now,
+          }).onConflictDoUpdate({
+            target: cushPassportPostArrivalFinancialProfiles.userId,
+            set: { countryCode: profile.countryCode, currencyCode: profile.currencyCode, encryptedProfile, updatedAt: now },
+          });
+        }
         await recordEvidenceEvent(tx, {
           userId: req.userId,
           actorUserId: req.userId,
           actorType: "user",
           eventType: "profile_saved",
-          eventData: { countryCode: profile.countryCode, currencyCode: profile.currencyCode },
+          eventData: { period, countryCode: profile.countryCode, currencyCode: profile.currencyCode },
         });
       });
-      return res.json({ profile, progress: getFinancialProfileProgress(profile), updatedAt: now.toISOString() });
+      return res.json({ period, arrivalDate, profile, progress: getFinancialProfileProgress(profile), updatedAt: now.toISOString() });
     } catch (error) {
       return sendEvidenceError(res, error, "Passport financial profile save failed");
     }
@@ -188,21 +250,31 @@ export function registerPassportEvidenceRoutes(app: Express) {
 
   app.delete("/api/passport/financial-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
     try {
+      if (period === "post_arrival" && !(await getConfirmedArrivalDate(req.userId!))) {
+        return res.status(409).json({ error: "Confirm your arrival before changing post-arrival financial details." });
+      }
       await db.transaction(async (tx) => {
-        const removed = await tx.delete(cushPassportFinancialProfiles)
-          .where(eq(cushPassportFinancialProfiles.userId, req.userId!))
-          .returning({ userId: cushPassportFinancialProfiles.userId });
+        const removed = period === "pre_arrival"
+          ? await tx.delete(cushPassportFinancialProfiles)
+            .where(eq(cushPassportFinancialProfiles.userId, req.userId!))
+            .returning({ userId: cushPassportFinancialProfiles.userId })
+          : await tx.delete(cushPassportPostArrivalFinancialProfiles)
+            .where(eq(cushPassportPostArrivalFinancialProfiles.userId, req.userId!))
+            .returning({ userId: cushPassportPostArrivalFinancialProfiles.userId });
         if (removed.length) {
           await recordEvidenceEvent(tx, {
             userId: req.userId,
             actorUserId: req.userId,
             actorType: "user",
             eventType: "profile_deleted",
+            eventData: { period },
           });
         }
       });
-      return res.json({ success: true });
+      return res.json({ success: true, period });
     } catch (error) {
       return sendEvidenceError(res, error, "Passport financial profile deletion failed");
     }
@@ -210,9 +282,14 @@ export function registerPassportEvidenceRoutes(app: Express) {
 
   app.get("/api/passport/evidence-submissions", isAuthenticated, async (req: AuthenticatedRequest, res) => {
     noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
     try {
       const rows = await db.select().from(cushPassportEvidenceSubmissions)
-        .where(eq(cushPassportEvidenceSubmissions.userId, req.userId!))
+        .where(and(
+          eq(cushPassportEvidenceSubmissions.userId, req.userId!),
+          eq(cushPassportEvidenceSubmissions.period, period),
+        ))
         .orderBy(desc(cushPassportEvidenceSubmissions.createdAt));
       return res.json({ submissions: rows.map(documentMetadata) });
     } catch (error) {
@@ -240,6 +317,8 @@ export function registerPassportEvidenceRoutes(app: Express) {
         return res.status(400).json({ error: "The file name is invalid." });
       }
       const contentType = (req.get("Content-Type") ?? "").split(";")[0].trim().toLowerCase();
+      const period = parseIntakePeriod(req.get("x-evidence-period"));
+      if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
       const metadata = evidenceUploadMetadataSchema.safeParse({
         documentType: req.get("x-evidence-type"),
         label: req.get("x-evidence-label"),
@@ -262,9 +341,14 @@ export function registerPassportEvidenceRoutes(app: Express) {
 
       try {
         const extraction = extractEvidenceDraft(file, contentType);
+        if (period === "post_arrival" && !(await getConfirmedArrivalDate(req.userId!))) {
+          return res.status(409).json({ error: "Confirm your arrival before submitting post-arrival evidence." });
+        }
+        const currencyDetection = detectCurrenciesInText(extraction);
         const [row] = await db.transaction(async (tx) => {
           const inserted = await tx.insert(cushPassportEvidenceSubmissions).values({
             userId: req.userId!,
+            period,
             documentType: metadata.data.documentType,
             label: metadata.data.label,
             fileName: metadata.data.fileName,
@@ -273,7 +357,11 @@ export function registerPassportEvidenceRoutes(app: Express) {
             countryCode: metadata.data.countryCode,
             currencyCode: metadata.data.currencyCode,
             encryptedFile: encryptEvidenceBytes(file),
-            encryptedExtraction: encryptEvidenceJson({ text: extraction, parser: contentType === "text/csv" ? "csv-text-v1" : "pdf-text-v1" }),
+            encryptedExtraction: encryptEvidenceJson({
+              text: extraction,
+              parser: contentType === "text/csv" ? "csv-text-v1" : "pdf-text-v1",
+              currencyDetection,
+            }),
           }).returning();
           await recordEvidenceEvent(tx, {
             submissionId: inserted[0].id,
@@ -282,6 +370,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
             actorType: "user",
             eventType: "document_uploaded",
             eventData: {
+              period,
               documentType: metadata.data.documentType,
               mimeType: contentType,
               fileSize: file.length,
@@ -293,6 +382,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
           submission: documentMetadata(row),
           extractedDraft: extraction,
           extractionStatus: extraction ? "text_extracted" : "no_text_found",
+          currencyDetection,
         });
       } catch (error) {
         if (error instanceof TypeError && contentType === "text/csv") {
@@ -340,6 +430,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
         submission: documentMetadata(row),
         extractedDraft: extraction.text,
         correctedDraft: correction,
+        currencyDetection: detectCurrenciesInText(correction ?? extraction.text),
         events: events.map((event) => ({
           eventType: event.eventType,
           createdAt: event.createdAt.toISOString(),
@@ -362,6 +453,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
       const updated = await db.transaction(async (tx) => {
         const [row] = await tx.update(cushPassportEvidenceSubmissions).set({
           encryptedCorrection: correction,
+          ...(parsed.data.currencyCode ? { currencyCode: parsed.data.currencyCode } : {}),
           updatedAt: new Date(),
         }).where(and(
           eq(cushPassportEvidenceSubmissions.id, id),
@@ -375,7 +467,10 @@ export function registerPassportEvidenceRoutes(app: Express) {
           actorUserId: req.userId,
           actorType: "user",
           eventType: "draft_corrected",
-          eventData: { characters: parsed.data.correctedDraft.length },
+          eventData: {
+            characters: parsed.data.correctedDraft.length,
+            ...(parsed.data.currencyCode ? { currencyCode: parsed.data.currencyCode } : {}),
+          },
         });
         return row;
       });
@@ -560,6 +655,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
           },
           extractedDraft: extraction.text,
           correctedDraft: correction,
+          currencyDetection: detectCurrenciesInText(correction ?? extraction.text),
           review,
           events: events.map((event) => ({
             eventType: event.eventType,

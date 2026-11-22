@@ -14,6 +14,7 @@ import { db } from "./db";
 import { isAuthenticated, type AuthenticatedRequest } from "./auth";
 import { getOrCreatePassport } from "./mem-store";
 import { authRateLimit } from "./security";
+import { isIsoCurrencyCode } from "./currency-catalog";
 
 const profileUpdateSchema = postArrivalProfileDataSchema.partial().strict();
 
@@ -171,6 +172,9 @@ export function registerPostArrivalRoutes(app: Express) {
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Invalid financial record." });
     }
+    if (!isIsoCurrencyCode(parsed.data.currencyCode)) {
+      return res.status(400).json({ error: "Enter a valid ISO 4217 currency code." });
+    }
     try {
       const userId = req.userId!;
       const profile = await ensureProfile(userId);
@@ -213,6 +217,9 @@ export function registerPostArrivalRoutes(app: Express) {
     const parsed = postArrivalRecordSchema.safeParse(req.body);
     if (!Number.isSafeInteger(id) || id < 1 || !parsed.success) {
       return res.status(400).json({ error: parsed.success ? "Invalid record ID." : parsed.error.issues[0]?.message ?? "Invalid financial record." });
+    }
+    if (!isIsoCurrencyCode(parsed.data.currencyCode)) {
+      return res.status(400).json({ error: "Enter a valid ISO 4217 currency code." });
     }
     try {
       const userId = req.userId!;

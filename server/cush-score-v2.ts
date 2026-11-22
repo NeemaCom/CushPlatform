@@ -3,6 +3,8 @@ import {
   cushAssessmentInputs,
   cushEvidenceFreshnessReviews,
   cushPassportFinancialProfiles,
+  cushPassportPostArrivalFinancialProfiles,
+  cushPostArrivalProfiles,
   cushScorePolicyVersions,
   cushScorePolicyConfigSchema,
   interswitchCreditHistoryEvidence,
@@ -66,6 +68,7 @@ export interface V2AssessmentView {
   }>;
   schemaReady: true;
   monoDataReady: boolean;
+  unscoredCurrencyCodes: string[];
 }
 
 export class ScoringPolicyValidationError extends Error {}
@@ -348,6 +351,27 @@ async function loadFinancialProfile(userId: number): Promise<PassportFinancialPr
   }
 }
 
+async function loadPostArrivalFinancialProfile(userId: number): Promise<PassportFinancialProfile | null> {
+  try {
+    const [arrival] = await db.select({ arrivalStatus: cushPostArrivalProfiles.arrivalStatus })
+      .from(cushPostArrivalProfiles)
+      .where(eq(cushPostArrivalProfiles.userId, userId))
+      .limit(1);
+    if (arrival?.arrivalStatus !== "arrived") return null;
+    const [row] = await db.select({
+      encryptedProfile: cushPassportPostArrivalFinancialProfiles.encryptedProfile,
+    }).from(cushPassportPostArrivalFinancialProfiles)
+      .where(eq(cushPassportPostArrivalFinancialProfiles.userId, userId))
+      .limit(1);
+    return row
+      ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
+      : null;
+  } catch (error) {
+    if (isV2SchemaMissing(error)) return null;
+    throw error;
+  }
+}
+
 function mergeManualProfileInputs(
   input: V2AssessmentInput,
   profileInput: Pick<V2AssessmentInput, "availableFunds" | "incomeHistory" | "cashFlowHistory">,
@@ -384,6 +408,7 @@ interface CalculatedV2Assessment {
   calculation: CushScoreResult;
   monoImports: Awaited<ReturnType<typeof loadMonoAssessmentData>>["imports"];
   monoDataReady: boolean;
+  unscoredCurrencyCodes: string[];
   activePolicyVersion: number | null;
   baselinePolicy: DestinationBaselinePolicy | null;
 }
@@ -392,15 +417,40 @@ async function calculateV2AssessmentForUser(
   userId: number,
   now: Date,
 ): Promise<CalculatedV2Assessment> {
-  const [storedInputs, profile, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
+  const [storedInputs, preArrivalProfile, postArrivalProfile, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
     loadStoredInputs(userId),
     loadFinancialProfile(userId),
+    loadPostArrivalFinancialProfile(userId),
     loadActivePolicy(),
     loadMonoAssessmentData(userId),
     loadCreditHistoryEvidence(userId),
     loadEvidenceFreshnessReviews(userId),
   ]);
-  const profileInputs = await buildProfileScoreInputs(profile, now.toISOString().slice(0, 7));
+  const [preArrivalInputs, postArrivalInputs] = await Promise.all([
+    buildProfileScoreInputs(preArrivalProfile, now.toISOString().slice(0, 7)),
+    buildProfileScoreInputs(postArrivalProfile, now.toISOString().slice(0, 7)),
+  ]);
+  const availableFundsByKey = new Map<string, (typeof preArrivalInputs.availableFunds)[number]>();
+  for (const fund of [...preArrivalInputs.availableFunds, ...postArrivalInputs.availableFunds]) {
+    availableFundsByKey.set(fund.deduplicationKey.toLowerCase(), fund);
+  }
+  const incomeBySourceMonth = new Map<string, (typeof preArrivalInputs.incomeHistory)[number]>();
+  for (const income of [...preArrivalInputs.incomeHistory, ...postArrivalInputs.incomeHistory]) {
+    incomeBySourceMonth.set(`${income.sourceId}:${income.month}`, income);
+  }
+  const cashFlowByMonth = new Map<string, (typeof preArrivalInputs.cashFlowHistory)[number]>();
+  for (const row of [...preArrivalInputs.cashFlowHistory, ...postArrivalInputs.cashFlowHistory]) {
+    cashFlowByMonth.set(row.month, row);
+  }
+  const profileInputs = {
+    availableFunds: [...availableFundsByKey.values()],
+    incomeHistory: [...incomeBySourceMonth.values()],
+    cashFlowHistory: [...cashFlowByMonth.values()],
+    unscoredCurrencyCodes: [...new Set([
+      ...preArrivalInputs.unscoredCurrencyCodes,
+      ...postArrivalInputs.unscoredCurrencyCodes,
+    ])].sort(),
+  };
   const inputs = mergeManualProfileInputs(storedInputs, profileInputs);
   const baselinePolicy = selectVersionedDestinationBaseline(
     activePolicy?.configuration ?? null,
@@ -440,6 +490,7 @@ async function calculateV2AssessmentForUser(
     calculation,
     monoImports: monoData.imports,
     monoDataReady: monoData.monoDataReady,
+    unscoredCurrencyCodes: profileInputs.unscoredCurrencyCodes,
     activePolicyVersion: activePolicy?.row.version ?? null,
     baselinePolicy,
   };
@@ -459,6 +510,7 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     })),
     schemaReady: true,
     monoDataReady: result.monoDataReady,
+    unscoredCurrencyCodes: result.unscoredCurrencyCodes,
   };
 }
 
@@ -491,6 +543,7 @@ export async function getAdminV2Assessment(userId: number, now = new Date()) {
     confidenceBreakdown: calculation.confidenceBreakdown,
     usableHistoryMonths: calculation.usableHistoryMonths,
     missingRequirements: calculation.missingRequirements,
+    unscoredCurrencyCodes: result.unscoredCurrencyCodes,
     activePolicyVersion: result.activePolicyVersion,
     baseline: result.baselinePolicy,
     generatedAt: now.toISOString(),

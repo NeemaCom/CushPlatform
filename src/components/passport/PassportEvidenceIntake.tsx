@@ -5,10 +5,11 @@ import { useToast } from "@/hooks/use-toast";
 import { accountRequest } from "@/lib/account-api";
 import { API_BASE_URL } from "@/lib/api-base";
 import { getProductSessionHeaders } from "@/lib/product-session";
+import CurrencyCodeField, { type CurrencyOption } from "./CurrencyCodeField";
 
 type FinancialProfile = {
   countryCode: string;
-  currencyCode: "GBP" | "USD" | "NGN";
+  currencyCode: string;
   employmentStatus: string;
   employer: string;
   jobTitle: string;
@@ -30,7 +31,7 @@ type FinancialHistoryEntry = {
   month: string;
   label: string;
   countryCode: string;
-  currencyCode: "GBP" | "USD" | "NGN";
+  currencyCode: string;
   incomeAmount: string;
   incomeFrequency: "weekly" | "monthly" | "annual" | "variable" | "";
   incomeCategory: "salary" | "contract" | "business" | "family_support" | "other";
@@ -43,6 +44,7 @@ type FinancialHistoryEntry = {
 };
 
 type ProfileData = {
+  arrivalDate?: string | null;
   profile: FinancialProfile | null;
   progress: {
     completed: number;
@@ -55,6 +57,7 @@ type ProfileData = {
 
 type Submission = {
   id: number;
+  period: "pre_arrival" | "post_arrival";
   documentType: string;
   label: string;
   fileName: string;
@@ -74,12 +77,17 @@ type SubmissionDetail = {
   submission: Submission;
   extractedDraft: string;
   correctedDraft: string | null;
+  currencyDetection: {
+    detectedCurrencyCodes: string[];
+    suggestedCurrencyCode: string | null;
+    ambiguousSymbols: Array<{ symbol: string; candidates: string[] }>;
+  };
   events: Array<{ eventType: string; createdAt: string }>;
 };
 
 const EMPTY_PROFILE: FinancialProfile = {
-  countryCode: "GB",
-  currencyCode: "GBP",
+  countryCode: "",
+  currencyCode: "",
   employmentStatus: "",
   employer: "",
   jobTitle: "",
@@ -95,6 +103,12 @@ const EMPTY_PROFILE: FinancialProfile = {
   financialHistorySummary: "",
   financialHistory: [],
 };
+
+function emptyProfileFor(period: "pre_arrival" | "post_arrival"): FinancialProfile {
+  return period === "post_arrival"
+    ? { ...EMPTY_PROFILE, countryCode: "GB", currencyCode: "GBP" }
+    : EMPTY_PROFILE;
+}
 
 const DOCUMENT_TYPES = [
   ["payslip", "Payslip"],
@@ -130,6 +144,7 @@ async function uploadDocument(file: File, metadata: {
   label: string;
   countryCode: string;
   currencyCode: string;
+  period: "pre_arrival" | "post_arrival";
 }) {
   const contentType = file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "text/csv";
   const response = await fetch(`${API_BASE_URL}/api/passport/evidence-submissions`, {
@@ -142,6 +157,7 @@ async function uploadDocument(file: File, metadata: {
       "X-Evidence-Label": metadata.label,
       "X-Country-Code": metadata.countryCode,
       "X-Currency-Code": metadata.currencyCode,
+      "X-Evidence-Period": metadata.period,
       "X-Evidence-Filename": encodeURIComponent(file.name),
     },
     body: file,
@@ -150,7 +166,12 @@ async function uploadDocument(file: File, metadata: {
   if (!response.ok) {
     throw new Error(typeof payload?.error === "string" ? payload.error : "The file could not be uploaded.");
   }
-  return payload as { submission: Submission; extractedDraft: string; extractionStatus: string };
+  return payload as {
+    submission: Submission;
+    extractedDraft: string;
+    extractionStatus: string;
+    currencyDetection: SubmissionDetail["currencyDetection"];
+  };
 }
 
 function statusTone(status: string) {
@@ -161,25 +182,33 @@ function statusTone(status: string) {
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
-export default function PassportEvidenceIntake() {
+export default function PassportEvidenceIntake({ period = "pre_arrival" }: { period?: "pre_arrival" | "post_arrival" }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [profile, setProfile] = useState(EMPTY_PROFILE);
+  const [profile, setProfile] = useState(() => emptyProfileFor(period));
   const [documentType, setDocumentType] = useState("bank_statement");
   const [documentLabel, setDocumentLabel] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentCountryCode, setDocumentCountryCode] = useState(() => emptyProfileFor(period).countryCode);
+  const [documentCurrencyCode, setDocumentCurrencyCode] = useState(() => emptyProfileFor(period).currencyCode);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [correctedDraft, setCorrectedDraft] = useState("");
+  const [correctedCurrencyCode, setCorrectedCurrencyCode] = useState("GBP");
 
   const profileQuery = useQuery<ProfileData>({
-    queryKey: ["/api/passport/financial-profile"],
-    queryFn: () => profileRequest("GET", "/api/passport/financial-profile"),
+    queryKey: ["/api/passport/financial-profile", period],
+    queryFn: () => profileRequest("GET", `/api/passport/financial-profile?period=${period}`),
     retry: false,
   });
   const documentsQuery = useQuery<{ submissions: Submission[] }>({
-    queryKey: ["/api/passport/evidence-submissions"],
-    queryFn: () => profileRequest("GET", "/api/passport/evidence-submissions"),
+    queryKey: ["/api/passport/evidence-submissions", period],
+    queryFn: () => profileRequest("GET", `/api/passport/evidence-submissions?period=${period}`),
     retry: false,
+  });
+  const currencyOptionsQuery = useQuery<{ currencies: CurrencyOption[] }>({
+    queryKey: ["/api/passport/currencies"],
+    queryFn: () => profileRequest("GET", "/api/passport/currencies"),
+    staleTime: 24 * 60 * 60 * 1000,
   });
   const detailQuery = useQuery<SubmissionDetail>({
     queryKey: ["/api/passport/evidence-submissions", selectedId],
@@ -194,17 +223,27 @@ export default function PassportEvidenceIntake() {
   });
 
   useEffect(() => {
-    if (profileQuery.data) setProfile(profileQuery.data.profile ?? EMPTY_PROFILE);
-  }, [profileQuery.data]);
+    if (profileQuery.data) setProfile(profileQuery.data.profile ?? emptyProfileFor(period));
+  }, [profileQuery.data, period]);
+  useEffect(() => {
+    if (period === "pre_arrival" && profileQuery.data?.profile) {
+      setDocumentCountryCode(profileQuery.data.profile.countryCode);
+      setDocumentCurrencyCode(profileQuery.data.profile.currencyCode);
+    }
+  }, [profileQuery.data, period]);
   useEffect(() => {
     if (detailQuery.data) {
       setCorrectedDraft(detailQuery.data.correctedDraft ?? detailQuery.data.extractedDraft);
+      setCorrectedCurrencyCode(
+        detailQuery.data.currencyDetection.suggestedCurrencyCode ??
+        detailQuery.data.submission.currencyCode,
+      );
     }
   }, [detailQuery.data]);
 
   const invalidateIntake = () => {
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", period] });
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] });
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] });
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] });
@@ -212,7 +251,7 @@ export default function PassportEvidenceIntake() {
   };
 
   const saveProfile = useMutation({
-    mutationFn: () => profileRequest("PUT", "/api/passport/financial-profile", profile),
+    mutationFn: () => profileRequest("PUT", `/api/passport/financial-profile?period=${period}`, profile),
     onSuccess: () => {
       invalidateIntake();
       toast({ title: "Financial profile saved", description: "Self-declared amounts can contribute to your provisional assessment. Uploaded documents remain separate and are not treated as verified." });
@@ -220,9 +259,9 @@ export default function PassportEvidenceIntake() {
     onError: (error: Error) => toast({ title: "Could not save profile", description: error.message, variant: "destructive" }),
   });
   const clearProfile = useMutation({
-    mutationFn: () => profileRequest("DELETE", "/api/passport/financial-profile"),
+    mutationFn: () => profileRequest("DELETE", `/api/passport/financial-profile?period=${period}`),
     onSuccess: () => {
-      setProfile(EMPTY_PROFILE);
+      setProfile(emptyProfileFor(period));
       invalidateIntake();
       toast({ title: "Financial profile removed" });
     },
@@ -234,8 +273,9 @@ export default function PassportEvidenceIntake() {
       return uploadDocument(documentFile, {
         documentType,
         label: documentLabel.trim() || documentFile.name,
-        countryCode: profile.countryCode,
-        currencyCode: profile.currencyCode,
+        countryCode: documentCountryCode,
+        currencyCode: documentCurrencyCode,
+        period,
       });
     },
     onSuccess: (result) => {
@@ -254,7 +294,10 @@ export default function PassportEvidenceIntake() {
     onError: (error: Error) => toast({ title: "Upload failed", description: error.message, variant: "destructive" }),
   });
   const saveCorrection = useMutation({
-    mutationFn: () => profileRequest("PUT", `/api/passport/evidence-submissions/${selectedId}/draft`, { correctedDraft }),
+    mutationFn: () => profileRequest("PUT", `/api/passport/evidence-submissions/${selectedId}/draft`, {
+      correctedDraft,
+      currencyCode: correctedCurrencyCode,
+    }),
     onSuccess: () => {
       invalidateIntake();
       toast({ title: "Draft corrections saved" });
@@ -264,7 +307,10 @@ export default function PassportEvidenceIntake() {
   const submitDocument = useMutation({
     mutationFn: async () => {
       if (selectedId === null) throw new Error("Choose a document first.");
-      await profileRequest("PUT", `/api/passport/evidence-submissions/${selectedId}/draft`, { correctedDraft });
+      await profileRequest("PUT", `/api/passport/evidence-submissions/${selectedId}/draft`, {
+        correctedDraft,
+        currencyCode: correctedCurrencyCode,
+      });
       return profileRequest("POST", `/api/passport/evidence-submissions/${selectedId}/submit`);
     },
     onSuccess: () => {
@@ -361,9 +407,13 @@ export default function PassportEvidenceIntake() {
             <ShieldCheck className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
-            <h2 id="passport-evidence-heading" className="text-base font-bold text-slate-900">Financial profile and evidence</h2>
+            <h2 id="passport-evidence-heading" className="text-base font-bold text-slate-900">
+              {period === "post_arrival" ? "Post-arrival financial profile and evidence" : "Pre-arrival financial profile and evidence"}
+            </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              Add your own financial details alongside connected data. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed.
+              {period === "post_arrival"
+                ? "Add your own financial details from your confirmed arrival month onward. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed."
+                : "Add your own financial details alongside connected data. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed."}
             </p>
           </div>
         </div>
@@ -407,19 +457,23 @@ export default function PassportEvidenceIntake() {
             >
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Your financial details</h3>
-                <p className="mt-1 text-xs text-slate-500">Supported scoring currencies are GBP, USD, and NGN. USD and NGN use the existing CBN rate for the relevant month. Other providers or currencies are not assumed.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Keep each amount in its original currency. GBP is scored directly; USD and NGN use the existing dated CBN rate. Other valid currencies are saved but remain outside the GBP-based Score until an approved conversion rate is available.
+                </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="space-y-1 text-xs font-medium text-slate-700">
                   Country code
-                  <input required maxLength={2} value={profile.countryCode} onChange={(event) => setProfile({ ...profile, countryCode: event.target.value.toUpperCase() })} placeholder="GB" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
+                  <input required maxLength={2} pattern="[A-Z]{2}" value={profile.countryCode} onChange={(event) => setProfile({ ...profile, countryCode: event.target.value.toUpperCase() })} placeholder="GB" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
                 </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Currency code
-                  <select required value={profile.currencyCode} onChange={(event) => setProfile({ ...profile, currencyCode: event.target.value as FinancialProfile["currencyCode"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
-                    <option value="GBP">GBP</option><option value="USD">USD</option><option value="NGN">NGN</option>
-                  </select>
-                </label>
+                <CurrencyCodeField
+                  id={`passport-profile-currency-${period}`}
+                  label="Currency code"
+                  value={profile.currencyCode}
+                  options={currencyOptionsQuery.data?.currencies ?? []}
+                  onChange={(currencyCode) => setProfile({ ...profile, currencyCode })}
+                  required
+                />
                 <label className="space-y-1 text-xs font-medium text-slate-700">
                   Employment status
                   <input maxLength={80} value={profile.employmentStatus} onChange={(event) => setProfile({ ...profile, employmentStatus: event.target.value })} placeholder="Employed, self-employed…" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
@@ -480,7 +534,7 @@ export default function PassportEvidenceIntake() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <h4 id="financial-history-heading" className="text-sm font-semibold text-slate-800">Monthly history across countries</h4>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">Add one row per month and source. Keep the original country and currency; supported USD and NGN values use CBN rates for that month.</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Add one row per month and source. Keep the original country and ISO currency code; GBP, USD and NGN can be converted with the existing approved rate rules.</p>
                   </div>
                   <button type="button" onClick={addHistoryEntry} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50">Add a month</button>
                 </div>
@@ -492,10 +546,19 @@ export default function PassportEvidenceIntake() {
                       <fieldset key={entry.id} className="rounded-lg border border-slate-200 bg-white p-3">
                         <legend className="px-1 text-xs font-semibold text-slate-700">History entry {index + 1}</legend>
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                          <label className="space-y-1 text-xs font-medium text-slate-700">Month<input type="month" value={entry.month} onChange={(event) => updateHistoryEntry(entry.id, { month: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                           <label className="space-y-1 text-xs font-medium text-slate-700">Month<input type="month" min={period === "post_arrival" ? profileQuery.data?.arrivalDate?.slice(0, 7) : undefined} value={entry.month} onChange={(event) => updateHistoryEntry(entry.id, { month: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
                           <label className="space-y-1 text-xs font-medium text-slate-700">Source label<input maxLength={100} value={entry.label} onChange={(event) => updateHistoryEntry(entry.id, { label: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
-                          <label className="space-y-1 text-xs font-medium text-slate-700">Country code<input maxLength={2} value={entry.countryCode} onChange={(event) => updateHistoryEntry(entry.id, { countryCode: event.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm uppercase" /></label>
-                          <label className="space-y-1 text-xs font-medium text-slate-700">Currency<select value={entry.currencyCode} onChange={(event) => updateHistoryEntry(entry.id, { currencyCode: event.target.value as FinancialHistoryEntry["currencyCode"] })} className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="GBP">GBP</option><option value="USD">USD</option><option value="NGN">NGN</option></select></label>
+                           <label className="space-y-1 text-xs font-medium text-slate-700">Country code<input required maxLength={2} pattern="[A-Z]{2}" value={entry.countryCode} onChange={(event) => updateHistoryEntry(entry.id, { countryCode: event.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm uppercase" /></label>
+                           <CurrencyCodeField
+                             id={`passport-history-currency-${period}-${entry.id}`}
+                             label="Currency"
+                             value={entry.currencyCode}
+                             options={currencyOptionsQuery.data?.currencies ?? []}
+                             onChange={(currencyCode) => updateHistoryEntry(entry.id, { currencyCode })}
+                             required
+                             className="block text-xs font-medium text-slate-700"
+                             inputClassName="mt-1 block min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800"
+                           />
                           <label className="space-y-1 text-xs font-medium text-slate-700">Income amount<input inputMode="decimal" value={entry.incomeAmount} onChange={(event) => updateHistoryEntry(entry.id, { incomeAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
                           <label className="space-y-1 text-xs font-medium text-slate-700">Frequency<select value={entry.incomeFrequency} onChange={(event) => updateHistoryEntry(entry.id, { incomeFrequency: event.target.value as FinancialHistoryEntry["incomeFrequency"] })} className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="">Not supplied</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="variable">Variable monthly</option></select></label>
                           <label className="space-y-1 text-xs font-medium text-slate-700">Savings balance<input inputMode="decimal" value={entry.savingsAmount} onChange={(event) => updateHistoryEntry(entry.id, { savingsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
@@ -552,6 +615,31 @@ export default function PassportEvidenceIntake() {
               Label
               <input maxLength={120} value={documentLabel} onChange={(event) => setDocumentLabel(event.target.value)} placeholder="e.g. October payslip" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
             </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block space-y-1 text-xs font-medium text-slate-700">
+                Country code
+                <input
+                  required
+                  maxLength={2}
+                  pattern="[A-Z]{2}"
+                  value={documentCountryCode}
+                  onChange={(event) => setDocumentCountryCode(event.target.value.toUpperCase())}
+                  placeholder="GB"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase"
+                />
+              </label>
+              <CurrencyCodeField
+                id={`passport-document-currency-${period}`}
+                label="Document currency"
+                value={documentCurrencyCode}
+                options={currencyOptionsQuery.data?.currencies ?? []}
+                onChange={setDocumentCurrencyCode}
+                required
+                className="block text-xs font-medium text-slate-700"
+                inputClassName="mt-1 block min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-800"
+              />
+            </div>
+            <p className="text-xs leading-5 text-slate-500">The document currency is metadata you confirm. The system detects explicit currency codes and names in readable text; ambiguous symbols such as “$” are shown as candidates, not guessed.</p>
             <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-center hover:bg-blue-50">
               <Upload className="h-5 w-5 text-blue-700" aria-hidden="true" />
               <span className="mt-2 text-sm font-semibold text-slate-700">{documentFile?.name || "Choose a PDF or CSV"}</span>
@@ -639,6 +727,29 @@ export default function PassportEvidenceIntake() {
                           <AlertCircle className="h-4 w-4 shrink-0" /> No text was extracted. This can happen with scanned PDFs; add a concise summary or correction below.
                         </p>
                       )}
+                      <div className="mt-3 space-y-2 rounded-lg border border-slate-200 bg-white p-3 text-xs">
+                        <p className="font-semibold text-slate-800">
+                          Detected currency codes: {detailQuery.data.currencyDetection.detectedCurrencyCodes.length
+                            ? detailQuery.data.currencyDetection.detectedCurrencyCodes.join(", ")
+                            : "none"}
+                        </p>
+                        {detailQuery.data.currencyDetection.ambiguousSymbols.map(({ symbol, candidates }) => (
+                          <p key={symbol} className="text-amber-800">
+                            The symbol “{symbol}” could mean {candidates.join(", ")}. Confirm the document’s currency below.
+                          </p>
+                        ))}
+                        <CurrencyCodeField
+                          id={`passport-confirm-document-currency-${selectedId}`}
+                          label="Confirm this document’s currency"
+                          value={correctedCurrencyCode}
+                          options={currencyOptionsQuery.data?.currencies ?? []}
+                          onChange={setCorrectedCurrencyCode}
+                          required
+                          disabled={!canEditDraft}
+                          className="block text-xs font-medium text-slate-700"
+                          inputClassName="mt-1 block min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800 disabled:bg-slate-50"
+                        />
+                      </div>
                       <label className="mt-3 block space-y-1 text-xs font-medium text-slate-700">
                         Review or correct the extracted draft
                         <textarea

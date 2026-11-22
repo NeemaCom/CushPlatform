@@ -87,4 +87,24 @@ describe("Passport manual financial assessment inputs", () => {
       complete: false,
     });
   });
+
+  it("preserves other ISO currencies but leaves them unscored until conversion is approved", async () => {
+    const profile = passportFinancialProfileSchema.parse({
+      countryCode: "FR",
+      currencyCode: "EUR",
+      employmentStatus: "Employed",
+      incomeAmount: "2500",
+      incomeFrequency: "monthly",
+      savingsAmount: "1200",
+      savingsLabel: "Current account",
+      financialHistory: [],
+    });
+
+    const input = await buildProfileScoreInputs(profile, "2026-11");
+
+    expect(input.availableFunds).toEqual([]);
+    expect(input.incomeHistory).toEqual([]);
+    expect(input.cashFlowHistory).toEqual([]);
+    expect(input.unscoredCurrencyCodes).toEqual(["EUR"]);
+  });
 });
