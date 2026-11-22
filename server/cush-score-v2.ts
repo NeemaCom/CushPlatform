@@ -44,7 +44,9 @@ import {
 } from "./cush-score-policy-selection";
 import {
   describeAssessmentChange,
+  fingerprintPassportProfileSections,
   fingerprintAssessmentInputs,
+  getAssessmentChangedInformation,
   getAssessmentMaturity,
 } from "./passport-assessment-history";
 import { mergePassportScoreInputs } from "./passport-score-input-merge";
@@ -506,26 +508,6 @@ interface CalculatedV2Assessment {
   sourceState: Record<string, unknown>;
 }
 
-function getChangedInformation(previous: unknown, current: Record<string, unknown>): string[] {
-  const previousState = typeof previous === "object" && previous !== null
-    ? previous as Record<string, unknown>
-    : null;
-  if (!previousState) return ["Initial assessment"];
-  const labels: Record<string, string> = {
-    algorithmVersion: "Scoring method",
-    policyVersion: "Scoring policy",
-    storedInputsUpdatedAt: "Manual assessment details",
-    preArrivalUpdatedAt: "Pre-arrival financial profile",
-    postArrivalUpdatedAt: "Post-arrival financial profile",
-    bankEvidence: "Connected bank evidence",
-    creditEvidenceAt: "Credit history evidence",
-    reviewedStatementEvidence: "Reviewed bank statements",
-  };
-  return Object.keys(current)
-    .filter((key) => JSON.stringify(previousState[key]) !== JSON.stringify(current[key]))
-    .map((key) => labels[key] ?? "Assessment information");
-}
-
 async function calculateV2AssessmentForUser(
   userId: number,
   now: Date,
@@ -603,8 +585,15 @@ async function calculateV2AssessmentForUser(
     algorithmVersion: calculation.algorithmVersion,
     policyVersion: activePolicy?.row.version ?? null,
     storedInputsUpdatedAt: storedInputsResult.updatedAt?.toISOString() ?? null,
+    manualDestinationFingerprint: fingerprintAssessmentInputs(storedInputs.selectedBaselineId),
+    manualAvailableFundsFingerprint: fingerprintAssessmentInputs(storedInputs.availableFunds),
+    manualIncomeHistoryFingerprint: fingerprintAssessmentInputs(storedInputs.incomeHistory),
+    manualCashFlowHistoryFingerprint: fingerprintAssessmentInputs(storedInputs.cashFlowHistory),
+    manualCreditClassificationFingerprint: fingerprintAssessmentInputs(storedInputs.creditClassification),
     preArrivalUpdatedAt: preArrivalProfileResult.updatedAt?.toISOString() ?? null,
     postArrivalUpdatedAt: postArrivalProfileResult.updatedAt?.toISOString() ?? null,
+    ...fingerprintPassportProfileSections(preArrivalProfile, "preArrival"),
+    ...fingerprintPassportProfileSections(postArrivalProfile, "postArrival"),
     bankEvidence: monoData.imports.map((item) => `${item.id}:${item.fetchedAt.toISOString()}`).sort(),
     creditEvidenceAt: creditHistoryEvidence?.fetchedAt.toISOString() ?? null,
     reviewedStatementEvidence: documentProgress.reviewedStatementEvidence,
@@ -650,7 +639,7 @@ async function recordAssessmentSnapshot(userId: number, result: CalculatedV2Asse
     .orderBy(desc(cushPassportAssessmentHistory.createdAt), desc(cushPassportAssessmentHistory.id))
     .limit(1);
   const score = result.calculation.cushScore ?? result.calculation.provisionalScore;
-  const changedInformation = getChangedInformation(previous?.sourceState, result.sourceState);
+  const changedInformation = getAssessmentChangedInformation(previous?.sourceState, result.sourceState);
   await db.insert(cushPassportAssessmentHistory).values({
     userId,
     inputFingerprint: result.inputFingerprint,

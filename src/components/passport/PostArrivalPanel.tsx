@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
@@ -45,6 +45,8 @@ type PostArrivalResponse = {
     data: ProfileData;
     updatedAt: string;
   };
+  profileDraft: ProfileData | null;
+  profileDraftUpdatedAt: string | null;
   records: SavedRecord[];
 };
 
@@ -77,6 +79,12 @@ function hasProfileValue(value: unknown) {
 function normalizeProfileValue(value: unknown) {
   if (typeof value === "string") return value.trim() || null;
   return value ?? null;
+}
+
+function profileDetailsChanged(left: ProfileData, right: ProfileData | null | undefined) {
+  return PROFILE_DETAIL_FIELDS.some(
+    (field) => normalizeProfileValue(left[field]) !== normalizeProfileValue(right?.[field]),
+  );
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -130,8 +138,15 @@ export default function PostArrivalPanel({
   const [notYetAcknowledged, setNotYetAcknowledged] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileData>({});
   const [profileFormReady, setProfileFormReady] = useState(false);
+  const [profileDraftStatus, setProfileDraftStatus] = useState<"idle" | "pending" | "saving" | "saved" | "error">("idle");
+  const [hasSavedProfileDraft, setHasSavedProfileDraft] = useState(false);
   const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
   const profileDetailsHydrated = useRef(false);
+  const profileDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileDraftSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const profileDraftSaveVersion = useRef(0);
+  const suspendProfileDraftSave = useRef(false);
+  const discardProfileDraftAction = useRef<() => void>(() => undefined);
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SavedRecord | undefined>();
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -148,16 +163,17 @@ export default function PostArrivalPanel({
   });
 
   useEffect(() => {
-    if (!profileQuery.data) return;
-    setProfileForm(profileQuery.data.profile.data ?? {});
+    if (!profileQuery.data || profileDetailsHydrated.current) return;
+    profileDetailsHydrated.current = true;
+    const savedDetails = profileQuery.data.profile.data ?? {};
+    const restoredDetails = profileQuery.data.profileDraft ?? savedDetails;
+    setProfileForm(restoredDetails);
     setArrivalDate(profileQuery.data.profile.arrivalDate ?? "");
     setProfileFormReady(true);
-    if (!profileDetailsHydrated.current) {
-      profileDetailsHydrated.current = true;
-      const savedDetails = profileQuery.data.profile.data ?? {};
-      const hasSavedDetails = PROFILE_DETAIL_FIELDS.some((field) => hasProfileValue(savedDetails[field]));
-      setProfileDetailsOpen(!hasSavedDetails);
-    }
+    setProfileDraftStatus(profileQuery.data.profileDraft ? "saved" : "idle");
+    setHasSavedProfileDraft(Boolean(profileQuery.data.profileDraft));
+    const hasSavedDetails = PROFILE_DETAIL_FIELDS.some((field) => hasProfileValue(savedDetails[field]));
+    setProfileDetailsOpen(Boolean(profileQuery.data.profileDraft) || !hasSavedDetails);
   }, [profileQuery.data]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["/api/passport/post-arrival"] });
@@ -172,11 +188,102 @@ export default function PostArrivalPanel({
     },
     onError: (error: Error) => setOperationError(error.message),
   });
+  const saveProfileDraft = useMutation({
+    mutationFn: (snapshot: ProfileData) =>
+      request<{ updatedAt: string }>("PUT", "/api/passport/post-arrival/profile/draft", snapshot),
+    onSuccess: (result, snapshot) => {
+      setProfileDraftStatus("saved");
+      setHasSavedProfileDraft(true);
+      queryClient.setQueryData<PostArrivalResponse>(["/api/passport/post-arrival"], (current) =>
+        current ? { ...current, profileDraft: snapshot, profileDraftUpdatedAt: result.updatedAt } : current,
+      );
+    },
+    onError: () => setProfileDraftStatus("error"),
+  });
+  const queueProfileDraft = useCallback((snapshot: ProfileData) => {
+    const version = ++profileDraftSaveVersion.current;
+    profileDraftSaveQueue.current = profileDraftSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (version !== profileDraftSaveVersion.current || suspendProfileDraftSave.current) return;
+        setProfileDraftStatus("saving");
+        try {
+          await saveProfileDraft.mutateAsync(snapshot);
+        } catch {
+          // Keep the queue usable and show the inline retry state.
+        }
+      });
+    return profileDraftSaveQueue.current;
+  }, [saveProfileDraft.mutateAsync]);
+  const pauseProfileDraftSaves = useCallback(async () => {
+    suspendProfileDraftSave.current = true;
+    profileDraftSaveVersion.current += 1;
+    if (profileDraftTimer.current) {
+      clearTimeout(profileDraftTimer.current);
+      profileDraftTimer.current = null;
+    }
+    await profileDraftSaveQueue.current.catch(() => undefined);
+  }, []);
+
+  const discardProfileDraft = useMutation({
+    mutationFn: async () => {
+      await pauseProfileDraftSaves();
+      return request("DELETE", "/api/passport/post-arrival/profile/draft");
+    },
+    onSuccess: async () => {
+      setProfileForm(profileQuery.data?.profile.data ?? {});
+      setProfileDraftStatus("idle");
+      setHasSavedProfileDraft(false);
+      await refresh();
+      suspendProfileDraftSave.current = false;
+    },
+    onError: () => {
+      suspendProfileDraftSave.current = false;
+      setProfileDraftStatus("error");
+    },
+  });
+  discardProfileDraftAction.current = () => discardProfileDraft.mutate();
+
+  useEffect(() => {
+    const savedDraft = profileQuery.data?.profileDraft ?? profileQuery.data?.profile.data;
+    if (!profileFormReady || !profileDetailsHydrated.current || !profileQuery.data || suspendProfileDraftSave.current) return;
+    if (!profileDetailsChanged(profileForm, savedDraft)) {
+      setProfileDraftStatus(hasSavedProfileDraft ? "saved" : "idle");
+      return;
+    }
+    setProfileDraftStatus("pending");
+    if (profileDraftTimer.current) clearTimeout(profileDraftTimer.current);
+    const confirmed = profileQuery.data.profile.data;
+    const isRevertingToConfirmed = hasSavedProfileDraft && !profileDetailsChanged(profileForm, confirmed);
+    const snapshot = { ...profileForm };
+    profileDraftTimer.current = setTimeout(() => {
+      profileDraftTimer.current = null;
+      if (isRevertingToConfirmed) discardProfileDraftAction.current();
+      else void queueProfileDraft(snapshot);
+    }, 650);
+    return () => {
+      if (profileDraftTimer.current) {
+        clearTimeout(profileDraftTimer.current);
+        profileDraftTimer.current = null;
+      }
+    };
+  }, [profileForm, profileFormReady, profileQuery.data, hasSavedProfileDraft, queueProfileDraft]);
+
+  useEffect(() => () => {
+    if (profileDraftTimer.current) clearTimeout(profileDraftTimer.current);
+  }, []);
+
   const saveProfile = useMutation({
-    mutationFn: () => request("PUT", "/api/passport/post-arrival/profile", profileForm),
+    mutationFn: async () => {
+      await pauseProfileDraftSaves();
+      return request("PUT", "/api/passport/post-arrival/profile", profileForm);
+    },
     onSuccess: async () => {
       setOperationError(null);
+      setProfileDraftStatus("idle");
+      setHasSavedProfileDraft(false);
       await refresh();
+      suspendProfileDraftSave.current = false;
       setProfileDetailsOpen(false);
       toast({
         title: "Your details are saved",
@@ -184,7 +291,10 @@ export default function PostArrivalPanel({
         className: "border-emerald-300 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 text-white shadow-xl",
       });
     },
-    onError: (error: Error) => setOperationError(error.message),
+    onError: (error: Error) => {
+      suspendProfileDraftSave.current = false;
+      setOperationError(error.message);
+    },
   });
   const saveRecord = useMutation({
     mutationFn: ({ payload, id }: { payload: PostArrivalRecordInput; id?: number }) =>
@@ -218,9 +328,7 @@ export default function PostArrivalPanel({
   const displayedProfileForm = profileFormReady ? profileForm : profile?.data ?? {};
   const filledProfileDetails = PROFILE_DETAIL_FIELDS.filter((field) => hasProfileValue(displayedProfileForm[field])).length;
   const profileDetailsProgress = Math.round((filledProfileDetails / PROFILE_DETAIL_FIELDS.length) * 100);
-  const profileDetailsDirty = profileFormReady && PROFILE_DETAIL_FIELDS.some(
-    (field) => normalizeProfileValue(profileForm[field]) !== normalizeProfileValue(profile?.data[field]),
-  );
+  const profileDetailsDirty = profileFormReady && profileDetailsChanged(profileForm, profile?.data);
   const completion = useMemo(() => {
     if (!profile) return { percent: 0, completed: 0, total: 8, label: "Not yet activated" };
     const checks = [
@@ -434,6 +542,17 @@ export default function PostArrivalPanel({
               <form
                 id="post-arrival-profile-details"
                 className="mt-4 space-y-3"
+                onBlurCapture={(event) => {
+                  const nextTarget = event.relatedTarget;
+                  if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+                  if (profileDraftTimer.current) {
+                    clearTimeout(profileDraftTimer.current);
+                    profileDraftTimer.current = null;
+                  }
+                  if (profileDetailsChanged(profileForm, profileQuery.data?.profileDraft ?? profile?.data)) {
+                    void queueProfileDraft({ ...profileForm });
+                  }
+                }}
                 onSubmit={(event) => {
                   event.preventDefault();
                   saveProfile.mutate();
@@ -540,9 +659,44 @@ export default function PostArrivalPanel({
                     onChange={(event) => setProfileForm((current) => ({ ...current, changesSinceArrival: event.target.value || null }))}
                   />
                 </label>
-                <button type="submit" disabled={saveProfile.isPending || !profileDetailsDirty} className={saveButtonClass}>
-                  {saveProfile.isPending ? "Saving…" : profileDetailsDirty ? "Save details" : "All changes saved"}
-                </button>
+                {profileDraftStatus !== "idle" && (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                      profileDraftStatus === "error"
+                        ? "border-rose-200 bg-rose-50 text-rose-800"
+                        : "border-indigo-100 bg-indigo-50 text-indigo-800"
+                    }`}
+                  >
+                    {profileDraftStatus === "pending" && <>Saving your unfinished changes shortly…</>}
+                    {profileDraftStatus === "saving" && <>Saving a private draft…</>}
+                    {profileDraftStatus === "saved" && <>Draft saved privately. It does not affect your Score or Confidence.</>}
+                    {profileDraftStatus === "error" && <>
+                      Draft could not be saved. Your confirmed profile is unchanged.
+                      <button type="button" onClick={() => void queueProfileDraft({ ...profileForm })} className="font-semibold underline underline-offset-2">Retry</button>
+                    </>}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button type="submit" disabled={saveProfile.isPending || discardProfileDraft.isPending || !profileDetailsDirty} className={saveButtonClass}>
+                    {saveProfile.isPending ? "Saving…" : profileDetailsDirty ? "Save details" : "All changes saved"}
+                  </button>
+                  {hasSavedProfileDraft && (
+                    <button
+                      type="button"
+                      disabled={saveProfile.isPending || discardProfileDraft.isPending}
+                      onClick={() => {
+                        if (window.confirm("Discard your unfinished Post-Arrival draft? Your saved details will not be changed.")) {
+                          discardProfileDraft.mutate();
+                        }
+                      }}
+                      className="min-h-10 rounded-lg border border-indigo-200 px-3 py-2 text-xs font-semibold text-indigo-800 hover:bg-indigo-50 disabled:opacity-50"
+                    >
+                      {discardProfileDraft.isPending ? "Discarding…" : "Discard draft"}
+                    </button>
+                  )}
+                </div>
               </form>
             ) : !profileDetailsOpen ? (
               <div
@@ -561,11 +715,15 @@ export default function PostArrivalPanel({
                   : <CalendarDays className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
                 <div>
                   <p className="text-xs font-bold">
-                    {profileDetailsDirty ? "Your edits are not saved yet" : filledProfileDetails ? "Profile details saved" : "No details added yet"}
+                    {profileDetailsDirty
+                      ? hasSavedProfileDraft ? "Draft saved; details not confirmed" : "Your edits are not saved yet"
+                      : filledProfileDetails ? "Profile details saved" : "No details added yet"}
                   </p>
                   <p className="mt-1 text-[11px] leading-5 opacity-90">
                     {profileDetailsDirty
-                      ? "Your entries are still here. Open the section and save them when ready."
+                      ? hasSavedProfileDraft
+                        ? "Your unfinished changes are saved privately. Open the section and choose Save details to confirm them."
+                        : "Your entries are still here. Open the section and save them when ready."
                       : filledProfileDetails
                         ? `${filledProfileDetails} optional details saved. They are not verified and do not affect your score.`
                         : "Add only the optional information you choose to share. You can reopen this section at any time."}

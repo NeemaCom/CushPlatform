@@ -111,6 +111,42 @@ export const passportFinancialProfileSchema = z.object({
   }
 });
 
+const passportFinancialHistoryDraftSchema = z.object({
+  id: z.string().max(64),
+  month: z.string().max(7),
+  label: z.string().max(100),
+  countryCode: z.string().max(2),
+  currencyCode: z.string().max(3),
+  incomeAmount: z.string().max(32),
+  incomeFrequency: z.enum(["weekly", "monthly", "annual", "variable", ""]),
+  incomeCategory: z.enum(["salary", "contract", "business", "family_support", "other"]),
+  recurring: z.boolean(),
+  variable: z.boolean(),
+  savingsAmount: z.string().max(32),
+  savingsLabel: z.string().max(100),
+  expensesAmount: z.string().max(32),
+  completeCashFlow: z.boolean(),
+}).strict();
+
+export const passportFinancialProfileDraftSchema = z.object({
+  countryCode: z.string().max(2),
+  currencyCode: z.string().max(3),
+  employmentStatus: z.string().max(80),
+  employer: z.string().max(160),
+  jobTitle: z.string().max(120),
+  incomeAmount: z.string().max(32),
+  incomeFrequency: z.enum(["weekly", "monthly", "annual", "variable", ""]),
+  incomeCategory: z.enum(["salary", "contract", "business", "family_support", "other"]),
+  housingStatus: z.string().max(100),
+  housingCost: z.string().max(32),
+  savingsAmount: z.string().max(32),
+  savingsLabel: z.string().max(100),
+  commitmentsAmount: z.string().max(32),
+  completeCashFlow: z.boolean(),
+  financialHistorySummary: z.string().max(2000),
+  financialHistory: z.array(passportFinancialHistoryDraftSchema).max(72),
+}).strict();
+
 export type PassportFinancialProfile = z.infer<typeof passportFinancialProfileSchema>;
 
 export function validatePassportFinancialProfilePeriod(

@@ -454,7 +454,7 @@ export default function PassportJourneyDashboard({
                         </p>
                         {item.sourceTypes.length > 0 && (
                           <p className="mt-1 text-[10px] text-slate-400">
-                            Sources: {item.sourceTypes.map((source) => evidenceSourceLabel(source, true)).join(" · ")}
+                            Evidence on file: {item.sourceTypes.map((source) => evidenceSourceLabel(source, true)).join(" · ")}
                           </p>
                         )}
                         {item.changedInformation.length > 0 && (

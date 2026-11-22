@@ -7,7 +7,9 @@ import {
   cushPostArrivalProfiles,
   cushPostArrivalRecords,
   passports,
+  cushPassportProfileDrafts,
   postArrivalProfileDataSchema,
+  postArrivalProfileDraftSchema,
   postArrivalRecordSchema,
 } from "@shared/schema";
 import { db } from "./db";
@@ -15,6 +17,11 @@ import { isAuthenticated, type AuthenticatedRequest } from "./auth";
 import { getOrCreatePassport } from "./mem-store";
 import { authRateLimit } from "./security";
 import { isIsoCurrencyCode } from "./currency-catalog";
+import {
+  decryptEvidenceJson,
+  encryptEvidenceJson,
+  EvidenceEncryptionUnavailableError,
+} from "./passport-evidence-service";
 
 const profileUpdateSchema = postArrivalProfileDataSchema.partial().strict();
 
@@ -24,10 +31,16 @@ function isMissingPostArrivalSchema(error: unknown): boolean {
 }
 
 function sendStorageError(res: import("express").Response, error: unknown) {
+  if (error instanceof EvidenceEncryptionUnavailableError) {
+    return res.status(503).json({
+      code: "PASSPORT_EVIDENCE_ENCRYPTION_NOT_CONFIGURED",
+      error: "Secure Passport draft storage is not configured. Please contact Cush support.",
+    });
+  }
   if (isMissingPostArrivalSchema(error)) {
     return res.status(503).json({
       code: "POST_ARRIVAL_SCHEMA_MISSING",
-      error: "Post-Arrival storage is not ready. Apply migrations/manual/create-cush-post-arrival.sql in the intended Supabase project.",
+      error: "Post-Arrival storage is not ready. Apply migrations/manual/create-cush-post-arrival.sql and migrations/manual/create-cush-passport-profile-drafts.sql in the intended Supabase project.",
     });
   }
   console.error("Post-Arrival data operation failed.");
@@ -77,6 +90,17 @@ export function registerPostArrivalRoutes(app: Express) {
           .orderBy(desc(cushPostArrivalRecords.activityDate), desc(cushPostArrivalRecords.updatedAt)),
       ]);
       const profileData = postArrivalProfileDataSchema.safeParse(profile.profileData);
+      const [draftRow] = profile.arrivalStatus === "arrived"
+        ? await db.select().from(cushPassportProfileDrafts)
+          .where(and(
+            eq(cushPassportProfileDrafts.userId, userId),
+            eq(cushPassportProfileDrafts.draftType, "post_arrival_profile"),
+          ))
+          .limit(1)
+        : [];
+      const profileDraft = draftRow
+        ? postArrivalProfileDraftSchema.parse(decryptEvidenceJson<unknown>(draftRow.encryptedDraft))
+        : null;
       return res.json({
         profile: {
           arrivalStatus: profile.arrivalStatus,
@@ -85,6 +109,8 @@ export function registerPostArrivalRoutes(app: Express) {
           data: profileData.success ? profileData.data : {},
           updatedAt: profile.updatedAt,
         },
+        profileDraft,
+        profileDraftUpdatedAt: draftRow?.updatedAt.toISOString() ?? null,
         records,
       });
     } catch (error) {
@@ -156,6 +182,11 @@ export function registerPostArrivalRoutes(app: Express) {
           resourceType: "arrival_profile",
           resourceId: String(userId),
         });
+        await tx.delete(cushPassportProfileDrafts)
+          .where(and(
+            eq(cushPassportProfileDrafts.userId, userId),
+            eq(cushPassportProfileDrafts.draftType, "post_arrival_profile"),
+          ));
         return result;
       });
       return res.json({ success: true, profile });
@@ -163,6 +194,49 @@ export function registerPostArrivalRoutes(app: Express) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.issues[0]?.message ?? "Invalid Post-Arrival profile." });
       }
+      return sendStorageError(res, error);
+    }
+  });
+
+  app.put("/api/passport/post-arrival/profile/draft", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    res.setHeader("Cache-Control", "no-store, private");
+    const parsed = postArrivalProfileDraftSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Check the Post-Arrival draft fields." });
+    }
+    try {
+      const userId = req.userId!;
+      const current = await ensureProfile(userId);
+      if (current.arrivalStatus !== "arrived") {
+        return res.status(409).json({ error: "Confirm your UK arrival before adding Post-Arrival details." });
+      }
+      const updatedAt = new Date();
+      const encryptedDraft = encryptEvidenceJson(parsed.data);
+      await db.insert(cushPassportProfileDrafts).values({
+        userId,
+        draftType: "post_arrival_profile",
+        encryptedDraft,
+        updatedAt,
+      }).onConflictDoUpdate({
+        target: [cushPassportProfileDrafts.userId, cushPassportProfileDrafts.draftType],
+        set: { encryptedDraft, updatedAt },
+      });
+      return res.json({ saved: true, updatedAt: updatedAt.toISOString() });
+    } catch (error) {
+      return sendStorageError(res, error);
+    }
+  });
+
+  app.delete("/api/passport/post-arrival/profile/draft", isAuthenticated, authRateLimit, async (req: AuthenticatedRequest, res) => {
+    res.setHeader("Cache-Control", "no-store, private");
+    try {
+      await db.delete(cushPassportProfileDrafts)
+        .where(and(
+          eq(cushPassportProfileDrafts.userId, req.userId!),
+          eq(cushPassportProfileDrafts.draftType, "post_arrival_profile"),
+        ));
+      return res.json({ success: true });
+    } catch (error) {
       return sendStorageError(res, error);
     }
   });

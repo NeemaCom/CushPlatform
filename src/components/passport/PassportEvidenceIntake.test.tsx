@@ -55,6 +55,8 @@ describe("PassportEvidenceIntake disclosures", () => {
       if (path === "/api/passport/financial-profile") {
         return jsonResponse({
           profile: savedProfile,
+          draft: null,
+          draftUpdatedAt: null,
           progress: { completed: 6, total: 6, percent: 100, steps: [] },
           updatedAt: "2026-11-22T00:00:00.000Z",
         });
@@ -85,6 +87,8 @@ describe("PassportEvidenceIntake disclosures", () => {
       if (path === "/api/passport/financial-profile") {
         return jsonResponse({
           profile: null,
+          draft: null,
+          draftUpdatedAt: null,
           progress: { completed: 0, total: 6, percent: 0, steps: [] },
           updatedAt: null,
         });
@@ -123,5 +127,86 @@ describe("PassportEvidenceIntake disclosures", () => {
     fireEvent.click(screen.getByText("Add a supporting document"));
     expect(uploadDetails.open).toBe(true);
     expect(screen.getByRole("button", { name: "Upload privately" })).toBeTruthy();
+  });
+
+  it("restores a private financial draft separately from the confirmed profile", async () => {
+    const draft = {
+      countryCode: "GB",
+      currencyCode: "GBP",
+      employmentStatus: "",
+      employer: "Draft employer",
+      jobTitle: "",
+      incomeAmount: "",
+      incomeFrequency: "",
+      incomeCategory: "other",
+      housingStatus: "",
+      housingCost: "",
+      savingsAmount: "",
+      savingsLabel: "",
+      commitmentsAmount: "",
+      completeCashFlow: false,
+      financialHistorySummary: "",
+      financialHistory: [],
+    };
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), "http://localhost").pathname;
+      if (path === "/api/passport/financial-profile") {
+        return jsonResponse({
+          profile: null,
+          draft,
+          draftUpdatedAt: "2026-11-22T00:00:00.000Z",
+          progress: { completed: 0, total: 6, percent: 0, steps: [] },
+          updatedAt: null,
+        });
+      }
+      if (path === "/api/passport/evidence-submissions") return jsonResponse({ submissions: [] });
+      if (path === "/api/passport/currencies") return jsonResponse({ currencies: [] });
+      if (path === "/api/passport/evidence-history") return jsonResponse({ events: [] });
+      throw new Error(`Unexpected request: ${path}`);
+    }));
+
+    renderIntake();
+    expect(await screen.findByText("Profile completeness")).toBeTruthy();
+    fireEvent.click(screen.getByText("Income and employment"));
+    expect((screen.getByLabelText("Employer") as HTMLInputElement).value).toBe("Draft employer");
+    expect(await screen.findByRole("button", { name: "Discard draft" })).toBeTruthy();
+    expect(await screen.findByText(/Draft saved privately/)).toBeTruthy();
+  });
+
+  it("autosaves edits as a draft without submitting confirmed financial data", async () => {
+    const requests: Array<{ path: string; method: string; body: unknown }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input), "http://localhost");
+      const path = url.pathname;
+      requests.push({
+        path,
+        method: init?.method ?? "GET",
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      });
+      if (path === "/api/passport/financial-profile") {
+        return jsonResponse({
+          profile: null,
+          draft: null,
+          draftUpdatedAt: null,
+          progress: { completed: 0, total: 6, percent: 0, steps: [] },
+          updatedAt: null,
+        });
+      }
+      if (path === "/api/passport/financial-profile/draft") return jsonResponse({ saved: true, updatedAt: "2026-11-22T00:00:00.000Z" });
+      if (path === "/api/passport/evidence-submissions") return jsonResponse({ submissions: [] });
+      if (path === "/api/passport/currencies") return jsonResponse({ currencies: [] });
+      if (path === "/api/passport/evidence-history") return jsonResponse({ events: [] });
+      throw new Error(`Unexpected request: ${init?.method ?? "GET"} ${path}`);
+    }));
+
+    renderIntake();
+    expect(await screen.findByText("Profile completeness")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Employer"), { target: { value: "Draft employer" } });
+    await waitFor(() => {
+      expect(requests.some((request) => request.path === "/api/passport/financial-profile/draft" && request.method === "PUT")).toBe(true);
+    }, { timeout: 3000 });
+    expect(requests.some((request) => request.path === "/api/passport/financial-profile" && request.method === "PUT")).toBe(false);
+    const savedDraft = requests.find((request) => request.path === "/api/passport/financial-profile/draft" && request.method === "PUT");
+    expect(savedDraft?.body).toMatchObject({ employer: "Draft employer" });
   });
 });

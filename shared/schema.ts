@@ -1607,6 +1607,23 @@ export const cushPassportPostArrivalFinancialProfiles = pgTable("cush_passport_p
   currencyCodeCheck: check("cush_passport_post_arrival_financial_profiles_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
 })).enableRLS();
 
+export const cushPassportProfileDrafts = pgTable("cush_passport_profile_drafts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  draftType: text("draft_type").notNull(),
+  encryptedDraft: text("encrypted_draft").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  draftTypeCheck: check(
+    "cush_passport_profile_drafts_type_check",
+    sql`${table.draftType} in ('pre_arrival_financial', 'post_arrival_financial', 'post_arrival_profile')`,
+  ),
+  userDraftUnique: uniqueIndex("cush_passport_profile_drafts_user_type_key")
+    .on(table.userId, table.draftType),
+  userUpdatedIndex: index("cush_passport_profile_drafts_user_updated_idx")
+    .on(table.userId, table.updatedAt),
+})).enableRLS();
+
 export const cushPassportEvidenceSubmissions = pgTable("cush_passport_evidence_submissions", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -1956,6 +1973,20 @@ export const postArrivalProfileDataSchema = z.object({
   startedWorking: z.boolean().nullable().optional(),
   studying: z.boolean().nullable().optional(),
   changesSinceArrival: z.string().trim().max(1000).nullable().optional(),
+}).strict();
+
+// Drafts accept incomplete fields, but remain bounded and separately encrypted.
+// This schema is intentionally more permissive than the confirmed profile schema.
+export const postArrivalProfileDraftSchema = z.object({
+  currentLocation: z.string().max(160).nullable().optional(),
+  accountHolderName: z.string().max(160).nullable().optional(),
+  accountHolderEmail: z.string().max(254).nullable().optional(),
+  accountHolderPhone: z.string().max(40).nullable().optional(),
+  accommodationArrangement: z.string().max(80).nullable().optional(),
+  employmentStatus: z.string().max(80).nullable().optional(),
+  startedWorking: z.boolean().nullable().optional(),
+  studying: z.boolean().nullable().optional(),
+  changesSinceArrival: z.string().max(1000).nullable().optional(),
 }).strict();
 
 export const postArrivalRecordSchema = z.discriminatedUnion("recordType", [

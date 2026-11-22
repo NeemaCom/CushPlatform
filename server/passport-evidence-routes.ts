@@ -5,6 +5,7 @@ import {
   cushPassportEvidenceEvents,
   cushPassportEvidenceSubmissions,
   cushPassportFinancialProfiles,
+  cushPassportProfileDrafts,
   cushPassportPostArrivalFinancialProfiles,
   cushPostArrivalProfiles,
   users,
@@ -31,6 +32,7 @@ import {
   extractEvidenceDraft,
   getFinancialProfileProgress,
   MAX_EVIDENCE_FILE_BYTES,
+  passportFinancialProfileDraftSchema,
   passportFinancialProfileSchema,
   validatePassportFinancialProfilePeriod,
 } from "./passport-evidence-service";
@@ -48,6 +50,10 @@ const intakePeriodSchema = z.enum(["pre_arrival", "post_arrival"]);
 function parseIntakePeriod(value: unknown): IntakePeriod | null {
   const parsed = intakePeriodSchema.safeParse(value ?? "pre_arrival");
   return parsed.success ? parsed.data : null;
+}
+
+function financialDraftType(period: IntakePeriod) {
+  return period === "pre_arrival" ? "pre_arrival_financial" : "post_arrival_financial";
 }
 
 async function getConfirmedArrivalDate(userId: number): Promise<string | null> {
@@ -121,7 +127,7 @@ function sendEvidenceError(res: Response, error: unknown, fallback: string) {
       ["42P01", "42703"].includes(String((error as { code?: unknown }).code))) {
     return res.status(503).json({
       code: "PASSPORT_EVIDENCE_SCHEMA_MISSING",
-      error: "Secure evidence storage is not ready. Apply the initial Passport evidence migration, then migrations/manual/extend-cush-passport-multicurrency.sql.",
+      error: "Secure Passport storage is not ready. Apply the existing evidence migrations and migrations/manual/create-cush-passport-profile-drafts.sql.",
     });
   }
   console.error(fallback, {
@@ -173,18 +179,77 @@ export function registerPassportEvidenceRoutes(app: Express) {
           .where(eq(cushPassportFinancialProfiles.userId, req.userId!)).limit(1)
         : await db.select().from(cushPassportPostArrivalFinancialProfiles)
           .where(eq(cushPassportPostArrivalFinancialProfiles.userId, req.userId!)).limit(1);
+      const [draftRow] = await db.select().from(cushPassportProfileDrafts)
+        .where(and(
+          eq(cushPassportProfileDrafts.userId, req.userId!),
+          eq(cushPassportProfileDrafts.draftType, financialDraftType(period)),
+        ))
+        .limit(1);
       const profile = row
         ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
+        : null;
+      const draft = draftRow
+        ? passportFinancialProfileDraftSchema.parse(decryptEvidenceJson<unknown>(draftRow.encryptedDraft))
         : null;
       return res.json({
         period,
         arrivalDate,
         profile,
+        draft,
+        draftUpdatedAt: draftRow?.updatedAt.toISOString() ?? null,
         progress: getFinancialProfileProgress(profile),
         updatedAt: row?.updatedAt.toISOString() ?? null,
       });
     } catch (error) {
       return sendEvidenceError(res, error, "Passport financial profile read failed");
+    }
+  });
+
+  app.put("/api/passport/financial-profile/draft", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
+    const parsed = passportFinancialProfileDraftSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Check the draft fields." });
+    }
+    try {
+      if (period === "post_arrival" && !(await getConfirmedArrivalDate(req.userId!))) {
+        return res.status(409).json({ error: "Confirm your arrival before adding post-arrival financial details." });
+      }
+      const updatedAt = new Date();
+      const encryptedDraft = encryptEvidenceJson(parsed.data);
+      await db.insert(cushPassportProfileDrafts).values({
+        userId: req.userId!,
+        draftType: financialDraftType(period),
+        encryptedDraft,
+        updatedAt,
+      }).onConflictDoUpdate({
+        target: [cushPassportProfileDrafts.userId, cushPassportProfileDrafts.draftType],
+        set: { encryptedDraft, updatedAt },
+      });
+      return res.json({ period, saved: true, updatedAt: updatedAt.toISOString() });
+    } catch (error) {
+      return sendEvidenceError(res, error, "Passport financial profile draft save failed");
+    }
+  });
+
+  app.delete("/api/passport/financial-profile/draft", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
+    const period = parseIntakePeriod(req.query.period);
+    if (!period) return res.status(400).json({ error: "Choose pre-arrival or post-arrival." });
+    try {
+      if (period === "post_arrival" && !(await getConfirmedArrivalDate(req.userId!))) {
+        return res.status(409).json({ error: "Confirm your arrival before changing post-arrival financial details." });
+      }
+      await db.delete(cushPassportProfileDrafts)
+        .where(and(
+          eq(cushPassportProfileDrafts.userId, req.userId!),
+          eq(cushPassportProfileDrafts.draftType, financialDraftType(period)),
+        ));
+      return res.json({ success: true, period });
+    } catch (error) {
+      return sendEvidenceError(res, error, "Passport financial profile draft deletion failed");
     }
   });
 
@@ -234,6 +299,11 @@ export function registerPassportEvidenceRoutes(app: Express) {
             set: { countryCode: profile.countryCode, currencyCode: profile.currencyCode, encryptedProfile, updatedAt: now },
           });
         }
+        await tx.delete(cushPassportProfileDrafts)
+          .where(and(
+            eq(cushPassportProfileDrafts.userId, req.userId!),
+            eq(cushPassportProfileDrafts.draftType, financialDraftType(period)),
+          ));
         await recordEvidenceEvent(tx, {
           userId: req.userId,
           actorUserId: req.userId,
@@ -264,6 +334,11 @@ export function registerPassportEvidenceRoutes(app: Express) {
           : await tx.delete(cushPassportPostArrivalFinancialProfiles)
             .where(eq(cushPassportPostArrivalFinancialProfiles.userId, req.userId!))
             .returning({ userId: cushPassportPostArrivalFinancialProfiles.userId });
+        await tx.delete(cushPassportProfileDrafts)
+          .where(and(
+            eq(cushPassportProfileDrafts.userId, req.userId!),
+            eq(cushPassportProfileDrafts.draftType, financialDraftType(period)),
+          ));
         if (removed.length) {
           await recordEvidenceEvent(tx, {
             userId: req.userId,

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Download, FileText, Loader2, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -47,6 +47,8 @@ type FinancialHistoryEntry = {
 type ProfileData = {
   arrivalDate?: string | null;
   profile: FinancialProfile | null;
+  draft: FinancialProfile | null;
+  draftUpdatedAt: string | null;
   progress: {
     completed: number;
     total: number;
@@ -229,6 +231,8 @@ export default function PassportEvidenceIntake({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [profile, setProfile] = useState(() => emptyProfileFor(period));
+  const [profileDraftStatus, setProfileDraftStatus] = useState<"idle" | "pending" | "saving" | "saved" | "error">("idle");
+  const [hasSavedProfileDraft, setHasSavedProfileDraft] = useState(false);
   const [openProfileSections, setOpenProfileSections] = useState<OpenProfileSections>(() => initialOpenProfileSections(emptyProfileFor(period)));
   const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
   const [documentType, setDocumentType] = useState("bank_statement");
@@ -242,6 +246,11 @@ export default function PassportEvidenceIntake({
   const [candidateMonths, setCandidateMonths] = useState<Record<string, string>>({});
   const hydratedProfilePeriod = useRef<string | null>(null);
   const hydratedDocumentDisclosure = useRef(false);
+  const profileDraftTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const profileDraftSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const profileDraftSaveVersion = useRef(0);
+  const suspendProfileDraftSave = useRef(false);
+  const discardProfileDraftAction = useRef<() => void>(() => undefined);
   const employmentStatusIsCustom = profile.employmentStatus !== "" && !EMPLOYMENT_STATUS_OPTIONS.includes(profile.employmentStatus);
   const housingStatusIsCustom = profile.housingStatus !== "" && !HOUSING_STATUS_OPTIONS.includes(profile.housingStatus);
 
@@ -273,13 +282,13 @@ export default function PassportEvidenceIntake({
   });
 
   useEffect(() => {
-    if (profileQuery.data) {
-      const savedProfile = profileQuery.data.profile ?? emptyProfileFor(period);
-      setProfile(savedProfile);
-      if (hydratedProfilePeriod.current !== period) {
-        hydratedProfilePeriod.current = period;
-        setOpenProfileSections(initialOpenProfileSections(savedProfile));
-      }
+    if (profileQuery.data && hydratedProfilePeriod.current !== period) {
+      const restoredProfile = profileQuery.data.draft ?? profileQuery.data.profile ?? emptyProfileFor(period);
+      hydratedProfilePeriod.current = period;
+      setProfile(restoredProfile);
+      setProfileDraftStatus(profileQuery.data.draft ? "saved" : "idle");
+      setHasSavedProfileDraft(Boolean(profileQuery.data.draft));
+      setOpenProfileSections(initialOpenProfileSections(restoredProfile));
     }
   }, [profileQuery.data, period]);
   useEffect(() => {
@@ -289,9 +298,10 @@ export default function PassportEvidenceIntake({
     }
   }, [documentsQuery.data]);
   useEffect(() => {
-    if (period === "pre_arrival" && profileQuery.data?.profile) {
-      setDocumentCountryCode(profileQuery.data.profile.countryCode);
-      setDocumentCurrencyCode(profileQuery.data.profile.currencyCode);
+    const currentProfile = profileQuery.data?.draft ?? profileQuery.data?.profile;
+    if (period === "pre_arrival" && currentProfile) {
+      setDocumentCountryCode(currentProfile.countryCode);
+      setDocumentCurrencyCode(currentProfile.currencyCode);
     }
   }, [profileQuery.data, period]);
   useEffect(() => {
@@ -305,34 +315,142 @@ export default function PassportEvidenceIntake({
     }
   }, [detailQuery.data]);
 
-  const invalidateIntake = () => {
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", period] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] });
-    if (selectedId !== null) void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", selectedId] });
-  };
+  const invalidateIntake = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", period] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] }),
+    ...(selectedId === null ? [] : [queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", selectedId] })]),
+  ]).then(() => undefined);
+
+  const saveProfileDraft = useMutation({
+    mutationFn: (snapshot: FinancialProfile) =>
+      profileRequest<{ updatedAt: string }>("PUT", `/api/passport/financial-profile/draft?period=${period}`, snapshot),
+    onSuccess: (result, snapshot) => {
+      setProfileDraftStatus("saved");
+      setHasSavedProfileDraft(true);
+      queryClient.setQueryData<ProfileData>(["/api/passport/financial-profile", period], (current) =>
+        current ? { ...current, draft: snapshot, draftUpdatedAt: result.updatedAt } : current,
+      );
+    },
+    onError: () => setProfileDraftStatus("error"),
+  });
+
+  const queueProfileDraft = useCallback((snapshot: FinancialProfile) => {
+    const version = ++profileDraftSaveVersion.current;
+    profileDraftSaveQueue.current = profileDraftSaveQueue.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (version !== profileDraftSaveVersion.current || suspendProfileDraftSave.current) return;
+        setProfileDraftStatus("saving");
+        try {
+          await saveProfileDraft.mutateAsync(snapshot);
+        } catch {
+          // The mutation exposes a visible retry state; keep the queue usable.
+        }
+      });
+    return profileDraftSaveQueue.current;
+  }, [saveProfileDraft.mutateAsync]);
+
+  const pauseProfileDraftSaves = useCallback(async () => {
+    suspendProfileDraftSave.current = true;
+    profileDraftSaveVersion.current += 1;
+    if (profileDraftTimer.current) {
+      clearTimeout(profileDraftTimer.current);
+      profileDraftTimer.current = null;
+    }
+    await profileDraftSaveQueue.current.catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!profileQuery.data || hydratedProfilePeriod.current !== period || suspendProfileDraftSave.current) return;
+    const confirmedSnapshot = profileQuery.data.profile ?? emptyProfileFor(period);
+    const savedSnapshot = profileQuery.data.draft ?? confirmedSnapshot;
+    if (JSON.stringify(profile) === JSON.stringify(savedSnapshot)) {
+      setProfileDraftStatus(hasSavedProfileDraft ? "saved" : "idle");
+      return;
+    }
+    setProfileDraftStatus("pending");
+    if (profileDraftTimer.current) clearTimeout(profileDraftTimer.current);
+    const isRevertingToConfirmed = hasSavedProfileDraft &&
+      JSON.stringify(profile) === JSON.stringify(confirmedSnapshot);
+    profileDraftTimer.current = setTimeout(() => {
+      profileDraftTimer.current = null;
+      if (isRevertingToConfirmed) {
+        discardProfileDraftAction.current();
+      } else {
+        void queueProfileDraft(structuredClone(profile));
+      }
+    }, 650);
+    return () => {
+      if (profileDraftTimer.current) {
+        clearTimeout(profileDraftTimer.current);
+        profileDraftTimer.current = null;
+      }
+    };
+  }, [profile, profileQuery.data, period, queueProfileDraft, hasSavedProfileDraft]);
+
+  useEffect(() => () => {
+    if (profileDraftTimer.current) clearTimeout(profileDraftTimer.current);
+  }, []);
+
+  const discardProfileDraft = useMutation({
+    mutationFn: async () => {
+      await pauseProfileDraftSaves();
+      return profileRequest("DELETE", `/api/passport/financial-profile/draft?period=${period}`);
+    },
+    onSuccess: async () => {
+      setProfile(profileQuery.data?.profile ?? emptyProfileFor(period));
+      setProfileDraftStatus("idle");
+      setHasSavedProfileDraft(false);
+      await queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile", period] });
+      suspendProfileDraftSave.current = false;
+    },
+    onError: () => {
+      suspendProfileDraftSave.current = false;
+      setProfileDraftStatus("error");
+    },
+  });
+  discardProfileDraftAction.current = () => discardProfileDraft.mutate();
 
   const saveProfile = useMutation({
-    mutationFn: () => profileRequest("PUT", `/api/passport/financial-profile?period=${period}`, profile),
-    onSuccess: () => {
+    mutationFn: async () => {
+      await pauseProfileDraftSaves();
+      return profileRequest("PUT", `/api/passport/financial-profile?period=${period}`, profile);
+    },
+    onSuccess: async () => {
       setOpenProfileSections({ income: false, housing: false, savings: false, history: false });
-      invalidateIntake();
+      setProfileDraftStatus("idle");
+      setHasSavedProfileDraft(false);
+      await invalidateIntake();
+      suspendProfileDraftSave.current = false;
       toast({ title: "Financial profile saved", description: "Your confirmed financial details can contribute to your provisional assessment. Uploaded files remain separate; their review status affects Confidence, not Score by itself." });
       onSaved?.();
     },
-    onError: (error: Error) => toast({ title: "Could not save profile", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      suspendProfileDraftSave.current = false;
+      toast({ title: "Could not save profile", description: error.message, variant: "destructive" });
+    },
   });
   const clearProfile = useMutation({
-    mutationFn: () => profileRequest("DELETE", `/api/passport/financial-profile?period=${period}`),
-    onSuccess: () => {
+    mutationFn: async () => {
+      await pauseProfileDraftSaves();
+      return profileRequest("DELETE", `/api/passport/financial-profile?period=${period}`);
+    },
+    onSuccess: async () => {
       setProfile(emptyProfileFor(period));
       setOpenProfileSections(initialOpenProfileSections(emptyProfileFor(period)));
-      invalidateIntake();
+      setProfileDraftStatus("idle");
+      setHasSavedProfileDraft(false);
+      await invalidateIntake();
+      suspendProfileDraftSave.current = false;
       toast({ title: "Financial profile removed" });
     },
-    onError: (error: Error) => toast({ title: "Could not remove profile", description: error.message, variant: "destructive" }),
+    onError: (error: Error) => {
+      suspendProfileDraftSave.current = false;
+      toast({ title: "Could not remove profile", description: error.message, variant: "destructive" });
+    },
   });
   const upload = useMutation({
     mutationFn: () => {
@@ -586,6 +704,18 @@ export default function PassportEvidenceIntake({
 
             <form
               className="mt-5 space-y-5"
+              onBlurCapture={(event) => {
+                const nextTarget = event.relatedTarget;
+                if (nextTarget instanceof Node && event.currentTarget.contains(nextTarget)) return;
+                if (profileDraftTimer.current) {
+                  clearTimeout(profileDraftTimer.current);
+                  profileDraftTimer.current = null;
+                }
+                const baseline = profileQuery.data?.draft ?? profileQuery.data?.profile ?? emptyProfileFor(period);
+                if (JSON.stringify(profile) !== JSON.stringify(baseline)) {
+                  void queueProfileDraft(structuredClone(profile));
+                }
+              }}
               onSubmit={(event) => {
                 event.preventDefault();
                 saveProfile.mutate();
@@ -600,7 +730,10 @@ export default function PassportEvidenceIntake({
               <div className="space-y-2.5">
                 <details
                   open={openProfileSections.income}
-                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, income: event.currentTarget.open }))}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setOpenProfileSections((current) => ({ ...current, income: open }));
+                  }}
                   className="rounded-xl border border-slate-200 bg-white p-4"
                 >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
@@ -663,7 +796,10 @@ export default function PassportEvidenceIntake({
                 </details>
                 <details
                   open={openProfileSections.housing}
-                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, housing: event.currentTarget.open }))}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setOpenProfileSections((current) => ({ ...current, housing: open }));
+                  }}
                   className="rounded-xl border border-slate-200 bg-white p-4"
                 >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
@@ -694,7 +830,10 @@ export default function PassportEvidenceIntake({
                 </details>
                 <details
                   open={openProfileSections.savings}
-                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, savings: event.currentTarget.open }))}
+                  onToggle={(event) => {
+                    const open = event.currentTarget.open;
+                    setOpenProfileSections((current) => ({ ...current, savings: open }));
+                  }}
                   className="rounded-xl border border-slate-200 bg-white p-4"
                 >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
@@ -731,7 +870,10 @@ export default function PassportEvidenceIntake({
               </div>
               <details
                 open={openProfileSections.history}
-                onToggle={(event) => setOpenProfileSections((current) => ({ ...current, history: event.currentTarget.open }))}
+                onToggle={(event) => {
+                  const open = event.currentTarget.open;
+                  setOpenProfileSections((current) => ({ ...current, history: open }));
+                }}
                 className="rounded-xl border border-slate-200 bg-slate-50 p-4"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
@@ -797,13 +939,41 @@ export default function PassportEvidenceIntake({
                 </summary>
                 <textarea maxLength={2000} rows={3} value={profile.financialHistorySummary} onChange={(event) => setProfile({ ...profile, financialHistorySummary: event.target.value })} placeholder="Add relevant context about your financial history. Do not include passwords, PINs, or full account numbers." className="mt-3 w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
               </details>
+              {profileDraftStatus !== "idle" && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-xs ${
+                    profileDraftStatus === "error"
+                      ? "border-rose-200 bg-rose-50 text-rose-800"
+                      : "border-indigo-100 bg-indigo-50 text-indigo-800"
+                  }`}
+                >
+                  {profileDraftStatus === "pending" && <>Saving your unfinished changes shortly…</>}
+                  {profileDraftStatus === "saving" && <><Loader2 className="h-3.5 w-3.5 animate-spin" />Saving a private draft…</>}
+                  {profileDraftStatus === "saved" && <><CheckCircle2 className="h-3.5 w-3.5" />Draft saved privately. It will not affect your Score until you save these details.</>}
+                  {profileDraftStatus === "error" && <>
+                    <AlertCircle className="h-3.5 w-3.5" />
+                    Draft could not be saved. Your confirmed profile is unchanged.
+                    <button type="button" onClick={() => void queueProfileDraft(structuredClone(profile))} className="font-semibold underline underline-offset-2">Retry</button>
+                  </>}
+                </div>
+              )}
               <div className="flex flex-wrap gap-2">
-                <button type="submit" disabled={saveProfile.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
+                <button type="submit" disabled={saveProfile.isPending || clearProfile.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
                   {saveProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {onSaved ? "Save and close" : "Save details"}
                 </button>
+                {hasSavedProfileDraft && (
+                  <button type="button" disabled={discardProfileDraft.isPending || saveProfile.isPending || clearProfile.isPending} onClick={() => {
+                    if (window.confirm("Discard your unfinished draft? Your saved profile will not be changed.")) discardProfileDraft.mutate();
+                  }} className="rounded-lg border border-indigo-200 px-4 py-2.5 text-sm font-medium text-indigo-800 hover:bg-indigo-50 disabled:opacity-50">
+                    {discardProfileDraft.isPending ? "Discarding…" : "Discard draft"}
+                  </button>
+                )}
                 {profileQuery.data?.profile && (
-                  <button type="button" disabled={clearProfile.isPending} onClick={() => {
-                    if (window.confirm("Remove your saved financial profile details? This does not remove uploaded documents.")) clearProfile.mutate();
+                  <button type="button" disabled={clearProfile.isPending || saveProfile.isPending || discardProfileDraft.isPending} onClick={() => {
+                    const draftCopy = hasSavedProfileDraft ? " and unfinished draft" : "";
+                    if (window.confirm(`Remove your saved financial profile details${draftCopy}? This does not remove uploaded documents.`)) clearProfile.mutate();
                   }} className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-white disabled:opacity-50">
                     Clear profile
                   </button>
