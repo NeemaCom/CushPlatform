@@ -115,7 +115,11 @@ function recordSummary(record: SavedRecord) {
   return `${humanize(record.recordType)}${suffix}${date}`;
 }
 
-export default function PostArrivalPanel() {
+export default function PostArrivalPanel({
+  view = "all",
+}: {
+  view?: "all" | "information" | "documents" | "connections";
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [showArrivalDate, setShowArrivalDate] = useState(false);
@@ -319,6 +323,7 @@ export default function PostArrivalPanel() {
 
   return (
     <section className="space-y-4" aria-labelledby="post-arrival-title">
+      {(view === "all" || view === "information") && (
       <div className="overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
         <div className="flex flex-col gap-4 bg-gradient-to-r from-indigo-700 to-violet-600 p-5 text-white sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div>
@@ -577,21 +582,30 @@ export default function PostArrivalPanel() {
           </div>
         </div>
       </div>
+      )}
 
-      <PassportEvidenceIntake period="post_arrival" />
+      <div hidden={view === "connections"}>
+        <PassportEvidenceIntake
+          period="post_arrival"
+          view={view === "documents" ? "documents" : view === "information" ? "profile" : "all"}
+        />
+      </div>
 
-      <PlaidConnectionPanel
-        request={request}
-        onProfileDetails={(details) => setProfileForm((current) => ({
-          ...current,
-          ...(details.accountHolderName ? { accountHolderName: details.accountHolderName } : {}),
-          ...(details.accountHolderEmail ? { accountHolderEmail: details.accountHolderEmail } : {}),
-          ...(details.accountHolderPhone ? { accountHolderPhone: details.accountHolderPhone } : {}),
-        }))}
-      />
+      <div hidden={view !== "all" && view !== "connections"}>
+        <PlaidConnectionPanel
+          request={request}
+          onProfileDetails={(details) => setProfileForm((current) => ({
+            ...current,
+            ...(details.accountHolderName ? { accountHolderName: details.accountHolderName } : {}),
+            ...(details.accountHolderEmail ? { accountHolderEmail: details.accountHolderEmail } : {}),
+            ...(details.accountHolderPhone ? { accountHolderPhone: details.accountHolderPhone } : {}),
+          }))}
+        />
+      </div>
 
       {operationError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{operationError}</p>}
 
+      <div hidden={view !== "all" && view !== "information"}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h3 className="text-lg font-bold text-slate-900">Your UK financial information</h3>
@@ -625,9 +639,9 @@ export default function PostArrivalPanel() {
       <div className="grid gap-3 md:grid-cols-2">
         {GROUPS.map(({ type, title, description, icon: Icon }) => {
           const items = records.filter((record) => record.recordType === type);
-          return (
-            <article key={type} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-3">
+            return (
+            <details key={type} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+              <summary className="flex cursor-pointer list-none items-start gap-3">
                 <div className="rounded-lg bg-indigo-50 p-2 text-indigo-700"><Icon className="h-4 w-4" aria-hidden="true" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
@@ -636,7 +650,8 @@ export default function PostArrivalPanel() {
                   </div>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
                 </div>
-              </div>
+                <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+              </summary>
               {items.length > 0 ? (
                 <ul className="mt-3 space-y-2">
                   {items.map((record) => (
@@ -668,7 +683,7 @@ export default function PostArrivalPanel() {
               ) : (
                 <p className="mt-3 rounded-lg border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500">Nothing added yet. This section is optional.</p>
               )}
-            </article>
+            </details>
           );
         })}
       </div>
@@ -689,6 +704,7 @@ export default function PostArrivalPanel() {
         <Wallet className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
         These Post-Arrival records are kept separately from pre-arrival history. Score and confidence calculations are not changed by adding profile details.
       </p>
+      </div>
     </section>
   );
 }

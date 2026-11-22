@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Clock3, Download, FileText, Loader2, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Download, FileText, Loader2, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { accountRequest } from "@/lib/account-api";
 import { API_BASE_URL } from "@/lib/api-base";
@@ -104,6 +104,9 @@ const EMPTY_PROFILE: FinancialProfile = {
   financialHistory: [],
 };
 
+const EMPLOYMENT_STATUS_OPTIONS = ["Employed", "Self-employed", "Business owner", "Not currently employed", "Student", "Other"];
+const HOUSING_STATUS_OPTIONS = ["Renting", "Owner-occupied", "Living with family or friends", "Temporary accommodation", "Other"];
+
 function emptyProfileFor(period: "pre_arrival" | "post_arrival"): FinancialProfile {
   return period === "post_arrival"
     ? { ...EMPTY_PROFILE, countryCode: "GB", currencyCode: "GBP" }
@@ -182,7 +185,15 @@ function statusTone(status: string) {
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
-export default function PassportEvidenceIntake({ period = "pre_arrival" }: { period?: "pre_arrival" | "post_arrival" }) {
+export default function PassportEvidenceIntake({
+  period = "pre_arrival",
+  view = "all",
+  onSaved,
+}: {
+  period?: "pre_arrival" | "post_arrival";
+  view?: "all" | "profile" | "documents";
+  onSaved?: () => void;
+}) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [profile, setProfile] = useState(() => emptyProfileFor(period));
@@ -194,6 +205,8 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [correctedDraft, setCorrectedDraft] = useState("");
   const [correctedCurrencyCode, setCorrectedCurrencyCode] = useState("GBP");
+  const employmentStatusIsCustom = profile.employmentStatus !== "" && !EMPLOYMENT_STATUS_OPTIONS.includes(profile.employmentStatus);
+  const housingStatusIsCustom = profile.housingStatus !== "" && !HOUSING_STATUS_OPTIONS.includes(profile.housingStatus);
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/passport/financial-profile", period],
@@ -255,6 +268,7 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
     onSuccess: () => {
       invalidateIntake();
       toast({ title: "Financial profile saved", description: "Self-declared amounts can contribute to your provisional assessment. Uploaded documents remain separate and are not treated as verified." });
+      onSaved?.();
     },
     onError: (error: Error) => toast({ title: "Could not save profile", description: error.message, variant: "destructive" }),
   });
@@ -400,14 +414,18 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
   }
 
   return (
-    <section className="space-y-5" aria-labelledby="passport-evidence-heading">
+    <section
+      className="space-y-5"
+      aria-label={`${period === "post_arrival" ? "Post-arrival" : "Pre-arrival"} financial profile and evidence`}
+    >
+      {view !== "documents" && (
       <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-white to-blue-50 p-5 shadow-sm sm:p-6">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
             <ShieldCheck className="h-5 w-5" aria-hidden="true" />
           </span>
           <div>
-            <h2 id="passport-evidence-heading" className="text-base font-bold text-slate-900">
+            <h2 id={`passport-evidence-heading-${period}`} className="text-base font-bold text-slate-900">
               {period === "post_arrival" ? "Post-arrival financial profile and evidence" : "Pre-arrival financial profile and evidence"}
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
@@ -461,79 +479,118 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
                   Keep each amount in its original currency. GBP is scored directly; USD and NGN use the existing dated CBN rate. Other valid currencies are saved but remain outside the GBP-based Score until an approved conversion rate is available.
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Country code
-                  <input required maxLength={2} pattern="[A-Z]{2}" value={profile.countryCode} onChange={(event) => setProfile({ ...profile, countryCode: event.target.value.toUpperCase() })} placeholder="GB" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
-                </label>
-                <CurrencyCodeField
-                  id={`passport-profile-currency-${period}`}
-                  label="Currency code"
-                  value={profile.currencyCode}
-                  options={currencyOptionsQuery.data?.currencies ?? []}
-                  onChange={(currencyCode) => setProfile({ ...profile, currencyCode })}
-                  required
-                />
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Employment status
-                  <input maxLength={80} value={profile.employmentStatus} onChange={(event) => setProfile({ ...profile, employmentStatus: event.target.value })} placeholder="Employed, self-employed…" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Employer
-                  <input maxLength={160} value={profile.employer} onChange={(event) => setProfile({ ...profile, employer: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Job title
-                  <input maxLength={120} value={profile.jobTitle} onChange={(event) => setProfile({ ...profile, jobTitle: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Income amount
-                  <input inputMode="decimal" value={profile.incomeAmount} onChange={(event) => setProfile({ ...profile, incomeAmount: event.target.value })} placeholder="e.g. 2500.00" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Income frequency
-                  <select value={profile.incomeFrequency} onChange={(event) => setProfile({ ...profile, incomeFrequency: event.target.value as FinancialProfile["incomeFrequency"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
-                    <option value="">Select frequency</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="variable">Variable</option>
-                  </select>
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Income type
-                  <select value={profile.incomeCategory} onChange={(event) => setProfile({ ...profile, incomeCategory: event.target.value as FinancialProfile["incomeCategory"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
-                    <option value="salary">Salary</option><option value="contract">Contract</option><option value="business">Business</option><option value="family_support">Family support</option><option value="other">Other</option>
-                  </select>
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Housing arrangement
-                  <input maxLength={100} value={profile.housingStatus} onChange={(event) => setProfile({ ...profile, housingStatus: event.target.value })} placeholder="Renting, owned…" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Monthly housing cost
-                  <input inputMode="decimal" value={profile.housingCost} onChange={(event) => setProfile({ ...profile, housingCost: event.target.value })} placeholder="Amount in selected currency" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Savings amount
-                  <input inputMode="decimal" value={profile.savingsAmount} onChange={(event) => setProfile({ ...profile, savingsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Savings source label
-                  <input maxLength={100} value={profile.savingsLabel} onChange={(event) => setProfile({ ...profile, savingsLabel: event.target.value })} placeholder="e.g. Savings account" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
-                <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Monthly regular commitments
-                  <input inputMode="decimal" value={profile.commitmentsAmount} onChange={(event) => setProfile({ ...profile, commitmentsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-                </label>
+              <div className="space-y-2.5">
+                <details open className="rounded-xl border border-slate-200 bg-white p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                    <span>Income and employment</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  </summary>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Country code
+                      <input required maxLength={2} pattern="[A-Z]{2}" value={profile.countryCode} onChange={(event) => setProfile({ ...profile, countryCode: event.target.value.toUpperCase() })} placeholder="GB" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
+                    </label>
+                    <CurrencyCodeField
+                      id={`passport-profile-currency-${period}`}
+                      label="Currency code"
+                      value={profile.currencyCode}
+                      options={currencyOptionsQuery.data?.currencies ?? []}
+                      onChange={(currencyCode) => setProfile({ ...profile, currencyCode })}
+                      required
+                    />
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Employment status
+                      <select value={employmentStatusIsCustom ? "Other" : profile.employmentStatus} onChange={(event) => setProfile({ ...profile, employmentStatus: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="">Choose a status</option>
+                        {EMPLOYMENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                      {(employmentStatusIsCustom || profile.employmentStatus === "Other") && (
+                        <input maxLength={80} value={employmentStatusIsCustom ? profile.employmentStatus : ""} onChange={(event) => setProfile({ ...profile, employmentStatus: event.target.value })} placeholder="Add your employment details" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                      )}
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Employer
+                      <input maxLength={160} value={profile.employer} onChange={(event) => setProfile({ ...profile, employer: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Job title
+                      <input maxLength={120} value={profile.jobTitle} onChange={(event) => setProfile({ ...profile, jobTitle: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Income amount
+                      <input inputMode="decimal" value={profile.incomeAmount} onChange={(event) => setProfile({ ...profile, incomeAmount: event.target.value })} placeholder="e.g. 2500.00" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Income frequency
+                      <select value={profile.incomeFrequency} onChange={(event) => setProfile({ ...profile, incomeFrequency: event.target.value as FinancialProfile["incomeFrequency"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="">Select frequency</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="variable">Variable</option>
+                      </select>
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Income type
+                      <select value={profile.incomeCategory} onChange={(event) => setProfile({ ...profile, incomeCategory: event.target.value as FinancialProfile["incomeCategory"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="salary">Salary</option><option value="contract">Contract</option><option value="business">Business</option><option value="family_support">Family support</option><option value="other">Other</option>
+                      </select>
+                    </label>
+                  </div>
+                </details>
+                <details className="rounded-xl border border-slate-200 bg-white p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                    <span>Housing and rent</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  </summary>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Housing arrangement
+                      <select value={housingStatusIsCustom ? "Other" : profile.housingStatus} onChange={(event) => setProfile({ ...profile, housingStatus: event.target.value })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                        <option value="">Choose an arrangement</option>
+                        {HOUSING_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                      {(housingStatusIsCustom || profile.housingStatus === "Other") && (
+                        <input maxLength={100} value={housingStatusIsCustom ? profile.housingStatus : ""} onChange={(event) => setProfile({ ...profile, housingStatus: event.target.value })} placeholder="Add your housing details" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                      )}
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Monthly housing cost
+                      <input inputMode="decimal" value={profile.housingCost} onChange={(event) => setProfile({ ...profile, housingCost: event.target.value })} placeholder="Amount in selected currency" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                  </div>
+                </details>
+                <details className="rounded-xl border border-slate-200 bg-white p-4">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                    <span>Savings and commitments</span>
+                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  </summary>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Savings amount
+                      <input inputMode="decimal" value={profile.savingsAmount} onChange={(event) => setProfile({ ...profile, savingsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Savings source label
+                      <input maxLength={100} value={profile.savingsLabel} onChange={(event) => setProfile({ ...profile, savingsLabel: event.target.value })} placeholder="e.g. Savings account" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                    <label className="space-y-1 text-xs font-medium text-slate-700">
+                      Monthly regular commitments
+                      <input inputMode="decimal" value={profile.commitmentsAmount} onChange={(event) => setProfile({ ...profile, commitmentsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                    </label>
+                  </div>
+                  <label className="mt-4 flex items-start gap-2 text-xs leading-5 text-slate-600">
+                    <input type="checkbox" checked={profile.completeCashFlow} onChange={(event) => setProfile({ ...profile, completeCashFlow: event.target.checked })} className="mt-0.5" />
+                    <span>For this month, these income and cost amounts cover all my regular spending. Only mark complete if the information is comprehensive.</span>
+                  </label>
+                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                    To avoid double counting, enter only savings sources that are not already included in a connected bank account. Use the history rows for separate sources and past months.
+                  </p>
+                </details>
               </div>
-              <label className="flex items-start gap-2 text-xs leading-5 text-slate-600">
-                <input type="checkbox" checked={profile.completeCashFlow} onChange={(event) => setProfile({ ...profile, completeCashFlow: event.target.checked })} className="mt-0.5" />
-                <span>For this month, these income and cost amounts cover all my regular spending. Only mark complete if the information is comprehensive.</span>
-              </label>
-              <p className="text-xs leading-5 text-slate-500">
-                To avoid double counting, enter only savings sources that are not already included in a connected bank account. Use the history rows for separate sources and past months.
-              </p>
-              <section className="rounded-xl border border-slate-200 bg-slate-50 p-4" aria-labelledby="financial-history-heading">
+              <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                  <span>Monthly history across countries</span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                </summary>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h4 id="financial-history-heading" className="text-sm font-semibold text-slate-800">Monthly history across countries</h4>
                     <p className="mt-1 text-xs leading-5 text-slate-500">Add one row per month and source. Keep the original country and ISO currency code; GBP, USD and NGN can be converted with the existing approved rate rules.</p>
                   </div>
                   <button type="button" onClick={addHistoryEntry} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50">Add a month</button>
@@ -578,14 +635,17 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
                     ))}
                   </div>
                 )}
-              </section>
-              <label className="block space-y-1 text-xs font-medium text-slate-700">
-                Financial history or context
-                <textarea maxLength={2000} rows={3} value={profile.financialHistorySummary} onChange={(event) => setProfile({ ...profile, financialHistorySummary: event.target.value })} placeholder="Add relevant context about your financial history. Do not include passwords, PINs, or full account numbers." className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
-              </label>
+              </details>
+              <details className="rounded-xl border border-slate-200 bg-white p-4">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
+                  <span>Financial history or context <span className="font-normal text-slate-500">Optional</span></span>
+                  <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                </summary>
+                <textarea maxLength={2000} rows={3} value={profile.financialHistorySummary} onChange={(event) => setProfile({ ...profile, financialHistorySummary: event.target.value })} placeholder="Add relevant context about your financial history. Do not include passwords, PINs, or full account numbers." className="mt-3 w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+              </details>
               <div className="flex flex-wrap gap-2">
                 <button type="submit" disabled={saveProfile.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
-                  {saveProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save details
+                  {saveProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {onSaved ? "Save and continue" : "Save details"}
                 </button>
                 {profileQuery.data?.profile && (
                   <button type="button" disabled={clearProfile.isPending} onClick={() => {
@@ -599,10 +659,13 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
           </>
         )}
       </div>
+      )}
 
+      {view !== "profile" && (
+      <>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="evidence-upload-heading">
-          <h3 id="evidence-upload-heading" className="text-sm font-bold text-slate-900">Add a supporting document</h3>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby={`evidence-upload-heading-${period}`}>
+          <h3 id={`evidence-upload-heading-${period}`} className="text-sm font-bold text-slate-900">Add a supporting document</h3>
           <p className="mt-1 text-sm leading-6 text-slate-500">PDF and CSV only, up to 5 MB. Files and extracted text are encrypted before they are saved.</p>
           <div className="mt-4 space-y-3">
             <label className="block space-y-1 text-xs font-medium text-slate-700">
@@ -666,10 +729,10 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby="evidence-history-heading">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby={`evidence-history-heading-${period}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 id="evidence-history-heading" className="text-sm font-bold text-slate-900">Documents and review history</h3>
+              <h3 id={`evidence-history-heading-${period}`} className="text-sm font-bold text-slate-900">Documents and review history</h3>
               <p className="mt-1 text-xs text-slate-500">An upload is not verification. Cush will update the status after review.</p>
             </div>
             <span className="text-xs text-slate-500">{documentsQuery.data?.submissions.length ?? 0} document(s)</span>
@@ -805,6 +868,8 @@ export default function PassportEvidenceIntake({ period = "pre_arrival" }: { per
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
         Self-declared income, savings, and complete monthly cash flow may affect provisional Score components. Confidence source credit follows the active policy; the new 5-point self-declared rule applies after an administrator activates it. Declarations do not satisfy final-score verification requirements. Uploaded documents do not affect Score automatically, and extraction never implies independent verification.
       </p>
+      </>
+      )}
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Building2, Check, Clock3, ShieldCheck, X } from "lucide-react";
+import { AlertTriangle, Building2, Check, ChevronDown, Clock3, ShieldCheck, X } from "lucide-react";
 import { API_BASE_URL } from "@/lib/api-base";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -222,20 +222,36 @@ export default function CushVerifyConsentInbox() {
     );
   }
 
+  const requests = requestsQuery.data!.requests;
+  const pendingCount = requests.filter((request) => request.status === "awaiting_consent").length;
+
   return (
-    <section aria-label="Institutional report requests" className="rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-4 shadow-sm sm:p-5">
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700">
-          <ShieldCheck className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div>
-          <h2 className="font-semibold text-slate-900">Cush Verify requests</h2>
-          <p className="mt-1 text-sm leading-5 text-slate-600">Review the institution, purpose, categories, and access period before sharing. Nothing is released unless you approve.</p>
+    <section aria-label="Institutional report requests" className="overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-sm">
+      <details>
+        <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3.5 transition hover:bg-indigo-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 sm:px-5">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-50 text-indigo-700">
+            <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-slate-900">Cush Verify requests</span>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              {pendingCount ? `${pendingCount} request${pendingCount === 1 ? "" : "s"} need your decision` : "No pending requests"}
+            </span>
+          </span>
+          {pendingCount > 0 && (
+            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">
+              {pendingCount} pending
+            </span>
+          )}
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform" aria-hidden="true" />
+        </summary>
+        <div className="space-y-3 border-t border-indigo-100 bg-indigo-50/30 p-3 sm:p-4">
+          <p className="px-1 text-xs leading-5 text-slate-600">
+            Review the institution, purpose, categories, and access period before sharing. Nothing is released unless you approve.
+          </p>
+          {requests.map((request) => <RequestCard key={request.id} request={request} />)}
         </div>
-      </div>
-      <div className="mt-4 space-y-3">
-        {requestsQuery.data!.requests.map((request) => <RequestCard key={request.id} request={request} />)}
-      </div>
+      </details>
     </section>
   );
 }
