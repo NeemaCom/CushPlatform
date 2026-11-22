@@ -67,19 +67,25 @@ describe("PassportJourneyDashboard", () => {
     const { rerender } = render(<PassportJourneyDashboard {...props} />);
 
     const informationStep = screen.getByRole("button", { name: /Self-provided information/ });
+    const documentStep = screen.getByRole("button", { name: /Document upload/ });
+    const connectionStep = screen.getByRole("button", { name: /Bank connection/ });
+    expect(informationStep.className).toContain("from-indigo-50");
+    expect(documentStep.className).toContain("from-violet-50");
+    expect(connectionStep.className).toContain("from-teal-50");
     expect(informationStep.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(informationStep);
     expect(informationStep.getAttribute("aria-expanded")).toBe("true");
+    expect(informationStep.className).toContain("from-indigo-100");
     expect(screen.getByTestId("evidence-pre_arrival-profile")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close section" }));
 
-    const documentStep = screen.getByRole("button", { name: /Document upload/ });
     fireEvent.click(documentStep);
+    expect(documentStep.className).toContain("from-violet-100");
     expect(screen.getByTestId("evidence-pre_arrival-documents")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close section" }));
 
-    const connectionStep = screen.getByRole("button", { name: /Bank connection/ });
     fireEvent.click(connectionStep);
+    expect(connectionStep.className).toContain("from-teal-100");
     expect(screen.getByTestId("pre-arrival-connections")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Close section" }));
 
