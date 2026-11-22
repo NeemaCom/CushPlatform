@@ -15,6 +15,7 @@ import {
   type AuthenticatedRequest,
 } from "./auth";
 import { db } from "./db";
+import { generalRateLimit } from "./security";
 import {
   decryptEvidenceBytes,
   decryptEvidenceJson,
@@ -36,6 +37,11 @@ const storedReviewSchema = z.object({
 });
 
 type EvidenceExecutor = Pick<typeof db, "insert">;
+
+function noStore(res: Response) {
+  res.setHeader("Cache-Control", "private, no-store");
+  res.setHeader("Pragma", "no-cache");
+}
 
 async function recordEvidenceEvent(
   executor: EvidenceExecutor,
@@ -123,6 +129,7 @@ function sendEncryptedFile(
 
 export function registerPassportEvidenceRoutes(app: Express) {
   app.get("/api/passport/financial-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     try {
       const [row] = await db.select().from(cushPassportFinancialProfiles)
         .where(eq(cushPassportFinancialProfiles.userId, req.userId!)).limit(1);
@@ -139,7 +146,8 @@ export function registerPassportEvidenceRoutes(app: Express) {
     }
   });
 
-  app.put("/api/passport/financial-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/passport/financial-profile", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const parsed = passportFinancialProfileSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "Check the financial profile fields." });
@@ -179,6 +187,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   });
 
   app.delete("/api/passport/financial-profile", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     try {
       await db.transaction(async (tx) => {
         const removed = await tx.delete(cushPassportFinancialProfiles)
@@ -200,6 +209,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   });
 
   app.get("/api/passport/evidence-submissions", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     try {
       const rows = await db.select().from(cushPassportEvidenceSubmissions)
         .where(eq(cushPassportEvidenceSubmissions.userId, req.userId!))
@@ -213,8 +223,10 @@ export function registerPassportEvidenceRoutes(app: Express) {
   app.post(
     "/api/passport/evidence-submissions",
     isAuthenticated,
+    generalRateLimit,
     express.raw({ type: () => true, limit: MAX_EVIDENCE_FILE_BYTES }),
     async (req: AuthenticatedRequest, res) => {
+      noStore(res);
       const file = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
       if (!file.length) return res.status(400).json({ error: "Choose a non-empty PDF or CSV file." });
       if (file.length > MAX_EVIDENCE_FILE_BYTES) {
@@ -301,6 +313,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   );
 
   app.get("/api/passport/evidence-submissions/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const id = validId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid document ID." });
     try {
@@ -338,7 +351,8 @@ export function registerPassportEvidenceRoutes(app: Express) {
     }
   });
 
-  app.put("/api/passport/evidence-submissions/:id/draft", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/passport/evidence-submissions/:id/draft", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const id = validId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid document ID." });
     const parsed = evidenceDraftCorrectionSchema.safeParse(req.body);
@@ -372,7 +386,8 @@ export function registerPassportEvidenceRoutes(app: Express) {
     }
   });
 
-  app.post("/api/passport/evidence-submissions/:id/submit", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/passport/evidence-submissions/:id/submit", isAuthenticated, generalRateLimit, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const id = validId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid document ID." });
     try {
@@ -404,6 +419,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   });
 
   app.delete("/api/passport/evidence-submissions/:id", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const id = validId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid document ID." });
     try {
@@ -439,6 +455,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   });
 
   app.get("/api/passport/evidence-submissions/:id/file", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     const id = validId(req.params.id);
     if (!id) return res.status(400).json({ error: "Invalid document ID." });
     try {
@@ -463,8 +480,10 @@ export function registerPassportEvidenceRoutes(app: Express) {
   app.get(
     "/api/admin/passport/evidence-submissions",
     isAuthenticated,
+    generalRateLimit,
     requireAdminPermission(ADMIN_PERMISSION.documentsRead),
     async (req: AuthenticatedRequest, res) => {
+      noStore(res);
       try {
         const rows = await db.select({
           document: cushPassportEvidenceSubmissions,
@@ -497,6 +516,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
     isAuthenticated,
     requireAdminPermission(ADMIN_PERMISSION.documentsRead),
     async (req: AuthenticatedRequest, res) => {
+      noStore(res);
       const id = validId(req.params.id);
       if (!id) return res.status(400).json({ error: "Invalid document ID." });
       try {
@@ -557,8 +577,10 @@ export function registerPassportEvidenceRoutes(app: Express) {
   app.get(
     "/api/admin/passport/evidence-submissions/:id/file",
     isAuthenticated,
+    generalRateLimit,
     requireAdminPermission(ADMIN_PERMISSION.documentsRead),
     async (req: AuthenticatedRequest, res) => {
+      noStore(res);
       const id = validId(req.params.id);
       if (!id) return res.status(400).json({ error: "Invalid document ID." });
       try {
@@ -582,9 +604,11 @@ export function registerPassportEvidenceRoutes(app: Express) {
   app.patch(
     "/api/admin/passport/evidence-submissions/:id/review",
     isAuthenticated,
+    generalRateLimit,
     requireAdminPermission(ADMIN_PERMISSION.documentsReview),
     requireTrustedAdminOrigin,
     async (req: AuthenticatedRequest, res) => {
+      noStore(res);
       const id = validId(req.params.id);
       if (!id) return res.status(400).json({ error: "Invalid document ID." });
       const parsed = evidenceReviewSchema.safeParse(req.body);
@@ -638,6 +662,7 @@ export function registerPassportEvidenceRoutes(app: Express) {
   );
 
   app.get("/api/passport/evidence-history", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    noStore(res);
     try {
       const events = await db.select({
         id: cushPassportEvidenceEvents.id,

@@ -1581,9 +1581,10 @@ export const cushPostArrivalAuditLogs = pgTable("cush_post_arrival_audit_logs", 
 })).enableRLS();
 
 // ─── Passport Evidence Intake ────────────────────────────────────────────────
-// User-entered financial details and extracted document content are encrypted
-// by the application before persistence; country/currency remain searchable
-// metadata and never feed the V2 scoring inputs.
+// User-entered details and document contents are encrypted before persistence.
+// Manual history may feed provisional V2 components as self-reported only after
+// supported currency conversion; uploaded documents do not become score inputs
+// through extraction or review alone.
 export const cushPassportFinancialProfiles = pgTable("cush_passport_financial_profiles", {
   userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
   countryCode: text("country_code").notNull(),
@@ -2143,7 +2144,7 @@ export const cushScorePolicyConfigSchema = z.object({
     sourceQualityPoints: z.object({
       bank_connection: z.literal(25),
       verified_statement: z.literal(15),
-      self_reported: z.literal(0),
+      self_reported: z.union([z.literal(0), z.literal(5)]),
     }).strict(),
     creditCheckPoints: z.object({
       matched: z.literal(15),

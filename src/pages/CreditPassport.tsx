@@ -8,6 +8,7 @@ import AccountDropdown from "@/components/AccountDropdown";
 import { logoutFromCush } from "@/lib/logout";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
+import PassportEvidenceIntake from "@/components/passport/PassportEvidenceIntake";
 import PostArrivalPanel from "@/components/passport/PostArrivalPanel";
 import CushVerifyConsentInbox from "@/components/passport/CushVerifyConsentInbox";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
@@ -570,12 +571,16 @@ export default function CreditPassport() {
               </div>
             </motion.div>
 
+            <section id="manual-financial-details" className="space-y-4">
+              <PassportEvidenceIntake />
+            </section>
+
             {passport.mode !== "post_arrival" && (
               <section id="assessment-tasks" className="space-y-4">
                 <div>
                   <h2 className="font-bold text-slate-900 text-base">Financial assessment</h2>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    Complete the two steps below. Your score updates as eligible information is reviewed.
+                    Review connected financial information alongside your self-declared details above.
                   </p>
                 </div>
                 {monoCodePending && <p className="text-xs text-blue-700" role="status">Finishing Mono bank connection…</p>}

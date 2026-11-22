@@ -250,6 +250,13 @@ function isSupportedCompleteCashFlowMonth(
     isWithinAssessmentWindow(assessmentMonth, item.month);
 }
 
+function isScoreableCompleteCashFlowMonth(
+  item: MonthlyCashFlow,
+  assessmentMonth: string,
+): boolean {
+  return item.complete && isWithinAssessmentWindow(assessmentMonth, item.month);
+}
+
 function assertEvidenceQuality(value: string, label: string): asserts value is EvidenceQuality {
   if (!QUALITY_VALUES.includes(value as EvidenceQuality)) {
     throw new Error(`${label} is not a supported evidence quality.`);
@@ -341,7 +348,9 @@ function sourceQualityPoints(
 
 function inferIncomeConfidenceSource(input: CushScoreInput): IncomeConfidenceSource {
   const recurringIncome = input.incomeHistory.filter((item) =>
-    item.recurring && isWithinAssessmentWindow(input.assessmentMonth, item.month),
+    item.recurring &&
+    item.evidenceQuality !== "self_reported" &&
+    isWithinAssessmentWindow(input.assessmentMonth, item.month),
   );
   if (!recurringIncome.length) {
     return input.verifiedUkEmploymentOffer?.evidenceQuality === "verified"
@@ -560,7 +569,6 @@ function calculateRecognizedMonthlyIncome(input: CushScoreInput): number | null 
   const bySource = new Map<string, MonthlyIncomeObservation[]>();
   for (const item of input.incomeHistory) {
     if (!item.recurring ||
-        item.evidenceQuality === "self_reported" ||
         !isWithinAssessmentWindow(input.assessmentMonth, item.month)) continue;
     const source = bySource.get(item.sourceId) ?? [];
     source.push(item);
@@ -597,14 +605,12 @@ function calculateRecognizedMonthlyIncome(input: CushScoreInput): number | null 
 }
 
 function calculateFundsScore(input: CushScoreInput): { score: number | null; months: number | null } {
-  const verifiedFunds = input.availableFunds.filter(
-    (fund) => fund.evidenceQuality === "verified",
-  );
-  if (verifiedFunds.length === 0 || input.destinationBaseline === null) {
+  const availableFunds = input.availableFunds.filter((fund) => fund.accessible);
+  if (availableFunds.length === 0 || input.destinationBaseline === null) {
     return { score: null, months: null };
   }
   const accessiblePence = sumSafeIntegers(
-    verifiedFunds.filter((fund) => fund.accessible).map((fund) => fund.amountPence),
+    availableFunds.map((fund) => fund.amountPence),
     "Available funds",
   );
   const months = accessiblePence / input.destinationBaseline.monthlyBaselinePence;
@@ -624,7 +630,7 @@ function calculateCashFlowScore(
   recognizedIncomePence: number | null,
 ): { score: number | null; cap: number | null } {
   const completeMonths = input.cashFlowHistory.filter((item) =>
-    isSupportedCompleteCashFlowMonth(item, input.assessmentMonth),
+    isScoreableCompleteCashFlowMonth(item, input.assessmentMonth),
   );
   if (completeMonths.length === 0 ||
       recognizedIncomePence === null ||

@@ -27,6 +27,10 @@ import {
   saveScoringPolicyDraft,
   saveV2Assessment,
 } from "./cush-score-v2";
+import {
+  EvidenceEncryptionUnavailableError,
+} from "./passport-evidence-service";
+import { ManualScoreConversionError } from "./passport-manual-score-input";
 
 function applyV2Calculation<T extends mem.MemPassport>(
   passport: T,
@@ -88,6 +92,18 @@ export function registerPassportRoutes(app: Express) {
         return res.json({ passport: sanitizePassportForCustomer(storedPassport), evidence, v2SchemaReady: false });
       }
     } catch (err) {
+      if (err instanceof EvidenceEncryptionUnavailableError) {
+        return res.status(503).json({
+          code: "PASSPORT_EVIDENCE_ENCRYPTION_NOT_CONFIGURED",
+          error: "Your encrypted financial profile is temporarily unavailable. Please contact Cush support.",
+        });
+      }
+      if (err instanceof ManualScoreConversionError) {
+        return res.status(503).json({
+          code: "MANUAL_FINANCIAL_CONVERSION_UNAVAILABLE",
+          error: "A recent supported exchange rate is unavailable, so the latest manual entries were not scored. Your saved entries have not changed.",
+        });
+      }
       console.error("GET /api/passport/me error:", err);
       return res.status(500).json({ error: "Failed to fetch passport" });
     }
@@ -102,6 +118,18 @@ export function registerPassportRoutes(app: Express) {
         return res.status(503).json({
           code: "V2_SCHEMA_MISSING",
           error: "V2 assessment storage is not set up yet. Apply the provided Supabase migration first.",
+        });
+      }
+      if (error instanceof EvidenceEncryptionUnavailableError) {
+        return res.status(503).json({
+          code: "PASSPORT_EVIDENCE_ENCRYPTION_NOT_CONFIGURED",
+          error: "Your encrypted financial profile is temporarily unavailable. Please contact Cush support.",
+        });
+      }
+      if (error instanceof ManualScoreConversionError) {
+        return res.status(503).json({
+          code: "MANUAL_FINANCIAL_CONVERSION_UNAVAILABLE",
+          error: "A recent supported exchange rate is unavailable, so the latest manual entries were not scored. Your saved entries have not changed.",
         });
       }
       console.error("GET /api/passport/v2 error:", error);

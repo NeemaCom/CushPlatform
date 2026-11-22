@@ -8,6 +8,7 @@ import CushScoringPolicyAdmin from "@/components/passport/CushScoringPolicyAdmin
 import CushUserScoreReview from "@/components/passport/CushUserScoreReview";
 import { ADMIN_PERMISSION, canManageUserRoles, hasAdminPermission } from "@shared/admin-permissions";
 import EvidenceFreshnessAdmin from "@/components/passport/EvidenceFreshnessAdmin";
+import PassportEvidenceAdmin from "@/components/passport/PassportEvidenceAdmin";
 import CushVerifyInterestAdmin from "@/components/admin/CushVerifyInterestAdmin";
 import CushVerifyApplicationsAdmin from "@/components/admin/CushVerifyApplicationsAdmin";
 import CushVerifyApiAccessAdmin from "@/components/admin/CushVerifyApiAccessAdmin";
@@ -112,7 +113,7 @@ function AdminOverviewSkeleton() {
 
 export default function AdminDashboard() {
   const [range, setRange] = useState<7 | 30 | 90>(7);
-  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-api-access" | "cush-verify-memberships" | "cush-verify-pricing" | "cush-verify-billing" | "visitor-intelligence">("overview");
+  const [activeSection, setActiveSection] = useState<"overview" | "users" | "scoring-policy" | "evidence-freshness" | "passport-evidence" | "score-review" | "cush-verify" | "cush-verify-applications" | "cush-verify-api-access" | "cush-verify-memberships" | "cush-verify-pricing" | "cush-verify-billing" | "visitor-intelligence">("overview");
   const { user, isLoading: authLoading } = useAuth();
   const hasOverviewAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.dashboardRead);
   const hasUsersRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.usersRead);
@@ -123,6 +124,8 @@ export default function AdminDashboard() {
   const hasScoreBreakdownAccess = hasAdminPermission(user?.role, ADMIN_PERMISSION.scoreBreakdownRead);
   const hasEvidenceFreshnessRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessRead);
   const hasEvidenceFreshnessManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.evidenceFreshnessManage);
+  const hasPassportEvidenceRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.documentsRead);
+  const canReviewPassportEvidence = hasAdminPermission(user?.role, ADMIN_PERMISSION.documentsReview);
   const hasVerifyInterestRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsRead);
   const hasVerifyInterestManage = hasAdminPermission(user?.role, ADMIN_PERMISSION.verificationsManage);
   const hasVerifyPricingRead = hasAdminPermission(user?.role, ADMIN_PERMISSION.verifyPricingRead);
@@ -243,6 +246,20 @@ export default function AdminDashboard() {
               }`}
             >
               Evidence freshness
+            </button>
+          )}
+          {hasPassportEvidenceRead && (
+            <button
+              type="button"
+              onClick={() => setActiveSection("passport-evidence")}
+              aria-current={activeSection === "passport-evidence" ? "page" : undefined}
+              className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                activeSection === "passport-evidence"
+                  ? "bg-[#29266f] text-white shadow-sm"
+                  : "border border-[#deddd4] bg-[#fbfaf6] text-[#555750] hover:bg-white"
+              }`}
+            >
+              Passport evidence
             </button>
           )}
           {hasScoreBreakdownAccess && (
@@ -396,6 +413,8 @@ export default function AdminDashboard() {
           </section>
         ) : activeSection === "evidence-freshness" ? (
           <EvidenceFreshnessAdmin canManage={hasEvidenceFreshnessManage} />
+        ) : activeSection === "passport-evidence" ? (
+          <PassportEvidenceAdmin canReview={canReviewPassportEvidence} />
         ) : activeSection === "score-review" ? (
           <section aria-labelledby="score-review-heading">
             <div className="mb-5">

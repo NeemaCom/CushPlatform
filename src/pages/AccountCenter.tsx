@@ -425,7 +425,7 @@ function Documents() {
         )}
       </Surface>
       <MessageBox tone="warning">
-        Evidence file previews and durable document archiving are not currently supported. The current dashboard uploader stores file payloads in the app’s in-memory evidence store, so do not rely on it for permanent document storage. Only submission records are shown here.
+        This list contains legacy assessment-evidence records. Use the assessment dashboard for encrypted PDF/CSV uploads, extracted-text review, submission status, and the secure document history.
       </MessageBox>
       <Link href="/dashboard" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
         Open assessment dashboard <ArrowRight className="h-4 w-4" />
@@ -468,7 +468,10 @@ function VerificationStatus({ user }: { user: User }) {
           </ul>
         )}
       </Surface>
-      <MessageBox>Full identity-check history and a document-review timeline are not exposed by the current backend.</MessageBox>
+      <MessageBox>Secure PDF/CSV uploads and the complete document-review timeline are available from the assessment dashboard.</MessageBox>
+      <Link href="/dashboard" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+        Open assessment dashboard <ArrowRight className="h-4 w-4" />
+      </Link>
     </div>
   );
 }

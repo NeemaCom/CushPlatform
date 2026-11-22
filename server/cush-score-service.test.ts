@@ -19,7 +19,7 @@ const policy: CushScorePolicy = {
     sourceQualityPoints: {
       bank_connection: 25,
       verified_statement: 15,
-      self_reported: 0,
+      self_reported: 5,
     },
     creditCheckPoints: {
       matched: 15,
@@ -173,7 +173,7 @@ describe("Cush Score V2 engine", () => {
     expect(older.confidenceScore).toBeLessThan(recent.confidenceScore!);
   });
 
-  it("only counts verified, accessible funds and rejects duplicate funds", () => {
+  it("scores accessible funds across evidence classes and rejects duplicate funds", () => {
     const result = calculateCushScore(completeInput({
       availableFunds: [
         {
@@ -200,8 +200,8 @@ describe("Cush Score V2 engine", () => {
       ],
     }), policy);
 
-    expect(result.fundsMonths).toBe(1);
-    expect(result.componentScores.availableFunds).toBe(20);
+    expect(result.fundsMonths).toBe(101);
+    expect(result.componentScores.availableFunds).toBe(100);
     expect(() => calculateCushScore(completeInput({
       availableFunds: [
         {
@@ -509,7 +509,7 @@ describe("Cush Score V2 engine", () => {
       incomeSourceType: "other",
     }), policy);
 
-    expect(low.confidenceScore).toBe(30);
+    expect(low.confidenceScore).toBe(35);
     expect(low.confidenceBand).toBe("low");
     expect(medium.confidenceScore).toBe(53);
     expect(medium.confidenceBand).toBe("medium");
@@ -573,22 +573,36 @@ describe("Cush Score V2 engine", () => {
     expect(result.assessmentStatus).toBe("provisional");
   });
 
-  it("does not score self-reported income or cash flow as supported components", () => {
+  it("scores self-declared financial amounts provisionally without satisfying final evidence gates", () => {
     const result = calculateCushScore(completeInput({
+      availableFunds: [{
+        id: "declared-funds",
+        deduplicationKey: "declared-savings",
+        amountPence: BASELINE_PENCE * 6,
+        accessible: true,
+        evidenceQuality: "self_reported",
+      }],
       incomeHistory: completeIncomeHistory(BASELINE_PENCE, { evidenceQuality: "self_reported" }),
       cashFlowHistory: completeCashFlow().map((item) => ({
         ...item,
         evidenceQuality: "self_reported",
       })),
+      sourceEvidenceShares: [{ sourceType: "self_reported", share: 1 }],
+      incomeSourceType: "other",
       credit: { classification: "unavailable", evidenceQuality: null, checkStatus: "not_done" },
     }), policy);
 
-    expect(result.componentScores.availableFunds).not.toBeNull();
-    expect(result.componentScores.incomeStrength).toBeNull();
-    expect(result.componentScores.cashFlow).toBeNull();
-    expect(result.scoreCoveragePercent).toBe(35);
-    expect(result.scoredComponentCount).toBe(1);
+    expect(result.componentScores.availableFunds).toBe(100);
+    expect(result.componentScores.incomeStrength).not.toBeNull();
+    expect(result.componentScores.cashFlow).not.toBeNull();
+    expect(result.scoreCoveragePercent).toBe(85);
+    expect(result.scoredComponentCount).toBe(3);
     expect(result.provisionalScore).not.toBeNull();
+    expect(result.cushScore).toBeNull();
+    expect(result.confidenceBreakdown?.sourceQualityAndVerification).toBe(5);
+    expect(result.confidenceBreakdown?.incomeSourceReliability).toBe(0);
+    expect(result.missingRequirements).toContain("Verified evidence for available funds");
+    expect(result.missingRequirements).toContain("Documented or verified recurring income");
   });
 
   it("rejects out-of-range and unverified provider component scores", () => {
@@ -620,7 +634,7 @@ describe("Cush Score V2 engine", () => {
       ],
     }), policy);
 
-    expect(result.confidenceBreakdown?.sourceQualityAndVerification).toBe(16);
+    expect(result.confidenceBreakdown?.sourceQualityAndVerification).toBe(17);
   });
 
   it("ignores history older than the six-month assessment window", () => {

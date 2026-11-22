@@ -8,17 +8,38 @@ import { getProductSessionHeaders } from "@/lib/product-session";
 
 type FinancialProfile = {
   countryCode: string;
-  currencyCode: string;
+  currencyCode: "GBP" | "USD" | "NGN";
   employmentStatus: string;
   employer: string;
   jobTitle: string;
   incomeAmount: string;
   incomeFrequency: "weekly" | "monthly" | "annual" | "variable" | "";
+  incomeCategory: "salary" | "contract" | "business" | "family_support" | "other";
   housingStatus: string;
   housingCost: string;
   savingsAmount: string;
+  savingsLabel: string;
   commitmentsAmount: string;
+  completeCashFlow: boolean;
   financialHistorySummary: string;
+  financialHistory: FinancialHistoryEntry[];
+};
+
+type FinancialHistoryEntry = {
+  id: string;
+  month: string;
+  label: string;
+  countryCode: string;
+  currencyCode: "GBP" | "USD" | "NGN";
+  incomeAmount: string;
+  incomeFrequency: "weekly" | "monthly" | "annual" | "variable" | "";
+  incomeCategory: "salary" | "contract" | "business" | "family_support" | "other";
+  recurring: boolean;
+  variable: boolean;
+  savingsAmount: string;
+  savingsLabel: string;
+  expensesAmount: string;
+  completeCashFlow: boolean;
 };
 
 type ProfileData = {
@@ -64,11 +85,15 @@ const EMPTY_PROFILE: FinancialProfile = {
   jobTitle: "",
   incomeAmount: "",
   incomeFrequency: "",
+  incomeCategory: "other",
   housingStatus: "",
   housingCost: "",
   savingsAmount: "",
+  savingsLabel: "",
   commitmentsAmount: "",
+  completeCashFlow: false,
   financialHistorySummary: "",
+  financialHistory: [],
 };
 
 const DOCUMENT_TYPES = [
@@ -85,7 +110,7 @@ const DOCUMENT_TYPES = [
 ];
 
 function readableStatus(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return value.replace(/_/g, " ").replace(/\b\w/g, (letter: string) => letter.toUpperCase());
 }
 
 function formatDate(value: string | null) {
@@ -181,6 +206,8 @@ export default function PassportEvidenceIntake() {
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/financial-profile"] });
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions"] });
     void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-history"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/passport/v2"] });
+    void queryClient.invalidateQueries({ queryKey: ["/api/passport/me"] });
     if (selectedId !== null) void queryClient.invalidateQueries({ queryKey: ["/api/passport/evidence-submissions", selectedId] });
   };
 
@@ -188,7 +215,7 @@ export default function PassportEvidenceIntake() {
     mutationFn: () => profileRequest("PUT", "/api/passport/financial-profile", profile),
     onSuccess: () => {
       invalidateIntake();
-      toast({ title: "Financial profile saved", description: "These details are stored separately and do not change your Cush Score." });
+      toast({ title: "Financial profile saved", description: "Self-declared amounts can contribute to your provisional assessment. Uploaded documents remain separate and are not treated as verified." });
     },
     onError: (error: Error) => toast({ title: "Could not save profile", description: error.message, variant: "destructive" }),
   });
@@ -263,6 +290,48 @@ export default function PassportEvidenceIntake() {
   );
   const canEditDraft = selected && ["draft", "additional_information_required"].includes(selected.reviewStatus);
 
+  function addHistoryEntry() {
+    if (profile.financialHistory.length >= 72) {
+      toast({ title: "History limit reached", description: "You can save up to 72 monthly history records.", variant: "destructive" });
+      return;
+    }
+    setProfile({
+      ...profile,
+      financialHistory: [...profile.financialHistory, {
+        id: crypto.randomUUID(),
+        month: new Date().toISOString().slice(0, 7),
+        label: "Main income and spending",
+        countryCode: profile.countryCode,
+        currencyCode: profile.currencyCode,
+        incomeAmount: "",
+        incomeFrequency: "monthly",
+        incomeCategory: profile.incomeCategory,
+        recurring: true,
+        variable: false,
+        savingsAmount: "",
+        savingsLabel: "",
+        expensesAmount: "",
+        completeCashFlow: false,
+      }],
+    });
+  }
+
+  function updateHistoryEntry(id: string, patch: Partial<FinancialHistoryEntry>) {
+    setProfile({
+      ...profile,
+      financialHistory: profile.financialHistory.map((entry) =>
+        entry.id === id ? { ...entry, ...patch } : entry,
+      ),
+    });
+  }
+
+  function removeHistoryEntry(id: string) {
+    setProfile({
+      ...profile,
+      financialHistory: profile.financialHistory.filter((entry) => entry.id !== id),
+    });
+  }
+
   async function downloadFile(id: number, name: string) {
     try {
       const response = await fetch(`${API_BASE_URL}/api/passport/evidence-submissions/${id}/file`, {
@@ -294,7 +363,7 @@ export default function PassportEvidenceIntake() {
           <div>
             <h2 id="passport-evidence-heading" className="text-base font-bold text-slate-900">Financial profile and evidence</h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              Add details in your original country and currency, then attach a PDF or CSV if you choose. Your entries and uploads are private, reviewed separately, and do not change your Cush Score.
+              Add your own financial details alongside connected data. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed.
             </p>
           </div>
         </div>
@@ -338,7 +407,7 @@ export default function PassportEvidenceIntake() {
             >
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">Your financial details</h3>
-                <p className="mt-1 text-xs text-slate-500">Amounts stay in the currency you enter; they are not converted into scoring inputs.</p>
+                <p className="mt-1 text-xs text-slate-500">Supported scoring currencies are GBP, USD, and NGN. USD and NGN use the existing CBN rate for the relevant month. Other providers or currencies are not assumed.</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <label className="space-y-1 text-xs font-medium text-slate-700">
@@ -347,7 +416,9 @@ export default function PassportEvidenceIntake() {
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
                   Currency code
-                  <input required maxLength={3} value={profile.currencyCode} onChange={(event) => setProfile({ ...profile, currencyCode: event.target.value.toUpperCase() })} placeholder="GBP" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
+                  <select required value={profile.currencyCode} onChange={(event) => setProfile({ ...profile, currencyCode: event.target.value as FinancialProfile["currencyCode"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                    <option value="GBP">GBP</option><option value="USD">USD</option><option value="NGN">NGN</option>
+                  </select>
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
                   Employment status
@@ -372,11 +443,17 @@ export default function PassportEvidenceIntake() {
                   </select>
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
+                  Income type
+                  <select value={profile.incomeCategory} onChange={(event) => setProfile({ ...profile, incomeCategory: event.target.value as FinancialProfile["incomeCategory"] })} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm">
+                    <option value="salary">Salary</option><option value="contract">Contract</option><option value="business">Business</option><option value="family_support">Family support</option><option value="other">Other</option>
+                  </select>
+                </label>
+                <label className="space-y-1 text-xs font-medium text-slate-700">
                   Housing arrangement
                   <input maxLength={100} value={profile.housingStatus} onChange={(event) => setProfile({ ...profile, housingStatus: event.target.value })} placeholder="Renting, owned…" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Housing cost
+                  Monthly housing cost
                   <input inputMode="decimal" value={profile.housingCost} onChange={(event) => setProfile({ ...profile, housingCost: event.target.value })} placeholder="Amount in selected currency" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
@@ -384,10 +461,61 @@ export default function PassportEvidenceIntake() {
                   <input inputMode="decimal" value={profile.savingsAmount} onChange={(event) => setProfile({ ...profile, savingsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
                 </label>
                 <label className="space-y-1 text-xs font-medium text-slate-700">
-                  Regular commitments
+                  Savings source label
+                  <input maxLength={100} value={profile.savingsLabel} onChange={(event) => setProfile({ ...profile, savingsLabel: event.target.value })} placeholder="e.g. Savings account" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
+                </label>
+                <label className="space-y-1 text-xs font-medium text-slate-700">
+                  Monthly regular commitments
                   <input inputMode="decimal" value={profile.commitmentsAmount} onChange={(event) => setProfile({ ...profile, commitmentsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
                 </label>
               </div>
+              <label className="flex items-start gap-2 text-xs leading-5 text-slate-600">
+                <input type="checkbox" checked={profile.completeCashFlow} onChange={(event) => setProfile({ ...profile, completeCashFlow: event.target.checked })} className="mt-0.5" />
+                <span>For this month, these income and cost amounts cover all my regular spending. Only mark complete if the information is comprehensive.</span>
+              </label>
+              <p className="text-xs leading-5 text-slate-500">
+                To avoid double counting, enter only savings sources that are not already included in a connected bank account. Use the history rows for separate sources and past months.
+              </p>
+              <section className="rounded-xl border border-slate-200 bg-slate-50 p-4" aria-labelledby="financial-history-heading">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 id="financial-history-heading" className="text-sm font-semibold text-slate-800">Monthly history across countries</h4>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Add one row per month and source. Keep the original country and currency; supported USD and NGN values use CBN rates for that month.</p>
+                  </div>
+                  <button type="button" onClick={addHistoryEntry} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50">Add a month</button>
+                </div>
+                {profile.financialHistory.length === 0 ? (
+                  <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white p-3 text-xs text-slate-500">No monthly history entries yet. Your current profile amounts can still contribute as self-declared data.</p>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {profile.financialHistory.map((entry, index) => (
+                      <fieldset key={entry.id} className="rounded-lg border border-slate-200 bg-white p-3">
+                        <legend className="px-1 text-xs font-semibold text-slate-700">History entry {index + 1}</legend>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Month<input type="month" value={entry.month} onChange={(event) => updateHistoryEntry(entry.id, { month: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Source label<input maxLength={100} value={entry.label} onChange={(event) => updateHistoryEntry(entry.id, { label: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Country code<input maxLength={2} value={entry.countryCode} onChange={(event) => updateHistoryEntry(entry.id, { countryCode: event.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm uppercase" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Currency<select value={entry.currencyCode} onChange={(event) => updateHistoryEntry(entry.id, { currencyCode: event.target.value as FinancialHistoryEntry["currencyCode"] })} className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="GBP">GBP</option><option value="USD">USD</option><option value="NGN">NGN</option></select></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Income amount<input inputMode="decimal" value={entry.incomeAmount} onChange={(event) => updateHistoryEntry(entry.id, { incomeAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Frequency<select value={entry.incomeFrequency} onChange={(event) => updateHistoryEntry(entry.id, { incomeFrequency: event.target.value as FinancialHistoryEntry["incomeFrequency"] })} className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="">Not supplied</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option><option value="variable">Variable monthly</option></select></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Savings balance<input inputMode="decimal" value={entry.savingsAmount} onChange={(event) => updateHistoryEntry(entry.id, { savingsAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Savings source<input maxLength={100} value={entry.savingsLabel} onChange={(event) => updateHistoryEntry(entry.id, { savingsLabel: event.target.value })} placeholder="Optional" className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Total monthly expenses<input inputMode="decimal" value={entry.expensesAmount} onChange={(event) => updateHistoryEntry(entry.id, { expensesAmount: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
+                          <label className="space-y-1 text-xs font-medium text-slate-700">Income category<select value={entry.incomeCategory} onChange={(event) => updateHistoryEntry(entry.id, { incomeCategory: event.target.value as FinancialHistoryEntry["incomeCategory"] })} className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm"><option value="salary">Salary</option><option value="contract">Contract</option><option value="business">Business</option><option value="family_support">Family support</option><option value="other">Other</option></select></label>
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-600">
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={entry.recurring} onChange={(event) => updateHistoryEntry(entry.id, { recurring: event.target.checked })} />Recurring income</label>
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={entry.variable} onChange={(event) => updateHistoryEntry(entry.id, { variable: event.target.checked })} />Variable income</label>
+                            <label className="flex items-center gap-2"><input type="checkbox" checked={entry.completeCashFlow} onChange={(event) => updateHistoryEntry(entry.id, { completeCashFlow: event.target.checked })} />All monthly spending included</label>
+                          </div>
+                          <button type="button" onClick={() => removeHistoryEntry(entry.id)} className="rounded-md px-2 py-1 text-xs font-medium text-rose-700 hover:bg-rose-50">Remove row</button>
+                        </div>
+                      </fieldset>
+                    ))}
+                  </div>
+                )}
+              </section>
               <label className="block space-y-1 text-xs font-medium text-slate-700">
                 Financial history or context
                 <textarea maxLength={2000} rows={3} value={profile.financialHistorySummary} onChange={(event) => setProfile({ ...profile, financialHistorySummary: event.target.value })} placeholder="Add relevant context about your financial history. Do not include passwords, PINs, or full account numbers." className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
@@ -564,7 +692,7 @@ export default function PassportEvidenceIntake() {
         </section>
       </div>
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-        Self-declared entries and document uploads do not affect your Score or Confidence. A file is only described as document-supported after Cush review. Independent verification is not inferred from upload or text extraction.
+        Self-declared income, savings, and complete monthly cash flow may affect provisional Score components. Confidence source credit follows the active policy; the new 5-point self-declared rule applies after an administrator activates it. Declarations do not satisfy final-score verification requirements. Uploaded documents do not affect Score automatically, and extraction never implies independent verification.
       </p>
     </section>
   );

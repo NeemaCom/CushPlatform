@@ -7,24 +7,108 @@ export const MAX_EXTRACTED_TEXT_CHARS = 25_000;
 
 const optionalText = (max: number) => z.string().trim().max(max).default("");
 const amountText = z.string().trim().max(32).default("").refine(
-  (value) => value === "" || /^\d{1,18}(?:\.\d{1,4})?$/.test(value),
+  (value) => value === "" || (/^\d{1,18}(?:\.\d{1,4})?$/.test(value) && Number(value) > 0),
   "Use a positive amount with up to four decimal places.",
 );
 
+const passportFinancialHistoryEntrySchema = z.object({
+  id: z.string().uuid(),
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/),
+  label: z.string().trim().min(1).max(100),
+  countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
+  currencyCode: z.enum(["GBP", "USD", "NGN"]),
+  incomeAmount: amountText,
+  incomeFrequency: z.enum(["weekly", "monthly", "annual", "variable", ""]).default(""),
+  incomeCategory: z.enum(["salary", "contract", "business", "family_support", "other"]).default("other"),
+  recurring: z.boolean().default(true),
+  variable: z.boolean().default(false),
+  savingsAmount: amountText,
+  savingsLabel: z.string().trim().max(100).default(""),
+  expensesAmount: amountText,
+  completeCashFlow: z.boolean().default(false),
+}).strict();
+
 export const passportFinancialProfileSchema = z.object({
   countryCode: z.string().trim().toUpperCase().regex(/^[A-Z]{2}$/),
-  currencyCode: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/),
+  currencyCode: z.enum(["GBP", "USD", "NGN"]),
   employmentStatus: optionalText(80),
   employer: optionalText(160),
   jobTitle: optionalText(120),
   incomeAmount: amountText,
   incomeFrequency: z.enum(["weekly", "monthly", "annual", "variable", ""]).default(""),
+  incomeCategory: z.enum(["salary", "contract", "business", "family_support", "other"]).default("other"),
   housingStatus: optionalText(100),
   housingCost: amountText,
   savingsAmount: amountText,
+  savingsLabel: z.string().trim().max(100).default(""),
   commitmentsAmount: amountText,
+  completeCashFlow: z.boolean().default(false),
   financialHistorySummary: optionalText(2000),
-}).strict();
+  financialHistory: z.array(passportFinancialHistoryEntrySchema).max(72).default([]),
+}).strict().superRefine((profile, context) => {
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const seenIds = new Set<string>();
+  const seenRows = new Set<string>();
+  if (profile.incomeAmount && !profile.incomeFrequency) {
+    context.addIssue({
+      code: "custom",
+      path: ["incomeFrequency"],
+      message: "Choose how often this income is received.",
+    });
+  }
+  if (
+    profile.completeCashFlow &&
+    !profile.incomeAmount &&
+    !profile.housingCost &&
+    !profile.commitmentsAmount
+  ) {
+    context.addIssue({
+      code: "custom",
+      path: ["completeCashFlow"],
+      message: "Enter monthly income or expenses before marking the current cash flow complete.",
+    });
+  }
+  for (const [index, entry] of profile.financialHistory.entries()) {
+    if (entry.incomeAmount && !entry.incomeFrequency) {
+      context.addIssue({
+        code: "custom",
+        path: ["financialHistory", index, "incomeFrequency"],
+        message: "Choose how often this income was received.",
+      });
+    }
+    if (entry.month > currentMonth) {
+      context.addIssue({
+        code: "custom",
+        path: ["financialHistory", index, "month"],
+        message: "Future months cannot be submitted as financial history.",
+      });
+    }
+    if (entry.completeCashFlow && !entry.incomeAmount && !entry.expensesAmount) {
+      context.addIssue({
+        code: "custom",
+        path: ["financialHistory", index, "completeCashFlow"],
+        message: "Enter monthly income or expenses before marking a history row complete.",
+      });
+    }
+    if (seenIds.has(entry.id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["financialHistory", index, "id"],
+        message: "History entry IDs must be unique.",
+      });
+    }
+    seenIds.add(entry.id);
+    const key = `${entry.month}:${entry.countryCode}:${entry.currencyCode}:${entry.label.toLowerCase()}`;
+    if (seenRows.has(key)) {
+      context.addIssue({
+        code: "custom",
+        path: ["financialHistory", index],
+        message: "Keep one history row per month, country, currency, and source label.",
+      });
+    }
+    seenRows.add(key);
+  }
+});
 
 export type PassportFinancialProfile = z.infer<typeof passportFinancialProfileSchema>;
 
@@ -129,7 +213,7 @@ export function getFinancialProfileProgress(profile: PassportFinancialProfile | 
     { id: "housing", label: "Housing costs", complete: Boolean(profile?.housingStatus || profile?.housingCost) },
     { id: "savings", label: "Savings", complete: Boolean(profile?.savingsAmount) },
     { id: "commitments", label: "Financial commitments", complete: Boolean(profile?.commitmentsAmount) },
-    { id: "history", label: "Financial history", complete: Boolean(profile?.financialHistorySummary) },
+    { id: "history", label: "Financial history", complete: Boolean(profile?.financialHistorySummary || profile?.financialHistory.length) },
   ];
   const completed = steps.filter((step) => step.complete).length;
   return {
@@ -255,7 +339,7 @@ export function extractPdfDraft(file: Buffer): string {
     if (endMarker < 0) break;
     const headerStart = raw.lastIndexOf("endobj", startMarker);
     const header = raw.slice(headerStart < 0 ? 0 : headerStart, startMarker);
-    let streamBytes = Buffer.from(raw.slice(dataStart, endMarker), "latin1");
+    let streamBytes: Buffer<ArrayBufferLike> = Buffer.from(raw.slice(dataStart, endMarker), "latin1");
     if (header.includes("/FlateDecode")) {
       try {
         streamBytes = inflateSync(streamBytes, { maxOutputLength: 20 * 1024 * 1024 });

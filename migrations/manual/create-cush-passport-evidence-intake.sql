@@ -2,7 +2,9 @@
 -- Financial values, extracted text, corrections, review notes, and file bytes
 -- are encrypted by the application before being stored in encrypted_* fields.
 -- The application must set PASSPORT_EVIDENCE_ENCRYPTION_KEY before using these
--- endpoints. This migration does not add or change any scoring inputs.
+-- endpoints. Financial-profile values are used only as self-reported inputs
+-- by the application for provisional V2 components after supported currency
+-- conversion; this migration does not change score weights or verification gates.
 
 create table if not exists public.cush_passport_financial_profiles (
   user_id integer primary key references public.users(id) on delete cascade,

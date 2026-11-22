@@ -41,7 +41,7 @@ type PolicyFormState = {
 
 const POLICY_CONFIDENCE_RULES: CushScorePolicyConfig["confidence"] = {
   historyMonthsForMaximum: 6,
-  sourceQualityPoints: { bank_connection: 25, verified_statement: 15, self_reported: 0 },
+  sourceQualityPoints: { bank_connection: 25, verified_statement: 15, self_reported: 5 },
   creditCheckPoints: { matched: 15, matched_thin: 10, no_match: 5, not_done: 0 },
   incomeSourcePoints: {
     uk_payslip_or_uk_credits: 10,
@@ -351,7 +351,7 @@ export default function CushScoringPolicyAdmin() {
         <div>
           <h3 className="font-bold text-slate-900">Confidence policy</h3>
           <p className="mt-1 text-xs text-slate-500">
-            Confidence is separate from the Cush Score. Verified source points require supported evidence; self-reported data earns no source-quality points.
+            Confidence remains separate from the Cush Score. Self-declared records receive 5 source-quality points when the policy draft is activated.
           </p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -359,7 +359,7 @@ export default function CushScoringPolicyAdmin() {
             <h4 className="text-sm font-semibold text-slate-800">Evidence and history</h4>
             <ul className="mt-2 space-y-1 text-xs text-slate-600">
               <li>History: 5 points per usable month, up to 6 months (30)</li>
-              <li>Bank connection: 25; verified statement: 15</li>
+              <li>Bank connection: 25; verified statement: 15; self-declared: 5</li>
               <li>Freshness: 10 / 6 / 3 points at 7 / 30 / 90 days</li>
               <li>Account coverage: up to 10, reduced by unresolved-transfer share</li>
             </ul>
@@ -375,7 +375,7 @@ export default function CushScoringPolicyAdmin() {
           </div>
         </div>
         <p className="text-xs text-slate-500">
-          Bands: 1–39 Low, 40–69 Medium, 70–100 High. No family-support-only cap is applied. Confidence never changes the score.
+          Bands: 1–39 Low, 40–69 Medium, 70–100 High. No family-support-only cap is applied. Confidence never changes the Cush Score.
         </p>
       </section>
 

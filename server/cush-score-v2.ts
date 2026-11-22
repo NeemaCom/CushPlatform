@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import {
   cushAssessmentInputs,
   cushEvidenceFreshnessReviews,
+  cushPassportFinancialProfiles,
   cushScorePolicyVersions,
   cushScorePolicyConfigSchema,
   interswitchCreditHistoryEvidence,
@@ -37,6 +38,13 @@ import {
   selectVersionedDestinationBaseline,
   type DestinationBaselinePolicy,
 } from "./cush-score-policy-selection";
+import {
+  decryptEvidenceJson,
+  EvidenceEncryptionUnavailableError,
+  passportFinancialProfileSchema,
+  type PassportFinancialProfile,
+} from "./passport-evidence-service";
+import { buildProfileScoreInputs } from "./passport-manual-score-input";
 
 export const EMPTY_V2_ASSESSMENT: V2AssessmentInput = {
   selectedBaselineId: null,
@@ -324,6 +332,46 @@ async function loadStoredInputs(userId: number): Promise<V2AssessmentInput> {
   return row ? v2AssessmentInputSchema.parse(row.inputData) : EMPTY_V2_ASSESSMENT;
 }
 
+async function loadFinancialProfile(userId: number): Promise<PassportFinancialProfile | null> {
+  try {
+    const [row] = await db.select({
+      encryptedProfile: cushPassportFinancialProfiles.encryptedProfile,
+    }).from(cushPassportFinancialProfiles)
+      .where(eq(cushPassportFinancialProfiles.userId, userId))
+      .limit(1);
+    return row
+      ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
+      : null;
+  } catch (error) {
+    if (isV2SchemaMissing(error)) return null;
+    throw error;
+  }
+}
+
+function mergeManualProfileInputs(
+  input: V2AssessmentInput,
+  profileInput: Pick<V2AssessmentInput, "availableFunds" | "incomeHistory" | "cashFlowHistory">,
+): V2AssessmentInput {
+  const profileFundKeys = new Set(profileInput.availableFunds.map((fund) => fund.deduplicationKey.toLowerCase()));
+  const profileIncomeKeys = new Set(profileInput.incomeHistory.map((income) => `${income.sourceId}:${income.month}`));
+  const profileCashFlowMonths = new Set(profileInput.cashFlowHistory.map((row) => row.month));
+  return {
+    ...input,
+    availableFunds: [
+      ...input.availableFunds.filter((fund) => !profileFundKeys.has(fund.deduplicationKey.toLowerCase())),
+      ...profileInput.availableFunds,
+    ],
+    incomeHistory: [
+      ...input.incomeHistory.filter((income) => !profileIncomeKeys.has(`${income.sourceId}:${income.month}`)),
+      ...profileInput.incomeHistory,
+    ],
+    cashFlowHistory: [
+      ...input.cashFlowHistory.filter((row) => !profileCashFlowMonths.has(row.month)),
+      ...profileInput.cashFlowHistory,
+    ],
+  };
+}
+
 async function loadActivePolicy() {
   const [row] = await db.select().from(cushScorePolicyVersions)
     .where(eq(cushScorePolicyVersions.status, "active"))
@@ -344,13 +392,16 @@ async function calculateV2AssessmentForUser(
   userId: number,
   now: Date,
 ): Promise<CalculatedV2Assessment> {
-  const [inputs, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
+  const [storedInputs, profile, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
     loadStoredInputs(userId),
+    loadFinancialProfile(userId),
     loadActivePolicy(),
     loadMonoAssessmentData(userId),
     loadCreditHistoryEvidence(userId),
     loadEvidenceFreshnessReviews(userId),
   ]);
+  const profileInputs = await buildProfileScoreInputs(profile, now.toISOString().slice(0, 7));
+  const inputs = mergeManualProfileInputs(storedInputs, profileInputs);
   const baselinePolicy = selectVersionedDestinationBaseline(
     activePolicy?.configuration ?? null,
     inputs.selectedBaselineId,
