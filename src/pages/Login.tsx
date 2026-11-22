@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation } from 'wouter'
 import type { User as FirebaseUser } from 'firebase/auth'
-import { ArrowRight, BadgeCheck, FileCheck2, MailCheck, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, BadgeCheck, MailCheck, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,16 +32,6 @@ import {
   signOut,
 } from '@/firebase.js'
 import { LOGIN_SUPPORT_EMAIL } from '@shared/auth-constants'
-
-type GoogleSignInDiagnostic = {
-  stage: string
-  code: string
-  message: string
-  appOrigin: string
-  authDomain: string
-  projectId: string
-  callbackUrl: string
-}
 
 type GoogleRedirectIntent = {
   mode: 'signin' | 'signup'
@@ -84,46 +74,24 @@ function readGoogleRedirectIntent(): GoogleRedirectIntent | null {
   }
 }
 
-function safeDiagnosticText(value: unknown, fallback: string) {
-  return String(value ?? fallback)
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[redacted email]')
-    .replace(/https?:\/\/[^\s"'<>]+/gi, '[redacted URL]')
-    .replace(/\beyJ[a-zA-Z0-9._-]{20,}\b/g, '[redacted token]')
-    .replace(/\bBearer\s+[a-zA-Z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
-    .slice(0, 240)
-}
+function friendlyGoogleAuthMessage(error: unknown, mode: 'signin' | 'signup') {
+  const code = error && typeof error === 'object'
+    ? (error as { code?: unknown }).code
+    : undefined
 
-function createGoogleSignInDiagnostic(stage: string, error: unknown): GoogleSignInDiagnostic {
-  const authError = error && typeof error === 'object'
-    ? error as { code?: unknown; message?: unknown }
-    : {}
-  const authOptions = auth?.app?.options
-  const authDomain = authOptions?.authDomain || 'not configured'
-
-  return {
-    stage,
-    code: safeDiagnosticText(authError.code, 'not provided'),
-    message: safeDiagnosticText(authError.message, 'No error message provided'),
-    appOrigin: window.location.origin,
-    authDomain,
-    projectId: authOptions?.projectId || 'not configured',
-    callbackUrl: authDomain === 'not configured'
-      ? 'not available'
-      : `https://${authDomain}/__/auth/handler`,
+  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+    return 'Sign-in was cancelled. You can try again whenever you’re ready.'
   }
-}
+  if (code === 'auth/popup-blocked') {
+    return 'Your browser blocked the sign-in window. Allow pop-ups for Cush, then try again.'
+  }
+  if (code === 'auth/network-request-failed') {
+    return 'A connection problem interrupted sign-in. Check your internet connection and try again.'
+  }
 
-function formatGoogleSignInDiagnostic(diagnostic: GoogleSignInDiagnostic) {
-  return [
-    'Cush Google sign-in diagnostic',
-    `Stage: ${diagnostic.stage}`,
-    `Error code: ${diagnostic.code}`,
-    `Message: ${diagnostic.message}`,
-    `App origin: ${diagnostic.appOrigin}`,
-    `Firebase auth domain: ${diagnostic.authDomain}`,
-    `Expected callback: ${diagnostic.callbackUrl}`,
-    `Firebase project: ${diagnostic.projectId}`,
-  ].join('\n')
+  return mode === 'signup'
+    ? 'We couldn’t create your account. Please try again or use email and password.'
+    : 'We couldn’t complete sign-in. Please try again.'
 }
 
 function getAuthActionSettings(returnTo: 'emailVerified' | 'passwordReset') {
@@ -168,10 +136,7 @@ export default function Login() {
   const [passwordLoginPending, setPasswordLoginPending] = useState(false)
   const [verificationEmail, setVerificationEmail] = useState('')
   const [signInMessage, setSignInMessage] = useState<{ text: string; support: boolean } | null>(null)
-  const [googleSignInDiagnostic, setGoogleSignInDiagnostic] = useState<GoogleSignInDiagnostic | null>(null)
-  const [diagnosticCopied, setDiagnosticCopied] = useState(false)
   const [resetLinkSent, setResetLinkSent] = useState(false)
-  const [termsNoticeOpen, setTermsNoticeOpen] = useState(false)
   const [welcomeState, setWelcomeState] = useState<WelcomeState | null>(null)
   const [consent, setConsent] = useState({ terms: false, privacy: false, marketing: false })
   const [form, setForm] = useState({ email: '', password: '', firstName: '', lastName: '' })
@@ -193,12 +158,9 @@ export default function Login() {
 
     clearGoogleRedirectIntent()
     setMode(redirectIntent.mode)
-    let stage = 'Reading Google redirect result'
 
     async function completeRedirectSignIn() {
       setLoading(true)
-      setGoogleSignInDiagnostic(null)
-      setDiagnosticCopied(false)
       try {
         const result = await getRedirectResult(auth)
         if (!result) {
@@ -210,12 +172,10 @@ export default function Login() {
         }
 
         const fbUser = result.user
-        stage = 'Refreshing Google account'
         await reload(fbUser)
 
         if (!fbUser.emailVerified) {
           if (redirectIntent.mode === 'signup') {
-            stage = 'Syncing new Google account'
             try {
               const syncResult = await firebaseSync(fbUser, {
                 acceptTerms: true,
@@ -234,24 +194,18 @@ export default function Login() {
 
           showVerificationPending(fbUser)
           try {
-            stage = 'Sending verification email'
             await sendEmailVerification(fbUser, getAuthActionSettings('emailVerified'))
-          } catch (sendError: any) {
-            setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, sendError))
+          } catch {
             toast({
               title: 'Verification email not sent',
-              description: sendError.code === 'auth/unauthorized-continue-uri'
-                ? 'Add this website domain to Firebase Authentication’s authorized domains, then resend the link.'
-                : sendError.message || 'Please try resending the verification email.',
+              description: 'We couldn’t send your activation email. Please try resending it shortly.',
               variant: 'destructive',
             })
           }
           return
         }
 
-        stage = 'Refreshing Firebase sign-in token'
         await fbUser.getIdToken(true)
-        stage = 'Syncing Google account with Cush'
         const syncResult = await firebaseSync(fbUser, redirectIntent.mode === 'signup'
           ? {
               acceptTerms: true,
@@ -261,11 +215,9 @@ export default function Login() {
           : undefined)
         if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
         else void trackVisitorEvent("login_completed", "/login")
-        stage = 'Finishing sign-in'
         if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
         await afterLogin()
       } catch (err: any) {
-        setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
         if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
           setSignInMessage({
             text: err.message,
@@ -273,7 +225,11 @@ export default function Login() {
           })
           return
         }
-        toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
+        toast({
+          title: redirectIntent.mode === 'signup' ? 'Account creation not completed' : 'Sign-in not completed',
+          description: friendlyGoogleAuthMessage(err, redirectIntent.mode),
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
@@ -305,7 +261,13 @@ export default function Login() {
 
   function hasRequiredConsent() {
     if (consent.terms && consent.privacy) return true
-    setTermsNoticeOpen(true)
+    toast({
+      title: 'Agreements required',
+      description: 'Please accept the Terms of Service and Privacy Policy to create an account.',
+    })
+    window.setTimeout(() => {
+      document.getElementById(consent.terms ? 'accept-privacy' : 'accept-terms')?.focus()
+    }, 0)
     return false
   }
 
@@ -322,9 +284,6 @@ export default function Login() {
     if (mode === 'signup' && !hasRequiredConsent()) return
     if (mode === 'signup') void trackVisitorEvent("signup_started", "/login")
 
-    let stage = isMobileAuthBrowser() ? 'Starting mobile Google redirect' : 'Opening Google sign-in'
-    setGoogleSignInDiagnostic(null)
-    setDiagnosticCopied(false)
     setLoading(true)
     try {
       if (isMobileAuthBrowser()) {
@@ -338,11 +297,9 @@ export default function Login() {
 
       const result = await signInWithPopup(auth, googleProvider)
       const fbUser = result.user
-      stage = 'Refreshing Google account'
       await reload(fbUser)
       if (!fbUser.emailVerified) {
         if (mode === 'signup') {
-          stage = 'Syncing new Google account'
           try {
             const syncResult = await firebaseSync(fbUser, {
               acceptTerms: true,
@@ -360,23 +317,17 @@ export default function Login() {
         }
         showVerificationPending(fbUser)
         try {
-          stage = 'Sending verification email'
           await sendEmailVerification(fbUser, getAuthActionSettings('emailVerified'))
-        } catch (sendError: any) {
-          setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, sendError))
+        } catch {
           toast({
             title: 'Verification email not sent',
-            description: sendError.code === 'auth/unauthorized-continue-uri'
-              ? 'Add this website domain to Firebase Authentication’s authorized domains, then resend the link.'
-              : sendError.message || 'Please try resending the verification email.',
+            description: 'We couldn’t send your activation email. Please try resending it shortly.',
             variant: 'destructive',
           })
         }
         return
       }
-      stage = 'Refreshing Firebase sign-in token'
       await fbUser.getIdToken(true)
-      stage = 'Syncing Google account with Cush'
       const syncResult = await firebaseSync(fbUser, mode === 'signup'
         ? {
             acceptTerms: true,
@@ -386,12 +337,10 @@ export default function Login() {
         : undefined)
       if (syncResult.isNewUser) void trackVisitorEvent("signup_completed", "/login")
       else void trackVisitorEvent("login_completed", "/login")
-      stage = 'Finishing sign-in'
       if (showWelcome(syncResult, 'dashboard', fbUser.email || '')) return
       await afterLogin()
     } catch (err: any) {
       clearGoogleRedirectIntent()
-      setGoogleSignInDiagnostic(createGoogleSignInDiagnostic(stage, err))
       if (err.code === 'PERMANENT_ACCOUNT_LOCK' || err.code === 'TEMPORARY_ACCOUNT_LOCK') {
         setSignInMessage({
           text: err.message,
@@ -399,7 +348,11 @@ export default function Login() {
         })
         return
       }
-      toast({ title: 'Google sign-in failed', description: err.message, variant: 'destructive' })
+      toast({
+        title: mode === 'signup' ? 'Account creation not completed' : 'Sign-in not completed',
+        description: friendlyGoogleAuthMessage(err, mode === 'signup' ? 'signup' : 'signin'),
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
@@ -508,7 +461,7 @@ export default function Login() {
           ? 'Password must be at least 6 characters.'
           : err.code === 'auth/password-does-not-meet-requirements'
           ? 'Password needs upper & lowercase letters, a number, and a special character.'
-          : err.message
+          : 'We couldn’t create your account. Please try again.'
       toast({ title: 'Sign-up failed', description: msg, variant: 'destructive' })
     } finally {
       setLoading(false)
@@ -670,8 +623,6 @@ export default function Login() {
                   onClick={() => {
                     setMode(t)
                     setSignInMessage(null)
-                    setGoogleSignInDiagnostic(null)
-                    setDiagnosticCopied(false)
                   }}
                   className={`flex-1 py-3 text-sm font-medium transition-colors ${
                     mode === t
@@ -784,53 +735,6 @@ export default function Login() {
             </>
           ) : (
           <CardContent className="pt-6 space-y-4">
-            {googleSignInDiagnostic && (
-              <section
-                role="alert"
-                aria-live="assertive"
-                className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
-              >
-                <div>
-                  <p className="font-semibold">Sign-in diagnostic</p>
-                  <p className="mt-1"><strong>Stage:</strong> {googleSignInDiagnostic.stage}</p>
-                  <p><strong>Error code:</strong> {googleSignInDiagnostic.code}</p>
-                  <p className="break-words"><strong>Message:</strong> {googleSignInDiagnostic.message}</p>
-                  <p className="break-all"><strong>App origin:</strong> {googleSignInDiagnostic.appOrigin}</p>
-                  <p className="break-all"><strong>Firebase auth domain:</strong> {googleSignInDiagnostic.authDomain}</p>
-                  <p className="break-all"><strong>Expected callback:</strong> {googleSignInDiagnostic.callbackUrl}</p>
-                  <p><strong>Firebase project:</strong> {googleSignInDiagnostic.projectId}</p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="min-h-10 w-full border-amber-700 bg-white text-amber-950 hover:bg-amber-100 dark:bg-slate-900 dark:text-amber-100"
-                  onClick={async () => {
-                    const text = formatGoogleSignInDiagnostic(googleSignInDiagnostic)
-                    try {
-                      await navigator.clipboard.writeText(text)
-                      setDiagnosticCopied(true)
-                    } catch {
-                      const textarea = document.createElement('textarea')
-                      textarea.value = text
-                      textarea.setAttribute('readonly', '')
-                      textarea.style.position = 'fixed'
-                      textarea.style.opacity = '0'
-                      document.body.appendChild(textarea)
-                      textarea.select()
-                      const copied = document.execCommand('copy')
-                      textarea.remove()
-                      setDiagnosticCopied(copied)
-                    }
-                  }}
-                >
-                  {diagnosticCopied ? 'Diagnostic copied' : 'Copy diagnostic details'}
-                </Button>
-                <p className="text-[11px]">
-                  These details exclude your email, password, and sign-in tokens.
-                </p>
-              </section>
-            )}
             {/* Google Button */}
             <Button
               onClick={handleGoogle}
@@ -1034,73 +938,6 @@ export default function Login() {
           <a href="/privacy-policy" className="underline hover:text-slate-700">Privacy Policy</a>.
         </p>
       </div>
-
-      <Dialog open={termsNoticeOpen} onOpenChange={setTermsNoticeOpen}>
-        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto rounded-2xl border border-[#e5c97b] bg-white p-0 shadow-[0_24px_80px_-24px_rgba(28,36,81,0.45)]">
-          <div className="rounded-t-2xl bg-[linear-gradient(125deg,#25238f_0%,#4439c4_65%,#6856da_100%)] px-6 pb-6 pt-7 text-white">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-white/20 bg-white/12 shadow-inner">
-              <ShieldCheck className="h-6 w-6 text-[#ffe69b]" aria-hidden="true" />
-            </div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#f6dda0]">One quick step</p>
-            <DialogHeader className="mt-2 space-y-2 text-left">
-              <DialogTitle className="text-2xl font-semibold tracking-tight text-white">
-                Review your agreements
-              </DialogTitle>
-              <DialogDescription className="text-sm leading-6 text-indigo-100">
-                Please accept both the Terms of Service and Privacy Policy before creating your Cush account.
-                Marketing updates remain optional.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <div className="space-y-3 px-6 py-5">
-            <a
-              href="/terms-of-service"
-              target="_blank"
-              rel="noreferrer"
-              className="group flex min-h-14 items-center gap-3 rounded-xl border border-[#e7e9f2] bg-[#f8f9fd] px-4 py-3 transition-colors hover:border-[#b9b7e8] hover:bg-[#f2f2fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5448c8]"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#e9e8fb] text-[#39339e]">
-                <FileCheck2 className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-[#242943]">Terms of Service</span>
-                <span className="text-xs text-[#6e7487]">Open and review the terms</span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-[#8589a0] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </a>
-            <a
-              href="/privacy-policy"
-              target="_blank"
-              rel="noreferrer"
-              className="group flex min-h-14 items-center gap-3 rounded-xl border border-[#e7e9f2] bg-[#f8f9fd] px-4 py-3 transition-colors hover:border-[#b9b7e8] hover:bg-[#f2f2fc] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5448c8]"
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#fff4d7] text-[#8b6811]">
-                <ShieldCheck className="h-4.5 w-4.5" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-[#242943]">Privacy Policy</span>
-                <span className="text-xs text-[#6e7487]">See how account data is handled</span>
-              </span>
-              <ArrowRight className="h-4 w-4 text-[#8589a0] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-            </a>
-            <Button
-              type="button"
-              className="mt-2 min-h-11 w-full rounded-xl bg-[#3530a8] font-semibold text-white shadow-sm hover:bg-[#292580]"
-              onClick={() => {
-                setTermsNoticeOpen(false)
-                window.setTimeout(() => {
-                  document.getElementById(consent.terms ? 'accept-privacy' : 'accept-terms')?.focus()
-                }, 0)
-              }}
-            >
-              Return to agreements
-            </Button>
-            <p className="text-center text-[11px] leading-5 text-[#85899a]">
-              You can change your marketing preference at any time. It is not needed to create an account.
-            </p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={Boolean(welcomeState)}

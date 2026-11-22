@@ -302,14 +302,22 @@ describe("Login", () => {
   });
 
   it.each([
-    ["popup closed", "auth/popup-closed-by-user", "The popup was closed."],
-    ["popup blocked", "auth/popup-blocked", "The popup was blocked."],
+    [
+      "popup closed",
+      "auth/popup-closed-by-user",
+      "Sign-in was cancelled. You can try again whenever you’re ready.",
+    ],
+    [
+      "popup blocked",
+      "auth/popup-blocked",
+      "Your browser blocked the sign-in window. Allow pop-ups for Cush, then try again.",
+    ],
     [
       "Google provider disabled",
       "auth/operation-not-allowed",
-      "Google sign-in is not enabled for this project.",
+      "We couldn’t complete sign-in. Please try again.",
     ],
-  ])("reports Google provider failure when the %s", async (_caseName, code, message) => {
+  ])("shows a friendly Google sign-in message when the %s", async (_caseName, code, message) => {
     mocks.signInWithPopup.mockRejectedValue({ code, message });
 
     renderLogin();
@@ -318,13 +326,14 @@ describe("Login", () => {
     await waitFor(() =>
       expect(mocks.toast).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "Google sign-in failed",
+          title: "Sign-in not completed",
           description: message,
           variant: "destructive",
         }),
       ),
     );
 
+    expect(screen.queryByText("Sign-in diagnostic")).not.toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.setLocation).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Continue with Google" })).toBeEnabled();
@@ -342,8 +351,8 @@ describe("Login", () => {
     await waitFor(() =>
       expect(mocks.toast).toHaveBeenCalledWith(
         expect.objectContaining({
-          title: "Google sign-in failed",
-          description: "Session creation failed",
+          title: "Sign-in not completed",
+          description: "We couldn’t complete sign-in. Please try again.",
           variant: "destructive",
         }),
       ),
@@ -522,7 +531,7 @@ describe("Login", () => {
     expect(getSignUpSubmitButton()).toBeEnabled();
   });
 
-  it("requires both agreements before creating an email account", async () => {
+  it("nudges users to accept both agreements before email signup", async () => {
     renderLogin();
     openSignUpForm();
     fillSignUpForm(false);
@@ -531,19 +540,23 @@ describe("Login", () => {
     expect(mocks.createUserWithEmailAndPassword).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.setLocation).not.toHaveBeenCalled();
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Review your agreements");
-    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Agreements required",
+      description: "Please accept the Terms of Service and Privacy Policy to create an account.",
+    }));
   });
 
-  it("requires both agreements before Google account creation", async () => {
+  it("shows the same agreement nudge before Google account creation", async () => {
     renderLogin();
     openSignUpForm();
     fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
 
     expect(mocks.signInWithPopup).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Review your agreements");
-    expect(mocks.toast).not.toHaveBeenCalled();
+    expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({
+      title: "Agreements required",
+      description: "Please accept the Terms of Service and Privacy Policy to create an account.",
+    }));
   });
 
   it("allows email signup with required policies accepted but marketing left unchecked", async () => {
@@ -656,7 +669,7 @@ describe("Login", () => {
       expect(mocks.toast).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Sign-up failed",
-          description: "Session creation failed",
+          description: "We couldn’t create your account. Please try again.",
           variant: "destructive",
         }),
       ),
