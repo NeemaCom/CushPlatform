@@ -21,3 +21,4 @@
 - [Cush Verify same-origin API](cush-verify-same-origin-api.md) — proxy Verify API calls through its own domain so browsers retain institutional session cookies.
 - [Cush Verify activation policy](cush-verify-onboarding-policy.md) — official-email activation grants workspace access and five promotional report credits, without pre-access admin review.
 - [Node network block lists](node-blocklist-dual-stack.md) — verify public IPv4 behavior after adding IPv4-mapped IPv6 ranges to a Node `BlockList`.
+- [Cush compact journey design](cush-compact-journey-design.md) — future Cush interfaces should be compact and welcoming, with forms revealed progressively.
