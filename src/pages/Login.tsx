@@ -88,6 +88,12 @@ function friendlyGoogleAuthMessage(error: unknown, mode: 'signin' | 'signup') {
   if (code === 'auth/network-request-failed') {
     return 'A connection problem interrupted sign-in. Check your internet connection and try again.'
   }
+  if (code === 'auth/unauthorized-domain') {
+    return 'Google sign-in is not enabled for this website yet. Please use email and password or contact Cush Support.'
+  }
+  if (code === 'auth/operation-not-allowed') {
+    return 'Google sign-in is temporarily unavailable. Please use email and password or contact Cush Support.'
+  }
 
   return mode === 'signup'
     ? 'We couldn’t create your account. Please try again or use email and password.'

@@ -315,7 +315,12 @@ describe("Login", () => {
     [
       "Google provider disabled",
       "auth/operation-not-allowed",
-      "We couldn’t complete sign-in. Please try again.",
+      "Google sign-in is temporarily unavailable. Please use email and password or contact Cush Support.",
+    ],
+    [
+      "website domain is unauthorized",
+      "auth/unauthorized-domain",
+      "Google sign-in is not enabled for this website yet. Please use email and password or contact Cush Support.",
     ],
   ])("shows a friendly Google sign-in message when the %s", async (_caseName, code, message) => {
     mocks.signInWithPopup.mockRejectedValue({ code, message });
