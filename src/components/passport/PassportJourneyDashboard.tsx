@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ArrowRight,
-  BadgeCheck,
-  ChevronRight,
   FileText,
   History,
   Link2,
@@ -14,10 +12,9 @@ import {
 } from "lucide-react";
 import CushVerifyConsentInbox from "@/components/passport/CushVerifyConsentInbox";
 import PassportEvidenceIntake from "@/components/passport/PassportEvidenceIntake";
+import PassportJourneySteps, { type JourneySection, type PassportJourneyStep } from "@/components/passport/PassportJourneySteps";
 import PostArrivalPanel from "@/components/passport/PostArrivalPanel";
 import V2AssessmentPanel from "@/components/passport/V2AssessmentPanel";
-
-type JourneySection = "information" | "documents" | "connections";
 
 type PassportSummary = {
   score: number | null;
@@ -67,17 +64,17 @@ type Props = {
 const sectionCopy: Record<JourneySection, { title: string; shortTitle: string; description: string }> = {
   information: {
     title: "Individual financial information",
-    shortTitle: "Financial information",
+    shortTitle: "Self-provided information",
     description: "Income, employment, housing, savings and commitments.",
   },
   documents: {
     title: "Document submission",
-    shortTitle: "Documents",
+    shortTitle: "Document upload",
     description: "Statements, payslips and supporting evidence.",
   },
   connections: {
     title: "Financial connections",
-    shortTitle: "Bank and credit connections",
+    shortTitle: "Bank connection",
     description: "Review the available bank and credit options for this stage.",
   },
 };
@@ -179,22 +176,53 @@ export default function PassportJourneyDashboard({
     {
       key: "information",
       icon: FileText,
-      status: passport.assessmentStatus === "not_started" ? "Suggested first" : "Continue",
+      status: isPostArrival
+        ? progression
+          ? progression.postArrival.activated
+            ? progression.postArrival.percent === 100
+              ? "Complete"
+              : progression.postArrival.completed
+                ? `${progression.postArrival.completed}/${progression.postArrival.total} added`
+                : "Start when ready"
+            : "Confirm arrival first"
+          : "Continue"
+        : progression
+          ? progression.preArrival.percent === 100
+            ? "Complete"
+            : progression.preArrival.completed
+              ? `${progression.preArrival.completed}/${progression.preArrival.total} added`
+              : "Start here"
+          : passport.assessmentStatus === "not_started" ? "Start here" : "Continue",
       postDescription: "UK income, employment, housing and financial history.",
     },
     {
       key: "documents",
       icon: Upload,
-      status: "Optional",
+      status: progression?.documents.approved
+        ? `${progression.documents.approved} approved`
+        : progression?.documents.submitted
+          ? `${progression.documents.submitted} submitted`
+          : "Optional",
       postDescription: "Statements, payslips and supporting records.",
     },
     {
       key: "connections",
       icon: Link2,
-      status: "Optional",
+      status: progression?.sourceTypes.includes("bank_connected")
+        ? "Connected"
+        : "Choose when ready",
       postDescription: "Available banking options for the UK.",
     },
   ];
+  const journeySteps: PassportJourneyStep[] = journeyOptions.map(({ key, icon, status, postDescription }, index) => ({
+    key,
+    icon,
+    status,
+    title: sectionCopy[key].shortTitle,
+    description: isPostArrival ? postDescription : sectionCopy[key].description,
+    step: index + 1,
+    expanded: activeSection === key,
+  }));
 
   const drawerTitle = section?.title ?? "Your financial identity";
 
@@ -307,39 +335,11 @@ export default function PassportJourneyDashboard({
                 </p>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
-              {journeyOptions.map(({ key, icon: Icon, status, postDescription }, index) => {
-                const copy = sectionCopy[key];
-                const description = isPostArrival ? postDescription : copy.description;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-haspopup="dialog"
-                    aria-expanded={activeSection === key}
-                    onClick={() => openSection(key)}
-                    className="group flex w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-indigo-200 hover:bg-indigo-50/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 sm:px-4"
-                  >
-                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-600 transition group-hover:bg-indigo-100 group-hover:text-indigo-700">
-                      <Icon className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-800">{copy.shortTitle}</span>
-                        {key === "information" && (
-                          <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-                            {status}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-5 text-slate-500">{description}</span>
-                    </span>
-                    <span className="hidden text-[10px] text-slate-400 sm:block">{String(index + 1).padStart(2, "0")}</span>
-                    <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-indigo-700" aria-hidden="true" />
-                  </button>
-                );
-              })}
-            </div>
+            <PassportJourneySteps
+              steps={journeySteps}
+              panelId="passport-section-dialog"
+              onSelect={openSection}
+            />
             <p className="mt-3 flex items-start gap-2 px-1 text-[11px] leading-5 text-slate-500">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-indigo-600" aria-hidden="true" />
               Your information stays private unless you choose to share it.
@@ -490,6 +490,7 @@ export default function PassportJourneyDashboard({
       >
         <section
           ref={drawerRef}
+          id="passport-section-dialog"
           role={activeSection ? "dialog" : undefined}
           aria-modal={activeSection ? "true" : undefined}
           aria-labelledby="passport-drawer-title"
@@ -525,7 +526,7 @@ export default function PassportJourneyDashboard({
                 <PassportEvidenceIntake
                   period="pre_arrival"
                   view={activeSection === "documents" ? "documents" : "profile"}
-                  onSaved={activeSection === "information" ? () => setActiveSection("documents") : undefined}
+                  onSaved={activeSection === "information" ? () => setActiveSection(null) : undefined}
                   onApplyExtractedFacts={() => setActiveSection("information")}
                 />
               </div>

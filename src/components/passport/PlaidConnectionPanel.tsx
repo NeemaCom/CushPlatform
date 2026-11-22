@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePlaidLink } from "react-plaid-link";
 import {
@@ -94,6 +94,7 @@ function formatAmount(amount: number, currencyCode: string | null) {
 export default function PlaidConnectionPanel({ request, onProfileDetails }: Props) {
   const queryClient = useQueryClient();
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [connectionDetailsOpen, setConnectionDetailsOpen] = useState(true);
   const [linkToken, setLinkToken] = useState<string | null>(() => {
     try {
       const stored = sessionStorage.getItem("cush-plaid-link-token");
@@ -206,6 +207,10 @@ export default function PlaidConnectionPanel({ request, onProfileDetails }: Prop
 
   const status = statusQuery.data;
   const setupReady = Boolean(status?.configured && status.schemaReady);
+  useEffect(() => {
+    if (status) setConnectionDetailsOpen(status.connections.length === 0);
+  }, [status?.connections.length]);
+
   const owners = useMemo(() => {
     if (!reviewResult) return [];
     return reviewResult.identityAccounts.flatMap((account, accountIndex) =>
@@ -235,28 +240,35 @@ export default function PlaidConnectionPanel({ request, onProfileDetails }: Prop
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#d5e2df] bg-[#fbfdfc] shadow-sm" aria-labelledby="plaid-connection-title">
-      <div className="relative overflow-hidden bg-[#163c3d] px-5 py-6 text-white sm:px-7 sm:py-7">
+      <button
+        type="button"
+        aria-expanded={connectionDetailsOpen}
+        aria-controls="plaid-connection-details"
+        onClick={() => setConnectionDetailsOpen((open) => !open)}
+        className="relative flex w-full items-center justify-between gap-4 overflow-hidden bg-[#163c3d] px-5 py-5 text-left text-white transition hover:bg-[#1b4848] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#d6f278] sm:px-7 sm:py-6"
+      >
         <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-white/10" aria-hidden="true" />
         <div className="pointer-events-none absolute -right-2 -top-10 h-44 w-44 rounded-full border border-white/10" aria-hidden="true" />
-        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b8d2c9]">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#b4d6b5]" aria-hidden="true" />
-              A more complete UK picture
-            </div>
-            <h3 id="plaid-connection-title" className="mt-2 font-semibold tracking-tight text-[1.55rem]">Connect accounts via Plaid</h3>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[#d2e0dc]">
+        <div className="relative flex min-w-0 flex-1 items-start gap-3">
+          <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#b4d6b5]" aria-hidden="true" />
+          <div className="min-w-0">
+            <span className="block text-[10px] font-semibold uppercase tracking-[0.18em] text-[#b8d2c9]">
+              {status?.connections.length ? `${status.connections.length} connected` : "Optional"}
+            </span>
+            <span id="plaid-connection-title" className="mt-1 block font-semibold tracking-tight text-xl sm:text-2xl">Connect accounts via Plaid</span>
+            <span className="mt-1 block max-w-xl text-xs leading-5 text-[#d2e0dc]">
               Review the account details and recent activity you choose to share. You stay in control of what becomes part of your profile.
-            </p>
-          </div>
-          <div className="flex w-fit items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-[#e6f0ed]">
-            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-            Secure connection
+            </span>
           </div>
         </div>
-      </div>
+        <span className="relative flex shrink-0 items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-medium text-[#e6f0ed]">
+          <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">Secure</span>
+          <ChevronDown className={`h-4 w-4 transition-transform ${connectionDetailsOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+        </span>
+      </button>
 
-      <div className="space-y-5 p-5 sm:p-7">
+      <div id="plaid-connection-details" hidden={!connectionDetailsOpen} className="space-y-5 p-5 sm:p-7">
         {statusQuery.isLoading ? (
           <div className="space-y-3" role="status" aria-label="Checking Plaid setup">
             <div className="h-4 w-48 animate-pulse rounded bg-[#e6eeeb]" />

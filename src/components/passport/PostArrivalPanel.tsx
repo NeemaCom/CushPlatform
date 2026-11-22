@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowDownLeft,
@@ -130,7 +130,8 @@ export default function PostArrivalPanel({
   const [notYetAcknowledged, setNotYetAcknowledged] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileData>({});
   const [profileFormReady, setProfileFormReady] = useState(false);
-  const [profileDetailsOpen, setProfileDetailsOpen] = useState(true);
+  const [profileDetailsOpen, setProfileDetailsOpen] = useState(false);
+  const profileDetailsHydrated = useRef(false);
   const [showRecordForm, setShowRecordForm] = useState(false);
   const [editingRecord, setEditingRecord] = useState<SavedRecord | undefined>();
   const [operationError, setOperationError] = useState<string | null>(null);
@@ -151,6 +152,12 @@ export default function PostArrivalPanel({
     setProfileForm(profileQuery.data.profile.data ?? {});
     setArrivalDate(profileQuery.data.profile.arrivalDate ?? "");
     setProfileFormReady(true);
+    if (!profileDetailsHydrated.current) {
+      profileDetailsHydrated.current = true;
+      const savedDetails = profileQuery.data.profile.data ?? {};
+      const hasSavedDetails = PROFILE_DETAIL_FIELDS.some((field) => hasProfileValue(savedDetails[field]));
+      setProfileDetailsOpen(!hasSavedDetails);
+    }
   }, [profileQuery.data]);
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["/api/passport/post-arrival"] });

@@ -204,7 +204,7 @@ export default function MonoBankDataPanel() {
         icon={<Landmark className="h-5 w-5" aria-hidden="true" />}
         title="Connect a bank for statements"
         description="Authorize account access, then review statement activity for your assessment."
-        defaultOpen
+        defaultOpen={accountsQuery.isLoading || linkedAccounts.length === 0}
       >
         <p className="text-xs leading-relaxed text-slate-600">
           Connect your bank to review account statements and add selected balance, recurring income, and expenses to V2. Raw statements are not retained; imports save reviewed monthly aggregates and exchange-rate provenance. NGN and USD transactions use CBN central rates for their transaction dates; the current balance uses the rate for its snapshot date.

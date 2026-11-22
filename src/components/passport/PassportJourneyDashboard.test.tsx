@@ -13,7 +13,7 @@ vi.mock("@/components/passport/PassportEvidenceIntake", () => ({
         Financial draft
         <input aria-label="Financial draft" defaultValue="" />
       </label>
-      {onSaved && <button type="button" onClick={onSaved}>Save and continue</button>}
+      {onSaved && <button type="button" onClick={onSaved}>Save and close</button>}
     </div>
   ),
 }));
@@ -54,6 +54,42 @@ function renderDashboard(onModeChange = vi.fn()) {
 }
 
 describe("PassportJourneyDashboard", () => {
+  it("shows the same three expandable journey steps for both arrival stages", () => {
+    const onModeChange = vi.fn();
+    const props = {
+      passport,
+      scoreSummary: <div>Score summary</div>,
+      sharePanel: <div>Share panel</div>,
+      modePending: false,
+      monoCodePending: false,
+      onModeChange,
+    };
+    const { rerender } = render(<PassportJourneyDashboard {...props} />);
+
+    const informationStep = screen.getByRole("button", { name: /Self-provided information/ });
+    expect(informationStep.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(informationStep);
+    expect(informationStep.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByTestId("evidence-pre_arrival-profile")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close section" }));
+
+    const documentStep = screen.getByRole("button", { name: /Document upload/ });
+    fireEvent.click(documentStep);
+    expect(screen.getByTestId("evidence-pre_arrival-documents")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close section" }));
+
+    const connectionStep = screen.getByRole("button", { name: /Bank connection/ });
+    fireEvent.click(connectionStep);
+    expect(screen.getByTestId("pre-arrival-connections")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Close section" }));
+
+    rerender(<PassportJourneyDashboard {...props} passport={{ ...passport, mode: "post_arrival" }} />);
+    expect(screen.getByRole("tabpanel", { name: "Post-arrival steps" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Self-provided information/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Document upload/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Bank connection/ })).toBeTruthy();
+  });
+
   it("keeps the server-backed stage switch and exposes the outstanding assessment items", () => {
     const { onModeChange } = renderDashboard();
 
@@ -93,17 +129,16 @@ describe("PassportJourneyDashboard", () => {
     expect(screen.getByTestId("post-arrival-information")).toBeTruthy();
   });
 
-  it("retains an unsaved financial draft while changing drawer sections", () => {
+  it("closes after saving and preserves the financial draft when reopened", () => {
     renderDashboard();
 
-    fireEvent.click(screen.getByRole("button", { name: /Financial information/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Self-provided information/ }));
     const draft = screen.getByLabelText("Financial draft") as HTMLInputElement;
     fireEvent.change(draft, { target: { value: "draft amount" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
-    expect(screen.getByTestId("evidence-pre_arrival-documents")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Close section" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save and close" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: /Financial information/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Self-provided information/ }));
     expect((screen.getByLabelText("Financial draft") as HTMLInputElement).value).toBe("draft amount");
     expect(screen.getByRole("dialog").getAttribute("aria-modal")).toBe("true");
   });

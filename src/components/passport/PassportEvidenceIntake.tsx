@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CheckCircle2, ChevronDown, Clock3, Download, FileText, Loader2, Save, ShieldCheck, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -114,6 +114,35 @@ function emptyProfileFor(period: "pre_arrival" | "post_arrival"): FinancialProfi
     : EMPTY_PROFILE;
 }
 
+type ProfileSection = "income" | "housing" | "savings" | "history";
+type OpenProfileSections = Record<ProfileSection, boolean>;
+
+function hasProfileSectionContent(profile: FinancialProfile, section: ProfileSection) {
+  const hasText = (...values: Array<string | null | undefined>) =>
+    values.some((value) => Boolean(value?.trim()));
+  if (section === "income") {
+    return hasText(profile.employmentStatus, profile.employer, profile.jobTitle, profile.incomeAmount, profile.incomeFrequency);
+  }
+  if (section === "housing") {
+    return hasText(profile.housingStatus, profile.housingCost);
+  }
+  if (section === "savings") {
+    return hasText(profile.savingsAmount, profile.savingsLabel, profile.commitmentsAmount) || profile.completeCashFlow;
+  }
+  return hasText(profile.financialHistorySummary) || profile.financialHistory.length > 0;
+}
+
+function initialOpenProfileSections(profile: FinancialProfile): OpenProfileSections {
+  const firstIncomplete = (["income", "housing", "savings", "history"] as const)
+    .find((section) => !hasProfileSectionContent(profile, section));
+  return {
+    income: firstIncomplete === "income",
+    housing: firstIncomplete === "housing",
+    savings: firstIncomplete === "savings",
+    history: firstIncomplete === "history",
+  };
+}
+
 const DOCUMENT_TYPES = [
   ["payslip", "Payslip"],
   ["bank_statement", "Bank statement"],
@@ -200,6 +229,8 @@ export default function PassportEvidenceIntake({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [profile, setProfile] = useState(() => emptyProfileFor(period));
+  const [openProfileSections, setOpenProfileSections] = useState<OpenProfileSections>(() => initialOpenProfileSections(emptyProfileFor(period)));
+  const [documentUploadOpen, setDocumentUploadOpen] = useState(false);
   const [documentType, setDocumentType] = useState("bank_statement");
   const [documentLabel, setDocumentLabel] = useState("");
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -209,6 +240,8 @@ export default function PassportEvidenceIntake({
   const [correctedDraft, setCorrectedDraft] = useState("");
   const [correctedCurrencyCode, setCorrectedCurrencyCode] = useState("GBP");
   const [candidateMonths, setCandidateMonths] = useState<Record<string, string>>({});
+  const hydratedProfilePeriod = useRef<string | null>(null);
+  const hydratedDocumentDisclosure = useRef(false);
   const employmentStatusIsCustom = profile.employmentStatus !== "" && !EMPLOYMENT_STATUS_OPTIONS.includes(profile.employmentStatus);
   const housingStatusIsCustom = profile.housingStatus !== "" && !HOUSING_STATUS_OPTIONS.includes(profile.housingStatus);
 
@@ -240,8 +273,21 @@ export default function PassportEvidenceIntake({
   });
 
   useEffect(() => {
-    if (profileQuery.data) setProfile(profileQuery.data.profile ?? emptyProfileFor(period));
+    if (profileQuery.data) {
+      const savedProfile = profileQuery.data.profile ?? emptyProfileFor(period);
+      setProfile(savedProfile);
+      if (hydratedProfilePeriod.current !== period) {
+        hydratedProfilePeriod.current = period;
+        setOpenProfileSections(initialOpenProfileSections(savedProfile));
+      }
+    }
   }, [profileQuery.data, period]);
+  useEffect(() => {
+    if (documentsQuery.data && !hydratedDocumentDisclosure.current) {
+      hydratedDocumentDisclosure.current = true;
+      setDocumentUploadOpen(documentsQuery.data.submissions.length === 0);
+    }
+  }, [documentsQuery.data]);
   useEffect(() => {
     if (period === "pre_arrival" && profileQuery.data?.profile) {
       setDocumentCountryCode(profileQuery.data.profile.countryCode);
@@ -271,6 +317,7 @@ export default function PassportEvidenceIntake({
   const saveProfile = useMutation({
     mutationFn: () => profileRequest("PUT", `/api/passport/financial-profile?period=${period}`, profile),
     onSuccess: () => {
+      setOpenProfileSections({ income: false, housing: false, savings: false, history: false });
       invalidateIntake();
       toast({ title: "Financial profile saved", description: "Your confirmed financial details can contribute to your provisional assessment. Uploaded files remain separate; their review status affects Confidence, not Score by itself." });
       onSaved?.();
@@ -281,6 +328,7 @@ export default function PassportEvidenceIntake({
     mutationFn: () => profileRequest("DELETE", `/api/passport/financial-profile?period=${period}`),
     onSuccess: () => {
       setProfile(emptyProfileFor(period));
+      setOpenProfileSections(initialOpenProfileSections(emptyProfileFor(period)));
       invalidateIntake();
       toast({ title: "Financial profile removed" });
     },
@@ -302,6 +350,7 @@ export default function PassportEvidenceIntake({
       setCorrectedDraft(result.extractedDraft);
       setDocumentFile(null);
       setDocumentLabel("");
+      setDocumentUploadOpen(false);
       invalidateIntake();
       toast({
         title: "Private document uploaded",
@@ -342,6 +391,7 @@ export default function PassportEvidenceIntake({
     mutationFn: (id: number) => profileRequest("DELETE", `/api/passport/evidence-submissions/${id}`),
     onSuccess: (_result, id) => {
       if (selectedId === id) setSelectedId(null);
+      if ((documentsQuery.data?.submissions.length ?? 0) <= 1) setDocumentUploadOpen(true);
       invalidateIntake();
       toast({ title: "Document removed" });
     },
@@ -548,10 +598,19 @@ export default function PassportEvidenceIntake({
                 </p>
               </div>
               <div className="space-y-2.5">
-                <details open className="rounded-xl border border-slate-200 bg-white p-4">
+                <details
+                  open={openProfileSections.income}
+                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, income: event.currentTarget.open }))}
+                  className="rounded-xl border border-slate-200 bg-white p-4"
+                >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
                     <span>Income and employment</span>
-                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <span className="flex items-center gap-2">
+                      {hasProfileSectionContent(profileQuery.data?.profile ?? emptyProfileFor(period), "income") && (
+                        <span className="text-[10px] font-medium text-emerald-700">On file</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    </span>
                   </summary>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1 text-xs font-medium text-slate-700">
@@ -602,10 +661,19 @@ export default function PassportEvidenceIntake({
                     </label>
                   </div>
                 </details>
-                <details className="rounded-xl border border-slate-200 bg-white p-4">
+                <details
+                  open={openProfileSections.housing}
+                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, housing: event.currentTarget.open }))}
+                  className="rounded-xl border border-slate-200 bg-white p-4"
+                >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
                     <span>Housing and rent</span>
-                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <span className="flex items-center gap-2">
+                      {hasProfileSectionContent(profileQuery.data?.profile ?? emptyProfileFor(period), "housing") && (
+                        <span className="text-[10px] font-medium text-emerald-700">On file</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    </span>
                   </summary>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1 text-xs font-medium text-slate-700">
@@ -624,10 +692,19 @@ export default function PassportEvidenceIntake({
                     </label>
                   </div>
                 </details>
-                <details className="rounded-xl border border-slate-200 bg-white p-4">
+                <details
+                  open={openProfileSections.savings}
+                  onToggle={(event) => setOpenProfileSections((current) => ({ ...current, savings: event.currentTarget.open }))}
+                  className="rounded-xl border border-slate-200 bg-white p-4"
+                >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
                     <span>Savings and commitments</span>
-                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    <span className="flex items-center gap-2">
+                      {hasProfileSectionContent(profileQuery.data?.profile ?? emptyProfileFor(period), "savings") && (
+                        <span className="text-[10px] font-medium text-emerald-700">On file</span>
+                      )}
+                      <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                    </span>
                   </summary>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <label className="space-y-1 text-xs font-medium text-slate-700">
@@ -652,10 +729,19 @@ export default function PassportEvidenceIntake({
                   </p>
                 </details>
               </div>
-              <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <details
+                open={openProfileSections.history}
+                onToggle={(event) => setOpenProfileSections((current) => ({ ...current, history: event.currentTarget.open }))}
+                className="rounded-xl border border-slate-200 bg-slate-50 p-4"
+              >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-800">
                   <span>Monthly history across countries</span>
-                  <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  <span className="flex items-center gap-2">
+                    {hasProfileSectionContent(profileQuery.data?.profile ?? emptyProfileFor(period), "history") && (
+                      <span className="text-[10px] font-medium text-emerald-700">On file</span>
+                    )}
+                    <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                  </span>
                 </summary>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -713,7 +799,7 @@ export default function PassportEvidenceIntake({
               </details>
               <div className="flex flex-wrap gap-2">
                 <button type="submit" disabled={saveProfile.isPending} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-50">
-                  {saveProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {onSaved ? "Save and continue" : "Save details"}
+                  {saveProfile.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} {onSaved ? "Save and close" : "Save details"}
                 </button>
                 {profileQuery.data?.profile && (
                   <button type="button" disabled={clearProfile.isPending} onClick={() => {
@@ -732,9 +818,24 @@ export default function PassportEvidenceIntake({
       {view !== "profile" && (
       <>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby={`evidence-upload-heading-${period}`}>
-          <h3 id={`evidence-upload-heading-${period}`} className="text-sm font-bold text-slate-900">Add a supporting document</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-500">PDF and CSV only, up to 5 MB. Files and extracted text are encrypted before they are saved.</p>
+        <details
+          open={documentUploadOpen}
+          onToggle={(event) => setDocumentUploadOpen(event.currentTarget.open)}
+          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
+          aria-labelledby={`evidence-upload-heading-${period}`}
+        >
+          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 [&::-webkit-details-marker]:hidden">
+            <span>
+              <span id={`evidence-upload-heading-${period}`} className="block text-sm font-bold text-slate-900">Add a supporting document</span>
+              <span className="mt-1 block text-sm leading-6 text-slate-500">PDF and CSV only, up to 5 MB. Files and extracted text are encrypted before they are saved.</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2 text-xs font-semibold text-indigo-700">
+              {(documentsQuery.data?.submissions.length ?? 0) > 0
+                ? `${documentsQuery.data!.submissions.length} on file`
+                : "Start here"}
+              <ChevronDown className={`h-4 w-4 transition-transform ${documentUploadOpen ? "rotate-180" : ""}`} aria-hidden="true" />
+            </span>
+          </summary>
           <div className="mt-4 space-y-3">
             <label className="block space-y-1 text-xs font-medium text-slate-700">
               Document type
@@ -795,7 +896,7 @@ export default function PassportEvidenceIntake({
             </button>
             <p className="text-xs leading-5 text-slate-500">Only upload records relevant to your financial profile. Never upload passwords, PINs, or full payment-card details.</p>
           </div>
-        </section>
+        </details>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6" aria-labelledby={`evidence-history-heading-${period}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
