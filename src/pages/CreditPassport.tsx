@@ -571,9 +571,11 @@ export default function CreditPassport() {
               </div>
             </motion.div>
 
-            <section id="manual-financial-details" className="space-y-4">
-              <PassportEvidenceIntake />
-            </section>
+            {passport.mode !== "post_arrival" && (
+              <section id="manual-financial-details" className="space-y-4">
+                <PassportEvidenceIntake />
+              </section>
+            )}
 
             {passport.mode !== "post_arrival" && (
               <section id="assessment-tasks" className="space-y-4">
