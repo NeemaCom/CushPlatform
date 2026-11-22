@@ -38,6 +38,7 @@ import {
 import { z } from "zod";
 import { registerPassportRoutes } from "./passport-routes";
 import { registerPostArrivalRoutes } from "./post-arrival-routes";
+import { registerPassportEvidenceRoutes } from "./passport-evidence-routes";
 import { registerPlaidRoutes } from "./plaid-routes";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerMonoRoutes } from "./mono-routes";
@@ -191,6 +192,7 @@ export async function registerRoutes(
   registerAdminRoutes(app);
   registerVisitorIntelligenceRoutes(app);
   registerPassportRoutes(app);
+  registerPassportEvidenceRoutes(app);
   registerPostArrivalRoutes(app);
   registerPlaidRoutes(app);
   registerMonoRoutes(app);

@@ -1580,6 +1580,81 @@ export const cushPostArrivalAuditLogs = pgTable("cush_post_arrival_audit_logs", 
   userCreatedAtIndex: index("cush_post_arrival_audit_user_created_at_idx").on(table.userId, table.createdAt),
 })).enableRLS();
 
+// ─── Passport Evidence Intake ────────────────────────────────────────────────
+// User-entered financial details and extracted document content are encrypted
+// by the application before persistence; country/currency remain searchable
+// metadata and never feed the V2 scoring inputs.
+export const cushPassportFinancialProfiles = pgTable("cush_passport_financial_profiles", {
+  userId: integer("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  countryCode: text("country_code").notNull(),
+  currencyCode: text("currency_code").notNull(),
+  encryptedProfile: text("encrypted_profile").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  countryCodeCheck: check("cush_passport_financial_profiles_country_check", sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
+  currencyCodeCheck: check("cush_passport_financial_profiles_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
+})).enableRLS();
+
+export const cushPassportEvidenceSubmissions = pgTable("cush_passport_evidence_submissions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  documentType: text("document_type").notNull(),
+  label: text("label").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  countryCode: text("country_code").notNull(),
+  currencyCode: text("currency_code").notNull(),
+  encryptedFile: text("encrypted_file").notNull(),
+  encryptedExtraction: text("encrypted_extraction").notNull(),
+  encryptedCorrection: text("encrypted_correction"),
+  encryptedReview: text("encrypted_review"),
+  reviewStatus: text("review_status").notNull().default("draft"),
+  evidenceClassification: text("evidence_classification").notNull().default("self_declared"),
+  submittedAt: timestamp("submitted_at", { withTimezone: true, mode: "date" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  reviewedBy: integer("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  documentTypeCheck: check(
+    "cush_passport_evidence_submissions_type_check",
+    sql`${table.documentType} in ('payslip', 'bank_statement', 'rent_receipt', 'savings_statement', 'commitment_statement', 'proof_of_residency', 'tax_return', 'employment_contract', 'transfer_receipt', 'other')`,
+  ),
+  reviewStatusCheck: check(
+    "cush_passport_evidence_submissions_status_check",
+    sql`${table.reviewStatus} in ('draft', 'submitted', 'under_review', 'additional_information_required', 'approved', 'rejected')`,
+  ),
+  classificationCheck: check(
+    "cush_passport_evidence_submissions_classification_check",
+    sql`${table.evidenceClassification} in ('self_declared', 'document_supported', 'independently_verified', 'institution_confirmed')`,
+  ),
+  fileSizeCheck: check("cush_passport_evidence_submissions_file_size_check", sql`${table.fileSize} between 1 and 5242880`),
+  countryCodeCheck: check("cush_passport_evidence_submissions_country_check", sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
+  currencyCodeCheck: check("cush_passport_evidence_submissions_currency_check", sql`${table.currencyCode} ~ '^[A-Z]{3}$'`),
+  userCreatedIndex: index("cush_passport_evidence_submissions_user_created_idx").on(table.userId, table.createdAt),
+  statusCreatedIndex: index("cush_passport_evidence_submissions_status_created_idx").on(table.reviewStatus, table.createdAt),
+})).enableRLS();
+
+export const cushPassportEvidenceEvents = pgTable("cush_passport_evidence_events", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").references(() => cushPassportEvidenceSubmissions.id, { onDelete: "set null" }),
+  userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorType: text("actor_type").notNull(),
+  eventType: text("event_type").notNull(),
+  eventData: jsonb("event_data").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  actorTypeCheck: check("cush_passport_evidence_events_actor_check", sql`${table.actorType} in ('user', 'admin', 'system')`),
+  eventTypeCheck: check(
+    "cush_passport_evidence_events_type_check",
+    sql`${table.eventType} in ('profile_saved', 'profile_deleted', 'document_uploaded', 'draft_corrected', 'document_submitted', 'document_deleted', 'document_accessed', 'review_opened', 'review_decided')`,
+  ),
+  userCreatedIndex: index("cush_passport_evidence_events_user_created_idx").on(table.userId, table.createdAt),
+  submissionCreatedIndex: index("cush_passport_evidence_events_submission_created_idx").on(table.submissionId, table.createdAt),
+})).enableRLS();
+
 // ─── Cush Score V2 Inputs and Policy ──────────────────────────────────────────
 
 export const cushAssessmentInputs = pgTable("cush_assessment_inputs", {

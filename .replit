@@ -19,3 +19,6 @@ name = "Start application"
 task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
+
+[nix]
+channel = "stable-25_05"
