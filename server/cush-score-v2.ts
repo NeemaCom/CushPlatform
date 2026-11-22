@@ -2,6 +2,8 @@ import { and, desc, eq } from "drizzle-orm";
 import {
   cushAssessmentInputs,
   cushEvidenceFreshnessReviews,
+  cushPassportAssessmentHistory,
+  cushPassportEvidenceSubmissions,
   cushPassportFinancialProfiles,
   cushPassportPostArrivalFinancialProfiles,
   cushPostArrivalProfiles,
@@ -41,8 +43,14 @@ import {
   type DestinationBaselinePolicy,
 } from "./cush-score-policy-selection";
 import {
+  describeAssessmentChange,
+  fingerprintAssessmentInputs,
+  getAssessmentMaturity,
+} from "./passport-assessment-history";
+import {
   decryptEvidenceJson,
   EvidenceEncryptionUnavailableError,
+  getFinancialProfileProgress,
   passportFinancialProfileSchema,
   type PassportFinancialProfile,
 } from "./passport-evidence-service";
@@ -69,6 +77,29 @@ export interface V2AssessmentView {
   schemaReady: true;
   monoDataReady: boolean;
   unscoredCurrencyCodes: string[];
+  progression: {
+    maturityStatus: "getting_started" | "provisional" | "evidence_supported" | "institution_supported";
+    sourceTypes: string[];
+    preArrival: ReturnType<typeof getFinancialProfileProgress>;
+    postArrival: ReturnType<typeof getFinancialProfileProgress> & { activated: boolean };
+    documents: { submitted: number; approved: number };
+    nextActions: string[];
+    historyReady: boolean;
+    history: Array<{
+      id: number;
+      previousScore: number | null;
+      score: number | null;
+      previousConfidence: number | null;
+      confidence: number | null;
+      scoreCoveragePercent: number;
+      assessmentStatus: string;
+      maturityStatus: string;
+      sourceTypes: string[];
+      changedInformation: string[];
+      changeSummary: string;
+      createdAt: string;
+    }>;
+  };
 }
 
 export class ScoringPolicyValidationError extends Error {}
@@ -86,6 +117,7 @@ function engineInput(
   linkedAccountCount: number,
   creditHistoryEvidence: { id: number; evidenceData: unknown; mappingVersion: string; fetchedAt: Date } | null,
   freshnessReviews: Array<typeof cushEvidenceFreshnessReviews.$inferSelect> = [],
+  reviewedStatementCount = 0,
 ): CushScoreInput {
   const monoMonthSet = new Set(monoImports.flatMap(({ evidence }) =>
     evidence.cashFlowHistory.map((item) => item.month),
@@ -137,11 +169,12 @@ function engineInput(
     monoCashFlowRows.length > 0;
   const monoRecordCount = monoFunds.length + monoIncome.length + monoCashFlowRows.length;
   const selfReportedRecordCount = manualFunds.length + manualIncome.length + manualCashFlow.length;
-  const sourceRecordCount = monoRecordCount + selfReportedRecordCount;
+  const sourceRecordCount = monoRecordCount + selfReportedRecordCount + reviewedStatementCount;
   const sourceEvidenceShares = sourceRecordCount === 0
     ? []
     : [
         ...(monoRecordCount > 0 ? [{ sourceType: "bank_connection" as const, share: monoRecordCount / sourceRecordCount }] : []),
+        ...(reviewedStatementCount > 0 ? [{ sourceType: "verified_statement" as const, share: reviewedStatementCount / sourceRecordCount }] : []),
         ...(selfReportedRecordCount > 0 ? [{ sourceType: "self_reported" as const, share: selfReportedRecordCount / sourceRecordCount }] : []),
       ];
   const creditAssessment = creditHistoryEvidence
@@ -330,44 +363,96 @@ async function loadEvidenceFreshnessReviews(userId: number) {
   }
 }
 
-async function loadStoredInputs(userId: number): Promise<V2AssessmentInput> {
+async function loadStoredInputs(userId: number) {
   const [row] = await db.select().from(cushAssessmentInputs).where(eq(cushAssessmentInputs.userId, userId)).limit(1);
-  return row ? v2AssessmentInputSchema.parse(row.inputData) : EMPTY_V2_ASSESSMENT;
+  return {
+    input: row ? v2AssessmentInputSchema.parse(row.inputData) : EMPTY_V2_ASSESSMENT,
+    updatedAt: row?.updatedAt ?? null,
+  };
 }
 
-async function loadFinancialProfile(userId: number): Promise<PassportFinancialProfile | null> {
+async function loadFinancialProfile(userId: number) {
   try {
     const [row] = await db.select({
       encryptedProfile: cushPassportFinancialProfiles.encryptedProfile,
+      updatedAt: cushPassportFinancialProfiles.updatedAt,
     }).from(cushPassportFinancialProfiles)
       .where(eq(cushPassportFinancialProfiles.userId, userId))
       .limit(1);
-    return row
-      ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
-      : null;
+    return {
+      profile: row
+        ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
+        : null,
+      updatedAt: row?.updatedAt ?? null,
+    };
   } catch (error) {
-    if (isV2SchemaMissing(error)) return null;
+    if (isV2SchemaMissing(error)) return { profile: null, updatedAt: null };
     throw error;
   }
 }
 
-async function loadPostArrivalFinancialProfile(userId: number): Promise<PassportFinancialProfile | null> {
+async function loadPostArrivalFinancialProfile(userId: number) {
   try {
-    const [arrival] = await db.select({ arrivalStatus: cushPostArrivalProfiles.arrivalStatus })
+    const [arrival] = await db.select({
+      arrivalStatus: cushPostArrivalProfiles.arrivalStatus,
+      updatedAt: cushPostArrivalProfiles.updatedAt,
+    })
       .from(cushPostArrivalProfiles)
       .where(eq(cushPostArrivalProfiles.userId, userId))
       .limit(1);
-    if (arrival?.arrivalStatus !== "arrived") return null;
+    if (arrival?.arrivalStatus !== "arrived") {
+      return { profile: null, updatedAt: arrival?.updatedAt ?? null, activated: false };
+    }
     const [row] = await db.select({
       encryptedProfile: cushPassportPostArrivalFinancialProfiles.encryptedProfile,
+      updatedAt: cushPassportPostArrivalFinancialProfiles.updatedAt,
     }).from(cushPassportPostArrivalFinancialProfiles)
       .where(eq(cushPassportPostArrivalFinancialProfiles.userId, userId))
       .limit(1);
-    return row
-      ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
-      : null;
+    return {
+      profile: row
+        ? passportFinancialProfileSchema.parse(decryptEvidenceJson<unknown>(row.encryptedProfile))
+        : null,
+      updatedAt: row?.updatedAt ?? arrival.updatedAt,
+      activated: true,
+    };
   } catch (error) {
-    if (isV2SchemaMissing(error)) return null;
+    if (isV2SchemaMissing(error)) return { profile: null, updatedAt: null, activated: false };
+    throw error;
+  }
+}
+
+async function loadEvidenceDocumentProgress(userId: number) {
+  try {
+    const rows = await db.select({
+      reviewStatus: cushPassportEvidenceSubmissions.reviewStatus,
+      evidenceClassification: cushPassportEvidenceSubmissions.evidenceClassification,
+      documentType: cushPassportEvidenceSubmissions.documentType,
+      id: cushPassportEvidenceSubmissions.id,
+      updatedAt: cushPassportEvidenceSubmissions.updatedAt,
+    }).from(cushPassportEvidenceSubmissions)
+      .where(eq(cushPassportEvidenceSubmissions.userId, userId));
+    return {
+      submitted: rows.length,
+      approved: rows.filter((row) => row.reviewStatus === "approved").length,
+      reviewedStatements: rows.filter((row) =>
+        row.reviewStatus === "approved" &&
+        row.documentType === "bank_statement" &&
+        ["document_supported", "independently_verified", "institution_confirmed"].includes(row.evidenceClassification),
+      ).length,
+      reviewedStatementEvidence: rows
+        .filter((row) =>
+          row.reviewStatus === "approved" &&
+          row.documentType === "bank_statement" &&
+          ["document_supported", "independently_verified", "institution_confirmed"].includes(row.evidenceClassification),
+        )
+        .map((row) => `${row.id}:${row.updatedAt.toISOString()}`)
+        .sort(),
+    };
+  } catch (error) {
+    if (isV2SchemaMissing(error)) {
+      return { submitted: 0, approved: 0, reviewedStatements: 0, reviewedStatementEvidence: [] };
+    }
     throw error;
   }
 }
@@ -411,13 +496,40 @@ interface CalculatedV2Assessment {
   unscoredCurrencyCodes: string[];
   activePolicyVersion: number | null;
   baselinePolicy: DestinationBaselinePolicy | null;
+  sourceTypes: string[];
+  maturityStatus: V2AssessmentView["progression"]["maturityStatus"];
+  inputFingerprint: string;
+  preArrivalProgress: ReturnType<typeof getFinancialProfileProgress>;
+  postArrivalProgress: ReturnType<typeof getFinancialProfileProgress> & { activated: boolean };
+  documentProgress: { submitted: number; approved: number };
+  sourceState: Record<string, unknown>;
+}
+
+function getChangedInformation(previous: unknown, current: Record<string, unknown>): string[] {
+  const previousState = typeof previous === "object" && previous !== null
+    ? previous as Record<string, unknown>
+    : null;
+  if (!previousState) return ["Initial assessment"];
+  const labels: Record<string, string> = {
+    algorithmVersion: "Scoring method",
+    policyVersion: "Scoring policy",
+    storedInputsUpdatedAt: "Manual assessment details",
+    preArrivalUpdatedAt: "Pre-arrival financial profile",
+    postArrivalUpdatedAt: "Post-arrival financial profile",
+    bankEvidence: "Connected bank evidence",
+    creditEvidenceAt: "Credit history evidence",
+    reviewedStatementEvidence: "Reviewed bank statements",
+  };
+  return Object.keys(current)
+    .filter((key) => JSON.stringify(previousState[key]) !== JSON.stringify(current[key]))
+    .map((key) => labels[key] ?? "Assessment information");
 }
 
 async function calculateV2AssessmentForUser(
   userId: number,
   now: Date,
 ): Promise<CalculatedV2Assessment> {
-  const [storedInputs, preArrivalProfile, postArrivalProfile, activePolicy, monoData, creditHistoryEvidence, freshnessReviews] = await Promise.all([
+  const [storedInputsResult, preArrivalProfileResult, postArrivalProfileResult, activePolicy, monoData, creditHistoryEvidence, freshnessReviews, documentProgress] = await Promise.all([
     loadStoredInputs(userId),
     loadFinancialProfile(userId),
     loadPostArrivalFinancialProfile(userId),
@@ -425,7 +537,11 @@ async function calculateV2AssessmentForUser(
     loadMonoAssessmentData(userId),
     loadCreditHistoryEvidence(userId),
     loadEvidenceFreshnessReviews(userId),
+    loadEvidenceDocumentProgress(userId),
   ]);
+  const storedInputs = storedInputsResult.input;
+  const preArrivalProfile = preArrivalProfileResult.profile;
+  const postArrivalProfile = postArrivalProfileResult.profile;
   const [preArrivalInputs, postArrivalInputs] = await Promise.all([
     buildProfileScoreInputs(preArrivalProfile, now.toISOString().slice(0, 7)),
     buildProfileScoreInputs(postArrivalProfile, now.toISOString().slice(0, 7)),
@@ -483,9 +599,46 @@ async function calculateV2AssessmentForUser(
       monoData.linkedAccountCount,
       creditHistoryEvidence,
       freshnessReviews,
+      documentProgress.reviewedStatements,
     ),
     scoringPolicy,
   );
+  const hasSelfDeclaredInputs = inputs.availableFunds.length > 0 ||
+    inputs.incomeHistory.length > 0 ||
+    inputs.cashFlowHistory.length > 0;
+  const sourceTypes = [
+    ...(hasSelfDeclaredInputs ? ["self_declared"] : []),
+    ...(documentProgress.reviewedStatements > 0 ? ["verified_statement"] : []),
+    ...(monoData.imports.length ? ["bank_connected"] : []),
+    ...(creditHistoryEvidence ? ["credit_history"] : []),
+  ];
+  const maturityStatus = getAssessmentMaturity({
+    hasScore: calculation.cushScore !== null || calculation.provisionalScore !== null,
+    hasInstitutionCredit: Boolean(creditHistoryEvidence),
+    hasBankConnection: monoData.imports.length > 0,
+    hasReviewedStatement: documentProgress.reviewedStatements > 0,
+  });
+  const sourceState = {
+    algorithmVersion: calculation.algorithmVersion,
+    policyVersion: activePolicy?.row.version ?? null,
+    storedInputsUpdatedAt: storedInputsResult.updatedAt?.toISOString() ?? null,
+    preArrivalUpdatedAt: preArrivalProfileResult.updatedAt?.toISOString() ?? null,
+    postArrivalUpdatedAt: postArrivalProfileResult.updatedAt?.toISOString() ?? null,
+    bankEvidence: monoData.imports.map((item) => `${item.id}:${item.fetchedAt.toISOString()}`).sort(),
+    creditEvidenceAt: creditHistoryEvidence?.fetchedAt.toISOString() ?? null,
+    reviewedStatementEvidence: documentProgress.reviewedStatementEvidence,
+  };
+  const sourceFingerprint = {
+    ...sourceState,
+    result: {
+      score: calculation.cushScore ?? calculation.provisionalScore,
+      confidence: calculation.confidenceScore,
+      coverage: calculation.scoreCoveragePercent,
+      status: calculation.assessmentStatus,
+      maturityStatus,
+    },
+  };
+  const inputFingerprint = fingerprintAssessmentInputs(sourceFingerprint);
   return {
     calculation,
     monoImports: monoData.imports,
@@ -493,11 +646,79 @@ async function calculateV2AssessmentForUser(
     unscoredCurrencyCodes: profileInputs.unscoredCurrencyCodes,
     activePolicyVersion: activePolicy?.row.version ?? null,
     baselinePolicy,
+    sourceTypes,
+    maturityStatus,
+    inputFingerprint,
+    sourceState,
+    preArrivalProgress: getFinancialProfileProgress(preArrivalProfile),
+    postArrivalProgress: {
+      ...getFinancialProfileProgress(postArrivalProfile),
+      activated: postArrivalProfileResult.activated,
+    },
+    documentProgress,
   };
+}
+
+async function recordAssessmentSnapshot(userId: number, result: CalculatedV2Assessment) {
+  const [previous] = await db.select({
+    score: cushPassportAssessmentHistory.score,
+    confidence: cushPassportAssessmentHistory.confidence,
+    sourceState: cushPassportAssessmentHistory.sourceState,
+  }).from(cushPassportAssessmentHistory)
+    .where(eq(cushPassportAssessmentHistory.userId, userId))
+    .orderBy(desc(cushPassportAssessmentHistory.createdAt), desc(cushPassportAssessmentHistory.id))
+    .limit(1);
+  const score = result.calculation.cushScore ?? result.calculation.provisionalScore;
+  const changedInformation = getChangedInformation(previous?.sourceState, result.sourceState);
+  await db.insert(cushPassportAssessmentHistory).values({
+    userId,
+    inputFingerprint: result.inputFingerprint,
+    sourceState: result.sourceState,
+    algorithmVersion: result.calculation.algorithmVersion,
+    policyVersion: result.activePolicyVersion,
+    previousScore: previous?.score ?? null,
+    score,
+    previousConfidence: previous?.confidence ?? null,
+    confidence: result.calculation.confidenceScore,
+    scoreCoveragePercent: result.calculation.scoreCoveragePercent,
+    assessmentStatus: result.calculation.assessmentStatus,
+    maturityStatus: result.maturityStatus,
+    sourceTypes: result.sourceTypes,
+    changedInformation,
+    changeSummary: describeAssessmentChange(previous, score, result.calculation.confidenceScore),
+  }).onConflictDoNothing({
+    target: [cushPassportAssessmentHistory.userId, cushPassportAssessmentHistory.inputFingerprint],
+  });
 }
 
 export async function getV2Assessment(userId: number, now = new Date()): Promise<V2AssessmentView> {
   const result = await calculateV2AssessmentForUser(userId, now);
+  let historyReady = true;
+  let history: V2AssessmentView["progression"]["history"] = [];
+  try {
+    await recordAssessmentSnapshot(userId, result);
+    const rows = await db.select().from(cushPassportAssessmentHistory)
+      .where(eq(cushPassportAssessmentHistory.userId, userId))
+      .orderBy(desc(cushPassportAssessmentHistory.createdAt), desc(cushPassportAssessmentHistory.id))
+      .limit(12);
+    history = rows.map((row) => ({
+      id: row.id,
+      previousScore: row.previousScore,
+      score: row.score,
+      previousConfidence: row.previousConfidence,
+      confidence: row.confidence,
+      scoreCoveragePercent: row.scoreCoveragePercent,
+      assessmentStatus: row.assessmentStatus,
+      maturityStatus: row.maturityStatus,
+      sourceTypes: row.sourceTypes,
+      changedInformation: row.changedInformation,
+      changeSummary: row.changeSummary,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  } catch (error) {
+    if (!isV2SchemaMissing(error)) throw error;
+    historyReady = false;
+  }
   return {
     calculation: toCustomerCalculation(result.calculation),
     monoImports: result.monoImports.map(({ linkedAccountId, fetchedAt, statementPeriodMonths, evidence }) => ({
@@ -511,6 +732,16 @@ export async function getV2Assessment(userId: number, now = new Date()): Promise
     schemaReady: true,
     monoDataReady: result.monoDataReady,
     unscoredCurrencyCodes: result.unscoredCurrencyCodes,
+    progression: {
+      maturityStatus: result.maturityStatus,
+      sourceTypes: result.sourceTypes,
+      preArrival: result.preArrivalProgress,
+      postArrival: result.postArrivalProgress,
+      documents: result.documentProgress,
+      nextActions: result.calculation.missingRequirements.slice(0, 4),
+      historyReady,
+      history,
+    },
   };
 }
 

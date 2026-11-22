@@ -60,10 +60,11 @@ describe("PassportJourneyDashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
 
     expect(onModeChange).toHaveBeenCalledWith("post_arrival");
+    expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByText("1 outstanding item")).toBeTruthy();
   });
 
-  it("clearly marks Post-arrival as selected and updates the stage heading", () => {
+  it("opens the Post-arrival information flow and updates the stage heading", () => {
     const onModeChange = vi.fn();
     const props = {
       passport,
@@ -89,6 +90,7 @@ describe("PassportJourneyDashboard", () => {
     expect(selectedTab.getAttribute("aria-selected")).toBe("true");
     expect(selectedTab.className).toContain("bg-teal-700");
     expect(screen.getByText("Build your new financial history")).toBeTruthy();
+    expect(screen.getByTestId("post-arrival-information")).toBeTruthy();
   });
 
   it("retains an unsaved financial draft while changing drawer sections", () => {

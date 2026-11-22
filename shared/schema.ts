@@ -1678,6 +1678,53 @@ export const cushAssessmentInputs = pgTable("cush_assessment_inputs", {
   updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
 }).enableRLS();
 
+export const cushPassportAssessmentHistory = pgTable("cush_passport_assessment_history", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  inputFingerprint: text("input_fingerprint").notNull(),
+  sourceState: jsonb("source_state").$type<Record<string, unknown>>().notNull().default({}),
+  algorithmVersion: text("algorithm_version").notNull(),
+  policyVersion: integer("policy_version"),
+  previousScore: integer("previous_score"),
+  score: integer("score"),
+  previousConfidence: integer("previous_confidence"),
+  confidence: integer("confidence"),
+  scoreCoveragePercent: integer("score_coverage_percent").notNull(),
+  assessmentStatus: text("assessment_status").notNull(),
+  maturityStatus: text("maturity_status").notNull(),
+  sourceTypes: text("source_types").array().notNull().default(sql`ARRAY[]::text[]`),
+  changedInformation: text("changed_information").array().notNull().default(sql`ARRAY[]::text[]`),
+  changeSummary: text("change_summary").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+}, (table) => ({
+  fingerprintUnique: uniqueIndex("cush_passport_assessment_history_user_fingerprint_key")
+    .on(table.userId, table.inputFingerprint),
+  userCreatedIndex: index("cush_passport_assessment_history_user_created_idx")
+    .on(table.userId, table.createdAt),
+  scoreCheck: check(
+    "cush_passport_assessment_history_score_check",
+    sql`(${table.score} is null or ${table.score} between 0 and 1000) and
+      (${table.previousScore} is null or ${table.previousScore} between 0 and 1000)`,
+  ),
+  confidenceCheck: check(
+    "cush_passport_assessment_history_confidence_check",
+    sql`(${table.confidence} is null or ${table.confidence} between 1 and 100) and
+      (${table.previousConfidence} is null or ${table.previousConfidence} between 1 and 100)`,
+  ),
+  coverageCheck: check(
+    "cush_passport_assessment_history_coverage_check",
+    sql`${table.scoreCoveragePercent} between 0 and 100`,
+  ),
+  statusCheck: check(
+    "cush_passport_assessment_history_status_check",
+    sql`${table.assessmentStatus} in ('not_started', 'incomplete', 'provisional', 'complete')`,
+  ),
+  maturityCheck: check(
+    "cush_passport_assessment_history_maturity_check",
+    sql`${table.maturityStatus} in ('getting_started', 'provisional', 'evidence_supported', 'institution_supported')`,
+  ),
+})).enableRLS();
+
 export const monoLinkedAccounts = pgTable("mono_linked_accounts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),

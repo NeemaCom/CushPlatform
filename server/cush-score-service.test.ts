@@ -526,6 +526,18 @@ describe("Cush Score V2 engine", () => {
     expect(result.componentScores.availableFunds).not.toBeNull();
   });
 
+  it("raises Confidence for reviewed statement evidence without changing the financial Score", () => {
+    const bankConnected = calculateCushScore(completeInput({
+      sourceEvidenceShares: [{ sourceType: "bank_connection", share: 1 }],
+    }), policy);
+    const reviewedStatement = calculateCushScore(completeInput({
+      sourceEvidenceShares: [{ sourceType: "verified_statement", share: 1 }],
+    }), policy);
+
+    expect(reviewedStatement.cushScore).toBe(bankConnected.cushScore);
+    expect(reviewedStatement.confidenceScore).toBe(bankConnected.confidenceScore! - 10);
+  });
+
   it("keeps a thin-file result incomplete until a supported credit check is recorded", () => {
     const result = calculateCushScore(completeInput({
       credit: { classification: "thin_file", evidenceQuality: "self_reported", checkStatus: "not_done" },

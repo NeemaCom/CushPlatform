@@ -27,6 +27,29 @@ interface PassportData {
     shareToken: string | null;
     reasonCodes: string[] | null; lastUpdated: string | null; generatedAt: string | null;
   };
+  progression?: {
+    maturityStatus: "getting_started" | "provisional" | "evidence_supported" | "institution_supported";
+    sourceTypes: string[];
+    preArrival: { completed: number; total: number; percent: number };
+    postArrival: { completed: number; total: number; percent: number; activated: boolean };
+    documents: { submitted: number; approved: number };
+    nextActions: string[];
+    historyReady: boolean;
+    history: Array<{
+      id: number;
+      previousScore: number | null;
+      score: number | null;
+      previousConfidence: number | null;
+      confidence: number | null;
+      scoreCoveragePercent: number;
+      assessmentStatus: string;
+      maturityStatus: string;
+      sourceTypes: string[];
+      changedInformation: string[];
+      changeSummary: string;
+      createdAt: string;
+    }>;
+  };
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -366,6 +389,18 @@ export default function CreditPassport() {
   });
   const toggleModeMutation = useMutation({
     mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
+    onMutate: async (mode: string) => {
+      const key = ["/api/passport/me"];
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<PassportData>(key);
+      if (previous) {
+        qc.setQueryData<PassportData>(key, {
+          ...previous,
+          passport: { ...previous.passport, mode },
+        });
+      }
+      return { previous };
+    },
     onSuccess: (result: { passport: PassportData["passport"] }, mode) => {
       qc.setQueryData<PassportData>(["/api/passport/me"], (current) =>
         current
@@ -383,7 +418,10 @@ export default function CreditPassport() {
           : "border-indigo-300 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-700 text-white shadow-xl",
       });
     },
-    onError: (e: Error) => toast({ title: "Cannot switch mode", description: e.message, variant: "destructive" }),
+    onError: (e: Error, _mode, context) => {
+      if (context?.previous) qc.setQueryData(["/api/passport/me"], context.previous);
+      toast({ title: "Cannot switch mode", description: e.message, variant: "destructive" });
+    },
   });
   const generateTokenMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/passport/generate-token"),
@@ -461,6 +499,7 @@ export default function CreditPassport() {
       <main className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-7">
         <PassportJourneyDashboard
           passport={passport}
+          progression={data?.progression}
           scoreSummary={(
             <ScoreRing
               score={passport.score}

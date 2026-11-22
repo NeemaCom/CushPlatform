@@ -4,6 +4,7 @@ import {
   BadgeCheck,
   ChevronRight,
   FileText,
+  History,
   Link2,
   MapPin,
   Plane,
@@ -29,8 +30,33 @@ type PassportSummary = {
   lastUpdated: string | null;
 };
 
+type Progression = {
+  maturityStatus: "getting_started" | "provisional" | "evidence_supported" | "institution_supported";
+  sourceTypes: string[];
+  preArrival: { completed: number; total: number; percent: number };
+  postArrival: { completed: number; total: number; percent: number; activated: boolean };
+  documents: { submitted: number; approved: number };
+  nextActions: string[];
+  historyReady: boolean;
+  history: Array<{
+    id: number;
+    previousScore: number | null;
+    score: number | null;
+    previousConfidence: number | null;
+    confidence: number | null;
+    scoreCoveragePercent: number;
+    assessmentStatus: string;
+    maturityStatus: string;
+    sourceTypes: string[];
+    changedInformation: string[];
+    changeSummary: string;
+    createdAt: string;
+  }>;
+};
+
 type Props = {
   passport: PassportSummary;
+  progression?: Progression;
   scoreSummary: ReactNode;
   sharePanel: ReactNode;
   modePending: boolean;
@@ -56,8 +82,19 @@ const sectionCopy: Record<JourneySection, { title: string; shortTitle: string; d
   },
 };
 
+function evidenceSourceLabel(source: string, compact = false) {
+  const labels: Record<string, { full: string; short: string }> = {
+    self_declared: { full: "self-declared information", short: "self-declared" },
+    verified_statement: { full: "reviewed bank statement", short: "reviewed statement" },
+    bank_connected: { full: "connected bank data", short: "bank data" },
+    credit_history: { full: "credit history", short: "credit history" },
+  };
+  return labels[source]?.[compact ? "short" : "full"] ?? source.replace(/_/g, " ");
+}
+
 export default function PassportJourneyDashboard({
   passport,
+  progression,
   scoreSummary,
   sharePanel,
   modePending,
@@ -161,6 +198,14 @@ export default function PassportJourneyDashboard({
 
   const drawerTitle = section?.title ?? "Your financial identity";
 
+  function selectStage(mode: "pre_arrival" | "post_arrival") {
+    setVisited((current) => mode === "post_arrival"
+      ? { ...current, postArrival: true }
+      : { ...current, preDetails: true });
+    setActiveSection("information");
+    onModeChange(mode);
+  }
+
   return (
     <>
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
@@ -185,7 +230,7 @@ export default function PassportJourneyDashboard({
                       aria-selected={passport.mode === value}
                       aria-controls="passport-journey-options"
                       disabled={modePending || passport.mode === value}
-                      onClick={() => onModeChange(value)}
+                      onClick={() => selectStage(value as "pre_arrival" | "post_arrival")}
                       className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                         passport.mode === value
                           ? value === "post_arrival"
@@ -325,6 +370,106 @@ export default function PassportJourneyDashboard({
               No deadline. Your Pre-arrival and Post-arrival records stay distinct.
             </p>
           </section>
+
+          {progression && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Financial identity progress">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-700">Your journey</p>
+                  <h2 className="mt-1 text-sm font-bold text-slate-900">Financial identity progress</h2>
+                </div>
+                <span className="rounded-full border border-indigo-100 bg-indigo-50 px-2 py-1 text-[10px] font-semibold text-indigo-800">
+                  {{
+                    getting_started: "Getting started",
+                    provisional: "Provisional",
+                    evidence_supported: "Evidence-supported",
+                    institution_supported: "Institution-supported",
+                  }[progression.maturityStatus]}
+                </span>
+              </div>
+              {progression.sourceTypes.length > 0 && (
+                <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                  Current sources: {progression.sourceTypes.map((source) => evidenceSourceLabel(source)).join(" · ")}
+                </p>
+              )}
+              <ol className="mt-3 space-y-2.5">
+                <li className="flex items-start gap-2.5 text-xs">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-indigo-50 text-[10px] font-bold text-indigo-700">1</span>
+                  <span><strong className="text-slate-800">Pre-arrival</strong><span className="block text-slate-500">{progression.preArrival.completed}/{progression.preArrival.total} profile areas</span></span>
+                </li>
+                <li className="flex items-start gap-2.5 text-xs">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-violet-50 text-[10px] font-bold text-violet-700">2</span>
+                  <span><strong className="text-slate-800">Supporting evidence</strong><span className="block text-slate-500">{progression.documents.approved} reviewed · {progression.documents.submitted} submitted</span></span>
+                </li>
+                <li className="flex items-start gap-2.5 text-xs">
+                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-teal-50 text-[10px] font-bold text-teal-700">3</span>
+                  <span>
+                    <strong className="text-slate-800">Post-arrival</strong>
+                    <span className="block text-slate-500">
+                      {progression.postArrival.activated
+                        ? `${progression.postArrival.completed}/${progression.postArrival.total} profile areas`
+                        : "Ready when you confirm arrival"}
+                    </span>
+                  </span>
+                </li>
+              </ol>
+              <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] leading-5 text-slate-500">
+                Score reflects financial information, not milestone completion. Confidence is measured separately.
+              </p>
+              {progression.nextActions.length > 0 && (
+                <details className="mt-2 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-amber-900">Ways to strengthen your assessment</summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] text-amber-900">
+                    {progression.nextActions.slice(0, 3).map((action) => <li key={action}>{action}</li>)}
+                  </ul>
+                </details>
+              )}
+              <details className="mt-2 rounded-lg border border-slate-100 px-3 py-2">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-xs font-semibold text-slate-700">
+                  <History className="h-3.5 w-3.5" aria-hidden="true" />Assessment history
+                </summary>
+                {!progression.historyReady ? (
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">A database update is needed before the assessment timeline can be saved.</p>
+                ) : progression.history.length === 0 ? (
+                  <p className="mt-2 text-[11px] leading-5 text-slate-500">Your first saved assessment will appear here.</p>
+                ) : (
+                  <ol className="mt-2 space-y-3">
+                    {progression.history.slice(0, 5).map((item) => (
+                      <li key={item.id} className="border-l-2 border-indigo-100 pl-3">
+                        <div className="flex items-center justify-between gap-2 text-[11px]">
+                          <strong className="text-slate-800">
+                            {item.score === null
+                              ? "Score pending"
+                              : `Score ${item.score}/1,000${item.previousScore === null ? "" : ` · from ${item.previousScore}`}`}
+                          </strong>
+                          <time className="shrink-0 text-slate-400" dateTime={item.createdAt}>
+                            {new Date(item.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          </time>
+                        </div>
+                        <p className="mt-1 text-[10px] text-slate-500">
+                          {item.confidence === null
+                            ? "Confidence pending"
+                            : `Confidence ${item.confidence}/100${item.previousConfidence === null ? "" : ` · from ${item.previousConfidence}`}`}
+                          {" · "}{item.scoreCoveragePercent}% score coverage
+                        </p>
+                        {item.sourceTypes.length > 0 && (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Sources: {item.sourceTypes.map((source) => evidenceSourceLabel(source, true)).join(" · ")}
+                          </p>
+                        )}
+                        {item.changedInformation.length > 0 && (
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            Updated: {item.changedInformation.join(" · ")}
+                          </p>
+                        )}
+                        <p className="mt-1 text-[11px] leading-5 text-slate-600">{item.changeSummary}</p>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </details>
+            </section>
+          )}
 
           <CushVerifyConsentInbox />
           {sharePanel}

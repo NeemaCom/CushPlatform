@@ -84,6 +84,7 @@ export function registerPassportRoutes(app: Express) {
         const assessment = await getV2Assessment(userId);
         return res.json({
           passport: sanitizePassportForCustomer(applyV2Calculation(storedPassport, assessment.calculation)),
+          progression: assessment.progression,
           evidence,
           v2SchemaReady: true,
         });
