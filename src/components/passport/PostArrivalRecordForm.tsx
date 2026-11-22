@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { PostArrivalRecordInput } from "@shared/schema";
 import CurrencyCodeField, { type CurrencyOption } from "./CurrencyCodeField";
+import CountrySelectField from "./CountrySelectField";
 
 type RecordType = PostArrivalRecordInput["recordType"];
 type SavedRecord = {
@@ -222,11 +223,15 @@ export default function PostArrivalRecordForm({ initialRecord, isSaving, onSubmi
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-sm font-medium text-slate-700">
-          Country code
-          <input className={inputClass} maxLength={2} value={countryCode} onChange={(event) => setCountryCode(event.target.value.toUpperCase())} placeholder="GB" />
-          <span className="mt-1 block text-xs font-normal text-slate-500">Two-letter code, such as GB or NG.</span>
-        </label>
+        <CountrySelectField
+          id="post-arrival-record-country"
+          label="Country"
+          value={countryCode}
+          onChange={setCountryCode}
+          required
+          className="block text-sm font-medium text-slate-700"
+          selectClassName={selectClass}
+        />
         <CurrencyCodeField
           id="post-arrival-record-currency"
           label="Currency"

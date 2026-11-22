@@ -6,6 +6,7 @@ import { accountRequest } from "@/lib/account-api";
 import { API_BASE_URL } from "@/lib/api-base";
 import { getProductSessionHeaders } from "@/lib/product-session";
 import CurrencyCodeField, { type CurrencyOption } from "./CurrencyCodeField";
+import CountrySelectField from "./CountrySelectField";
 import { extractPassportDocumentFinancialFacts } from "@shared/passport-document-facts";
 
 type FinancialProfile = {
@@ -746,10 +747,14 @@ export default function PassportEvidenceIntake({
                     </span>
                   </summary>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <label className="space-y-1 text-xs font-medium text-slate-700">
-                      Country code
-                      <input required maxLength={2} pattern="[A-Z]{2}" value={profile.countryCode} onChange={(event) => setProfile({ ...profile, countryCode: event.target.value.toUpperCase() })} placeholder="GB" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase" />
-                    </label>
+                    <CountrySelectField
+                      id={`passport-profile-country-${period}`}
+                      label="Country"
+                      value={profile.countryCode}
+                      onChange={(countryCode) => setProfile({ ...profile, countryCode })}
+                      required
+                      selectClassName="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+                    />
                     <CurrencyCodeField
                       id={`passport-profile-currency-${period}`}
                       label="Currency code"
@@ -901,7 +906,16 @@ export default function PassportEvidenceIntake({
                         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                            <label className="space-y-1 text-xs font-medium text-slate-700">Month<input type="month" min={period === "post_arrival" ? profileQuery.data?.arrivalDate?.slice(0, 7) : undefined} value={entry.month} onChange={(event) => updateHistoryEntry(entry.id, { month: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
                           <label className="space-y-1 text-xs font-medium text-slate-700">Source label<input maxLength={100} value={entry.label} onChange={(event) => updateHistoryEntry(entry.id, { label: event.target.value })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm" /></label>
-                           <label className="space-y-1 text-xs font-medium text-slate-700">Country code<input required maxLength={2} pattern="[A-Z]{2}" value={entry.countryCode} onChange={(event) => updateHistoryEntry(entry.id, { countryCode: event.target.value.toUpperCase() })} className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm uppercase" /></label>
+                            <CountrySelectField
+                              id={`passport-history-country-${period}-${entry.id}`}
+                              label="Country"
+                              value={entry.countryCode}
+                              onChange={(countryCode) => updateHistoryEntry(entry.id, { countryCode })}
+                              required
+                              className="block text-xs font-medium text-slate-700"
+                              selectClassName="mt-1 block min-h-9 w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-800"
+                              hint=""
+                            />
                            <CurrencyCodeField
                              id={`passport-history-currency-${period}-${entry.id}`}
                              label="Currency"
@@ -1018,18 +1032,15 @@ export default function PassportEvidenceIntake({
               <input maxLength={120} value={documentLabel} onChange={(event) => setDocumentLabel(event.target.value)} placeholder="e.g. October payslip" className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm" />
             </label>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="block space-y-1 text-xs font-medium text-slate-700">
-                Country code
-                <input
-                  required
-                  maxLength={2}
-                  pattern="[A-Z]{2}"
-                  value={documentCountryCode}
-                  onChange={(event) => setDocumentCountryCode(event.target.value.toUpperCase())}
-                  placeholder="GB"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm uppercase"
-                />
-              </label>
+              <CountrySelectField
+                id={`passport-document-country-${period}`}
+                label="Country"
+                value={documentCountryCode}
+                onChange={setDocumentCountryCode}
+                required
+                className="block space-y-1 text-xs font-medium text-slate-700"
+                selectClassName="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm"
+              />
               <CurrencyCodeField
                 id={`passport-document-currency-${period}`}
                 label="Document currency"
