@@ -120,37 +120,37 @@ export default function V2AssessmentPanel() {
     },
   });
 
-  if (assessmentQuery.isLoading) {
-    return <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">Loading V2 assessment…</div>;
-  }
-
-  if (assessmentQuery.isError) {
-    const error = assessmentQuery.error as ApiError;
-    return (
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5" role="status">
-        <div className="flex gap-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-          <div>
-            <h3 className="font-semibold text-amber-950">
-              {error.code === "V2_SCHEMA_MISSING" ? "Database setup required" : "Assessment unavailable"}
-            </h3>
-            <p className="mt-1 text-sm text-amber-900">{error.message}</p>
-            {error.code === "V2_SCHEMA_MISSING" && (
-              <p className="mt-2 text-xs text-amber-800">Run the new manual migration in the intended Supabase project, then reload this panel.</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const view = assessmentQuery.data!;
+  const view = assessmentQuery.data;
 
   return (
     <div className="space-y-4">
-      {(view.unscoredCurrencyCodes?.length ?? 0) > 0 && (
+      {assessmentQuery.isLoading && (
+        <p className="rounded-lg border border-slate-200 bg-white p-3 text-xs text-slate-500" role="status">
+          Loading assessment summary…
+        </p>
+      )}
+      {assessmentQuery.isError && (() => {
+        const error = assessmentQuery.error as ApiError;
+        return (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3" role="status">
+            <div className="flex gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <div>
+                <h3 className="text-xs font-semibold text-amber-950">
+                  {error.code === "V2_SCHEMA_MISSING" ? "Assessment summary unavailable" : "Could not load assessment summary"}
+                </h3>
+                <p className="mt-1 text-xs text-amber-900">{error.message}</p>
+                {error.code === "V2_SCHEMA_MISSING" && (
+                  <p className="mt-1 text-[11px] text-amber-800">Bank and credit options remain available below.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      {(view?.unscoredCurrencyCodes?.length ?? 0) > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900" role="status">
-          Your {view.unscoredCurrencyCodes!.join(", ")} entries are saved in their original currencies but are not included in the GBP-based Score until a dated approved conversion rate is available.
+          Your {view!.unscoredCurrencyCodes!.join(", ")} entries are saved in their original currencies but are not included in the GBP-based Score until a dated approved conversion rate is available.
         </div>
       )}
       <MonoBankDataPanel />
@@ -283,10 +283,10 @@ export default function V2AssessmentPanel() {
         )}
       </AssessmentStep>
 
-      {view.monoImports.length > 0 && (
+      {(view?.monoImports.length ?? 0) > 0 && (
         <Card title="Bank statements included">
           <div className="space-y-2">
-            {view.monoImports.map((item) => (
+            {view!.monoImports.map((item) => (
               <div key={item.linkedAccountId} className="rounded-lg border border-slate-100 p-3 text-xs">
                 <p className="font-semibold text-slate-800">Connected account</p>
                 <p className="mt-1 text-slate-600">
@@ -305,7 +305,7 @@ export default function V2AssessmentPanel() {
           </p>
         </Card>
       )}
-      {!view.monoDataReady && (
+      {view && !view.monoDataReady && (
         <div role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           Bank statement data is not available to your assessment yet. Connect a bank and review a statement above.
         </div>

@@ -63,6 +63,34 @@ describe("PassportJourneyDashboard", () => {
     expect(screen.getByText("1 outstanding item")).toBeTruthy();
   });
 
+  it("clearly marks Post-arrival as selected and updates the stage heading", () => {
+    const onModeChange = vi.fn();
+    const props = {
+      passport,
+      scoreSummary: <div>Score summary</div>,
+      sharePanel: <div>Share panel</div>,
+      modePending: false,
+      monoCodePending: false,
+      onModeChange,
+    };
+    const { rerender } = render(<PassportJourneyDashboard {...props} />);
+
+    fireEvent.click(screen.getByRole("tab", { name: "Post-arrival" }));
+    expect(onModeChange).toHaveBeenCalledWith("post_arrival");
+
+    rerender(
+      <PassportJourneyDashboard
+        {...props}
+        passport={{ ...passport, mode: "post_arrival" }}
+      />,
+    );
+
+    const selectedTab = screen.getByRole("tab", { name: /Post-arrival/ });
+    expect(selectedTab.getAttribute("aria-selected")).toBe("true");
+    expect(selectedTab.className).toContain("bg-teal-700");
+    expect(screen.getByText("Build your new financial history")).toBeTruthy();
+  });
+
   it("retains an unsaved financial draft while changing drawer sections", () => {
     renderDashboard();
 

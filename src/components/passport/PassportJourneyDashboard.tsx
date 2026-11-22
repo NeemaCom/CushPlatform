@@ -188,12 +188,15 @@ export default function PassportJourneyDashboard({
                       onClick={() => onModeChange(value)}
                       className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition ${
                         passport.mode === value
-                          ? "bg-white text-indigo-800 shadow-sm"
-                          : "text-slate-600 hover:text-slate-900"
+                          ? value === "post_arrival"
+                            ? "bg-teal-700 text-white shadow-md ring-1 ring-teal-800"
+                            : "bg-indigo-700 text-white shadow-md ring-1 ring-indigo-800"
+                          : "bg-white/70 text-slate-600 hover:bg-white hover:text-slate-900"
                       } disabled:cursor-default`}
                     >
                       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                       {label}
+                      {passport.mode === value && <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">Selected</span>}
                     </button>
                   ))}
                 </div>

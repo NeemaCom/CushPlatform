@@ -366,8 +366,12 @@ export default function CreditPassport() {
   });
   const toggleModeMutation = useMutation({
     mutationFn: (mode: string) => apiRequest("PUT", "/api/passport/mode", { mode }),
-    onSuccess: (_data, mode) => {
-      qc.invalidateQueries({ queryKey: ["/api/passport/me"] });
+    onSuccess: (result: { passport: PassportData["passport"] }, mode) => {
+      qc.setQueryData<PassportData>(["/api/passport/me"], (current) =>
+        current
+          ? { ...current, passport: { ...current.passport, ...result.passport } }
+          : current,
+      );
       const isPostArrival = mode === "post_arrival";
       toast({
         title: isPostArrival ? "Post-Arrival selected" : "Pre-Arrival selected",
