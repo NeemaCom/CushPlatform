@@ -47,6 +47,7 @@ import {
   fingerprintAssessmentInputs,
   getAssessmentMaturity,
 } from "./passport-assessment-history";
+import { mergePassportScoreInputs } from "./passport-score-input-merge";
 import {
   decryptEvidenceJson,
   EvidenceEncryptionUnavailableError,
@@ -546,27 +547,7 @@ async function calculateV2AssessmentForUser(
     buildProfileScoreInputs(preArrivalProfile, now.toISOString().slice(0, 7)),
     buildProfileScoreInputs(postArrivalProfile, now.toISOString().slice(0, 7)),
   ]);
-  const availableFundsByKey = new Map<string, (typeof preArrivalInputs.availableFunds)[number]>();
-  for (const fund of [...preArrivalInputs.availableFunds, ...postArrivalInputs.availableFunds]) {
-    availableFundsByKey.set(fund.deduplicationKey.toLowerCase(), fund);
-  }
-  const incomeBySourceMonth = new Map<string, (typeof preArrivalInputs.incomeHistory)[number]>();
-  for (const income of [...preArrivalInputs.incomeHistory, ...postArrivalInputs.incomeHistory]) {
-    incomeBySourceMonth.set(`${income.sourceId}:${income.month}`, income);
-  }
-  const cashFlowByMonth = new Map<string, (typeof preArrivalInputs.cashFlowHistory)[number]>();
-  for (const row of [...preArrivalInputs.cashFlowHistory, ...postArrivalInputs.cashFlowHistory]) {
-    cashFlowByMonth.set(row.month, row);
-  }
-  const profileInputs = {
-    availableFunds: [...availableFundsByKey.values()],
-    incomeHistory: [...incomeBySourceMonth.values()],
-    cashFlowHistory: [...cashFlowByMonth.values()],
-    unscoredCurrencyCodes: [...new Set([
-      ...preArrivalInputs.unscoredCurrencyCodes,
-      ...postArrivalInputs.unscoredCurrencyCodes,
-    ])].sort(),
-  };
+  const profileInputs = mergePassportScoreInputs(preArrivalInputs, postArrivalInputs);
   const inputs = mergeManualProfileInputs(storedInputs, profileInputs);
   const baselinePolicy = selectVersionedDestinationBaseline(
     activePolicy?.configuration ?? null,

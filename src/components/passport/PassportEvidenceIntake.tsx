@@ -6,6 +6,7 @@ import { accountRequest } from "@/lib/account-api";
 import { API_BASE_URL } from "@/lib/api-base";
 import { getProductSessionHeaders } from "@/lib/product-session";
 import CurrencyCodeField, { type CurrencyOption } from "./CurrencyCodeField";
+import { extractPassportDocumentFinancialFacts } from "@shared/passport-document-facts";
 
 type FinancialProfile = {
   countryCode: string;
@@ -189,10 +190,12 @@ export default function PassportEvidenceIntake({
   period = "pre_arrival",
   view = "all",
   onSaved,
+  onApplyExtractedFacts,
 }: {
   period?: "pre_arrival" | "post_arrival";
   view?: "all" | "profile" | "documents";
   onSaved?: () => void;
+  onApplyExtractedFacts?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -205,6 +208,7 @@ export default function PassportEvidenceIntake({
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [correctedDraft, setCorrectedDraft] = useState("");
   const [correctedCurrencyCode, setCorrectedCurrencyCode] = useState("GBP");
+  const [candidateMonths, setCandidateMonths] = useState<Record<string, string>>({});
   const employmentStatusIsCustom = profile.employmentStatus !== "" && !EMPLOYMENT_STATUS_OPTIONS.includes(profile.employmentStatus);
   const housingStatusIsCustom = profile.housingStatus !== "" && !HOUSING_STATUS_OPTIONS.includes(profile.housingStatus);
 
@@ -247,6 +251,7 @@ export default function PassportEvidenceIntake({
   useEffect(() => {
     if (detailQuery.data) {
       setCorrectedDraft(detailQuery.data.correctedDraft ?? detailQuery.data.extractedDraft);
+      setCandidateMonths({});
       setCorrectedCurrencyCode(
         detailQuery.data.currencyDetection.suggestedCurrencyCode ??
         detailQuery.data.submission.currencyCode,
@@ -267,7 +272,7 @@ export default function PassportEvidenceIntake({
     mutationFn: () => profileRequest("PUT", `/api/passport/financial-profile?period=${period}`, profile),
     onSuccess: () => {
       invalidateIntake();
-      toast({ title: "Financial profile saved", description: "Self-declared amounts can contribute to your provisional assessment. Uploaded documents remain separate and are not treated as verified." });
+      toast({ title: "Financial profile saved", description: "Your confirmed financial details can contribute to your provisional assessment. Uploaded files remain separate; their review status affects Confidence, not Score by itself." });
       onSaved?.();
     },
     onError: (error: Error) => toast({ title: "Could not save profile", description: error.message, variant: "destructive" }),
@@ -348,7 +353,70 @@ export default function PassportEvidenceIntake({
     () => documentsQuery.data?.submissions.find((item) => item.id === selectedId) ?? detailQuery.data?.submission,
     [documentsQuery.data?.submissions, detailQuery.data?.submission, selectedId],
   );
+  const extractedFacts = useMemo(() => {
+    const submission = detailQuery.data?.submission;
+    if (!submission) return [];
+    return extractPassportDocumentFinancialFacts(
+      correctedDraft,
+      submission.documentType,
+      submission.mimeType,
+    );
+  }, [correctedDraft, detailQuery.data?.submission]);
   const canEditDraft = selected && ["draft", "additional_information_required"].includes(selected.reviewStatus);
+
+  function addExtractedFactsToProfile() {
+    const submission = detailQuery.data?.submission;
+    if (!submission || extractedFacts.length === 0) return;
+    const additions: FinancialHistoryEntry[] = [];
+    const existingKeys = new Set(profile.financialHistory.map((entry) =>
+      `${entry.month}:${entry.countryCode}:${entry.currencyCode}:${entry.label.toLowerCase()}`,
+    ));
+    for (const fact of extractedFacts) {
+      const month = fact.month ?? candidateMonths[fact.id] ?? "";
+      if (!month) {
+        toast({ title: "Choose the statement month", description: "Confirm the period for each extracted amount before adding it to your financial profile.", variant: "destructive" });
+        return;
+      }
+      const label = `${submission.label}: ${fact.label}`.slice(0, 100);
+      const key = `${month}:${submission.countryCode}:${correctedCurrencyCode}:${label.toLowerCase()}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      additions.push({
+        id: crypto.randomUUID(),
+        month,
+        label,
+        countryCode: submission.countryCode,
+        currencyCode: correctedCurrencyCode,
+        incomeAmount: fact.incomeAmount,
+        incomeFrequency: fact.incomeFrequency,
+        incomeCategory: fact.incomeCategory,
+        recurring: fact.recurring,
+        variable: fact.variable,
+        savingsAmount: fact.savingsAmount,
+        savingsLabel: fact.savingsAmount ? fact.label : "",
+        expensesAmount: fact.expensesAmount,
+        completeCashFlow: false,
+      });
+    }
+    if (profile.financialHistory.length + additions.length > 72) {
+      toast({ title: "History limit reached", description: "Remove an older monthly row before adding these details.", variant: "destructive" });
+      return;
+    }
+    if (additions.length === 0) {
+      toast({ title: "These figures are already in your profile" });
+      return;
+    }
+    setProfile((current) => ({
+      ...current,
+      financialHistory: [...current.financialHistory, ...additions],
+    }));
+    setSelectedId(null);
+    onApplyExtractedFacts?.();
+    toast({
+      title: "Review the extracted details",
+      description: "Check the amounts and currency, then save your financial profile to include them in your assessment.",
+    });
+  }
 
   function addHistoryEntry() {
     if (profile.financialHistory.length >= 72) {
@@ -430,8 +498,8 @@ export default function PassportEvidenceIntake({
             </h2>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
               {period === "post_arrival"
-                ? "Add your own financial details from your confirmed arrival month onward. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed."
-                : "Add your own financial details alongside connected data. Self-declared amounts may affect the provisional Score and Confidence as self-reported; they are never marked verified. Uploaded documents stay separate until reviewed."}
+                ? "Add your own financial details from your confirmed arrival month onward. Self-declared amounts can affect provisional Score and Confidence as self-reported. You can review extracted document figures and add them to your profile before they are scored."
+                : "Add your own financial details alongside connected data. Self-declared amounts can affect provisional Score and Confidence as self-reported. You can review extracted document figures and add them to your profile before they are scored."}
             </p>
           </div>
         </div>
@@ -824,6 +892,55 @@ export default function PassportEvidenceIntake({
                           className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-xs leading-5 read-only:bg-slate-50"
                         />
                       </label>
+                      {extractedFacts.length > 0 ? (
+                        <section className="mt-3 rounded-lg border border-indigo-200 bg-indigo-50/70 p-3" aria-label="Extracted financial details">
+                          <h4 className="text-xs font-semibold text-indigo-950">Financial details found to review</h4>
+                          <p className="mt-1 text-[11px] leading-5 text-indigo-900">
+                            These are suggestions, not verified facts. Check that the amounts are not already included in a connected account or another saved row, then add and save them before they can affect Score.
+                          </p>
+                          <ul className="mt-2 space-y-2">
+                            {extractedFacts.map((fact) => (
+                              <li key={fact.id} className="rounded-md border border-indigo-100 bg-white/80 p-2 text-xs text-slate-700">
+                                <div className="font-medium">{fact.label}</div>
+                                <div className="mt-1 text-slate-600">
+                                  {[
+                                    fact.incomeAmount ? `Income ${correctedCurrencyCode} ${fact.incomeAmount}` : "",
+                                    fact.savingsAmount ? `Savings ${correctedCurrencyCode} ${fact.savingsAmount}` : "",
+                                    fact.expensesAmount ? `Expenses ${correctedCurrencyCode} ${fact.expensesAmount}` : "",
+                                  ].filter(Boolean).join(" · ")}
+                                </div>
+                                {fact.month ? (
+                                  <div className="mt-1 text-[11px] text-slate-500">Period: {fact.month}</div>
+                                ) : (
+                                  <label className="mt-2 block text-[11px] font-medium text-slate-600">
+                                    Confirm the statement month
+                                    <input
+                                      type="month"
+                                      value={candidateMonths[fact.id] ?? ""}
+                                      onChange={(event) => setCandidateMonths((current) => ({
+                                        ...current,
+                                        [fact.id]: event.target.value,
+                                      }))}
+                                      className="mt-1 block rounded-md border border-slate-300 bg-white px-2 py-1.5 text-xs"
+                                    />
+                                  </label>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                          <button
+                            type="button"
+                            onClick={addExtractedFactsToProfile}
+                            className="mt-3 rounded-lg bg-indigo-700 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-800"
+                          >
+                            Add to financial details
+                          </button>
+                        </section>
+                      ) : correctedDraft.trim() ? (
+                        <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-5 text-slate-600">
+                          No clear score-related figures were found. You can enter amounts in your financial profile; ambiguous or unsupported text is never scored automatically.
+                        </p>
+                      ) : null}
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button type="button" disabled={!canEditDraft || saveCorrection.isPending} onClick={() => saveCorrection.mutate()} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:opacity-50">
                           {saveCorrection.isPending ? "Saving…" : "Save corrections"}
@@ -866,7 +983,7 @@ export default function PassportEvidenceIntake({
         </section>
       </div>
       <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
-        Self-declared income, savings, and complete monthly cash flow may affect provisional Score components. Confidence source credit follows the active policy; the new 5-point self-declared rule applies after an administrator activates it. Declarations do not satisfy final-score verification requirements. Uploaded documents do not affect Score automatically, and extraction never implies independent verification.
+        Self-declared income, savings, and complete monthly cash flow may affect provisional Score components. Financial figures extracted from a document affect Score only after you add and save them in your profile. Document approval or classification can affect Confidence, but does not award Score points by itself. The new 5-point self-declared Confidence rule applies after an administrator activates it.
       </p>
       </>
       )}

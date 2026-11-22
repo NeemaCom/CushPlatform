@@ -117,8 +117,10 @@ function recordSummary(record: SavedRecord) {
 
 export default function PostArrivalPanel({
   view = "all",
+  onApplyExtractedFacts,
 }: {
   view?: "all" | "information" | "documents" | "connections";
+  onApplyExtractedFacts?: () => void;
 }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -575,6 +577,9 @@ export default function PostArrivalPanel({
                   Arrival confirmation and contact-profile completion do not add score points. The financial profile below can affect provisional Score components as self-reported data; none of it is treated as verified evidence.
                 </p>
                 <p className="mt-2 text-xs leading-5 text-slate-600">
+                  Review extracted document amounts and save them in your financial profile before they affect Score. Document review or approval alone does not award Score points.
+                </p>
+                <p className="mt-2 text-xs leading-5 text-slate-600">
                   Amounts keep their original date, country and currency. GBP is scored directly; USD and NGN use the existing CBN rate for the relevant month. Other currencies remain saved but unscored until an approved rate is available.
                 </p>
               </div>
@@ -588,6 +593,7 @@ export default function PostArrivalPanel({
         <PassportEvidenceIntake
           period="post_arrival"
           view={view === "documents" ? "documents" : view === "information" ? "profile" : "all"}
+          onApplyExtractedFacts={onApplyExtractedFacts}
         />
       </div>
 

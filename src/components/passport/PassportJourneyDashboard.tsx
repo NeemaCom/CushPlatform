@@ -526,6 +526,7 @@ export default function PassportJourneyDashboard({
                   period="pre_arrival"
                   view={activeSection === "documents" ? "documents" : "profile"}
                   onSaved={activeSection === "information" ? () => setActiveSection("documents") : undefined}
+                  onApplyExtractedFacts={() => setActiveSection("information")}
                 />
               </div>
             )}
@@ -541,7 +542,10 @@ export default function PassportJourneyDashboard({
             )}
             {visited.postArrival && (
               <div hidden={!isPostArrival}>
-                <PostArrivalPanel view={postArrivalView} />
+                <PostArrivalPanel
+                  view={postArrivalView}
+                  onApplyExtractedFacts={() => setActiveSection("information")}
+                />
               </div>
             )}
             {!activeSection && <span className="sr-only">Choose a dashboard section to begin.</span>}
