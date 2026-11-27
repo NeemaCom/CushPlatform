@@ -310,7 +310,9 @@ export default function PassportJourneyDashboard({
                   />
                 </div>
                 <p className="mt-1.5 text-[11px] leading-5 text-slate-500">
-                  Missing information is excluded, not counted as zero.
+                  {isPostArrival
+                    ? "Your current Score stays visible while you add Post-Arrival information. Saved financial-profile details are included in the next assessment."
+                    : "Missing information is excluded, not counted as zero."}
                 </p>
                 {passport.missingRequirements.length > 0 && (
                   <details className="mt-3 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2">

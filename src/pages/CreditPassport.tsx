@@ -6,6 +6,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import AccountDropdown from "@/components/AccountDropdown";
 import { logoutFromCush } from "@/lib/logout";
+import { updateCachedPassportMode } from "@/lib/passport-mode-cache";
 import { motion, AnimatePresence, animate as fmAnimate } from "framer-motion";
 import PassportJourneyDashboard from "@/components/passport/PassportJourneyDashboard";
 import { ADMIN_PERMISSION, hasAdminPermission } from "@shared/admin-permissions";
@@ -415,7 +416,7 @@ export default function CreditPassport() {
     onSuccess: (result: { passport: PassportData["passport"] }, mode) => {
       qc.setQueryData<PassportData>(["/api/passport/me"], (current) =>
         current
-          ? { ...current, passport: { ...current.passport, ...result.passport } }
+          ? updateCachedPassportMode(current, result.passport.mode)
           : current,
       );
       const isPostArrival = mode === "post_arrival";
