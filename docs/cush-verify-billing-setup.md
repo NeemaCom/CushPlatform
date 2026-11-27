@@ -22,13 +22,13 @@ The Replit Stripe connection is for workspace tooling; it does not provide crede
 
 ## 3. Create the Stripe catalog mappings
 
-Run the setup script in a trusted environment with `CUSH_VERIFY_DATABASE_URL` pointing to the **isolated staging Cush Verify database** and `STRIPE_SECRET_KEY` set to a Stripe **test** key. Also set `CUSH_VERIFY_DEPLOYMENT_ENV=staging`. Never point a test key at the production database. If the staging service runs with `NODE_ENV=production`, set `CUSH_VERIFY_ALLOW_TEST_MODE_IN_PRODUCTION=true` on that staging service only.
+Run the setup script in a trusted environment with `CUSH_VERIFY_DATABASE_URL` pointing to the **isolated staging Cush Verify database** and `STRIPE_SECRET_KEY` set to a Stripe **test** key. Also set `CUSH_VERIFY_DEPLOYMENT_ENV=staging`. Never point a test key at the production database or reuse the Passport `DATABASE_URL`. If the staging service runs with `NODE_ENV=production`, set `CUSH_VERIFY_ALLOW_TEST_MODE_IN_PRODUCTION=true` on that staging service only.
 
 ```sh
 npx tsx scripts/setup-cush-verify-stripe-prices.ts
 ```
 
-It connects directly to `CUSH_VERIFY_DATABASE_URL` (not the general Passport `DATABASE_URL`), creates or reuses one Stripe product per self-service plan and monthly/annual recurring prices, then stores the exact price IDs and catalog terms in that Verify database. It skips contact-sales and sandbox-only plans. The script does not charge a customer. It requires the deployment marker to match the Stripe key mode and rejects changed terms in an already-published version; publish a new pricing version before changing prices.
+It connects directly to `CUSH_VERIFY_DATABASE_URL` (not the general Passport `DATABASE_URL`), verifies the database TLS certificate, creates or reuses one Stripe product per self-service plan and monthly/annual recurring prices, then stores the exact price IDs and catalog terms in that Verify database. It skips contact-sales and sandbox-only plans. The script does not charge a customer. It requires the deployment marker to match the Stripe key mode and rejects changed terms in an already-published version; publish a new pricing version before changing prices.
 
 Test the script and checkout in Stripe test mode first. Creating live products and prices requires `CUSH_VERIFY_DEPLOYMENT_ENV=production`, both the `--confirm-live` flag and `CONFIRM_LIVE_STRIPE_PRICE_SETUP=YES`; do not use those until production pricing is approved. Production `main` accepts only a live Stripe key.
 
